@@ -1,0 +1,6 @@
+dist
+node_modules
+.env
+.venv
+client_secret_*.json
+__pycache__
