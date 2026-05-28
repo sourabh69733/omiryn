@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StructuredDatingProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "relationship_intent",
+    "values",
+    "lifestyle",
+    "communication_style",
+    "family_expectations",
+    "dealbreakers",
+    "soft_preferences",
+    "green_flags",
+    "red_flags",
+    "confidence"
+  ],
+  "properties": {
+    "relationship_intent": {
+      "type": "string",
+      "enum": ["long_term", "marriage", "exploring", "casual", "unsure", "unknown"]
+    },
+    "values": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "lifestyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "work_life_balance": { "type": "string" },
+        "social_energy": { "type": "string" },
+        "health_fitness": { "type": "string" },
+        "travel": { "type": "string" },
+        "substances": { "type": "string" },
+        "schedule": { "type": "string" }
+      }
+    },
+    "communication_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary_style": { "type": "string" },
+        "texting_frequency": { "type": "string" },
+        "conflict_style": { "type": "string" },
+        "emotional_expression": { "type": "string" }
+      }
+    },
+    "family_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family_involvement": { "type": "string" },
+        "religion_importance": { "type": "string" },
+        "culture_importance": { "type": "string" },
+        "marriage_timeline": { "type": "string" }
+      }
+    },
+    "children_preference": {
+      "type": "string",
+      "enum": ["wants_children", "does_not_want_children", "open", "unsure", "unknown"]
+    },
+    "relocation_preference": {
+      "type": "string"
+    },
+    "dealbreakers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "description", "severity"],
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "severity": { "type": "string", "enum": ["hard", "strong", "soft"] }
+        }
+      }
+    },
+    "soft_preferences": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "green_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "red_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary_for_matching": {
+      "type": "string"
+    },
+    "private_notes": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  }
+}
