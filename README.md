@@ -32,9 +32,27 @@ users remain in control.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+cp .env.example .env
+pip install -r requirements.txt
+pip install -e .
 python -m unittest discover -s tests
 ```
+
+Use `.env` for local secrets and machine-specific config. Keep `.env.example`
+updated whenever a new required setting is added.
+
+## Run App
+
+```bash
+source .venv/bin/activate
+./scripts/start.sh
+```
+
+Then open:
+
+- API: `http://127.0.0.1:8000`
+- Health check: `http://127.0.0.1:8000/health`
+- Docs: `http://127.0.0.1:8000/docs`
 
 ## Product Principle
 
