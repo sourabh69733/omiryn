@@ -42,9 +42,15 @@ updated whenever a new required setting is added.
 ./scripts/start.sh
 ```
 
+For auto-reload during development:
+
+```bash
+APP_RELOAD=true ./scripts/start.sh
+```
+
 Then open:
 
-- API: `http://127.0.0.1:8000`
+- App UI: `http://127.0.0.1:8000`
 - Health check: `http://127.0.0.1:8000/health`
 - Docs: `http://127.0.0.1:8000/docs`
 
