@@ -9,5 +9,10 @@ export PYTHONPATH="${PYTHONPATH:-src}"
 
 HOST="${APP_HOST:-127.0.0.1}"
 PORT="${APP_PORT:-8000}"
+RELOAD="${APP_RELOAD:-false}"
 
-python -m uvicorn omiryn.api.main:app --reload --host "$HOST" --port "$PORT"
+if [ "$RELOAD" = "true" ]; then
+  python -m uvicorn omiryn.api.main:app --reload --host "$HOST" --port "$PORT"
+else
+  python -m uvicorn omiryn.api.main:app --host "$HOST" --port "$PORT"
+fi
