@@ -30,12 +30,7 @@ users remain in control.
 ## Python Setup
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-cp .env.example .env
-pip install -r requirements.txt
-pip install -e .
-python -m unittest discover -s tests
+./scripts/setup.sh
 ```
 
 Use `.env` for local secrets and machine-specific config. Keep `.env.example`
@@ -44,7 +39,6 @@ updated whenever a new required setting is added.
 ## Run App
 
 ```bash
-source .venv/bin/activate
 ./scripts/start.sh
 ```
 
