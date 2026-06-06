@@ -18,10 +18,73 @@
         </div>
         <div class="status-strip" aria-label="Product status">
           <span>Private profile</span>
+          <span>Agent draft review</span>
           <span>3 suggestions</span>
           <span>Human chat only</span>
         </div>
       </header>
+
+      <section class="draft-review" aria-labelledby="draft-title">
+        <div class="draft-heading">
+          <div>
+            <p class="eyebrow">Agent Submission</p>
+            <h2 id="draft-title">Review Before Matching</h2>
+          </div>
+          <div class="draft-actions">
+            <button id="create-demo-draft" type="button">Create demo draft</button>
+            <button id="save-draft" class="secondary-button" type="button" disabled>Save edits</button>
+            <button id="approve-draft" type="button" disabled>Approve</button>
+            <button id="delete-draft" class="danger-button" type="button" disabled>Delete</button>
+          </div>
+        </div>
+
+        <div class="draft-status" id="draft-status">
+          No agent draft loaded. Create a demo draft or open a review URL.
+        </div>
+
+        <form class="draft-form" id="draft-form">
+          <label>
+            Name
+            <input id="draft-name" type="text" placeholder="Display name" />
+          </label>
+          <label>
+            City
+            <input id="draft-city" type="text" placeholder="City" />
+          </label>
+          <label>
+            Intent
+            <input id="draft-intent" type="text" placeholder="long_term, marriage, exploring" />
+          </label>
+          <label>
+            Communication
+            <input id="draft-communication" type="text" placeholder="Direct, reflective, warm..." />
+          </label>
+          <label>
+            Family expectations
+            <input id="draft-family" type="text" placeholder="Balanced, high involvement..." />
+          </label>
+          <label>
+            Children preference
+            <input id="draft-children" type="text" placeholder="wants_children, open, unsure" />
+          </label>
+          <label>
+            Values
+            <input id="draft-values" type="text" placeholder="family, ambition, kindness" />
+          </label>
+          <label>
+            Lifestyle
+            <input id="draft-lifestyle" type="text" placeholder="fitness, travel, balanced_work" />
+          </label>
+          <label>
+            Dealbreakers
+            <input id="draft-dealbreakers" type="text" placeholder="smoking, casual intent" />
+          </label>
+          <label class="wide-field">
+            Summary
+            <textarea id="draft-summary" rows="3" placeholder="Agent's short relationship summary"></textarea>
+          </label>
+        </form>
+      </section>
 
       <section class="workspace" aria-label="Matchmaking workspace">
         <section class="panel chat-panel" aria-labelledby="chat-title">

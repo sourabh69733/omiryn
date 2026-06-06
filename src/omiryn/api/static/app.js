@@ -53,6 +53,25 @@ const resetChat = document.querySelector("#reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
+const createDemoDraft = document.querySelector("#create-demo-draft");
+const saveDraft = document.querySelector("#save-draft");
+const approveDraft = document.querySelector("#approve-draft");
+const deleteDraft = document.querySelector("#delete-draft");
+const draftStatus = document.querySelector("#draft-status");
+const draftInputs = {
+  name: document.querySelector("#draft-name"),
+  city: document.querySelector("#draft-city"),
+  intent: document.querySelector("#draft-intent"),
+  communication: document.querySelector("#draft-communication"),
+  family: document.querySelector("#draft-family"),
+  children: document.querySelector("#draft-children"),
+  values: document.querySelector("#draft-values"),
+  lifestyle: document.querySelector("#draft-lifestyle"),
+  dealbreakers: document.querySelector("#draft-dealbreakers"),
+  summary: document.querySelector("#draft-summary")
+};
+
+let activeDraftId = null;
 
 function renderMessages() {
   chatLog.innerHTML = "";
@@ -119,6 +138,120 @@ async function loadMatches() {
   });
 }
 
+async function createAgentDraft() {
+  const response = await fetch("/api/agent-submissions/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agent_provider: "chatgpt",
+      agent_user_reference: "demo-user",
+      display_name: "Aarav",
+      age: 29,
+      city: { value: "Bengaluru", source: "user_stated", confidence: 0.95 },
+      relationship_intent: { value: "long_term", source: "user_stated", confidence: 0.92 },
+      values: {
+        values: ["family", "ambition", "emotional_stability"],
+        source: "user_stated",
+        confidence: 0.86
+      },
+      lifestyle: {
+        values: ["fitness", "travel", "balanced_work"],
+        source: "inferred",
+        confidence: 0.72
+      },
+      communication_style: { value: "direct", source: "user_stated", confidence: 0.82 },
+      family_expectations: {
+        value: "medium involvement",
+        source: "user_stated",
+        confidence: 0.8
+      },
+      children_preference: { value: "wants_children", source: "inferred", confidence: 0.62 },
+      dealbreakers: {
+        values: ["smoking", "unclear intent"],
+        source: "user_stated",
+        confidence: 0.91
+      },
+      soft_preferences: {
+        values: ["Bengaluru", "emotionally steady", "career oriented"],
+        source: "inferred",
+        confidence: 0.7
+      },
+      summary:
+        "Looking for a serious relationship with someone emotionally steady, family-aware, and clear in communication."
+    })
+  });
+  const data = await response.json();
+  window.history.replaceState({}, "", data.review_url);
+  await loadDraft(data.draft_id);
+}
+
+async function loadDraft(draftId) {
+  const response = await fetch(`/api/drafts/${draftId}`);
+  if (!response.ok) {
+    setDraftStatus("Draft not found.", "deleted");
+    return;
+  }
+
+  const draft = await response.json();
+  activeDraftId = draft.id;
+  fillDraftForm(draft);
+  setDraftStatus(
+    draft.status === "approved"
+      ? "Approved. This profile can now enter matching."
+      : `Draft ${draft.id} loaded. Review each field before approving.`,
+    draft.status
+  );
+  setDraftButtons(draft.status);
+}
+
+function fillDraftForm(draft) {
+  const submission = draft.submission;
+  draftInputs.name.value = submission.display_name || "";
+  draftInputs.city.value = submission.city.value;
+  draftInputs.intent.value = submission.relationship_intent.value;
+  draftInputs.communication.value = submission.communication_style.value;
+  draftInputs.family.value = submission.family_expectations.value;
+  draftInputs.children.value = submission.children_preference.value;
+  draftInputs.values.value = submission.values.values.join(", ");
+  draftInputs.lifestyle.value = submission.lifestyle.values.join(", ");
+  draftInputs.dealbreakers.value = submission.dealbreakers.values.join(", ");
+  draftInputs.summary.value = submission.summary || "";
+}
+
+function draftPatchFromForm() {
+  return {
+    display_name: draftInputs.name.value.trim(),
+    city: draftInputs.city.value.trim(),
+    relationship_intent: draftInputs.intent.value.trim(),
+    communication_style: draftInputs.communication.value.trim(),
+    family_expectations: draftInputs.family.value.trim(),
+    children_preference: draftInputs.children.value.trim(),
+    values: splitList(draftInputs.values.value),
+    lifestyle: splitList(draftInputs.lifestyle.value),
+    dealbreakers: splitList(draftInputs.dealbreakers.value),
+    summary: draftInputs.summary.value.trim()
+  };
+}
+
+function splitList(value) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function setDraftStatus(text, status = "draft") {
+  draftStatus.textContent = text;
+  draftStatus.className = `draft-status ${status}`;
+}
+
+function setDraftButtons(status) {
+  const editable = status === "draft";
+  saveDraft.disabled = !editable;
+  approveDraft.disabled = !editable;
+  deleteDraft.disabled = !activeDraftId || status === "deleted";
+}
+
 chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = chatInput.value.trim();
@@ -146,6 +279,40 @@ extractProfile.addEventListener("click", () => {
 });
 
 refreshMatches.addEventListener("click", loadMatches);
+
+createDemoDraft.addEventListener("click", createAgentDraft);
+
+saveDraft.addEventListener("click", async () => {
+  if (!activeDraftId) return;
+  const response = await fetch(`/api/drafts/${activeDraftId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(draftPatchFromForm())
+  });
+  const draft = await response.json();
+  fillDraftForm(draft);
+  setDraftStatus("Saved. Review is still required before matching.", "draft");
+});
+
+approveDraft.addEventListener("click", async () => {
+  if (!activeDraftId) return;
+  await fetch(`/api/drafts/${activeDraftId}/approve`, { method: "POST" });
+  await loadDraft(activeDraftId);
+  await loadMatches();
+});
+
+deleteDraft.addEventListener("click", async () => {
+  if (!activeDraftId) return;
+  await fetch(`/api/drafts/${activeDraftId}`, { method: "DELETE" });
+  setDraftStatus("Deleted. This draft will not enter matching.", "deleted");
+  activeDraftId = null;
+  setDraftButtons("deleted");
+});
+
+const draftMatch = window.location.pathname.match(/^\/drafts\/([^/]+)$/);
+if (draftMatch) {
+  loadDraft(draftMatch[1]);
+}
 
 renderMessages();
 setProfile(extractedProfiles[0]);
