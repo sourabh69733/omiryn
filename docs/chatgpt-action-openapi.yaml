@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: Omiryn Agent Submission API
+  version: 0.1.0
+servers:
+  - url: https://YOUR_OMIRYN_DOMAIN
+paths:
+  /api/agent-submissions/profile:
+    post:
+      operationId: submitAgentDatingProfile
+      summary: Submit a draft dating profile for user review.
+      description: >
+        Creates a draft relationship profile from an AI assistant conversation.
+        The profile is not active for matching until the user reviews and
+        approves it on Omiryn.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentProfileSubmission"
+      responses:
+        "201":
+          description: Draft created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  draft_id:
+                    type: string
+                  status:
+                    type: string
+                  review_url:
+                    type: string
+components:
+  schemas:
+    SourcedString:
+      type: object
+      required: [value, source, confidence]
+      properties:
+        value:
+          type: string
+        source:
+          type: string
+          enum: [user_stated, inferred, unknown]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    SourcedList:
+      type: object
+      required: [values, source, confidence]
+      properties:
+        values:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          enum: [user_stated, inferred, unknown]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    AgentProfileSubmission:
+      type: object
+      required:
+        - agent_provider
+        - city
+        - relationship_intent
+        - values
+        - lifestyle
+        - communication_style
+        - family_expectations
+        - children_preference
+        - dealbreakers
+        - soft_preferences
+      properties:
+        agent_provider:
+          type: string
+          example: chatgpt
+        agent_user_reference:
+          type: string
+        display_name:
+          type: string
+        age:
+          type: integer
+          minimum: 18
+          maximum: 100
+        city:
+          $ref: "#/components/schemas/SourcedString"
+        relationship_intent:
+          $ref: "#/components/schemas/SourcedString"
+        values:
+          $ref: "#/components/schemas/SourcedList"
+        lifestyle:
+          $ref: "#/components/schemas/SourcedList"
+        communication_style:
+          $ref: "#/components/schemas/SourcedString"
+        family_expectations:
+          $ref: "#/components/schemas/SourcedString"
+        children_preference:
+          $ref: "#/components/schemas/SourcedString"
+        dealbreakers:
+          $ref: "#/components/schemas/SourcedList"
+        soft_preferences:
+          $ref: "#/components/schemas/SourcedList"
+        summary:
+          type: string

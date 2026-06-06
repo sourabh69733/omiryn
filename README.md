@@ -54,6 +54,19 @@ Then open:
 - Health check: `http://127.0.0.1:8000/health`
 - Docs: `http://127.0.0.1:8000/docs`
 
+## Agent Submission Flow
+
+The first agent-integration path is draft-first:
+
+1. An external agent submits a relationship profile to
+   `POST /api/agent-submissions/profile`.
+2. Omiryn creates a draft and returns a review URL.
+3. The user reviews, edits, approves, or deletes the draft.
+4. Only approved drafts should enter matching.
+
+The ChatGPT Action starter spec lives at
+[docs/chatgpt-action-openapi.yaml](/Users/sourabh/nexus/work/p1/quack/omiryn/docs/chatgpt-action-openapi.yaml).
+
 ## Product Principle
 
 Less swiping, better understanding, more intentional introductions.
