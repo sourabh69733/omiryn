@@ -8,7 +8,7 @@ fi
 export PYTHONPATH="${PYTHONPATH:-src}"
 
 HOST="${APP_HOST:-127.0.0.1}"
-PORT="${APP_PORT:-8000}"
+PORT="${APP_PORT:-8001}"
 RELOAD="${APP_RELOAD:-false}"
 
 if [ "$RELOAD" = "true" ]; then
