@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omiryn</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">O</div>
+          <div>
+            <h1>Omiryn</h1>
+            <p>AI-assisted matchmaking workspace</p>
+          </div>
+        </div>
+        <div class="status-strip" aria-label="Product status">
+          <span>Private profile</span>
+          <span>Agent draft review</span>
+          <span>3 suggestions</span>
+          <span>Human chat only</span>
+        </div>
+      </header>
+
+      <section class="draft-review" aria-labelledby="draft-title">
+        <div class="draft-heading">
+          <div>
+            <p class="eyebrow">Agent Submission</p>
+            <h2 id="draft-title">Review Before Matching</h2>
+          </div>
+          <div class="draft-actions">
+            <button id="create-demo-draft" type="button">Create demo draft</button>
+            <button id="save-draft" class="secondary-button" type="button" disabled>Save edits</button>
+            <button id="approve-draft" type="button" disabled>Approve</button>
+            <button id="delete-draft" class="danger-button" type="button" disabled>Delete</button>
+          </div>
+        </div>
+
+        <div class="draft-status" id="draft-status">
+          No agent draft loaded. Create a demo draft or open a review URL.
+        </div>
+
+        <form class="draft-form" id="draft-form">
+          <label>
+            Name
+            <input id="draft-name" type="text" placeholder="Display name" />
+          </label>
+          <label>
+            City
+            <input id="draft-city" type="text" placeholder="City" />
+          </label>
+          <label>
+            Intent
+            <input id="draft-intent" type="text" placeholder="long_term, marriage, exploring" />
+          </label>
+          <label>
+            Communication
+            <input id="draft-communication" type="text" placeholder="Direct, reflective, warm..." />
+          </label>
+          <label>
+            Family expectations
+            <input id="draft-family" type="text" placeholder="Balanced, high involvement..." />
+          </label>
+          <label>
+            Children preference
+            <input id="draft-children" type="text" placeholder="wants_children, open, unsure" />
+          </label>
+          <label>
+            Values
+            <input id="draft-values" type="text" placeholder="family, ambition, kindness" />
+          </label>
+          <label>
+            Lifestyle
+            <input id="draft-lifestyle" type="text" placeholder="fitness, travel, balanced_work" />
+          </label>
+          <label>
+            Dealbreakers
+            <input id="draft-dealbreakers" type="text" placeholder="smoking, casual intent" />
+          </label>
+          <label class="wide-field">
+            Summary
+            <textarea id="draft-summary" rows="3" placeholder="Agent's short relationship summary"></textarea>
+          </label>
+        </form>
+      </section>
+
+      <section class="workspace" aria-label="Matchmaking workspace">
+        <section class="panel chat-panel" aria-labelledby="chat-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Onboarding Agent</p>
+              <h2 id="chat-title">Interview</h2>
+            </div>
+            <button class="icon-button" id="reset-chat" type="button" title="Reset chat">
+              New
+            </button>
+          </div>
+
+          <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+          <form class="composer" id="chat-form">
+            <input
+              id="chat-input"
+              name="message"
+              type="text"
+              autocomplete="off"
+              placeholder="Reply to the matchmaker"
+            />
+            <button type="submit">Send</button>
+          </form>
+        </section>
+
+        <section class="panel profile-panel" aria-labelledby="profile-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Structured Data</p>
+              <h2 id="profile-title">Dating Profile</h2>
+            </div>
+            <button id="extract-profile" type="button">Extract draft</button>
+          </div>
+
+          <div class="profile-grid">
+            <div class="field-block">
+              <span>Intent</span>
+              <strong id="profile-intent">Long-term</strong>
+            </div>
+            <div class="field-block">
+              <span>City</span>
+              <strong id="profile-city">Bengaluru</strong>
+            </div>
+            <div class="field-block">
+              <span>Communication</span>
+              <strong id="profile-communication">Direct</strong>
+            </div>
+            <div class="field-block">
+              <span>Family</span>
+              <strong id="profile-family">Medium involvement</strong>
+            </div>
+          </div>
+
+          <div class="signal-section">
+            <h3>Values</h3>
+            <div class="chips" id="value-chips">
+              <span>family</span>
+              <span>ambition</span>
+              <span>emotional stability</span>
+            </div>
+          </div>
+
+          <div class="signal-section">
+            <h3>Dealbreakers</h3>
+            <div class="chips danger" id="dealbreaker-chips">
+              <span>smoking</span>
+              <span>unclear intent</span>
+            </div>
+          </div>
+
+          <div class="confidence">
+            <div>
+              <span>Profile confidence</span>
+              <strong id="confidence-text">72%</strong>
+            </div>
+            <div class="meter">
+              <span id="confidence-meter"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel matches-panel" aria-labelledby="matches-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Recommendations</p>
+              <h2 id="matches-title">Suggested Matches</h2>
+            </div>
+            <button id="refresh-matches" type="button">Refresh</button>
+          </div>
+
+          <div class="match-list" id="match-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
