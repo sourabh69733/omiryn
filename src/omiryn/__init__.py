@@ -1,1 +1,0 @@
-"""Omiryn backend package."""
