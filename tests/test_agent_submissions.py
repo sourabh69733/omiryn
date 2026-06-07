@@ -2,11 +2,12 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from omiryn.api.main import DRAFTS, app
+from omiryn.api.main import CONVERSATIONS, DRAFTS, app
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
+        CONVERSATIONS.clear()
         DRAFTS.clear()
         self.client = TestClient(app)
 
@@ -50,6 +51,35 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(self.client.get(f"/api/drafts/{draft_id}").status_code, 404)
+
+    def test_omiryn_agent_conversation_extracts_to_review_draft(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation_id = conversation_response.json()["id"]
+
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={
+                "message": (
+                    "I want a long-term relationship in Bengaluru. Family and emotional "
+                    "stability matter, and smoking is a dealbreaker."
+                )
+            },
+        )
+        self.assertEqual(message_response.status_code, 200)
+        self.assertGreaterEqual(len(message_response.json()["messages"]), 3)
+
+        extract_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/extract"
+        )
+        self.assertEqual(extract_response.status_code, 200)
+        draft_id = extract_response.json()["draft_id"]
+        draft_response = self.client.get(f"/api/drafts/{draft_id}")
+        self.assertEqual(draft_response.status_code, 200)
+        self.assertEqual(
+            draft_response.json()["submission"]["relationship_intent"]["value"],
+            "long_term",
+        )
 
     def _create_draft(self) -> str:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())
