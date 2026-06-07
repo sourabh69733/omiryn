@@ -48,6 +48,37 @@ For auto-reload during development:
 APP_RELOAD=true ./scripts/start.sh
 ```
 
+## Agent Providers
+
+The app now supports the first Omiryn-owned agent flow:
+
+```text
+user chats with Omiryn agent -> extraction creates draft -> user reviews/approves
+```
+
+Provider options live in `.env`:
+
+```bash
+# no external model cost, good for development
+AGENT_PROVIDER=mock
+
+# hosted model
+AGENT_PROVIDER=groq
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.1-8b-instant
+
+# local model
+AGENT_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+```
+
+For Ollama, start Ollama separately and pull a model first, for example:
+
+```bash
+ollama pull llama3.1
+```
+
 Then open:
 
 - App UI: `http://127.0.0.1:8000`
