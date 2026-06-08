@@ -12,7 +12,7 @@ PORT="${APP_PORT:-8001}"
 RELOAD="${APP_RELOAD:-false}"
 
 if [ "$RELOAD" = "true" ]; then
-  python -m uvicorn omiryn.api.main:app --reload --host "$HOST" --port "$PORT"
+  python -m uvicorn api.main:app --reload --host "$HOST" --port "$PORT"
 else
-  python -m uvicorn omiryn.api.main:app --host "$HOST" --port "$PORT"
+  python -m uvicorn api.main:app --host "$HOST" --port "$PORT"
 fi

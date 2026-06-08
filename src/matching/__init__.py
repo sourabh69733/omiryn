@@ -1,4 +1,4 @@
-from omiryn.matching.scorer import (
+from matching.scorer import (
     AgePreference,
     Dealbreaker,
     MatchProfile,

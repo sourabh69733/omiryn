@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omiryn.agent.providers import AgentProviderError, extract_profile, generate_agent_reply
-from omiryn.matching import AgePreference, Dealbreaker, MatchProfile, score_match
+from agent.providers import AgentProviderError, extract_profile, generate_agent_reply
+from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 
 STATIC_DIR = Path(__file__).parent / "static"
 DRAFTS: dict[str, "DraftProfile"] = {}
