@@ -25,7 +25,7 @@ users remain in control.
 - [docs/api-contract.md](/Users/sourabh/nexus/work/p1/quack/omiryn/docs/api-contract.md) - first API surface
 - [llm/profile-extraction.schema.json](/Users/sourabh/nexus/work/p1/quack/omiryn/llm/profile-extraction.schema.json) - structured output schema for dating profile extraction
 - [llm/onboarding-agent.md](/Users/sourabh/nexus/work/p1/quack/omiryn/llm/onboarding-agent.md) - onboarding agent behavior
-- [src/omiryn/matching/scorer.py](/Users/sourabh/nexus/work/p1/quack/omiryn/src/omiryn/matching/scorer.py) - first deterministic matchmaking scorer
+- [src/matching/scorer.py](/Users/sourabh/nexus/work/p1/quack/omiryn/src/matching/scorer.py) - first deterministic matchmaking scorer
 
 ## Python Setup
 
