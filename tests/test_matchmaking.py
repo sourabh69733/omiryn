@@ -1,6 +1,6 @@
 import unittest
 
-from omiryn.matching import (
+from matching import (
     AgePreference,
     Dealbreaker,
     MatchProfile,

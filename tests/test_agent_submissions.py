@@ -2,7 +2,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from omiryn.api.main import CONVERSATIONS, DRAFTS, app
+from api.main import CONVERSATIONS, DRAFTS, app
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
