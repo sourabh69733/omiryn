@@ -270,6 +270,11 @@ def draft_review_page(draft_id: str) -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/matches")
+def matches_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 @app.get("/api/demo/matches")
 def demo_matches() -> dict[str, object]:
     user = MatchProfile(

@@ -1,40 +1,30 @@
-const extractedProfiles = [
-  {
-    intent: "Long-term",
-    city: "Bengaluru",
-    communication: "Direct",
-    family: "Medium involvement",
-    values: ["family", "ambition", "emotional stability"],
-    dealbreakers: ["smoking", "unclear intent"],
-    confidence: 72
-  },
-  {
-    intent: "Marriage-oriented",
-    city: "Bengaluru",
-    communication: "Direct but calm",
-    family: "Important, balanced",
-    values: ["family", "kindness", "stability", "growth"],
-    dealbreakers: ["casual intent", "smoking", "poor conflict repair"],
-    confidence: 84
-  }
-];
-
 let messages = [];
-let profileIndex = 0;
 let conversationId = null;
+let activeDraftId = null;
+
+const routes = {
+  interview: document.querySelector("#interview-screen"),
+  review: document.querySelector("#review-screen"),
+  matches: document.querySelector("#matches-screen")
+};
 
 const chatLog = document.querySelector("#chat-log");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const resetChat = document.querySelector("#reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
+const readinessScore = document.querySelector("#readiness-score");
+const readinessMeter = document.querySelector("#readiness-meter");
+const signalList = document.querySelector("#signal-list");
+
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
-const createDemoDraft = document.querySelector("#create-demo-draft");
+
 const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
 const deleteDraft = document.querySelector("#delete-draft");
 const draftStatus = document.querySelector("#draft-status");
+const reviewNav = document.querySelector("#review-nav");
 const draftInputs = {
   name: document.querySelector("#draft-name"),
   city: document.querySelector("#draft-city"),
@@ -48,7 +38,32 @@ const draftInputs = {
   summary: document.querySelector("#draft-summary")
 };
 
-let activeDraftId = null;
+function showScreen(name) {
+  Object.entries(routes).forEach(([key, element]) => {
+    element.hidden = key !== name;
+  });
+  document.querySelectorAll("[data-nav]").forEach((link) => {
+    link.classList.toggle("active", link.dataset.nav === name);
+  });
+}
+
+function currentDraftIdFromPath() {
+  const match = window.location.pathname.match(/^\/drafts\/([^/]+)$/);
+  return match ? match[1] : null;
+}
+
+async function startConversation() {
+  chatInput.disabled = true;
+  extractProfile.disabled = true;
+  const response = await fetch("/api/agent/conversations", { method: "POST" });
+  const conversation = await response.json();
+  conversationId = conversation.id;
+  messages = conversation.messages;
+  chatInput.disabled = false;
+  extractProfile.disabled = false;
+  renderMessages();
+  updateReadiness();
+}
 
 function renderMessages() {
   chatLog.innerHTML = "";
@@ -61,131 +76,72 @@ function renderMessages() {
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-async function startConversation() {
+function updateReadiness() {
+  const userMessageCount = messages.filter((message) => message.role === "user").length;
+  const score = Math.min(100, 20 + userMessageCount * 20);
+  readinessScore.textContent = `${score}%`;
+  readinessMeter.style.width = `${score}%`;
+
+  Array.from(signalList.children).forEach((item, index) => {
+    item.classList.toggle("complete", index < Math.max(1, userMessageCount + 1));
+  });
+}
+
+async function sendUserMessage() {
+  const text = chatInput.value.trim();
+  if (!text || !conversationId) return;
+
+  messages.push({ role: "user", content: text });
+  chatInput.value = "";
   chatInput.disabled = true;
-  const response = await fetch("/api/agent/conversations", { method: "POST" });
-  const conversation = await response.json();
-  conversationId = conversation.id;
-  messages = conversation.messages;
-  chatInput.disabled = false;
   renderMessages();
-}
+  updateReadiness();
 
-function setProfile(profile) {
-  document.querySelector("#profile-intent").textContent = profile.intent;
-  document.querySelector("#profile-city").textContent = profile.city;
-  document.querySelector("#profile-communication").textContent = profile.communication;
-  document.querySelector("#profile-family").textContent = profile.family;
-  document.querySelector("#confidence-text").textContent = `${profile.confidence}%`;
-  document.querySelector("#confidence-meter").style.width = `${profile.confidence}%`;
-  renderChips("#value-chips", profile.values);
-  renderChips("#dealbreaker-chips", profile.dealbreakers);
-}
-
-function renderChips(selector, items) {
-  const container = document.querySelector(selector);
-  container.innerHTML = "";
-  items.forEach((item) => {
-    const chip = document.createElement("span");
-    chip.textContent = item;
-    container.appendChild(chip);
-  });
-}
-
-async function loadMatches() {
-  matchList.innerHTML = "";
-  const loading = document.createElement("div");
-  loading.className = "match-item";
-  loading.textContent = "Loading suggestions...";
-  matchList.appendChild(loading);
-
-  const response = await fetch("/api/demo/matches");
-  const data = await response.json();
-
-  matchList.innerHTML = "";
-  data.matches.forEach((match) => {
-    const item = document.createElement("article");
-    item.className = `match-item ${match.result.decision === "reject" ? "rejected" : ""}`;
-    const breakdown = Object.entries(match.result.breakdown)
-      .map(([key, value]) => `<span>${key}: ${value}</span>`)
-      .join("");
-
-    item.innerHTML = `
-      <div class="match-top">
-        <div>
-          <h3>${match.name}</h3>
-          <p class="match-meta">${match.age} · ${match.city || "Location open"}</p>
-        </div>
-        <div class="score">${match.result.score}</div>
-      </div>
-      <p class="match-copy">${match.result.explanation}</p>
-      <div class="breakdown">${breakdown}</div>
-    `;
-    matchList.appendChild(item);
-  });
-}
-
-async function createAgentDraft() {
-  const response = await fetch("/api/agent-submissions/profile", {
+  const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      agent_provider: "chatgpt",
-      agent_user_reference: "demo-user",
-      display_name: "Aarav",
-      age: 29,
-      city: { value: "Bengaluru", source: "user_stated", confidence: 0.95 },
-      relationship_intent: { value: "long_term", source: "user_stated", confidence: 0.92 },
-      values: {
-        values: ["family", "ambition", "emotional_stability"],
-        source: "user_stated",
-        confidence: 0.86
-      },
-      lifestyle: {
-        values: ["fitness", "travel", "balanced_work"],
-        source: "inferred",
-        confidence: 0.72
-      },
-      communication_style: { value: "direct", source: "user_stated", confidence: 0.82 },
-      family_expectations: {
-        value: "medium involvement",
-        source: "user_stated",
-        confidence: 0.8
-      },
-      children_preference: { value: "wants_children", source: "inferred", confidence: 0.62 },
-      dealbreakers: {
-        values: ["smoking", "unclear intent"],
-        source: "user_stated",
-        confidence: 0.91
-      },
-      soft_preferences: {
-        values: ["Bengaluru", "emotionally steady", "career oriented"],
-        source: "inferred",
-        confidence: 0.7
-      },
-      summary:
-        "Looking for a serious relationship with someone emotionally steady, family-aware, and clear in communication."
-    })
+    body: JSON.stringify({ message: text })
+  });
+  const conversation = await response.json();
+  messages = conversation.messages || messages;
+  chatInput.disabled = false;
+  renderMessages();
+  updateReadiness();
+}
+
+async function extractConversationDraft() {
+  if (!conversationId) return;
+
+  extractProfile.disabled = true;
+  extractProfile.textContent = "Extracting...";
+  const response = await fetch(`/api/agent/conversations/${conversationId}/extract`, {
+    method: "POST"
   });
   const data = await response.json();
-  window.history.replaceState({}, "", data.review_url);
-  await loadDraft(data.draft_id);
+  extractProfile.disabled = false;
+  extractProfile.textContent = "Extract review draft";
+
+  if (data.review_url) {
+    window.location.href = data.review_url;
+  }
 }
 
 async function loadDraft(draftId) {
   const response = await fetch(`/api/drafts/${draftId}`);
   if (!response.ok) {
     setDraftStatus("Draft not found.", "deleted");
+    setDraftButtons("deleted");
     return;
   }
 
   const draft = await response.json();
   activeDraftId = draft.id;
+  reviewNav.href = `/drafts/${draft.id}`;
   fillDraftForm(draft);
   setDraftStatus(
     draft.status === "approved"
-      ? "Approved. This profile can now enter matching."
-      : `Draft ${draft.id} loaded. Review each field before approving.`,
+      ? "Approved. This profile is ready for matching."
+      : "Draft loaded. Review and edit before approving.",
     draft.status
   );
   setDraftButtons(draft.status);
@@ -239,57 +195,7 @@ function setDraftButtons(status) {
   deleteDraft.disabled = !activeDraftId || status === "deleted";
 }
 
-chatForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  sendUserMessage();
-});
-
-async function sendUserMessage() {
-  const text = chatInput.value.trim();
-  if (!text || !conversationId) return;
-
-  messages.push({ role: "user", content: text });
-  chatInput.value = "";
-  chatInput.disabled = true;
-  renderMessages();
-
-  const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text })
-  });
-  const conversation = await response.json();
-  messages = conversation.messages || messages;
-  chatInput.disabled = false;
-  renderMessages();
-}
-
-resetChat.addEventListener("click", () => {
-  startConversation();
-});
-
-extractProfile.addEventListener("click", async () => {
-  if (!conversationId) return;
-  extractProfile.disabled = true;
-  const response = await fetch(`/api/agent/conversations/${conversationId}/extract`, {
-    method: "POST"
-  });
-  const data = await response.json();
-  extractProfile.disabled = false;
-  if (data.review_url) {
-    window.history.replaceState({}, "", data.review_url);
-    await loadDraft(data.draft_id);
-  } else {
-    profileIndex = (profileIndex + 1) % extractedProfiles.length;
-    setProfile(extractedProfiles[profileIndex]);
-  }
-});
-
-refreshMatches.addEventListener("click", loadMatches);
-
-createDemoDraft.addEventListener("click", createAgentDraft);
-
-saveDraft.addEventListener("click", async () => {
+async function saveDraftEdits() {
   if (!activeDraftId) return;
   const response = await fetch(`/api/drafts/${activeDraftId}`, {
     method: "PATCH",
@@ -298,30 +204,75 @@ saveDraft.addEventListener("click", async () => {
   });
   const draft = await response.json();
   fillDraftForm(draft);
-  setDraftStatus("Saved. Review is still required before matching.", "draft");
-});
+  setDraftStatus("Saved. Approval is still required before matching.", "draft");
+}
 
-approveDraft.addEventListener("click", async () => {
+async function approveCurrentDraft() {
   if (!activeDraftId) return;
   await fetch(`/api/drafts/${activeDraftId}/approve`, { method: "POST" });
   await loadDraft(activeDraftId);
-  await loadMatches();
-});
-
-deleteDraft.addEventListener("click", async () => {
-  if (!activeDraftId) return;
-  await fetch(`/api/drafts/${activeDraftId}`, { method: "DELETE" });
-  setDraftStatus("Deleted. This draft will not enter matching.", "deleted");
-  activeDraftId = null;
-  setDraftButtons("deleted");
-});
-
-const draftMatch = window.location.pathname.match(/^\/drafts\/([^/]+)$/);
-if (draftMatch) {
-  loadDraft(draftMatch[1]);
+  window.location.href = "/matches";
 }
 
-renderMessages();
-setProfile(extractedProfiles[0]);
-loadMatches();
-startConversation();
+async function deleteCurrentDraft() {
+  if (!activeDraftId) return;
+  await fetch(`/api/drafts/${activeDraftId}`, { method: "DELETE" });
+  activeDraftId = null;
+  setDraftStatus("Deleted. This draft will not enter matching.", "deleted");
+  setDraftButtons("deleted");
+}
+
+async function loadMatches() {
+  matchList.innerHTML = '<div class="loading-row">Loading suggestions...</div>';
+  const response = await fetch("/api/demo/matches");
+  const data = await response.json();
+
+  matchList.innerHTML = "";
+  data.matches.forEach((match) => {
+    const item = document.createElement("article");
+    item.className = `match-item ${match.result.decision === "reject" ? "rejected" : ""}`;
+    const breakdown = Object.entries(match.result.breakdown)
+      .map(([key, value]) => `<span>${key}: ${value}</span>`)
+      .join("");
+
+    item.innerHTML = `
+      <div class="match-top">
+        <div>
+          <h2>${match.name}</h2>
+          <p>${match.age} · ${match.city || "Location open"}</p>
+        </div>
+        <strong>${match.result.score}</strong>
+      </div>
+      <p class="match-copy">${match.result.explanation}</p>
+      <div class="breakdown">${breakdown}</div>
+      <div class="match-actions">
+        <button type="button">Accept</button>
+        <button class="secondary-button" type="button">Pass</button>
+      </div>
+    `;
+    matchList.appendChild(item);
+  });
+}
+
+chatForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  sendUserMessage();
+});
+resetChat.addEventListener("click", startConversation);
+extractProfile.addEventListener("click", extractConversationDraft);
+saveDraft.addEventListener("click", saveDraftEdits);
+approveDraft.addEventListener("click", approveCurrentDraft);
+deleteDraft.addEventListener("click", deleteCurrentDraft);
+refreshMatches.addEventListener("click", loadMatches);
+
+const draftId = currentDraftIdFromPath();
+if (draftId) {
+  showScreen("review");
+  loadDraft(draftId);
+} else if (window.location.pathname === "/matches") {
+  showScreen("matches");
+  loadMatches();
+} else {
+  showScreen("interview");
+  startConversation();
+}

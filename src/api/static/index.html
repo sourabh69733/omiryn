@@ -7,180 +7,170 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">O</div>
-          <div>
-            <h1>Omiryn</h1>
-            <p>AI-assisted matchmaking workspace</p>
-          </div>
-        </div>
-        <div class="status-strip" aria-label="Product status">
-          <span>Private profile</span>
-          <span>Agent draft review</span>
-          <span>3 suggestions</span>
-          <span>Human chat only</span>
-        </div>
+    <div class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="/" aria-label="Omiryn home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>
+            <strong>Omiryn</strong>
+            <small>Private AI matchmaking</small>
+          </span>
+        </a>
+
+        <nav class="progress-nav" aria-label="Matchmaking progress">
+          <a data-nav="interview" href="/">Interview</a>
+          <a data-nav="review" href="#" id="review-nav">Review</a>
+          <a data-nav="matches" href="/matches">Matches</a>
+        </nav>
       </header>
 
-      <section class="draft-review" aria-labelledby="draft-title">
-        <div class="draft-heading">
-          <div>
-            <p class="eyebrow">Agent Submission</p>
-            <h2 id="draft-title">Review Before Matching</h2>
-          </div>
-          <div class="draft-actions">
-            <button id="create-demo-draft" type="button">Create demo draft</button>
-            <button id="save-draft" class="secondary-button" type="button" disabled>Save edits</button>
-            <button id="approve-draft" type="button" disabled>Approve</button>
-            <button id="delete-draft" class="danger-button" type="button" disabled>Delete</button>
-          </div>
-        </div>
-
-        <div class="draft-status" id="draft-status">
-          No agent draft loaded. Create a demo draft or open a review URL.
-        </div>
-
-        <form class="draft-form" id="draft-form">
-          <label>
-            Name
-            <input id="draft-name" type="text" placeholder="Display name" />
-          </label>
-          <label>
-            City
-            <input id="draft-city" type="text" placeholder="City" />
-          </label>
-          <label>
-            Intent
-            <input id="draft-intent" type="text" placeholder="long_term, marriage, exploring" />
-          </label>
-          <label>
-            Communication
-            <input id="draft-communication" type="text" placeholder="Direct, reflective, warm..." />
-          </label>
-          <label>
-            Family expectations
-            <input id="draft-family" type="text" placeholder="Balanced, high involvement..." />
-          </label>
-          <label>
-            Children preference
-            <input id="draft-children" type="text" placeholder="wants_children, open, unsure" />
-          </label>
-          <label>
-            Values
-            <input id="draft-values" type="text" placeholder="family, ambition, kindness" />
-          </label>
-          <label>
-            Lifestyle
-            <input id="draft-lifestyle" type="text" placeholder="fitness, travel, balanced_work" />
-          </label>
-          <label>
-            Dealbreakers
-            <input id="draft-dealbreakers" type="text" placeholder="smoking, casual intent" />
-          </label>
-          <label class="wide-field">
-            Summary
-            <textarea id="draft-summary" rows="3" placeholder="Agent's short relationship summary"></textarea>
-          </label>
-        </form>
-      </section>
-
-      <section class="workspace" aria-label="Matchmaking workspace">
-        <section class="panel chat-panel" aria-labelledby="chat-title">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Onboarding Agent</p>
-              <h2 id="chat-title">Interview</h2>
-            </div>
-            <button class="icon-button" id="reset-chat" type="button" title="Reset chat">
-              New
-            </button>
+      <main>
+        <section class="screen interview-screen" id="interview-screen" hidden>
+          <div class="screen-copy">
+            <p class="eyebrow">Step 1</p>
+            <h1>Build your private relationship profile.</h1>
+            <p>
+              Talk with Omiryn's matchmaker. We turn the conversation into structured
+              profile data only after you choose to extract it.
+            </p>
           </div>
 
-          <div class="chat-log" id="chat-log" aria-live="polite"></div>
+          <div class="interview-layout">
+            <section class="chat-card" aria-labelledby="chat-title">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">AI Interview</p>
+                  <h2 id="chat-title">Matchmaker conversation</h2>
+                </div>
+                <button class="secondary-button" id="reset-chat" type="button">New chat</button>
+              </div>
 
-          <form class="composer" id="chat-form">
-            <input
-              id="chat-input"
-              name="message"
-              type="text"
-              autocomplete="off"
-              placeholder="Reply to the matchmaker"
-            />
-            <button type="submit">Send</button>
-          </form>
-        </section>
+              <div class="chat-log" id="chat-log" aria-live="polite"></div>
 
-        <section class="panel profile-panel" aria-labelledby="profile-title">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Structured Data</p>
-              <h2 id="profile-title">Dating Profile</h2>
-            </div>
-            <button id="extract-profile" type="button">Extract draft</button>
-          </div>
+              <form class="composer" id="chat-form">
+                <input
+                  id="chat-input"
+                  name="message"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Tell Omiryn what you want in a relationship"
+                />
+                <button type="submit">Send</button>
+              </form>
+            </section>
 
-          <div class="profile-grid">
-            <div class="field-block">
-              <span>Intent</span>
-              <strong id="profile-intent">Long-term</strong>
-            </div>
-            <div class="field-block">
-              <span>City</span>
-              <strong id="profile-city">Bengaluru</strong>
-            </div>
-            <div class="field-block">
-              <span>Communication</span>
-              <strong id="profile-communication">Direct</strong>
-            </div>
-            <div class="field-block">
-              <span>Family</span>
-              <strong id="profile-family">Medium involvement</strong>
-            </div>
-          </div>
+            <aside class="signal-card" aria-labelledby="signals-title">
+              <p class="eyebrow">Collected Signals</p>
+              <h2 id="signals-title">Profile readiness</h2>
 
-          <div class="signal-section">
-            <h3>Values</h3>
-            <div class="chips" id="value-chips">
-              <span>family</span>
-              <span>ambition</span>
-              <span>emotional stability</span>
-            </div>
-          </div>
+              <div class="readiness">
+                <span id="readiness-score">20%</span>
+                <div class="meter"><i id="readiness-meter"></i></div>
+              </div>
 
-          <div class="signal-section">
-            <h3>Dealbreakers</h3>
-            <div class="chips danger" id="dealbreaker-chips">
-              <span>smoking</span>
-              <span>unclear intent</span>
-            </div>
-          </div>
+              <ul class="signal-list" id="signal-list">
+                <li data-signal="intent">Relationship intent</li>
+                <li data-signal="values">Values</li>
+                <li data-signal="communication">Communication style</li>
+                <li data-signal="dealbreakers">Dealbreakers</li>
+                <li data-signal="family">Family and future</li>
+              </ul>
 
-          <div class="confidence">
-            <div>
-              <span>Profile confidence</span>
-              <strong id="confidence-text">72%</strong>
-            </div>
-            <div class="meter">
-              <span id="confidence-meter"></span>
-            </div>
+              <button class="primary-wide" id="extract-profile" type="button">
+                Extract review draft
+              </button>
+              <p class="quiet-note">
+                Extraction creates a draft. Nothing enters matching until you approve it.
+              </p>
+            </aside>
           </div>
         </section>
 
-        <section class="panel matches-panel" aria-labelledby="matches-title">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Recommendations</p>
-              <h2 id="matches-title">Suggested Matches</h2>
-            </div>
-            <button id="refresh-matches" type="button">Refresh</button>
+        <section class="screen review-screen" id="review-screen" hidden>
+          <div class="screen-copy compact">
+            <p class="eyebrow">Step 2</p>
+            <h1>Review what your agent understood.</h1>
+            <p>Edit anything before approving. This is the consent gate.</p>
           </div>
 
+          <div class="review-layout">
+            <section class="review-card">
+              <div class="draft-status" id="draft-status">Loading draft...</div>
+
+              <form class="draft-form" id="draft-form">
+                <label>
+                  Name
+                  <input id="draft-name" type="text" placeholder="Display name" />
+                </label>
+                <label>
+                  City
+                  <input id="draft-city" type="text" placeholder="City" />
+                </label>
+                <label>
+                  Intent
+                  <input id="draft-intent" type="text" placeholder="long_term, marriage" />
+                </label>
+                <label>
+                  Communication
+                  <input id="draft-communication" type="text" placeholder="Direct, reflective..." />
+                </label>
+                <label>
+                  Family expectations
+                  <input id="draft-family" type="text" placeholder="Balanced, high involvement..." />
+                </label>
+                <label>
+                  Children preference
+                  <input id="draft-children" type="text" placeholder="wants_children, open..." />
+                </label>
+                <label>
+                  Values
+                  <input id="draft-values" type="text" placeholder="family, ambition, kindness" />
+                </label>
+                <label>
+                  Lifestyle
+                  <input id="draft-lifestyle" type="text" placeholder="fitness, travel" />
+                </label>
+                <label>
+                  Dealbreakers
+                  <input id="draft-dealbreakers" type="text" placeholder="smoking, casual intent" />
+                </label>
+                <label class="wide-field">
+                  Summary
+                  <textarea id="draft-summary" rows="4" placeholder="Short relationship summary"></textarea>
+                </label>
+              </form>
+            </section>
+
+            <aside class="approval-card">
+              <p class="eyebrow">Consent</p>
+              <h2>Approve for matching</h2>
+              <p>
+                Approved profiles can be used by Omiryn's matching engine. You can
+                save edits, approve the draft, or delete it.
+              </p>
+              <div class="action-stack">
+                <button id="save-draft" class="secondary-button" type="button" disabled>Save edits</button>
+                <button id="approve-draft" type="button" disabled>Approve profile</button>
+                <button id="delete-draft" class="danger-button" type="button" disabled>Delete draft</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="screen matches-screen" id="matches-screen" hidden>
+          <div class="screen-copy compact">
+            <p class="eyebrow">Step 3</p>
+            <h1>Curated suggestions, not endless swiping.</h1>
+            <p>Each suggestion includes compatibility signals and possible friction.</p>
+          </div>
+
+          <div class="matches-toolbar">
+            <button id="refresh-matches" type="button">Refresh suggestions</button>
+          </div>
           <div class="match-list" id="match-list"></div>
         </section>
-      </section>
-    </main>
+      </main>
+    </div>
 
     <script src="/static/app.js"></script>
   </body>
