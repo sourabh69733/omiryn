@@ -2,13 +2,13 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from api.main import CONVERSATIONS, DRAFTS, app
+from api.main import app
+from storage import reset_db
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
-        CONVERSATIONS.clear()
-        DRAFTS.clear()
+        reset_db()
         self.client = TestClient(app)
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
