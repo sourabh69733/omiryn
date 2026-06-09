@@ -48,6 +48,22 @@ For auto-reload during development:
 APP_RELOAD=true ./scripts/start.sh
 ```
 
+## Database
+
+Drafts and agent conversations are persisted through SQLAlchemy.
+
+Local default:
+
+```bash
+DATABASE_URL=sqlite:///./data/omiryn.db
+```
+
+Production target:
+
+```bash
+DATABASE_URL=postgresql+psycopg://user:password@host:5432/omiryn
+```
+
 ## Agent Providers
 
 The app now supports the first Omiryn-owned agent flow:
