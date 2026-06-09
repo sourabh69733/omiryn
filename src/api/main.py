@@ -61,6 +61,7 @@ class AgentProfileSubmission(BaseModel):
     dealbreakers: SourcedList = Field(default_factory=SourcedList)
     soft_preferences: SourcedList = Field(default_factory=SourcedList)
     summary: str = ""
+    extraction_warnings: list[str] = Field(default_factory=list)
 
 
 class DraftProfile(BaseModel):
@@ -150,27 +151,7 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id)
     try:
         raw_profile = await extract_profile(conversation.messages)
-        submission = AgentProfileSubmission(
-            agent_provider=raw_profile.get("agent_provider", "omiryn_agent"),
-            display_name=raw_profile.get("display_name"),
-            age=raw_profile.get("age"),
-            city=raw_profile.get("city", {"value": "unknown"}),
-            relationship_intent=raw_profile.get("relationship_intent", {"value": "unknown"}),
-            values=raw_profile.get("values", {}),
-            lifestyle=raw_profile.get("lifestyle", {}),
-            communication_style=raw_profile.get(
-                "communication_style", {"value": "unknown"}
-            ),
-            family_expectations=raw_profile.get(
-                "family_expectations", {"value": "unknown"}
-            ),
-            children_preference=raw_profile.get(
-                "children_preference", {"value": "unknown"}
-            ),
-            dealbreakers=raw_profile.get("dealbreakers", {}),
-            soft_preferences=raw_profile.get("soft_preferences", {}),
-            summary=raw_profile.get("summary", ""),
-        )
+        submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 

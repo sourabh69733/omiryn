@@ -6,11 +6,16 @@ from typing import Any
 
 import httpx
 
+from agent.extraction import normalize_extracted_profile
+
 ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's matchmaking agent.
 You help users build a private relationship profile for better matching.
 Ask one concise question at a time. Do not flirt. Do not pretend to be a match.
 Focus on intent, values, lifestyle, communication style, family expectations,
 children preference, location constraints, and dealbreakers."""
+
+EXTRACTION_REPAIR_PROMPT = """Your previous response was not valid JSON for Omiryn.
+Return only one JSON object. No markdown, no commentary, no extra text."""
 
 EXTRACTION_SYSTEM_PROMPT = """Extract a structured dating profile from this conversation.
 Return only valid JSON. Do not include markdown.
@@ -29,7 +34,13 @@ Use this shape:
   "soft_preferences": {"values": [], "source": "unknown", "confidence": 0.5},
   "summary": ""
 }
-For every source use one of: user_stated, inferred, unknown."""
+For every source use one of: user_stated, inferred, unknown.
+Rules:
+- If the user did not clearly state a field, use source=inferred only when there is strong evidence.
+- Otherwise use value="unknown", source="unknown", confidence <= 0.5.
+- Do not invent age, city, religion, family preference, children preference, or dealbreakers.
+- Keep values and lifestyle as short snake_case strings.
+- Keep summary under 40 words."""
 
 
 class AgentProviderError(RuntimeError):
@@ -50,7 +61,7 @@ async def generate_agent_reply(messages: list[dict[str, str]]) -> str:
 async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
     provider = _provider_name()
     if provider == "mock":
-        return _mock_profile(messages)
+        return normalize_extracted_profile(_mock_profile(messages), provider)
 
     extraction_messages = [
         {
@@ -67,7 +78,17 @@ async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
     else:
         raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
 
-    return _parse_json_object(content)
+    try:
+        raw_profile = _parse_json_object(content)
+    except (json.JSONDecodeError, AgentProviderError):
+        repair_messages = extraction_messages + [{"role": "assistant", "content": content}]
+        if provider == "groq":
+            content = await _groq_chat(EXTRACTION_REPAIR_PROMPT, repair_messages, temperature=0)
+        else:
+            content = await _ollama_chat(EXTRACTION_REPAIR_PROMPT, repair_messages, temperature=0)
+        raw_profile = _parse_json_object(content)
+
+    return normalize_extracted_profile(raw_profile, provider)
 
 
 def _provider_name() -> str:

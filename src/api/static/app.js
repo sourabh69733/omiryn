@@ -24,6 +24,7 @@ const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
 const deleteDraft = document.querySelector("#delete-draft");
 const draftStatus = document.querySelector("#draft-status");
+const warningList = document.querySelector("#warning-list");
 const reviewNav = document.querySelector("#review-nav");
 const draftInputs = {
   name: document.querySelector("#draft-name"),
@@ -138,6 +139,7 @@ async function loadDraft(draftId) {
   activeDraftId = draft.id;
   reviewNav.href = `/drafts/${draft.id}`;
   fillDraftForm(draft);
+  renderExtractionWarnings(draft.submission.extraction_warnings || []);
   setDraftStatus(
     draft.status === "approved"
       ? "Approved. This profile is ready for matching."
@@ -145,6 +147,19 @@ async function loadDraft(draftId) {
     draft.status
   );
   setDraftButtons(draft.status);
+}
+
+function renderExtractionWarnings(warnings) {
+  if (!warnings.length) {
+    warningList.hidden = true;
+    warningList.innerHTML = "";
+    return;
+  }
+
+  warningList.hidden = false;
+  warningList.innerHTML = warnings
+    .map((warning) => `<span>${warning}</span>`)
+    .join("");
 }
 
 function fillDraftForm(draft) {
