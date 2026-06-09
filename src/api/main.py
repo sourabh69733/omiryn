@@ -9,10 +9,15 @@ from pydantic import BaseModel, Field
 
 from agent.providers import AgentProviderError, extract_profile, generate_agent_reply
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
+from storage import (
+    get_conversation as storage_get_conversation,
+    get_draft as storage_get_draft,
+    init_db,
+    save_conversation,
+    save_draft,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
-DRAFTS: dict[str, "DraftProfile"] = {}
-CONVERSATIONS: dict[str, "AgentConversation"] = {}
 
 app = FastAPI(
     title="Omiryn API",
@@ -20,6 +25,11 @@ app = FastAPI(
     description="AI-assisted matchmaking platform API.",
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.on_event("startup")
+def startup() -> None:
+    init_db()
 
 
 class SourcedString(BaseModel):
@@ -109,7 +119,7 @@ def create_agent_conversation() -> AgentConversation:
             }
         ],
     )
-    CONVERSATIONS[conversation_id] = conversation
+    save_conversation(conversation.model_dump(mode="json"))
     return conversation
 
 
@@ -131,7 +141,7 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     conversation.messages.append({"role": "assistant", "content": reply})
-    CONVERSATIONS[conversation_id] = conversation
+    save_conversation(conversation.model_dump(mode="json"))
     return conversation
 
 
@@ -165,9 +175,11 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     draft_id = str(uuid4())
-    DRAFTS[draft_id] = DraftProfile(id=draft_id, status="draft", submission=submission)
+    save_draft(
+        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json")
+    )
     conversation.status = "extracted"
-    CONVERSATIONS[conversation_id] = conversation
+    save_conversation(conversation.model_dump(mode="json"))
     return {
         "draft_id": draft_id,
         "status": "draft",
@@ -178,7 +190,9 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
 @app.post("/api/agent-submissions/profile", status_code=201)
 def submit_agent_profile(submission: AgentProfileSubmission) -> dict[str, str]:
     draft_id = str(uuid4())
-    DRAFTS[draft_id] = DraftProfile(id=draft_id, status="draft", submission=submission)
+    save_draft(
+        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json")
+    )
 
     return {
         "draft_id": draft_id,
@@ -242,7 +256,7 @@ def update_draft(draft_id: str, patch: DraftPatch) -> DraftProfile:
         data.summary = patch.summary
 
     updated = DraftProfile(id=draft.id, status=draft.status, submission=data)
-    DRAFTS[draft_id] = updated
+    save_draft(updated.model_dump(mode="json"))
     return updated
 
 
@@ -253,14 +267,18 @@ def approve_draft(draft_id: str) -> DraftProfile:
         raise HTTPException(status_code=409, detail="Only draft profiles can be approved.")
 
     approved = DraftProfile(id=draft.id, status="approved", submission=draft.submission)
-    DRAFTS[draft_id] = approved
+    save_draft(approved.model_dump(mode="json"))
     return approved
 
 
 @app.delete("/api/drafts/{draft_id}")
 def delete_draft(draft_id: str) -> dict[str, str]:
     draft = _get_existing_draft(draft_id)
-    DRAFTS[draft_id] = DraftProfile(id=draft.id, status="deleted", submission=draft.submission)
+    save_draft(
+        DraftProfile(id=draft.id, status="deleted", submission=draft.submission).model_dump(
+            mode="json"
+        )
+    )
     return {"draft_id": draft_id, "status": "deleted"}
 
 
@@ -358,14 +376,14 @@ def demo_matches() -> dict[str, object]:
 
 
 def _get_existing_draft(draft_id: str) -> DraftProfile:
-    draft = DRAFTS.get(draft_id)
-    if not draft or draft.status == "deleted":
+    draft = storage_get_draft(draft_id)
+    if not draft or draft["status"] == "deleted":
         raise HTTPException(status_code=404, detail="Draft profile not found.")
-    return draft
+    return DraftProfile.model_validate(draft)
 
 
 def _get_existing_conversation(conversation_id: str) -> AgentConversation:
-    conversation = CONVERSATIONS.get(conversation_id)
+    conversation = storage_get_conversation(conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
-    return conversation
+    return AgentConversation.model_validate(conversation)
