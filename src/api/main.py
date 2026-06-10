@@ -7,6 +7,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - keeps tests usable before deps install
+    load_dotenv = None
+
+if load_dotenv:
+    load_dotenv()
+
 from agent.providers import AgentProviderError, extract_profile, generate_agent_reply
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
@@ -18,6 +26,7 @@ from storage import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
 
 app = FastAPI(
     title="Omiryn API",
@@ -101,7 +110,7 @@ def health() -> dict[str, str]:
 
 @app.get("/")
 def root() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
 @app.post("/api/agent/conversations", status_code=201)
@@ -266,12 +275,12 @@ def delete_draft(draft_id: str) -> dict[str, str]:
 @app.get("/drafts/{draft_id}")
 def draft_review_page(draft_id: str) -> FileResponse:
     _get_existing_draft(draft_id)
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
 @app.get("/matches")
 def matches_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
 @app.get("/api/demo/matches")
