@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260610-usage-polish" />
   </head>
   <body>
     <div class="app-shell">
@@ -21,6 +21,7 @@
           <a data-nav="interview" href="/">Interview</a>
           <a data-nav="review" href="#" id="review-nav">Review</a>
           <a data-nav="matches" href="/matches">Matches</a>
+          <a data-nav="usage" href="/usage">Usage</a>
         </nav>
       </header>
 
@@ -83,6 +84,9 @@
               <p class="quiet-note">
                 Extraction creates a draft. Nothing enters matching until you approve it.
               </p>
+              <div class="usage-summary" id="usage-summary">
+                Usage will appear after the first agent reply.
+              </div>
             </aside>
           </div>
         </section>
@@ -171,9 +175,83 @@
           </div>
           <div class="match-list" id="match-list"></div>
         </section>
+
+        <section class="screen usage-screen" id="usage-screen" hidden>
+          <div class="usage-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Agent Ops</p>
+              <h1>Token and cost control.</h1>
+              <p>Track every agent call, model choice, latency, token volume, and estimated spend.</p>
+            </div>
+            <button id="refresh-usage" type="button">Refresh</button>
+          </div>
+
+          <div class="usage-grid" id="usage-grid">
+            <article class="metric-card">
+              <span>Requests</span>
+              <strong id="usage-requests">0</strong>
+              <small id="usage-request-detail">0 successful</small>
+            </article>
+            <article class="metric-card">
+              <span>Total tokens</span>
+              <strong id="usage-total-tokens">0</strong>
+              <small id="usage-token-detail">0 input / 0 output</small>
+            </article>
+            <article class="metric-card">
+              <span>Estimated cost</span>
+              <strong id="usage-cost">$0.000000</strong>
+              <small id="usage-cost-detail">Set pricing env for estimates</small>
+            </article>
+            <article class="metric-card">
+              <span>Failures</span>
+              <strong id="usage-failures">0</strong>
+              <small>Provider/network errors</small>
+            </article>
+          </div>
+
+          <div class="usage-panels">
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Model Mix</p>
+                  <h2>Tokens by provider</h2>
+                </div>
+              </div>
+              <div class="provider-list" id="provider-list"></div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Ledger</p>
+                  <h2>Recent agent calls</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Model</th>
+                      <th>Tokens</th>
+                      <th>Latency</th>
+                      <th>Cost</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-events">
+                    <tr>
+                      <td colspan="6">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260610-agent-status"></script>
+    <script src="/static/app.js?v=20260610-usage-polish"></script>
   </body>
 </html>

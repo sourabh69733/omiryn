@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+from time import perf_counter
 from typing import Any
 
 import httpx
 
 from agent.extraction import normalize_extracted_profile
+from storage import save_agent_usage_event
 
 logger = logging.getLogger(__name__)
 
@@ -63,22 +65,54 @@ class AgentProviderError(RuntimeError):
     pass
 
 
-async def generate_agent_reply(messages: list[dict[str, str]]) -> str:
+async def generate_agent_reply(
+    messages: list[dict[str, str]],
+    conversation_id: str | None = None,
+) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
     if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind="chat_reply",
+            provider=provider,
+            model="mock",
+            success=True,
+            latency_ms=0,
+        )
         return _mock_reply(messages)
     if provider == "groq":
-        return await _groq_chat(ONBOARDING_SYSTEM_PROMPT, messages)
+        return await _groq_chat(
+            ONBOARDING_SYSTEM_PROMPT,
+            messages,
+            conversation_id=conversation_id,
+            request_kind="chat_reply",
+        )
     if provider == "ollama":
-        return await _ollama_chat(ONBOARDING_SYSTEM_PROMPT, messages)
+        return await _ollama_chat(
+            ONBOARDING_SYSTEM_PROMPT,
+            messages,
+            conversation_id=conversation_id,
+            request_kind="chat_reply",
+        )
     raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
 
 
-async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
+async def extract_profile(
+    messages: list[dict[str, str]],
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
     provider = _provider_name()
     logger.info("agent.extract provider=%s user_messages=%s", provider, _user_message_count(messages))
     if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind="profile_extract",
+            provider=provider,
+            model="mock",
+            success=True,
+            latency_ms=0,
+        )
         return normalize_extracted_profile(_mock_profile(messages), provider)
 
     extraction_messages = [
@@ -90,9 +124,21 @@ async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
         }
     ]
     if provider == "groq":
-        content = await _groq_chat(EXTRACTION_SYSTEM_PROMPT, extraction_messages, temperature=0)
+        content = await _groq_chat(
+            EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind="profile_extract",
+        )
     elif provider == "ollama":
-        content = await _ollama_chat(EXTRACTION_SYSTEM_PROMPT, extraction_messages, temperature=0)
+        content = await _ollama_chat(
+            EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind="profile_extract",
+        )
     else:
         raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
 
@@ -101,9 +147,21 @@ async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
     except (json.JSONDecodeError, AgentProviderError):
         repair_messages = extraction_messages + [{"role": "assistant", "content": content}]
         if provider == "groq":
-            content = await _groq_chat(EXTRACTION_REPAIR_PROMPT, repair_messages, temperature=0)
+            content = await _groq_chat(
+                EXTRACTION_REPAIR_PROMPT,
+                repair_messages,
+                temperature=0,
+                conversation_id=conversation_id,
+                request_kind="profile_extract_repair",
+            )
         else:
-            content = await _ollama_chat(EXTRACTION_REPAIR_PROMPT, repair_messages, temperature=0)
+            content = await _ollama_chat(
+                EXTRACTION_REPAIR_PROMPT,
+                repair_messages,
+                temperature=0,
+                conversation_id=conversation_id,
+                request_kind="profile_extract_repair",
+            )
         raw_profile = _parse_json_object(content)
 
     return normalize_extracted_profile(raw_profile, provider)
@@ -141,6 +199,8 @@ async def _groq_chat(
     system_prompt: str,
     messages: list[dict[str, str]],
     temperature: float = 0.4,
+    conversation_id: str | None = None,
+    request_kind: str = "chat_reply",
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -160,21 +220,50 @@ async def _groq_chat(
             len(payload["messages"]),
             temperature,
         )
-        response = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json=payload,
-            headers=headers,
-        )
-        response.raise_for_status()
-        logger.info("agent.groq.response status_code=%s", response.status_code)
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+        started_at = perf_counter()
+        try:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            latency_ms = _elapsed_ms(started_at)
+            logger.info("agent.groq.response status_code=%s", response.status_code)
+            data = response.json()
+            usage = data.get("usage") or {}
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="groq",
+                model=payload["model"],
+                success=True,
+                latency_ms=latency_ms,
+                raw_usage=usage,
+                prompt_tokens=usage.get("prompt_tokens"),
+                completion_tokens=usage.get("completion_tokens"),
+                total_tokens=usage.get("total_tokens"),
+            )
+            return data["choices"][0]["message"]["content"]
+        except Exception as error:
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="groq",
+                model=payload["model"],
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                error=str(error),
+            )
+            raise
 
 
 async def _ollama_chat(
     system_prompt: str,
     messages: list[dict[str, str]],
     temperature: float = 0.4,
+    conversation_id: str | None = None,
+    request_kind: str = "chat_reply",
 ) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     payload = {
@@ -185,10 +274,115 @@ async def _ollama_chat(
     }
 
     async with httpx.AsyncClient(timeout=90) as client:
-        response = await client.post(f"{base_url}/api/chat", json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data["message"]["content"]
+        started_at = perf_counter()
+        try:
+            response = await client.post(f"{base_url}/api/chat", json=payload)
+            response.raise_for_status()
+            latency_ms = _elapsed_ms(started_at)
+            data = response.json()
+            prompt_tokens = data.get("prompt_eval_count")
+            completion_tokens = data.get("eval_count")
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="ollama",
+                model=payload["model"],
+                success=True,
+                latency_ms=latency_ms,
+                raw_usage=data,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=_sum_optional_ints(prompt_tokens, completion_tokens),
+            )
+            return data["message"]["content"]
+        except Exception as error:
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="ollama",
+                model=payload["model"],
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                error=str(error),
+            )
+            raise
+
+
+def _record_usage_event(
+    *,
+    conversation_id: str | None,
+    request_kind: str,
+    provider: str,
+    model: str | None,
+    success: bool,
+    latency_ms: int | None,
+    raw_usage: dict[str, Any] | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    total_tokens: int | None = None,
+    error: str | None = None,
+) -> None:
+    event = {
+        "conversation_id": conversation_id,
+        "request_kind": request_kind,
+        "provider": provider,
+        "model": model,
+        "success": success,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "latency_ms": latency_ms,
+        "estimated_cost_usd": _estimated_cost_usd(provider, prompt_tokens, completion_tokens),
+        "error": error[:500] if error else None,
+        "raw_usage": raw_usage or {},
+    }
+    logger.info(
+        "agent.usage provider=%s model=%s kind=%s success=%s prompt_tokens=%s "
+        "completion_tokens=%s total_tokens=%s latency_ms=%s estimated_cost_usd=%s",
+        provider,
+        model,
+        request_kind,
+        success,
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+        latency_ms,
+        event["estimated_cost_usd"],
+    )
+    try:
+        save_agent_usage_event(event)
+    except Exception:
+        logger.exception("agent.usage.persist_failed")
+
+
+def _estimated_cost_usd(
+    provider: str,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+) -> float | None:
+    if provider != "groq" or prompt_tokens is None or completion_tokens is None:
+        return None
+
+    input_cost_per_1m = float(os.getenv("GROQ_INPUT_COST_PER_1M", "0") or 0)
+    output_cost_per_1m = float(os.getenv("GROQ_OUTPUT_COST_PER_1M", "0") or 0)
+    if input_cost_per_1m == 0 and output_cost_per_1m == 0:
+        return None
+
+    return round(
+        (prompt_tokens / 1_000_000 * input_cost_per_1m)
+        + (completion_tokens / 1_000_000 * output_cost_per_1m),
+        8,
+    )
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((perf_counter() - started_at) * 1000)
+
+
+def _sum_optional_ints(first: int | None, second: int | None) -> int | None:
+    if first is None and second is None:
+        return None
+    return (first or 0) + (second or 0)
 
 
 def _parse_json_object(content: str) -> dict[str, Any]:

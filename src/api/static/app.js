@@ -6,7 +6,8 @@ let isSendingMessage = false;
 const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
-  matches: document.querySelector("#matches-screen")
+  matches: document.querySelector("#matches-screen"),
+  usage: document.querySelector("#usage-screen")
 };
 
 const chatLog = document.querySelector("#chat-log");
@@ -19,9 +20,21 @@ const extractProfile = document.querySelector("#extract-profile");
 const readinessScore = document.querySelector("#readiness-score");
 const readinessMeter = document.querySelector("#readiness-meter");
 const signalList = document.querySelector("#signal-list");
+const usageSummary = document.querySelector("#usage-summary");
 
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
+
+const refreshUsage = document.querySelector("#refresh-usage");
+const usageRequests = document.querySelector("#usage-requests");
+const usageRequestDetail = document.querySelector("#usage-request-detail");
+const usageTotalTokens = document.querySelector("#usage-total-tokens");
+const usageTokenDetail = document.querySelector("#usage-token-detail");
+const usageCost = document.querySelector("#usage-cost");
+const usageCostDetail = document.querySelector("#usage-cost-detail");
+const usageFailures = document.querySelector("#usage-failures");
+const providerList = document.querySelector("#provider-list");
+const usageEvents = document.querySelector("#usage-events");
 
 const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
@@ -68,6 +81,7 @@ async function startConversation() {
   extractProfile.disabled = false;
   renderMessages();
   updateReadiness();
+  loadAgentUsage();
   focusChatInput();
 }
 
@@ -149,7 +163,31 @@ async function sendUserMessage() {
     isSendingMessage = false;
     renderMessages();
     updateReadiness();
+    loadAgentUsage();
     focusChatInput();
+  }
+}
+
+async function loadAgentUsage() {
+  if (!usageSummary || !conversationId) return;
+
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/usage`);
+    const data = await response.json();
+    const summary = data.summary || {};
+    const cost = summary.estimated_cost_usd
+      ? ` · $${summary.estimated_cost_usd.toFixed(6)}`
+      : "";
+    const inrCost = summary.estimated_cost_inr
+      ? ` / ₹${summary.estimated_cost_inr.toFixed(4)}`
+      : "";
+    usageSummary.textContent = [
+      `${summary.request_count || 0} agent requests`,
+      `${summary.total_tokens || 0} total tokens`,
+      `${summary.prompt_tokens || 0} in / ${summary.completion_tokens || 0} out${cost}${inrCost}`
+    ].join(" · ");
+  } catch {
+    usageSummary.textContent = "Usage unavailable";
   }
 }
 
@@ -164,12 +202,14 @@ async function extractConversationDraft() {
 
   extractProfile.disabled = true;
   extractProfile.textContent = "Extracting...";
+  await loadAgentUsage();
   const response = await fetch(`/api/agent/conversations/${conversationId}/extract`, {
     method: "POST"
   });
   const data = await response.json();
   extractProfile.disabled = false;
   extractProfile.textContent = "Extract review draft";
+  await loadAgentUsage();
 
   if (data.review_url) {
     window.location.href = data.review_url;
@@ -318,6 +358,142 @@ async function loadMatches() {
   });
 }
 
+async function loadUsageDashboard() {
+  if (!usageEvents) return;
+
+  usageEvents.innerHTML = '<tr><td colspan="6">Loading usage...</td></tr>';
+  providerList.innerHTML = '<div class="loading-row">Loading provider mix...</div>';
+
+  try {
+    const response = await fetch("/api/agent/usage");
+    const data = await response.json();
+    renderUsageSummary(data.summary || {});
+    renderProviderMix(data.events || []);
+    renderUsageEvents(data.events || []);
+  } catch (error) {
+    usageEvents.innerHTML = `<tr><td colspan="6">Could not load usage. ${escapeHtml(error.message)}</td></tr>`;
+    providerList.innerHTML = '<div class="loading-row">Usage unavailable.</div>';
+  }
+}
+
+function renderUsageSummary(summary) {
+  usageRequests.textContent = formatNumber(summary.request_count || 0);
+  usageRequestDetail.textContent = `${formatNumber(summary.successful_request_count || 0)} successful`;
+  usageTotalTokens.textContent = formatNumber(summary.total_tokens || 0);
+  usageTokenDetail.textContent = `${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output`;
+  usageFailures.textContent = formatNumber(summary.failed_request_count || 0);
+
+  if (summary.estimated_cost_usd) {
+    usageCost.textContent = formatUsd(summary.estimated_cost_usd);
+    usageCostDetail.textContent = summary.estimated_cost_inr
+      ? `${formatInr(summary.estimated_cost_inr)} estimated`
+      : "USD estimate";
+  } else {
+    usageCost.textContent = "$0.000000";
+    usageCostDetail.textContent = "Set pricing env for estimates";
+  }
+}
+
+function renderProviderMix(events) {
+  if (!events.length) {
+    providerList.innerHTML = '<div class="table-empty">No agent usage yet.</div>';
+    return;
+  }
+
+  const totals = events.reduce((accumulator, event) => {
+    const key = `${event.provider || "unknown"} · ${event.model || "unknown"}`;
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        provider: event.provider || "unknown",
+        model: event.model || "unknown",
+        requests: 0,
+        tokens: 0,
+        cost: 0
+      };
+    }
+    accumulator[key].requests += 1;
+    accumulator[key].tokens += event.total_tokens || 0;
+    accumulator[key].cost += event.estimated_cost_usd || 0;
+    return accumulator;
+  }, {});
+  const rows = Object.values(totals).sort((first, second) => second.tokens - first.tokens);
+
+  providerList.innerHTML = `
+    <table class="provider-table">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Calls</th>
+          <th>Tokens</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.provider)}<small>${escapeHtml(row.model)}</small></td>
+                <td class="mono">${formatNumber(row.requests)}</td>
+                <td class="mono">${formatNumber(row.tokens)}</td>
+                <td class="mono">${row.cost ? formatUsd(row.cost) : "-"}</td>
+              </tr>
+            `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderUsageEvents(events) {
+  if (!events.length) {
+    usageEvents.innerHTML = '<tr><td class="table-empty" colspan="6">No agent calls logged yet.</td></tr>';
+    return;
+  }
+
+  usageEvents.innerHTML = events
+    .slice(0, 40)
+    .map((event) => {
+      const statusClass = event.success ? "success" : "failed";
+      const statusText = event.success ? "Success" : "Failed";
+      const cost = event.estimated_cost_usd ? formatUsd(event.estimated_cost_usd) : "-";
+      const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+      return `
+        <tr>
+          <td>${escapeHtml(event.request_kind || "-")}<small>${escapeHtml(createdAt)}</small></td>
+          <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
+          <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
+          <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
+          <td class="mono">${cost}</td>
+          <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function formatUsd(value) {
+  return `$${Number(value).toFixed(6)}`;
+}
+
+function formatInr(value) {
+  return `₹${Number(value).toFixed(4)}`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
   event.stopPropagation();
@@ -340,6 +516,7 @@ saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
 refreshMatches.addEventListener("click", loadMatches);
+refreshUsage.addEventListener("click", loadUsageDashboard);
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {
@@ -348,6 +525,9 @@ if (draftId) {
 } else if (window.location.pathname === "/matches") {
   showScreen("matches");
   loadMatches();
+} else if (window.location.pathname === "/usage") {
+  showScreen("usage");
+  loadUsageDashboard();
 } else {
   showScreen("interview");
   startConversation();

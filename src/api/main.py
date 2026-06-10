@@ -28,8 +28,10 @@ from storage import (
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
     init_db,
+    list_agent_usage_events,
     save_conversation,
     save_draft,
+    summarize_agent_usage,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -40,7 +42,16 @@ app = FastAPI(
     version="0.1.0",
     description="AI-assisted matchmaking platform API.",
 )
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: dict[str, object]):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.on_event("startup")
@@ -120,6 +131,23 @@ def agent_status() -> dict[str, object]:
     return agent_runtime_status()
 
 
+@app.get("/api/agent/usage")
+def agent_usage(conversation_id: str | None = None) -> dict[str, object]:
+    return {
+        "summary": summarize_agent_usage(conversation_id),
+        "events": list_agent_usage_events(conversation_id),
+    }
+
+
+@app.get("/api/agent/conversations/{conversation_id}/usage")
+def conversation_agent_usage(conversation_id: str) -> dict[str, object]:
+    _get_existing_conversation(conversation_id)
+    return {
+        "summary": summarize_agent_usage(conversation_id),
+        "events": list_agent_usage_events(conversation_id),
+    }
+
+
 @app.get("/")
 def root() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
@@ -158,7 +186,7 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
 
     conversation.messages.append({"role": "user", "content": payload.message})
     try:
-        reply = await generate_agent_reply(conversation.messages)
+        reply = await generate_agent_reply(conversation.messages, conversation_id=conversation.id)
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
@@ -171,7 +199,7 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
 async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id)
     try:
-        raw_profile = await extract_profile(conversation.messages)
+        raw_profile = await extract_profile(conversation.messages, conversation_id=conversation.id)
         submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -292,6 +320,11 @@ def draft_review_page(draft_id: str) -> FileResponse:
 
 @app.get("/matches")
 def matches_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
+
+
+@app.get("/usage")
+def usage_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 

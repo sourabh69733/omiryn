@@ -1,10 +1,24 @@
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, MetaData, String, Table, create_engine, func, select
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    func,
+    select,
+)
 from sqlalchemy.engine import Engine
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
@@ -29,6 +43,25 @@ agent_conversations = Table(
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+agent_usage_events = Table(
+    "agent_usage_events",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("conversation_id", String, nullable=True),
+    Column("request_kind", String, nullable=False),
+    Column("provider", String, nullable=False),
+    Column("model", String, nullable=True),
+    Column("success", Boolean, nullable=False),
+    Column("prompt_tokens", Integer, nullable=True),
+    Column("completion_tokens", Integer, nullable=True),
+    Column("total_tokens", Integer, nullable=True),
+    Column("latency_ms", Integer, nullable=True),
+    Column("estimated_cost_usd", Float, nullable=True),
+    Column("error", String, nullable=True),
+    Column("raw_usage_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 
@@ -135,3 +168,79 @@ def get_conversation(conversation_id: str) -> dict[str, Any] | None:
         "status": row["status"],
         "messages": row["messages_json"],
     }
+
+
+def save_agent_usage_event(event: dict[str, Any]) -> None:
+    payload = {
+        "id": event.get("id") or str(uuid4()),
+        "conversation_id": event.get("conversation_id"),
+        "request_kind": event["request_kind"],
+        "provider": event["provider"],
+        "model": event.get("model"),
+        "success": event["success"],
+        "prompt_tokens": event.get("prompt_tokens"),
+        "completion_tokens": event.get("completion_tokens"),
+        "total_tokens": event.get("total_tokens"),
+        "latency_ms": event.get("latency_ms"),
+        "estimated_cost_usd": event.get("estimated_cost_usd"),
+        "error": event.get("error"),
+        "raw_usage_json": event.get("raw_usage") or {},
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_usage_events.insert().values(**payload))
+
+
+def list_agent_usage_events(conversation_id: str | None = None) -> list[dict[str, Any]]:
+    statement = select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
+    if conversation_id:
+        statement = statement.where(agent_usage_events.c.conversation_id == conversation_id)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+
+    return [
+        {
+            "id": row["id"],
+            "conversation_id": row["conversation_id"],
+            "request_kind": row["request_kind"],
+            "provider": row["provider"],
+            "model": row["model"],
+            "success": row["success"],
+            "prompt_tokens": row["prompt_tokens"],
+            "completion_tokens": row["completion_tokens"],
+            "total_tokens": row["total_tokens"],
+            "latency_ms": row["latency_ms"],
+            "estimated_cost_usd": row["estimated_cost_usd"],
+            "error": row["error"],
+            "raw_usage": row["raw_usage_json"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        }
+        for row in rows
+    ]
+
+
+def summarize_agent_usage(conversation_id: str | None = None) -> dict[str, Any]:
+    events = list_agent_usage_events(conversation_id)
+    successful_events = [event for event in events if event["success"]]
+    estimated_cost_usd = round(
+        sum(event["estimated_cost_usd"] or 0 for event in events),
+        8,
+    )
+    return {
+        "conversation_id": conversation_id,
+        "request_count": len(events),
+        "successful_request_count": len(successful_events),
+        "failed_request_count": len(events) - len(successful_events),
+        "prompt_tokens": sum(event["prompt_tokens"] or 0 for event in events),
+        "completion_tokens": sum(event["completion_tokens"] or 0 for event in events),
+        "total_tokens": sum(event["total_tokens"] or 0 for event in events),
+        "estimated_cost_usd": estimated_cost_usd,
+        "estimated_cost_inr": _estimated_cost_inr(estimated_cost_usd),
+    }
+
+
+def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:
+    usd_to_inr = float(os.getenv("USD_TO_INR", "0") or 0)
+    if usd_to_inr == 0:
+        return None
+    return round(estimated_cost_usd * usd_to_inr, 6)
