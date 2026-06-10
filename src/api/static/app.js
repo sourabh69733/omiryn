@@ -1,6 +1,7 @@
 let messages = [];
 let conversationId = null;
 let activeDraftId = null;
+let isSendingMessage = false;
 
 const routes = {
   interview: document.querySelector("#interview-screen"),
@@ -11,6 +12,7 @@ const routes = {
 const chatLog = document.querySelector("#chat-log");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
+const sendMessage = document.querySelector("#send-message");
 const resetChat = document.querySelector("#reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
 const readinessScore = document.querySelector("#readiness-score");
@@ -64,6 +66,7 @@ async function startConversation() {
   extractProfile.disabled = false;
   renderMessages();
   updateReadiness();
+  focusChatInput();
 }
 
 function renderMessages() {
@@ -89,25 +92,48 @@ function updateReadiness() {
 }
 
 async function sendUserMessage() {
+  if (isSendingMessage) return;
+
   const text = chatInput.value.trim();
   if (!text || !conversationId) return;
 
   messages.push({ role: "user", content: text });
   chatInput.value = "";
-  chatInput.disabled = true;
+  isSendingMessage = true;
   renderMessages();
   updateReadiness();
+  focusChatInput();
 
-  const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text })
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    const conversation = await response.json();
+
+    if (!response.ok) {
+      throw new Error(conversation.detail || "The agent could not reply.");
+    }
+
+    messages = conversation.messages || messages;
+  } catch (error) {
+    messages.push({
+      role: "assistant",
+      content: `I could not answer that yet. ${error.message}`
+    });
+  } finally {
+    isSendingMessage = false;
+    renderMessages();
+    updateReadiness();
+    focusChatInput();
+  }
+}
+
+function focusChatInput() {
+  window.requestAnimationFrame(() => {
+    chatInput.focus();
   });
-  const conversation = await response.json();
-  messages = conversation.messages || messages;
-  chatInput.disabled = false;
-  renderMessages();
-  updateReadiness();
 }
 
 async function extractConversationDraft() {
@@ -271,7 +297,19 @@ async function loadMatches() {
 
 chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  event.stopPropagation();
   sendUserMessage();
+});
+chatInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  sendUserMessage();
+});
+sendMessage.addEventListener("click", () => {
+  sendUserMessage();
+  focusChatInput();
 });
 resetChat.addEventListener("click", startConversation);
 extractProfile.addEventListener("click", extractConversationDraft);
