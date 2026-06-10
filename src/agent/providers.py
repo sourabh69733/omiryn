@@ -8,11 +8,24 @@ import httpx
 
 from agent.extraction import normalize_extracted_profile
 
-ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's matchmaking agent.
-You help users build a private relationship profile for better matching.
-Ask one concise question at a time. Do not flirt. Do not pretend to be a match.
-Focus on intent, values, lifestyle, communication style, family expectations,
-children preference, location constraints, and dealbreakers."""
+ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private matchmaking interviewer.
+Your job is to understand the user well enough to build a structured dating profile
+for real-world matching.
+
+Behavior:
+- Read the full conversation before replying. Do not follow a fixed questionnaire.
+- Keep replies warm, natural, and short: usually 1-3 sentences.
+- Ask only one clear question at a time.
+- If the user only greets you, greets back briefly and ask the first useful question.
+- If the user gives a vague answer, ask a focused follow-up before moving on.
+- If the user answers clearly, acknowledge the answer in a few words and ask the next missing topic.
+- Do not repeat questions that the user has already answered.
+- Do not flirt, roleplay as a partner, or pretend to be a match.
+
+Collect these topics over time:
+relationship intent, values, lifestyle, communication style, conflict style,
+family expectations, children preference, location constraints, attraction preferences,
+and hard dealbreakers."""
 
 EXTRACTION_REPAIR_PROMPT = """Your previous response was not valid JSON for Omiryn.
 Return only one JSON object. No markdown, no commentary, no extra text."""
@@ -157,6 +170,12 @@ def _parse_json_object(content: str) -> dict[str, Any]:
 
 def _mock_reply(messages: list[dict[str, str]]) -> str:
     user_messages = [message for message in messages if message["role"] == "user"]
+    if user_messages and _is_greeting_only(user_messages[-1]["content"]):
+        return (
+            "Hi, good to meet you. Are you looking for long-term dating, marriage, "
+            "exploring, or something else?"
+        )
+
     prompts = [
         "Are you looking for long-term dating, marriage, exploring, or something else?",
         "What values matter most to you in a partner?",
@@ -165,6 +184,11 @@ def _mock_reply(messages: list[dict[str, str]]) -> str:
         "How should family, children, and location fit into your future relationship?",
     ]
     return prompts[min(len(user_messages), len(prompts) - 1)]
+
+
+def _is_greeting_only(text: str) -> bool:
+    normalized = text.strip().lower().strip(".!?, ")
+    return normalized in {"hi", "hello", "hey", "hii", "heyy", "namaste"}
 
 
 def _mock_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
