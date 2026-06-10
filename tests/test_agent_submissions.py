@@ -81,6 +81,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "long_term",
         )
 
+        usage_response = self.client.get(f"/api/agent/conversations/{conversation_id}/usage")
+        self.assertEqual(usage_response.status_code, 200)
+        usage = usage_response.json()
+        self.assertEqual(usage["summary"]["request_count"], 2)
+        self.assertEqual(usage["summary"]["successful_request_count"], 2)
+        self.assertEqual(
+            {event["request_kind"] for event in usage["events"]},
+            {"chat_reply", "profile_extract"},
+        )
+
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")
 
@@ -90,6 +100,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("model", data)
         self.assertIn("groq_api_key_loaded", data)
         self.assertNotIn("groq_api_key", data)
+
+    def test_usage_page_is_served(self) -> None:
+        response = self.client.get("/usage")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Token and cost control", response.text)
 
     def _create_draft(self) -> str:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())
