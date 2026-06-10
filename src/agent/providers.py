@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
 
 import httpx
 
 from agent.extraction import normalize_extracted_profile
+
+logger = logging.getLogger(__name__)
 
 ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private matchmaking interviewer.
 Your job is to understand the user well enough to build a structured dating profile
@@ -62,6 +65,7 @@ class AgentProviderError(RuntimeError):
 
 async def generate_agent_reply(messages: list[dict[str, str]]) -> str:
     provider = _provider_name()
+    logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
     if provider == "mock":
         return _mock_reply(messages)
     if provider == "groq":
@@ -73,6 +77,7 @@ async def generate_agent_reply(messages: list[dict[str, str]]) -> str:
 
 async def extract_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
     provider = _provider_name()
+    logger.info("agent.extract provider=%s user_messages=%s", provider, _user_message_count(messages))
     if provider == "mock":
         return normalize_extracted_profile(_mock_profile(messages), provider)
 
@@ -108,6 +113,30 @@ def _provider_name() -> str:
     return os.getenv("AGENT_PROVIDER", "mock").strip().lower()
 
 
+def agent_runtime_status() -> dict[str, Any]:
+    provider = _provider_name()
+    return {
+        "provider": provider,
+        "model": _provider_model(provider),
+        "groq_api_key_loaded": bool(os.getenv("GROQ_API_KEY")),
+        "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+    }
+
+
+def _provider_model(provider: str) -> str | None:
+    if provider == "groq":
+        return os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    if provider == "ollama":
+        return os.getenv("OLLAMA_MODEL", "llama3.1")
+    if provider == "mock":
+        return "mock"
+    return None
+
+
+def _user_message_count(messages: list[dict[str, str]]) -> int:
+    return sum(1 for message in messages if message.get("role") == "user")
+
+
 async def _groq_chat(
     system_prompt: str,
     messages: list[dict[str, str]],
@@ -125,12 +154,19 @@ async def _groq_chat(
     headers = {"Authorization": f"Bearer {api_key}"}
 
     async with httpx.AsyncClient(timeout=45) as client:
+        logger.info(
+            "agent.groq.request model=%s messages=%s temperature=%s",
+            payload["model"],
+            len(payload["messages"]),
+            temperature,
+        )
         response = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",
             json=payload,
             headers=headers,
         )
         response.raise_for_status()
+        logger.info("agent.groq.response status_code=%s", response.status_code)
         data = response.json()
         return data["choices"][0]["message"]["content"]
 

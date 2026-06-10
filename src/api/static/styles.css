@@ -212,6 +212,12 @@ p {
   font-size: 20px;
 }
 
+.agent-status {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .secondary-button {
   color: var(--primary);
   background: #e8f1ef;

@@ -13,6 +13,7 @@ const chatLog = document.querySelector("#chat-log");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
+const agentStatus = document.querySelector("#agent-status");
 const resetChat = document.querySelector("#reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
 const readinessScore = document.querySelector("#readiness-score");
@@ -56,6 +57,7 @@ function currentDraftIdFromPath() {
 }
 
 async function startConversation() {
+  loadAgentStatus();
   chatInput.disabled = true;
   extractProfile.disabled = true;
   const response = await fetch("/api/agent/conversations", { method: "POST" });
@@ -67,6 +69,27 @@ async function startConversation() {
   renderMessages();
   updateReadiness();
   focusChatInput();
+}
+
+async function loadAgentStatus() {
+  if (!agentStatus) return;
+
+  try {
+    const response = await fetch("/api/agent/status");
+    const status = await response.json();
+    const provider = titleCase(status.provider || "unknown");
+    const model = status.model || "no model";
+    const keyState = status.provider === "groq"
+      ? status.groq_api_key_loaded ? "key loaded" : "missing key"
+      : "local";
+    agentStatus.textContent = `${provider} · ${model} · ${keyState}`;
+  } catch {
+    agentStatus.textContent = "Agent status unavailable";
+  }
+}
+
+function titleCase(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function renderMessages() {

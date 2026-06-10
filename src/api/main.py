@@ -7,15 +7,22 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover - keeps tests usable before deps install
     load_dotenv = None
 
 if load_dotenv:
-    load_dotenv()
+    load_dotenv(PROJECT_ROOT / ".env")
 
-from agent.providers import AgentProviderError, extract_profile, generate_agent_reply
+from agent.providers import (
+    AgentProviderError,
+    agent_runtime_status,
+    extract_profile,
+    generate_agent_reply,
+)
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
     get_conversation as storage_get_conversation,
@@ -106,6 +113,11 @@ class UserMessage(BaseModel):
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/agent/status")
+def agent_status() -> dict[str, object]:
+    return agent_runtime_status()
 
 
 @app.get("/")
