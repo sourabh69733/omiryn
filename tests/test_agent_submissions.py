@@ -81,6 +81,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "long_term",
         )
 
+    def test_agent_status_exposes_safe_runtime_config(self) -> None:
+        response = self.client.get("/api/agent/status")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("provider", data)
+        self.assertIn("model", data)
+        self.assertIn("groq_api_key_loaded", data)
+        self.assertNotIn("groq_api_key", data)
+
     def _create_draft(self) -> str:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())
         return response.json()["draft_id"]
