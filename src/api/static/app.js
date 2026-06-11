@@ -114,37 +114,11 @@ function renderMessages() {
     content.textContent = message.content;
     bubble.appendChild(content);
 
-    if (message.role === "assistant" && index > 0) {
-      const chips = document.createElement("div");
-      chips.className = "message-chips";
-      signalChipsForConversation().forEach((chip) => {
-        const item = document.createElement("span");
-        item.textContent = chip;
-        chips.appendChild(item);
-      });
-      bubble.appendChild(chips);
-    }
+    // Later: show extracted signal chips below assistant replies.
 
     chatLog.appendChild(bubble);
   });
   chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-function signalChipsForConversation() {
-  const text = messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.content.toLowerCase())
-    .join(" ");
-  const chips = [];
-
-  if (text.includes("marriage")) chips.push("marriage");
-  if (text.includes("long")) chips.push("long_term");
-  if (text.includes("family")) chips.push("family");
-  if (text.includes("calm")) chips.push("calm");
-  if (text.includes("smok")) chips.push("no_smoking");
-  if (text.includes("travel")) chips.push("travel");
-
-  return chips.length ? chips.slice(0, 4) : ["intent", "values"];
 }
 
 function updateReadiness() {
@@ -155,10 +129,6 @@ function updateReadiness() {
 
   Array.from(signalList.children).forEach((item, index) => {
     item.classList.toggle("complete", index < Math.max(1, userMessageCount + 1));
-  });
-
-  document.querySelectorAll("[data-mini-signal]").forEach((item, index) => {
-    item.classList.toggle("complete", index < Math.min(4, userMessageCount));
   });
 }
 
