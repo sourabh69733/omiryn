@@ -93,10 +93,7 @@ async function loadAgentStatus() {
     const status = await response.json();
     const provider = titleCase(status.provider || "unknown");
     const model = status.model || "no model";
-    const keyState = status.provider === "groq"
-      ? status.groq_api_key_loaded ? "key loaded" : "missing key"
-      : "local";
-    agentStatus.textContent = `${provider} · ${model} · ${keyState}`;
+    agentStatus.textContent = `${provider} · ${model}`;
   } catch {
     agentStatus.textContent = "Agent status unavailable";
   }
@@ -108,13 +105,46 @@ function titleCase(value) {
 
 function renderMessages() {
   chatLog.innerHTML = "";
-  messages.forEach((message) => {
+  messages.forEach((message, index) => {
     const bubble = document.createElement("div");
     bubble.className = `message ${message.role === "assistant" ? "agent" : "user"}`;
-    bubble.textContent = message.content;
+
+    const content = document.createElement("div");
+    content.className = "message-content";
+    content.textContent = message.content;
+    bubble.appendChild(content);
+
+    if (message.role === "assistant" && index > 0) {
+      const chips = document.createElement("div");
+      chips.className = "message-chips";
+      signalChipsForConversation().forEach((chip) => {
+        const item = document.createElement("span");
+        item.textContent = chip;
+        chips.appendChild(item);
+      });
+      bubble.appendChild(chips);
+    }
+
     chatLog.appendChild(bubble);
   });
   chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function signalChipsForConversation() {
+  const text = messages
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.toLowerCase())
+    .join(" ");
+  const chips = [];
+
+  if (text.includes("marriage")) chips.push("marriage");
+  if (text.includes("long")) chips.push("long_term");
+  if (text.includes("family")) chips.push("family");
+  if (text.includes("calm")) chips.push("calm");
+  if (text.includes("smok")) chips.push("no_smoking");
+  if (text.includes("travel")) chips.push("travel");
+
+  return chips.length ? chips.slice(0, 4) : ["intent", "values"];
 }
 
 function updateReadiness() {
@@ -125,6 +155,10 @@ function updateReadiness() {
 
   Array.from(signalList.children).forEach((item, index) => {
     item.classList.toggle("complete", index < Math.max(1, userMessageCount + 1));
+  });
+
+  document.querySelectorAll("[data-mini-signal]").forEach((item, index) => {
+    item.classList.toggle("complete", index < Math.min(4, userMessageCount));
   });
 }
 

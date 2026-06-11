@@ -162,9 +162,9 @@ def create_agent_conversation() -> AgentConversation:
             {
                 "role": "assistant",
                 "content": (
-                    "Hi, I am Omiryn's matchmaker. I will help create your private "
-                    "relationship profile. Are you looking for long-term dating, "
-                    "marriage, exploring, or something else?"
+                    "Hi, I am Omiryn. I will ask a few short questions and turn your "
+                    "answers into profile signals when you are ready. Are you looking "
+                    "for long-term dating, marriage, exploring, or something else?"
                 ),
             }
         ],

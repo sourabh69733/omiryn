@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260610-usage-polish" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260611-terminal-font" />
   </head>
   <body>
     <div class="app-shell">
@@ -31,23 +31,30 @@
             <p class="eyebrow">Step 1</p>
             <h1>Build your private relationship profile.</h1>
             <p>
-              Talk with Omiryn's matchmaker. We turn the conversation into structured
-              profile data only after you choose to extract it.
+              Talk with Omiryn. We turn the conversation into structured profile data
+              only after you choose to extract it.
             </p>
           </div>
 
           <div class="interview-layout">
-            <section class="chat-card" aria-labelledby="chat-title">
+            <section class="chat-card agentic-chat" aria-labelledby="chat-title">
               <div class="card-heading">
-                <div>
-                  <p class="eyebrow">AI Interview</p>
-                  <h2 id="chat-title">Matchmaker conversation</h2>
+                <div class="chat-title-lockup">
+                  <span class="terminal-mark" aria-hidden="true"></span>
+                  <h2 id="chat-title">Omiryn</h2>
                   <p class="agent-status" id="agent-status">Checking agent...</p>
                 </div>
-                <button class="secondary-button" id="reset-chat" type="button">New chat</button>
+                <button class="secondary-button" id="reset-chat" type="button">New</button>
               </div>
 
               <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+              <div class="chat-readiness-strip" aria-label="Profile signal readiness">
+                <span data-mini-signal="intent">intent</span>
+                <span data-mini-signal="values">values</span>
+                <span data-mini-signal="lifestyle">lifestyle</span>
+                <span data-mini-signal="dealbreakers">dealbreakers</span>
+              </div>
 
               <form class="composer" id="chat-form">
                 <input
@@ -55,7 +62,7 @@
                   name="message"
                   type="text"
                   autocomplete="off"
-                  placeholder="Tell Omiryn what you want in a relationship"
+                  placeholder="Say what matters..."
                 />
                 <button id="send-message" type="button">Send</button>
               </form>
@@ -252,6 +259,6 @@
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260610-usage-polish"></script>
+    <script src="/static/app.js?v=20260611-terminal-font"></script>
   </body>
 </html>

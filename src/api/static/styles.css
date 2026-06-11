@@ -12,6 +12,8 @@
   --success: #2d7557;
   --warning: #b98225;
   --shadow: 0 18px 50px rgba(23, 32, 38, 0.08);
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-terminal: "JetBrains Mono", "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, ui-monospace, monospace;
 }
 
 * {
@@ -28,8 +30,7 @@ body {
   color: var(--ink);
   background:
     linear-gradient(180deg, #f6f3ed 0%, var(--surface) 34%, #ffffff 100%);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
 }
 
 button,
@@ -198,6 +199,17 @@ p {
   overflow: hidden;
 }
 
+.agentic-chat {
+  border-color: #25333a;
+  color: #e9f2f0;
+  background:
+    linear-gradient(180deg, rgba(22, 33, 39, 0.98), rgba(12, 18, 22, 0.98)),
+    #10181d;
+  font-family: var(--font-terminal);
+  font-variant-ligatures: none;
+  box-shadow: 0 26px 70px rgba(8, 13, 16, 0.32);
+}
+
 .card-heading {
   display: flex;
   align-items: center;
@@ -207,11 +219,40 @@ p {
   border-bottom: 1px solid var(--line);
 }
 
+.agentic-chat .card-heading {
+  padding: 16px 18px;
+  border-bottom-color: #24333a;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chat-title-lockup {
+  display: grid;
+  grid-template-columns: 12px auto;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.terminal-mark {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #64d8cb;
+  box-shadow: 0 0 18px rgba(100, 216, 203, 0.72);
+}
+
 .card-heading h2,
 .signal-card h2,
 .approval-card h2 {
   margin-top: 4px;
   font-size: 20px;
+}
+
+.agentic-chat .card-heading h2 {
+  margin: 0;
+  color: #f7fbfa;
+  font-size: 17px;
+  font-weight: 760;
+  letter-spacing: 0;
 }
 
 .agent-status {
@@ -220,14 +261,36 @@ p {
   font-size: 12px;
 }
 
+.agentic-chat .agent-status {
+  grid-column: 2;
+  margin: 3px 0 0;
+  color: #7f9897;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
 .secondary-button {
   color: var(--primary);
   background: #e8f1ef;
 }
 
+.agentic-chat .secondary-button {
+  min-height: 34px;
+  border: 1px solid #2d4548;
+  color: #b8d8d3;
+  background: rgba(100, 216, 203, 0.08);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
 .secondary-button:hover {
   color: #ffffff;
   background: var(--primary);
+}
+
+.agentic-chat .secondary-button:hover {
+  color: #071113;
+  background: #64d8cb;
 }
 
 .danger-button {
@@ -242,9 +305,16 @@ p {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 14px;
-  padding: 20px;
+  gap: 12px;
+  padding: 18px;
   overflow: auto;
+}
+
+.agentic-chat .chat-log {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 .message {
@@ -255,16 +325,90 @@ p {
   line-height: 1.5;
 }
 
+.agentic-chat .message {
+  max-width: min(82%, 680px);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.62;
+  letter-spacing: 0;
+}
+
 .message.agent {
   align-self: flex-start;
   border: 1px solid #d8e6e1;
   background: #f0f7f4;
 }
 
+.agentic-chat .message.agent {
+  position: relative;
+  border-color: #27424a;
+  color: #dfecea;
+  background: rgba(17, 29, 34, 0.9);
+}
+
+.agentic-chat .message.agent::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -1px;
+  width: 2px;
+  border-radius: 999px;
+  background: #64d8cb;
+  content: "";
+}
+
 .message.user {
   align-self: flex-end;
   border: 1px solid #d5e3e8;
   background: #eef6f8;
+}
+
+.agentic-chat .message.user {
+  border-color: #2b5960;
+  color: #ecfbf8;
+  background: rgba(31, 95, 91, 0.48);
+}
+
+.message-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.message-chips span {
+  border: 1px solid #2d5558;
+  border-radius: 999px;
+  color: #9ee4dc;
+  background: rgba(100, 216, 203, 0.08);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 4px 7px;
+}
+
+.chat-readiness-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 16px 0;
+  background: #10181d;
+}
+
+.chat-readiness-strip span {
+  min-width: 0;
+  border-top: 2px solid #2a383e;
+  color: #647d7e;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding-top: 7px;
+  text-align: center;
+}
+
+.chat-readiness-strip span.complete {
+  border-top-color: #64d8cb;
+  color: #b7efea;
 }
 
 .composer {
@@ -274,6 +418,12 @@ p {
   padding: 16px;
   border-top: 1px solid var(--line);
   background: #ffffff;
+}
+
+.agentic-chat .composer {
+  grid-template-columns: 1fr 76px;
+  border-top-color: #24333a;
+  background: #10181d;
 }
 
 .composer input,
@@ -287,6 +437,31 @@ p {
   outline: none;
 }
 
+.agentic-chat .composer input {
+  border-color: #2b3e45;
+  color: #f4fbfa;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.agentic-chat .composer input::placeholder {
+  color: #6e8486;
+}
+
+.agentic-chat .composer button {
+  border: 1px solid #54bfb5;
+  color: #081315;
+  background: #64d8cb;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.agentic-chat .composer button:hover {
+  background: #87eee5;
+}
+
 .composer input {
   min-width: 0;
   min-height: 46px;
@@ -298,6 +473,11 @@ p {
 .draft-form textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(31, 95, 91, 0.12);
+}
+
+.agentic-chat .composer input:focus {
+  border-color: #64d8cb;
+  box-shadow: 0 0 0 3px rgba(100, 216, 203, 0.12);
 }
 
 .signal-card,
