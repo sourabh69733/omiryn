@@ -16,11 +16,16 @@ const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
 const resetChat = document.querySelector("#reset-chat");
+const sidebarResetChat = document.querySelector("#sidebar-reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
 const readinessScore = document.querySelector("#readiness-score");
 const readinessMeter = document.querySelector("#readiness-meter");
 const signalList = document.querySelector("#signal-list");
 const usageSummary = document.querySelector("#usage-summary");
+const sideTabButtons = document.querySelectorAll("[data-side-tab]");
+const sidePanels = document.querySelectorAll("[data-side-panel]");
+const sidebarMessageCount = document.querySelector("#sidebar-message-count");
+const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
 
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
@@ -81,6 +86,7 @@ async function startConversation() {
   extractProfile.disabled = false;
   renderMessages();
   updateReadiness();
+  updateSidebarMeta();
   loadAgentUsage();
   focusChatInput();
 }
@@ -119,6 +125,31 @@ function renderMessages() {
     chatLog.appendChild(bubble);
   });
   chatLog.scrollTop = chatLog.scrollHeight;
+  updateSidebarMeta();
+}
+
+function updateSidebarMeta() {
+  if (sidebarMessageCount) {
+    const userMessages = messages.filter((message) => message.role === "user").length;
+    const totalMessages = messages.length;
+    sidebarMessageCount.textContent = `${totalMessages} messages · ${userMessages} user`;
+  }
+
+  if (sidebarConversationId) {
+    sidebarConversationId.textContent = conversationId
+      ? `Session ${conversationId.slice(0, 8)}`
+      : "No conversation started.";
+  }
+}
+
+function showSidePanel(name) {
+  sideTabButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.sideTab === name);
+  });
+  sidePanels.forEach((panel) => {
+    panel.hidden = panel.dataset.sidePanel !== name;
+    panel.classList.toggle("active", panel.dataset.sidePanel === name);
+  });
 }
 
 function updateReadiness() {
@@ -515,12 +546,16 @@ sendMessage.addEventListener("click", () => {
   focusChatInput();
 });
 resetChat.addEventListener("click", startConversation);
+sidebarResetChat.addEventListener("click", startConversation);
 extractProfile.addEventListener("click", extractConversationDraft);
 saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
 refreshMatches.addEventListener("click", loadMatches);
 refreshUsage.addEventListener("click", loadUsageDashboard);
+sideTabButtons.forEach((button) => {
+  button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
+});
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {

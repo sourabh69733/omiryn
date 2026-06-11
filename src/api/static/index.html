@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260611-terminal-font" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260611-fullscreen-chat" />
   </head>
   <body>
     <div class="app-shell">
@@ -27,16 +27,69 @@
 
       <main>
         <section class="screen interview-screen" id="interview-screen" hidden>
-          <div class="screen-copy">
-            <p class="eyebrow">Step 1</p>
-            <h1>Build your private relationship profile.</h1>
-            <p>
-              Talk with Omiryn. We turn the conversation into structured profile data
-              only after you choose to extract it.
-            </p>
-          </div>
+          <div class="chat-workspace">
+            <aside class="chat-sidebar" aria-label="Chat workspace details">
+              <div class="sidebar-heading">
+                <p class="eyebrow">Workspace</p>
+                <h1>Omiryn</h1>
+              </div>
 
-          <div class="interview-layout">
+              <div class="side-tabs" role="tablist" aria-label="Chat details">
+                <button class="active" data-side-tab="signals" type="button">Signals</button>
+                <button data-side-tab="history" type="button">History</button>
+                <button data-side-tab="usage" type="button">Usage</button>
+              </div>
+
+              <section class="side-panel active" data-side-panel="signals">
+                <p class="eyebrow">Collected Signals</p>
+                <h2 id="signals-title">Profile readiness</h2>
+
+                <div class="readiness">
+                  <span id="readiness-score">20%</span>
+                  <div class="meter"><i id="readiness-meter"></i></div>
+                </div>
+
+                <ul class="signal-list" id="signal-list">
+                  <li data-signal="intent">Relationship intent</li>
+                  <li data-signal="values">Values</li>
+                  <li data-signal="communication">Communication style</li>
+                  <li data-signal="dealbreakers">Dealbreakers</li>
+                  <li data-signal="family">Family and future</li>
+                </ul>
+
+                <button class="primary-wide" id="extract-profile" type="button">
+                  Extract review draft
+                </button>
+                <p class="quiet-note">
+                  Extraction creates a draft. Nothing enters matching until you approve it.
+                </p>
+              </section>
+
+              <section class="side-panel" data-side-panel="history" hidden>
+                <p class="eyebrow">Chat History</p>
+                <h2>Current session</h2>
+                <div class="history-list">
+                  <div class="history-item active">
+                    <strong>Relationship profile</strong>
+                    <span id="sidebar-message-count">0 messages</span>
+                  </div>
+                </div>
+                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button">
+                  New conversation
+                </button>
+                <p class="quiet-note" id="sidebar-conversation-id">No conversation started.</p>
+              </section>
+
+              <section class="side-panel" data-side-panel="usage" hidden>
+                <p class="eyebrow">Agent Usage</p>
+                <h2>Runtime cost</h2>
+                <div class="usage-summary" id="usage-summary">
+                  Usage will appear after the first agent reply.
+                </div>
+                <a class="side-link" href="/usage">Open usage dashboard</a>
+              </section>
+            </aside>
+
             <section class="chat-card agentic-chat" aria-labelledby="chat-title">
               <div class="card-heading">
                 <div class="chat-title-lockup">
@@ -62,34 +115,6 @@
                 <button id="send-message" type="button">Send</button>
               </form>
             </section>
-
-            <aside class="signal-card" aria-labelledby="signals-title">
-              <p class="eyebrow">Collected Signals</p>
-              <h2 id="signals-title">Profile readiness</h2>
-
-              <div class="readiness">
-                <span id="readiness-score">20%</span>
-                <div class="meter"><i id="readiness-meter"></i></div>
-              </div>
-
-              <ul class="signal-list" id="signal-list">
-                <li data-signal="intent">Relationship intent</li>
-                <li data-signal="values">Values</li>
-                <li data-signal="communication">Communication style</li>
-                <li data-signal="dealbreakers">Dealbreakers</li>
-                <li data-signal="family">Family and future</li>
-              </ul>
-
-              <button class="primary-wide" id="extract-profile" type="button">
-                Extract review draft
-              </button>
-              <p class="quiet-note">
-                Extraction creates a draft. Nothing enters matching until you approve it.
-              </p>
-              <div class="usage-summary" id="usage-summary">
-                Usage will appear after the first agent reply.
-              </div>
-            </aside>
           </div>
         </section>
 
@@ -254,6 +279,6 @@
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260611-terminal-font"></script>
+    <script src="/static/app.js?v=20260611-fullscreen-chat"></script>
   </body>
 </html>
