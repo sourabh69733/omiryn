@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260612-hide-new" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-context-import-fallback" />
   </head>
   <body>
     <div class="app-shell">
@@ -36,6 +36,7 @@
 
               <div class="side-tabs" role="tablist" aria-label="Chat details">
                 <button class="active" data-side-tab="signals" type="button">Signals</button>
+                <button data-side-tab="context" type="button">Context</button>
                 <button data-side-tab="history" type="button">History</button>
                 <button data-side-tab="usage" type="button">Usage</button>
               </div>
@@ -63,6 +64,65 @@
                 <p class="quiet-note">
                   Extraction creates a draft. Nothing enters matching until you approve it.
                 </p>
+              </section>
+
+              <section class="side-panel" data-side-panel="context" hidden>
+                <p class="eyebrow">Import Context</p>
+                <h2>External memory</h2>
+                <p class="quiet-note">
+                  Ask another LLM to summarize you, then paste the result here.
+                </p>
+
+                <label class="context-field">
+                  Prompt to copy
+                  <textarea id="context-prompt" rows="7" readonly>I am using Omiryn to build a private personal profile about myself.
+
+Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
+Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
+
+Return sections:
+1. Basic background and life context, only if known
+2. Personality traits and temperament
+3. Core values, priorities, and beliefs
+4. Interests, hobbies, routines, and lifestyle patterns
+5. Communication style and thinking style
+6. Goals, ambitions, and current focus areas
+7. Strengths, recurring challenges, and stress patterns
+8. Preferences, dislikes, boundaries, and sensitivities
+9. Important unknowns Omiryn should ask me
+
+Rules:
+- Do not invent facts.
+- Mark uncertain points as uncertain.
+- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
+- Avoid exposing names, phone numbers, addresses, or private third-party details.
+- Keep it under 1000 words.</textarea>
+                </label>
+                <button class="secondary-button primary-wide" id="copy-context-prompt" type="button">
+                  Copy prompt
+                </button>
+
+                <label class="context-field">
+                  Source type
+                  <select id="context-source-type">
+                    <option value="llm_profile">ChatGPT / Claude / Gemini summary</option>
+                    <option value="chat_export">Chat export</option>
+                    <option value="manual_notes">Manual notes</option>
+                  </select>
+                </label>
+                <label class="context-field">
+                  Title
+                  <input id="context-title" type="text" value="Imported context" />
+                </label>
+                <label class="context-field">
+                  Paste result
+                  <textarea id="context-content" rows="7" placeholder="Paste the summary or chat context here..."></textarea>
+                </label>
+                <button class="primary-wide" id="save-context-source" type="button">
+                  Save context
+                </button>
+                <p class="quiet-note" id="context-status">No imported context yet.</p>
+                <div class="context-source-list" id="context-source-list"></div>
               </section>
 
               <section class="side-panel" data-side-panel="history" hidden>
@@ -287,6 +347,6 @@
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260612-hide-new"></script>
+    <script src="/static/app.js?v=20260612-context-import-fallback"></script>
   </body>
 </html>

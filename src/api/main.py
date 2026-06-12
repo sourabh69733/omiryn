@@ -29,7 +29,9 @@ from storage import (
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
     init_db,
+    list_context_sources,
     list_agent_usage_events,
+    save_context_source,
     save_conversation,
     save_draft,
     summarize_agent_usage,
@@ -37,6 +39,29 @@ from storage import (
 
 STATIC_DIR = Path(__file__).parent / "static"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
+LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
+
+Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
+Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
+
+Return sections:
+1. Basic background and life context, only if known
+2. Personality traits and temperament
+3. Core values, priorities, and beliefs
+4. Interests, hobbies, routines, and lifestyle patterns
+5. Communication style and thinking style
+6. Goals, ambitions, and current focus areas
+7. Strengths, recurring challenges, and stress patterns
+8. Preferences, dislikes, boundaries, and sensitivities
+9. Important unknowns Omiryn should ask me
+
+Rules:
+- Do not invent facts.
+- Mark uncertain points as uncertain.
+- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
+- Avoid exposing names, phone numbers, addresses, or private third-party details.
+- Keep it under 1000 words.
+"""
 
 app = FastAPI(
     title="Omiryn API",
@@ -132,6 +157,12 @@ class UserMessage(BaseModel):
     message: str = Field(min_length=1)
 
 
+class ContextSourceCreate(BaseModel):
+    source_type: Literal["llm_profile", "chat_export", "manual_notes"] = "llm_profile"
+    title: str = Field(default="Imported context", min_length=1, max_length=120)
+    content: str = Field(min_length=20, max_length=50000)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -157,6 +188,39 @@ def conversation_agent_usage(conversation_id: str) -> dict[str, object]:
         "summary": summarize_agent_usage(conversation_id),
         "events": list_agent_usage_events(conversation_id),
     }
+
+
+@app.get("/api/context-import-prompt")
+def context_import_prompt() -> dict[str, str]:
+    return {"prompt": LLM_CONTEXT_IMPORT_PROMPT}
+
+
+@app.get("/api/agent/conversations/{conversation_id}/context-sources")
+def get_conversation_context_sources(conversation_id: str) -> dict[str, object]:
+    _get_existing_conversation(conversation_id)
+    sources = list_context_sources(conversation_id)
+    return {
+        "count": len(sources),
+        "sources": [_context_source_summary(source) for source in sources],
+    }
+
+
+@app.post("/api/agent/conversations/{conversation_id}/context-sources", status_code=201)
+def create_conversation_context_source(
+    conversation_id: str,
+    payload: ContextSourceCreate,
+) -> dict[str, object]:
+    _get_existing_conversation(conversation_id)
+    source = save_context_source(
+        {
+            "conversation_id": conversation_id,
+            "source_type": payload.source_type,
+            "title": payload.title,
+            "content": payload.content,
+            "metadata": {"content_length": len(payload.content)},
+        }
+    )
+    return _context_source_summary(source)
 
 
 @app.get("/")
@@ -228,6 +292,7 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
             conversation.messages,
             conversation_id=conversation.id,
             model=conversation.agent_model,
+            context_sources=list_context_sources(conversation.id),
         )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -245,6 +310,7 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
             conversation.messages,
             conversation_id=conversation.id,
             model=conversation.agent_model,
+            context_sources=list_context_sources(conversation.id),
         )
         submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
@@ -481,3 +547,16 @@ def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> 
     if model_names:
         return model_names[0]
     return selected or None
+
+
+def _context_source_summary(source: dict[str, object]) -> dict[str, object]:
+    content = str(source.get("content") or "")
+    return {
+        "id": source["id"],
+        "conversation_id": source["conversation_id"],
+        "source_type": source["source_type"],
+        "title": source["title"],
+        "content_length": len(content),
+        "preview": content[:240],
+        "created_at": source["created_at"],
+    }

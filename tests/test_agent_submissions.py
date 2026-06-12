@@ -139,6 +139,38 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["agent_model"], "mock")
 
+    def test_conversation_can_import_external_context(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        prompt_response = self.client.get("/api/context-import-prompt")
+        self.assertEqual(prompt_response.status_code, 200)
+        self.assertIn("privacy-safe self-profile", prompt_response.json()["prompt"])
+
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "ChatGPT summary",
+                "content": (
+                    "The user values calm communication, long-term commitment, "
+                    "family compatibility, and emotionally steady partners."
+                ),
+            },
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        created = create_response.json()
+        self.assertEqual(created["title"], "ChatGPT summary")
+        self.assertGreater(created["content_length"], 20)
+        self.assertNotIn("content", created)
+
+        list_response = self.client.get(
+            f"/api/agent/conversations/{conversation_id}/context-sources"
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["count"], 1)
+
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")
 

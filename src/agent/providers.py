@@ -109,6 +109,7 @@ async def generate_agent_reply(
     messages: list[dict[str, str]],
     conversation_id: str | None = None,
     model: str | None = None,
+    context_sources: list[dict[str, Any]] | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -136,7 +137,7 @@ async def generate_agent_reply(
         return _mock_reply(messages)
     if provider == "groq":
         return await _groq_chat(
-            ONBOARDING_SYSTEM_PROMPT,
+            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -144,7 +145,7 @@ async def generate_agent_reply(
         )
     if provider == "ollama":
         return await _ollama_chat(
-            ONBOARDING_SYSTEM_PROMPT,
+            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -157,6 +158,7 @@ async def extract_profile(
     messages: list[dict[str, str]],
     conversation_id: str | None = None,
     model: str | None = None,
+    context_sources: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     provider = _provider_name()
     logger.info("agent.extract provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -175,9 +177,7 @@ async def extract_profile(
     extraction_messages = [
         {
             "role": "user",
-            "content": "\n".join(
-                f"{message['role']}: {message['content']}" for message in profile_messages
-            ),
+            "content": _conversation_and_context_text(profile_messages, context_sources),
         }
     ]
     if provider == "groq":
@@ -311,6 +311,47 @@ def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dic
         for message in messages
         if message.get("quality") != "low_information"
     ]
+
+
+def _system_prompt_with_context(
+    system_prompt: str,
+    context_sources: list[dict[str, Any]] | None,
+) -> str:
+    context_text = _context_sources_text(context_sources)
+    if not context_text:
+        return system_prompt
+    return (
+        f"{system_prompt}\n\n"
+        "Additional user-provided context is available below. Use it only to ask better "
+        "questions and understand the user. Do not quote private source text back unless "
+        "the user explicitly asks.\n"
+        f"{context_text}"
+    )
+
+
+def _conversation_and_context_text(
+    messages: list[dict[str, str]],
+    context_sources: list[dict[str, Any]] | None,
+) -> str:
+    conversation_text = "\n".join(
+        f"{message['role']}: {message['content']}" for message in messages
+    )
+    context_text = _context_sources_text(context_sources)
+    if not context_text:
+        return conversation_text
+    return f"{context_text}\n\nConversation:\n{conversation_text}"
+
+
+def _context_sources_text(context_sources: list[dict[str, Any]] | None) -> str:
+    if not context_sources:
+        return ""
+    sections = []
+    for source in context_sources[:5]:
+        title = source.get("title") or "Untitled source"
+        source_type = source.get("source_type") or "context"
+        content = str(source.get("content") or "")[:4000]
+        sections.append(f"[{source_type}] {title}\n{content}")
+    return "User-provided context sources:\n" + "\n\n".join(sections)
 
 
 async def _groq_chat(

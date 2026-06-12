@@ -68,6 +68,18 @@ agent_usage_events = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+conversation_context_sources = Table(
+    "conversation_context_sources",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("conversation_id", String, nullable=False),
+    Column("source_type", String, nullable=False),
+    Column("title", String, nullable=False),
+    Column("content", String, nullable=False),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 
 def database_url() -> str:
     return os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
@@ -272,3 +284,44 @@ def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:
     if usd_to_inr == 0:
         return None
     return round(estimated_cost_usd * usd_to_inr, 6)
+
+
+def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "id": source.get("id") or str(uuid4()),
+        "conversation_id": source["conversation_id"],
+        "source_type": source["source_type"],
+        "title": source["title"],
+        "content": source["content"],
+        "metadata_json": source.get("metadata") or {},
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(conversation_context_sources.insert().values(**payload))
+        row = connection.execute(
+            select(conversation_context_sources).where(
+                conversation_context_sources.c.id == payload["id"]
+            )
+        ).mappings().first()
+    return _context_source_from_row(row)
+
+
+def list_context_sources(conversation_id: str) -> list[dict[str, Any]]:
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(conversation_context_sources)
+            .where(conversation_context_sources.c.conversation_id == conversation_id)
+            .order_by(conversation_context_sources.c.created_at.desc())
+        ).mappings().all()
+    return [_context_source_from_row(row) for row in rows]
+
+
+def _context_source_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "conversation_id": row["conversation_id"],
+        "source_type": row["source_type"],
+        "title": row["title"],
+        "content": row["content"],
+        "metadata": row["metadata_json"],
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+    }

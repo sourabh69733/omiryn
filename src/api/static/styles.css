@@ -228,7 +228,7 @@ p {
 
 .side-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   padding: 10px;
   border-bottom: 1px solid var(--line);
@@ -305,6 +305,66 @@ p {
   font-weight: 900;
   padding: 11px 12px;
   text-align: center;
+}
+
+.context-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.context-field input,
+.context-field select,
+.context-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font-size: 12px;
+  outline: none;
+  padding: 10px;
+}
+
+.context-field textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.context-field textarea[readonly] {
+  color: #47545b;
+  background: #f8faf9;
+}
+
+.context-source-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.context-source-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.context-source-item strong,
+.context-source-item span {
+  display: block;
+}
+
+.context-source-item strong {
+  font-size: 13px;
+}
+
+.context-source-item span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .chat-card {

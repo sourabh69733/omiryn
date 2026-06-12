@@ -3,6 +3,31 @@ let conversationId = null;
 let activeDraftId = null;
 let isSendingMessage = false;
 
+const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
+
+Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
+Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
+
+Return sections:
+1. Basic background and life context, only if known
+2. Personality traits and temperament
+3. Core values, priorities, and beliefs
+4. Interests, hobbies, routines, and lifestyle patterns
+5. Communication style and thinking style
+6. Goals, ambitions, and current focus areas
+7. Strengths, recurring challenges, and stress patterns
+8. Preferences, dislikes, boundaries, and sensitivities
+9. Important unknowns Omiryn should ask me
+
+Rules:
+- Do not invent facts.
+- Mark uncertain points as uncertain.
+- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
+- Avoid exposing names, phone numbers, addresses, or private third-party details.
+- Keep it under 1000 words.`;
+
+const activeConversationStorageKey = "omiryn.activeConversationId";
+
 const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
@@ -27,6 +52,14 @@ const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
+const contextPrompt = document.querySelector("#context-prompt");
+const copyContextPrompt = document.querySelector("#copy-context-prompt");
+const contextSourceType = document.querySelector("#context-source-type");
+const contextTitle = document.querySelector("#context-title");
+const contextContent = document.querySelector("#context-content");
+const saveContextSource = document.querySelector("#save-context-source");
+const contextStatus = document.querySelector("#context-status");
+const contextSourceList = document.querySelector("#context-source-list");
 
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
@@ -75,6 +108,31 @@ function currentDraftIdFromPath() {
   return match ? match[1] : null;
 }
 
+function storedConversationId() {
+  try {
+    return window.localStorage.getItem(activeConversationStorageKey);
+  } catch {
+    return null;
+  }
+}
+
+function rememberConversation(id) {
+  conversationId = id;
+  try {
+    window.localStorage.setItem(activeConversationStorageKey, id);
+  } catch {
+    // Browser storage can be unavailable in private or restricted contexts.
+  }
+}
+
+function forgetStoredConversation() {
+  try {
+    window.localStorage.removeItem(activeConversationStorageKey);
+  } catch {
+    // Nothing to clear when browser storage is unavailable.
+  }
+}
+
 async function startConversation() {
   await loadAgentStatus();
   chatInput.disabled = true;
@@ -85,7 +143,34 @@ async function startConversation() {
     body: JSON.stringify({ agent_model: selectedAgentModel() })
   });
   const conversation = await response.json();
-  conversationId = conversation.id;
+  hydrateConversation(conversation);
+}
+
+async function restoreOrStartConversation() {
+  await loadAgentStatus();
+  const savedConversationId = storedConversationId();
+  if (!savedConversationId) {
+    await startConversation();
+    return;
+  }
+
+  chatInput.disabled = true;
+  extractProfile.disabled = true;
+  try {
+    const response = await fetch(`/api/agent/conversations/${savedConversationId}`);
+    if (!response.ok) {
+      throw new Error("Stored conversation was not found.");
+    }
+    const conversation = await response.json();
+    hydrateConversation(conversation);
+  } catch {
+    forgetStoredConversation();
+    await startConversation();
+  }
+}
+
+function hydrateConversation(conversation) {
+  rememberConversation(conversation.id);
   messages = conversation.messages;
   if (conversation.agent_model && agentModelSelect) {
     agentModelSelect.value = conversation.agent_model;
@@ -96,6 +181,8 @@ async function startConversation() {
   renderMessages();
   updateReadiness();
   updateSidebarMeta();
+  loadContextImportPrompt();
+  loadContextSources();
   loadAgentUsage();
   focusChatInput();
 }
@@ -212,6 +299,122 @@ function showSidePanel(name) {
     panel.hidden = panel.dataset.sidePanel !== name;
     panel.classList.toggle("active", panel.dataset.sidePanel === name);
   });
+  if (name === "context") {
+    loadContextImportPrompt();
+    loadContextSources();
+  }
+}
+
+async function loadContextImportPrompt() {
+  if (!contextPrompt || contextPrompt.dataset.loaded === "true") return;
+
+  contextPrompt.value = contextPrompt.value.trim() || contextImportPromptFallback;
+  try {
+    const response = await fetch("/api/context-import-prompt");
+    if (!response.ok) {
+      throw new Error("Prompt API unavailable.");
+    }
+    const data = await response.json();
+    contextPrompt.value = data.prompt || contextImportPromptFallback;
+    contextPrompt.dataset.loaded = "true";
+  } catch {
+    contextPrompt.value = contextImportPromptFallback;
+  }
+}
+
+async function copyContextImportPrompt() {
+  if (!contextPrompt) return;
+
+  try {
+    await navigator.clipboard.writeText(contextPrompt.value);
+    setContextStatus("Prompt copied.");
+  } catch {
+    contextPrompt.select();
+    document.execCommand("copy");
+    setContextStatus("Prompt copied.");
+  }
+}
+
+async function loadContextSources() {
+  if (!conversationId || !contextSourceList) return;
+
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`);
+    if (response.status === 404) {
+      throw new Error("Restart the app server to enable context import.");
+    }
+    if (!response.ok) {
+      throw new Error("Could not load imported context.");
+    }
+    const data = await response.json();
+    renderContextSources(data.sources || []);
+  } catch (error) {
+    setContextStatus(error.message);
+  }
+}
+
+async function saveConversationContextSource() {
+  if (!conversationId || !contextContent || !saveContextSource) return;
+
+  const content = contextContent.value.trim();
+  if (content.length < 20) {
+    setContextStatus("Paste at least a few sentences before saving.");
+    return;
+  }
+
+  saveContextSource.disabled = true;
+  setContextStatus("Saving context...");
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_type: contextSourceType?.value || "llm_profile",
+        title: contextTitle?.value.trim() || "Imported context",
+        content
+      })
+    });
+    const data = await response.json();
+    if (response.status === 404) {
+      throw new Error("Restart the app server to enable context import.");
+    }
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not save context.");
+    }
+    contextContent.value = "";
+    setContextStatus("Context saved. Future replies can use it.");
+    await loadContextSources();
+  } catch (error) {
+    setContextStatus(error.message);
+  } finally {
+    saveContextSource.disabled = false;
+  }
+}
+
+function renderContextSources(sources) {
+  if (!contextSourceList) return;
+
+  if (!sources.length) {
+    contextSourceList.innerHTML = "";
+    setContextStatus("No imported context yet.");
+    return;
+  }
+
+  contextSourceList.innerHTML = sources
+    .map((source) => `
+      <div class="context-source-item">
+        <strong>${escapeHtml(source.title)}</strong>
+        <span>${escapeHtml(source.source_type)} · ${formatNumber(source.content_length)} chars</span>
+      </div>
+    `)
+    .join("");
+  setContextStatus(`${sources.length} context source${sources.length === 1 ? "" : "s"} saved.`);
+}
+
+function setContextStatus(message) {
+  if (contextStatus) {
+    contextStatus.textContent = message;
+  }
 }
 
 function updateReadiness() {
@@ -621,6 +824,8 @@ sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });
 agentModelSelect.addEventListener("change", updateConversationModel);
+copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
+saveContextSource?.addEventListener("click", saveConversationContextSource);
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {
@@ -634,5 +839,5 @@ if (draftId) {
   loadUsageDashboard();
 } else {
   showScreen("interview");
-  startConversation();
+  restoreOrStartConversation();
 }
