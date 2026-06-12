@@ -209,6 +209,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(summary.metadata["selected_sender"], "Aarav")
         self.assertFalse(summary.metadata["raw_chat_stored"])
         self.assertIn("User messages analyzed: 3", summary.content)
+        self.assertIn("Recent chat context", summary.content)
+        self.assertIn("Last parsed sender: Riya", summary.content)
+        self.assertIn("Recent topic terms:", summary.content)
 
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")
