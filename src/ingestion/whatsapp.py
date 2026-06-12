@@ -7,6 +7,7 @@ from dataclasses import dataclass
 WHATSAPP_IMPORT_MAX_CHARS = 1_000_000
 WHATSAPP_STYLE_MAX_MESSAGES = 800
 WHATSAPP_STYLE_SAMPLE_LIMIT = 10
+WHATSAPP_RECENT_CONTEXT_LIMIT = 8
 
 MESSAGE_PATTERNS = [
     re.compile(
@@ -70,6 +71,9 @@ def build_whatsapp_style_summary(
         raise ValueError("Not enough messages from that sender to learn a speaking style.")
 
     samples = _representative_samples(user_messages)
+    recent_messages = _recent_style_messages(messages)
+    recent_terms = _frequent_terms(recent_messages)
+    recent_previews = _recent_previews(recent_messages)
     lengths = [len(message.content) for message in user_messages]
     short_count = sum(1 for length in lengths if length <= 30)
     question_count = sum(1 for message in user_messages if "?" in message.content)
@@ -104,6 +108,12 @@ def build_whatsapp_style_summary(
             f"- Emoji/non-ASCII marker share: {_percentage(emoji_like_count, len(user_messages))}",
             f"- Lowercase opening share: {_percentage(lowercase_start_count, len(user_messages))}",
             f"- Frequent lightweight terms: {', '.join(frequent_terms) if frequent_terms else 'not enough signal'}",
+            "",
+            "Recent chat context, processed from the import:",
+            f"- Last parsed sender: {messages[-1].sender}",
+            f"- Recent topic terms: {', '.join(recent_terms) if recent_terms else 'not enough signal'}",
+            "- Recent message previews are redacted and shortened, not the full transcript.",
+            *[f"- {preview}" for preview in recent_previews],
             "",
             "Representative user style examples, redacted and shortened:",
             *[f"- {sample}" for sample in samples],
@@ -199,6 +209,25 @@ def _representative_samples(messages: list[WhatsappMessage]) -> list[str]:
         if len(samples) == WHATSAPP_STYLE_SAMPLE_LIMIT:
             break
     return samples
+
+
+def _recent_style_messages(messages: list[WhatsappMessage]) -> list[WhatsappMessage]:
+    recent = [
+        message
+        for message in reversed(messages)
+        if _is_style_message(message.content)
+    ]
+    return list(reversed(recent[:WHATSAPP_RECENT_CONTEXT_LIMIT]))
+
+
+def _recent_previews(messages: list[WhatsappMessage]) -> list[str]:
+    previews: list[str] = []
+    for message in messages:
+        text = _redact_private_text(" ".join(message.content.split()))
+        if len(text) < 3:
+            continue
+        previews.append(f"{message.sender}: {_truncate(text, 160)}")
+    return previews
 
 
 def _redact_private_text(text: str) -> str:

@@ -324,7 +324,9 @@ def _system_prompt_with_context(
         f"{system_prompt}\n\n"
         "Additional user-provided context is available below. Use it only to ask better "
         "questions, understand the user, and lightly adapt tone when speaking-style context "
-        "is present. Do not quote private source text back unless the user explicitly asks.\n"
+        "is present. If WhatsApp context is present, you may discuss broad recent topics from "
+        "the processed summary, but be clear you do not have live WhatsApp access or a full "
+        "raw transcript. Do not quote private source text back unless the user explicitly asks.\n"
         f"{context_text}"
     )
 
