@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260612-token-minutes" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-whatsapp-files" />
   </head>
   <body>
     <div class="app-shell">
@@ -106,7 +106,7 @@ Rules:
                   Source type
                   <select id="context-source-type">
                     <option value="llm_profile">ChatGPT / Claude / Gemini summary</option>
-                    <option value="chat_export">Chat export</option>
+                    <option value="chat_export">Short chat summary</option>
                     <option value="manual_notes">Manual notes</option>
                   </select>
                 </label>
@@ -123,6 +123,27 @@ Rules:
                 </button>
                 <p class="quiet-note" id="context-status">No imported context yet.</p>
                 <div class="context-source-list" id="context-source-list"></div>
+
+                <div class="context-divider"></div>
+                <p class="eyebrow">WhatsApp Style</p>
+                <h2>Learn my tone</h2>
+                <p class="quiet-note">
+                  Import normal 1:1 WhatsApp text exports. Omiryn stores only compact speaking-style summaries.
+                </p>
+                <label class="context-field">
+                  Your name in export
+                  <input id="whatsapp-sender" type="text" placeholder="Exact sender name, optional" />
+                </label>
+                <label class="context-field">
+                  WhatsApp .txt files
+                  <input id="whatsapp-files" type="file" accept=".txt,text/plain" multiple />
+                </label>
+                <button class="secondary-button primary-wide" id="save-whatsapp-import" type="button">
+                  Import WhatsApp style
+                </button>
+                <p class="quiet-note" id="whatsapp-status">
+                  V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context.
+                </p>
               </section>
 
               <section class="side-panel" data-side-panel="history" hidden>
@@ -373,6 +394,6 @@ Rules:
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260612-token-minutes"></script>
+    <script src="/static/app.js?v=20260612-whatsapp-files"></script>
   </body>
 </html>

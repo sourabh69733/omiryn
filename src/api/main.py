@@ -24,6 +24,7 @@ from agent.providers import (
     extract_profile,
     generate_agent_reply,
 )
+from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
     get_conversation as storage_get_conversation,
@@ -158,9 +159,15 @@ class UserMessage(BaseModel):
 
 
 class ContextSourceCreate(BaseModel):
-    source_type: Literal["llm_profile", "chat_export", "manual_notes"] = "llm_profile"
+    source_type: Literal["llm_profile", "chat_export", "manual_notes", "whatsapp_chat"] = "llm_profile"
     title: str = Field(default="Imported context", min_length=1, max_length=120)
     content: str = Field(min_length=20, max_length=50000)
+
+
+class WhatsappChatImportCreate(BaseModel):
+    title: str = Field(default="WhatsApp speaking style", min_length=1, max_length=120)
+    user_sender: str | None = Field(default=None, max_length=120)
+    content: str = Field(min_length=50, max_length=WHATSAPP_IMPORT_MAX_CHARS)
 
 
 @app.get("/health")
@@ -218,6 +225,32 @@ def create_conversation_context_source(
             "title": payload.title,
             "content": payload.content,
             "metadata": {"content_length": len(payload.content)},
+        }
+    )
+    return _context_source_summary(source)
+
+
+@app.post("/api/agent/conversations/{conversation_id}/whatsapp-import", status_code=201)
+def create_whatsapp_context_source(
+    conversation_id: str,
+    payload: WhatsappChatImportCreate,
+) -> dict[str, object]:
+    _get_existing_conversation(conversation_id)
+    try:
+        style_summary = build_whatsapp_style_summary(
+            payload.content,
+            user_sender=payload.user_sender,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    source = save_context_source(
+        {
+            "conversation_id": conversation_id,
+            "source_type": "whatsapp_chat",
+            "title": payload.title,
+            "content": style_summary.content,
+            "metadata": style_summary.metadata,
         }
     )
     return _context_source_summary(source)
@@ -310,7 +343,7 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
             conversation.messages,
             conversation_id=conversation.id,
             model=conversation.agent_model,
-            context_sources=list_context_sources(conversation.id),
+            context_sources=_profile_extraction_context_sources(conversation.id),
         )
         submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
@@ -534,6 +567,14 @@ def _get_existing_conversation(conversation_id: str) -> AgentConversation:
     if not conversation:
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return AgentConversation.model_validate(conversation)
+
+
+def _profile_extraction_context_sources(conversation_id: str) -> list[dict[str, object]]:
+    return [
+        source
+        for source in list_context_sources(conversation_id)
+        if source.get("source_type") != "whatsapp_chat"
+    ]
 
 
 def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> str | None:

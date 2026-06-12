@@ -339,6 +339,16 @@ p {
   background: #f8faf9;
 }
 
+.context-field input[type="file"] {
+  cursor: pointer;
+}
+
+.context-divider {
+  height: 1px;
+  margin: 18px 0;
+  background: var(--line);
+}
+
 .context-source-list {
   display: grid;
   gap: 8px;

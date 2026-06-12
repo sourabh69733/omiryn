@@ -323,8 +323,8 @@ def _system_prompt_with_context(
     return (
         f"{system_prompt}\n\n"
         "Additional user-provided context is available below. Use it only to ask better "
-        "questions and understand the user. Do not quote private source text back unless "
-        "the user explicitly asks.\n"
+        "questions, understand the user, and lightly adapt tone when speaking-style context "
+        "is present. Do not quote private source text back unless the user explicitly asks.\n"
         f"{context_text}"
     )
 
