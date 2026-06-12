@@ -35,6 +35,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -339,6 +340,45 @@ p {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.chat-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-picker {
+  display: grid;
+  gap: 4px;
+  min-width: 230px;
+}
+
+.model-picker span {
+  color: #6e8586;
+  font-family: var(--font-terminal);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.model-picker select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #2d4548;
+  border-radius: 8px;
+  color: #d8ebe8;
+  background: #132127;
+  font-family: var(--font-terminal);
+  font-size: 11px;
+  outline: none;
+  padding: 0 32px 0 10px;
+}
+
+.model-picker select:focus {
+  border-color: #64d8cb;
+  box-shadow: 0 0 0 3px rgba(100, 216, 203, 0.12);
+}
+
 .chat-title-lockup {
   display: grid;
   grid-template-columns: 12px auto;
@@ -481,6 +521,20 @@ p {
   border-color: #2b5960;
   color: #ecfbf8;
   background: rgba(31, 95, 91, 0.48);
+}
+
+.agentic-chat .message.user.low-information {
+  border-color: #56646a;
+  color: #9babaf;
+  background: rgba(70, 83, 89, 0.42);
+}
+
+.agentic-chat .message.user.low-information::after {
+  display: block;
+  margin-top: 6px;
+  color: #7f9094;
+  font-size: 10px;
+  content: "ignored";
 }
 
 .message-chips {
@@ -1078,6 +1132,16 @@ p {
 
   .chat-card {
     min-height: 560px;
+  }
+
+  .agentic-chat .card-heading,
+  .chat-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .model-picker {
+    min-width: 0;
   }
 
   .message {

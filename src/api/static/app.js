@@ -15,6 +15,7 @@ const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
+const agentModelSelect = document.querySelector("#agent-model-select");
 const resetChat = document.querySelector("#reset-chat");
 const sidebarResetChat = document.querySelector("#sidebar-reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
@@ -75,13 +76,21 @@ function currentDraftIdFromPath() {
 }
 
 async function startConversation() {
-  loadAgentStatus();
+  await loadAgentStatus();
   chatInput.disabled = true;
   extractProfile.disabled = true;
-  const response = await fetch("/api/agent/conversations", { method: "POST" });
+  const response = await fetch("/api/agent/conversations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_model: selectedAgentModel() })
+  });
   const conversation = await response.json();
   conversationId = conversation.id;
   messages = conversation.messages;
+  if (conversation.agent_model && agentModelSelect) {
+    agentModelSelect.value = conversation.agent_model;
+  }
+  updateAgentStatusModel();
   chatInput.disabled = false;
   extractProfile.disabled = false;
   renderMessages();
@@ -99,10 +108,60 @@ async function loadAgentStatus() {
     const status = await response.json();
     const provider = titleCase(status.provider || "unknown");
     const model = status.model || "no model";
-    agentStatus.textContent = `${provider} · ${model}`;
+    configureModelSelect(status.available_models || [], model);
+    agentStatus.dataset.provider = provider;
+    updateAgentStatusModel();
   } catch {
     agentStatus.textContent = "Agent status unavailable";
   }
+}
+
+function configureModelSelect(models, selectedModel) {
+  if (!agentModelSelect) return;
+
+  const currentValue = agentModelSelect.value || selectedModel;
+  agentModelSelect.innerHTML = "";
+  models.forEach((model) => {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    agentModelSelect.appendChild(option);
+  });
+
+  if (!models.length) {
+    const option = document.createElement("option");
+    option.value = selectedModel;
+    option.textContent = selectedModel;
+    agentModelSelect.appendChild(option);
+  }
+
+  agentModelSelect.value = models.includes(currentValue) ? currentValue : selectedModel;
+}
+
+function selectedAgentModel() {
+  return agentModelSelect ? agentModelSelect.value : null;
+}
+
+function updateAgentStatusModel() {
+  if (!agentStatus) return;
+
+  const provider = agentStatus.dataset.provider || "Agent";
+  agentStatus.textContent = `${provider} · ${selectedAgentModel() || "no model"}`;
+}
+
+async function updateConversationModel() {
+  if (!conversationId || !selectedAgentModel()) return;
+
+  const response = await fetch(`/api/agent/conversations/${conversationId}/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_model: selectedAgentModel() })
+  });
+  const conversation = await response.json();
+  if (conversation.agent_model && agentModelSelect) {
+    agentModelSelect.value = conversation.agent_model;
+  }
+  updateAgentStatusModel();
 }
 
 function titleCase(value) {
@@ -114,6 +173,9 @@ function renderMessages() {
   messages.forEach((message, index) => {
     const bubble = document.createElement("div");
     bubble.className = `message ${message.role === "assistant" ? "agent" : "user"}`;
+    if (message.quality === "low_information") {
+      bubble.classList.add("low-information");
+    }
 
     const content = document.createElement("div");
     content.className = "message-content";
@@ -153,7 +215,9 @@ function showSidePanel(name) {
 }
 
 function updateReadiness() {
-  const userMessageCount = messages.filter((message) => message.role === "user").length;
+  const userMessageCount = messages.filter(
+    (message) => message.role === "user" && message.quality !== "low_information"
+  ).length;
   const score = Math.min(100, 20 + userMessageCount * 20);
   readinessScore.textContent = `${score}%`;
   readinessMeter.style.width = `${score}%`;
@@ -545,8 +609,8 @@ sendMessage.addEventListener("click", () => {
   sendUserMessage();
   focusChatInput();
 });
-resetChat.addEventListener("click", startConversation);
-sidebarResetChat.addEventListener("click", startConversation);
+resetChat?.addEventListener("click", startConversation);
+sidebarResetChat?.addEventListener("click", startConversation);
 extractProfile.addEventListener("click", extractConversationDraft);
 saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
@@ -556,6 +620,7 @@ refreshUsage.addEventListener("click", loadUsageDashboard);
 sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });
+agentModelSelect.addEventListener("change", updateConversationModel);
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {

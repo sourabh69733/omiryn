@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260611-fullscreen-chat" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-hide-new" />
   </head>
   <body>
     <div class="app-shell">
@@ -74,7 +74,8 @@
                     <span id="sidebar-message-count">0 messages</span>
                   </div>
                 </div>
-                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button">
+                <!-- Later: re-enable manual new conversation control. -->
+                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button" hidden>
                   New conversation
                 </button>
                 <p class="quiet-note" id="sidebar-conversation-id">No conversation started.</p>
@@ -97,7 +98,14 @@
                   <h2 id="chat-title">Omiryn</h2>
                   <p class="agent-status" id="agent-status">Checking agent...</p>
                 </div>
-                <button class="secondary-button" id="reset-chat" type="button">New</button>
+                <div class="chat-controls">
+                  <label class="model-picker">
+                    <span>Model</span>
+                    <select id="agent-model-select" aria-label="Choose agent model"></select>
+                  </label>
+                  <!-- Later: re-enable manual new conversation control. -->
+                  <button class="secondary-button" id="reset-chat" type="button" hidden>New</button>
+                </div>
               </div>
 
               <div class="chat-log" id="chat-log" aria-live="polite"></div>
@@ -279,6 +287,6 @@
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260611-fullscreen-chat"></script>
+    <script src="/static/app.js?v=20260612-hide-new"></script>
   </body>
 </html>

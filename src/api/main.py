@@ -20,6 +20,7 @@ if load_dotenv:
 from agent.providers import (
     AgentProviderError,
     agent_runtime_status,
+    assess_user_message_quality,
     extract_profile,
     generate_agent_reply,
 )
@@ -114,7 +115,17 @@ class DraftPatch(BaseModel):
 class AgentConversation(BaseModel):
     id: str
     status: Literal["active", "extracted"] = "active"
+    agent_provider: str | None = None
+    agent_model: str | None = None
     messages: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AgentConversationCreate(BaseModel):
+    agent_model: str | None = None
+
+
+class AgentConversationSettings(BaseModel):
+    agent_model: str
 
 
 class UserMessage(BaseModel):
@@ -154,10 +165,17 @@ def root() -> FileResponse:
 
 
 @app.post("/api/agent/conversations", status_code=201)
-def create_agent_conversation() -> AgentConversation:
+def create_agent_conversation(payload: AgentConversationCreate | None = None) -> AgentConversation:
     conversation_id = str(uuid4())
+    runtime = agent_runtime_status()
+    selected_model = _normalize_selected_model(
+        payload.agent_model if payload else None,
+        runtime,
+    )
     conversation = AgentConversation(
         id=conversation_id,
+        agent_provider=str(runtime["provider"]),
+        agent_model=selected_model,
         messages=[
             {
                 "role": "assistant",
@@ -178,15 +196,39 @@ def get_agent_conversation(conversation_id: str) -> AgentConversation:
     return _get_existing_conversation(conversation_id)
 
 
+@app.patch("/api/agent/conversations/{conversation_id}/settings")
+def update_agent_conversation_settings(
+    conversation_id: str,
+    payload: AgentConversationSettings,
+) -> AgentConversation:
+    conversation = _get_existing_conversation(conversation_id)
+    if conversation.status != "active":
+        raise HTTPException(status_code=409, detail="Conversation already extracted.")
+
+    runtime = agent_runtime_status()
+    conversation.agent_provider = str(runtime["provider"])
+    conversation.agent_model = _normalize_selected_model(payload.agent_model, runtime)
+    save_conversation(conversation.model_dump(mode="json"))
+    return conversation
+
+
 @app.post("/api/agent/conversations/{conversation_id}/messages")
 async def send_agent_message(conversation_id: str, payload: UserMessage) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
 
-    conversation.messages.append({"role": "user", "content": payload.message})
+    user_message = {"role": "user", "content": payload.message}
+    quality = assess_user_message_quality(conversation.messages + [user_message])
+    if not quality["valid"]:
+        user_message["quality"] = "low_information"
+    conversation.messages.append(user_message)
     try:
-        reply = await generate_agent_reply(conversation.messages, conversation_id=conversation.id)
+        reply = await generate_agent_reply(
+            conversation.messages,
+            conversation_id=conversation.id,
+            model=conversation.agent_model,
+        )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
@@ -199,7 +241,11 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
 async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id)
     try:
-        raw_profile = await extract_profile(conversation.messages, conversation_id=conversation.id)
+        raw_profile = await extract_profile(
+            conversation.messages,
+            conversation_id=conversation.id,
+            model=conversation.agent_model,
+        )
         submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -422,3 +468,16 @@ def _get_existing_conversation(conversation_id: str) -> AgentConversation:
     if not conversation:
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return AgentConversation.model_validate(conversation)
+
+
+def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> str | None:
+    available_models = runtime.get("available_models")
+    if not isinstance(available_models, list):
+        available_models = []
+    model_names = [str(candidate) for candidate in available_models]
+    selected = model or str(runtime.get("model") or "")
+    if selected and (not model_names or selected in model_names):
+        return selected
+    if model_names:
+        return model_names[0]
+    return selected or None

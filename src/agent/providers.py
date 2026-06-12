@@ -65,18 +65,71 @@ class AgentProviderError(RuntimeError):
     pass
 
 
+def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str | bool]:
+    latest_user_message = next(
+        (message for message in reversed(messages) if message.get("role") == "user"),
+        None,
+    )
+    if not latest_user_message:
+        return {"valid": True}
+
+    text = latest_user_message.get("content", "")
+    if _is_greeting_only(text):
+        return {"valid": True}
+
+    normalized = _normalized_user_text(text)
+    allowed_short_answers = {
+        "casual",
+        "exploring",
+        "longterm",
+        "long_term",
+        "marriage",
+        "serious",
+    }
+    vague_answers = {"idk", "dont know", "don't know", "maybe", "yes", "no", "ok", "okay"}
+    junk_answers = {"asdf", "qwerty", "test", "knl", "blah", "random"}
+
+    if not normalized:
+        return _quality_result("I did not catch that. Could you answer in a few words?")
+    if normalized in allowed_short_answers:
+        return {"valid": True}
+    if normalized in vague_answers:
+        return _quality_result("That is a little too vague. Could you say what you mean in one sentence?")
+    if normalized in junk_answers:
+        return _quality_result("That does not look like a real answer. Could you answer the question directly?")
+    if len(normalized) < 4:
+        return _quality_result("I did not get enough information. Could you answer with a little more detail?")
+    if _looks_like_gibberish(normalized):
+        return _quality_result("That looks unclear. Could you rephrase it in normal words?")
+
+    return {"valid": True}
+
+
 async def generate_agent_reply(
     messages: list[dict[str, str]],
     conversation_id: str | None = None,
+    model: str | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
+    quality = assess_user_message_quality(messages)
+    if not quality["valid"]:
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind="input_guardrail",
+            provider="guardrail",
+            model="local",
+            success=True,
+            latency_ms=0,
+        )
+        return str(quality["reply"])
+
     if provider == "mock":
         _record_usage_event(
             conversation_id=conversation_id,
             request_kind="chat_reply",
             provider=provider,
-            model="mock",
+            model=model or "mock",
             success=True,
             latency_ms=0,
         )
@@ -87,6 +140,7 @@ async def generate_agent_reply(
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
+            model=model,
         )
     if provider == "ollama":
         return await _ollama_chat(
@@ -94,6 +148,7 @@ async def generate_agent_reply(
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
+            model=model,
         )
     raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
 
@@ -101,6 +156,7 @@ async def generate_agent_reply(
 async def extract_profile(
     messages: list[dict[str, str]],
     conversation_id: str | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     provider = _provider_name()
     logger.info("agent.extract provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -109,17 +165,18 @@ async def extract_profile(
             conversation_id=conversation_id,
             request_kind="profile_extract",
             provider=provider,
-            model="mock",
+            model=model or "mock",
             success=True,
             latency_ms=0,
         )
         return normalize_extracted_profile(_mock_profile(messages), provider)
 
+    profile_messages = _messages_for_profile_extraction(messages)
     extraction_messages = [
         {
             "role": "user",
             "content": "\n".join(
-                f"{message['role']}: {message['content']}" for message in messages
+                f"{message['role']}: {message['content']}" for message in profile_messages
             ),
         }
     ]
@@ -130,6 +187,7 @@ async def extract_profile(
             temperature=0,
             conversation_id=conversation_id,
             request_kind="profile_extract",
+            model=model,
         )
     elif provider == "ollama":
         content = await _ollama_chat(
@@ -138,6 +196,7 @@ async def extract_profile(
             temperature=0,
             conversation_id=conversation_id,
             request_kind="profile_extract",
+            model=model,
         )
     else:
         raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
@@ -153,6 +212,7 @@ async def extract_profile(
                 temperature=0,
                 conversation_id=conversation_id,
                 request_kind="profile_extract_repair",
+                model=model,
             )
         else:
             content = await _ollama_chat(
@@ -161,6 +221,7 @@ async def extract_profile(
                 temperature=0,
                 conversation_id=conversation_id,
                 request_kind="profile_extract_repair",
+                model=model,
             )
         raw_profile = _parse_json_object(content)
 
@@ -176,6 +237,7 @@ def agent_runtime_status() -> dict[str, Any]:
     return {
         "provider": provider,
         "model": _provider_model(provider),
+        "available_models": _available_models(provider),
         "groq_api_key_loaded": bool(os.getenv("GROQ_API_KEY")),
         "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     }
@@ -191,8 +253,64 @@ def _provider_model(provider: str) -> str | None:
     return None
 
 
+def _available_models(provider: str) -> list[str]:
+    if provider == "groq":
+        return _models_from_env(
+            "GROQ_AVAILABLE_MODELS",
+            [
+                os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+            ],
+        )
+    if provider == "ollama":
+        return _models_from_env("OLLAMA_AVAILABLE_MODELS", [os.getenv("OLLAMA_MODEL", "llama3.1")])
+    if provider == "mock":
+        return ["mock"]
+    return []
+
+
+def _models_from_env(env_name: str, defaults: list[str]) -> list[str]:
+    configured = [
+        model.strip()
+        for model in os.getenv(env_name, "").split(",")
+        if model.strip()
+    ]
+    models = configured or defaults
+    return list(dict.fromkeys(models))
+
+
 def _user_message_count(messages: list[dict[str, str]]) -> int:
     return sum(1 for message in messages if message.get("role") == "user")
+
+
+def _quality_result(reply: str) -> dict[str, str | bool]:
+    return {"valid": False, "reply": reply}
+
+
+def _normalized_user_text(text: str) -> str:
+    return " ".join(
+        "".join(character.lower() if character.isalnum() else " " for character in text).split()
+    )
+
+
+def _looks_like_gibberish(normalized: str) -> bool:
+    compact = normalized.replace(" ", "")
+    if not compact:
+        return True
+    if len(compact) <= 5 and not any(character in "aeiou" for character in compact):
+        return True
+    if len(set(compact)) <= 2 and len(compact) >= 4:
+        return True
+    return False
+
+
+def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        message
+        for message in messages
+        if message.get("quality") != "low_information"
+    ]
 
 
 async def _groq_chat(
@@ -201,13 +319,14 @@ async def _groq_chat(
     temperature: float = 0.4,
     conversation_id: str | None = None,
     request_kind: str = "chat_reply",
+    model: str | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise AgentProviderError("GROQ_API_KEY is required when AGENT_PROVIDER=groq.")
 
     payload = {
-        "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        "model": model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
         "messages": [{"role": "system", "content": system_prompt}] + messages,
         "temperature": temperature,
     }
@@ -264,10 +383,11 @@ async def _ollama_chat(
     temperature: float = 0.4,
     conversation_id: str | None = None,
     request_kind: str = "chat_reply",
+    model: str | None = None,
 ) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     payload = {
-        "model": os.getenv("OLLAMA_MODEL", "llama3.1"),
+        "model": model or os.getenv("OLLAMA_MODEL", "llama3.1"),
         "messages": [{"role": "system", "content": system_prompt}] + messages,
         "stream": False,
         "options": {"temperature": temperature},
@@ -422,7 +542,12 @@ def _is_greeting_only(text: str) -> bool:
 
 
 def _mock_profile(messages: list[dict[str, str]]) -> dict[str, Any]:
-    text = " ".join(message["content"].lower() for message in messages if message["role"] == "user")
+    profile_messages = _messages_for_profile_extraction(messages)
+    text = " ".join(
+        message["content"].lower()
+        for message in profile_messages
+        if message["role"] == "user"
+    )
     city = "Bengaluru" if "bengaluru" in text or "bangalore" in text else "unknown"
     intent = "marriage" if "marriage" in text else "long_term" if "long" in text else "unknown"
     dealbreakers = []

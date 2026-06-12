@@ -91,6 +91,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
             {"chat_reply", "profile_extract"},
         )
 
+    def test_low_quality_agent_answer_is_rejected_before_model_call(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "knl"},
+        )
+
+        self.assertEqual(message_response.status_code, 200)
+        messages = message_response.json()["messages"]
+        self.assertEqual(messages[-2]["quality"], "low_information")
+        self.assertIn("real answer", messages[-1]["content"])
+
+        usage_response = self.client.get(f"/api/agent/conversations/{conversation_id}/usage")
+        usage = usage_response.json()
+        self.assertEqual(usage["summary"]["request_count"], 1)
+        self.assertEqual(usage["events"][0]["request_kind"], "input_guardrail")
+        self.assertEqual(usage["events"][0]["provider"], "guardrail")
+
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")
 
@@ -98,8 +118,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
         data = response.json()
         self.assertIn("provider", data)
         self.assertIn("model", data)
+        self.assertIn("available_models", data)
         self.assertIn("groq_api_key_loaded", data)
         self.assertNotIn("groq_api_key", data)
+
+    def test_conversation_can_store_selected_model(self) -> None:
+        response = self.client.post(
+            "/api/agent/conversations",
+            json={"agent_model": "mock"},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        conversation = response.json()
+        self.assertEqual(conversation["agent_model"], "mock")
+
+        update_response = self.client.patch(
+            f"/api/agent/conversations/{conversation['id']}/settings",
+            json={"agent_model": "mock"},
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["agent_model"], "mock")
 
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")
