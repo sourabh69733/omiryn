@@ -349,6 +349,49 @@ p {
   background: var(--line);
 }
 
+.quiet-note[data-state="working"] {
+  color: var(--primary);
+}
+
+.quiet-note[data-state="success"] {
+  color: #16803c;
+  font-weight: 800;
+}
+
+.quiet-note[data-state="error"] {
+  color: #b42318;
+  font-weight: 800;
+}
+
+.whatsapp-import-log {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.whatsapp-import-item {
+  border: 1px solid rgba(39, 119, 111, 0.22);
+  border-radius: 8px;
+  background: #f4fbf9;
+  padding: 10px;
+}
+
+.whatsapp-import-item strong,
+.whatsapp-import-item span {
+  display: block;
+}
+
+.whatsapp-import-item strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.whatsapp-import-item span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .context-source-list {
   display: grid;
   gap: 8px;

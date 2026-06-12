@@ -66,6 +66,7 @@ const whatsappFiles = document.querySelector("#whatsapp-files");
 const whatsappContent = document.querySelector("#whatsapp-content");
 const saveWhatsappImport = document.querySelector("#save-whatsapp-import");
 const whatsappStatus = document.querySelector("#whatsapp-status");
+const whatsappImportLog = document.querySelector("#whatsapp-import-log");
 
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchList = document.querySelector("#match-list");
@@ -399,40 +400,51 @@ async function saveConversationContextSource() {
 }
 
 async function saveWhatsappStyleImport() {
-  if (!conversationId || !whatsappContent || !saveWhatsappImport) return;
+  if (!saveWhatsappImport) return;
+  if (!conversationId) {
+    setWhatsappStatus("Conversation is still loading. Try again in a moment.", "error");
+    return;
+  }
 
   let imports;
   try {
     imports = await whatsappImportPayloads();
   } catch (error) {
-    setWhatsappStatus(error.message);
+    setWhatsappStatus(error.message, "error");
     return;
   }
 
   if (!imports.length) {
-    setWhatsappStatus("Choose WhatsApp .txt files or paste one text export before importing.");
+    setWhatsappStatus("Choose WhatsApp .txt files or paste one text export before importing.", "error");
     return;
   }
 
   saveWhatsappImport.disabled = true;
-  setWhatsappStatus(`Analyzing ${imports.length} WhatsApp export${imports.length === 1 ? "" : "s"}...`);
+  renderWhatsappImportLog([]);
+  setWhatsappStatus(`Analyzing ${imports.length} WhatsApp export${imports.length === 1 ? "" : "s"}...`, "working");
   try {
+    const imported = [];
     for (let index = 0; index < imports.length; index += 1) {
       const item = imports[index];
-      setWhatsappStatus(`Importing ${index + 1}/${imports.length}: ${item.title}`);
-      await importWhatsappPayload(item);
+      setWhatsappStatus(`Importing ${index + 1}/${imports.length}: ${item.title}`, "working");
+      const source = await importWhatsappPayload(item);
+      imported.push(source);
+      renderWhatsappImportLog(imported);
     }
 
     if (whatsappFiles) {
       whatsappFiles.value = "";
     }
-    whatsappContent.value = "";
+    if (whatsappContent) {
+      whatsappContent.value = "";
+    }
     setWhatsappStatus(
-      `${imports.length} WhatsApp style source${imports.length === 1 ? "" : "s"} imported. Future replies can use them.`
+      `${imports.length} WhatsApp style source${imports.length === 1 ? "" : "s"} imported. Future replies can use them.`,
+      "success"
     );
     await loadContextSources();
   } catch (error) {
-    setWhatsappStatus(error.message);
+    setWhatsappStatus(error.message, "error");
   } finally {
     saveWhatsappImport.disabled = false;
   }
@@ -444,7 +456,7 @@ async function whatsappImportPayloads() {
     return Promise.all(files.map(whatsappPayloadFromFile));
   }
 
-  const content = whatsappContent.value.trim();
+  const content = whatsappContent?.value.trim() || "";
   if (!content) return [];
   validateWhatsappImportSize(content, "Pasted export");
   return [
@@ -494,7 +506,7 @@ async function importWhatsappPayload(item) {
     throw new Error("Restart the app server to enable WhatsApp import.");
   }
   if (!response.ok) {
-    throw new Error(data.detail || `Could not import ${item.title}.`);
+    throw new Error(apiErrorMessage(data.detail, `Could not import ${item.title}.`));
   }
   return data;
 }
@@ -512,11 +524,21 @@ function renderContextSources(sources) {
     .map((source) => `
       <div class="context-source-item">
         <strong>${escapeHtml(source.title)}</strong>
-        <span>${escapeHtml(source.source_type)} · ${formatNumber(source.content_length)} chars</span>
+        <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars</span>
       </div>
     `)
     .join("");
   setContextStatus(`${sources.length} context source${sources.length === 1 ? "" : "s"} saved.`);
+}
+
+function contextSourceLabel(sourceType) {
+  const labels = {
+    llm_profile: "LLM profile",
+    chat_export: "Short chat summary",
+    manual_notes: "Manual notes",
+    whatsapp_chat: "WhatsApp style"
+  };
+  return labels[sourceType] || sourceType || "Context";
 }
 
 function setContextStatus(message) {
@@ -525,10 +547,48 @@ function setContextStatus(message) {
   }
 }
 
-function setWhatsappStatus(message) {
+function setWhatsappStatus(message, state = "") {
   if (whatsappStatus) {
     whatsappStatus.textContent = message;
+    whatsappStatus.dataset.state = state;
   }
+}
+
+function updateWhatsappFileSelectionStatus() {
+  const count = whatsappFiles?.files?.length || 0;
+  if (!count) {
+    setWhatsappStatus(
+      "V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context."
+    );
+    renderWhatsappImportLog([]);
+    return;
+  }
+
+  setWhatsappStatus(`${count} WhatsApp .txt file${count === 1 ? "" : "s"} selected. Click Import WhatsApp style.`, "working");
+}
+
+function renderWhatsappImportLog(sources) {
+  if (!whatsappImportLog) return;
+
+  whatsappImportLog.innerHTML = sources
+    .map(
+      (source) => `
+        <div class="whatsapp-import-item">
+          <strong>${escapeHtml(source.title || "WhatsApp style")}</strong>
+          <span>Saved · ${formatNumber(source.content_length || 0)} chars summary</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function apiErrorMessage(detail, fallback) {
+  if (!detail) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg || item.message || String(item)).join(" ");
+  }
+  return detail.msg || detail.message || fallback;
 }
 
 function updateReadiness() {
@@ -1006,6 +1066,7 @@ agentModelSelect.addEventListener("change", updateConversationModel);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
 saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
+whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {
