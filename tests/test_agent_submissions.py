@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import reset_db
 
 
@@ -171,6 +172,44 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["count"], 1)
 
+    def test_whatsapp_export_import_creates_style_context(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Friend chat style",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        created = create_response.json()
+        self.assertEqual(created["source_type"], "whatsapp_chat")
+        self.assertEqual(created["title"], "Friend chat style")
+        self.assertIn("WhatsApp speaking-style context", created["preview"])
+        self.assertNotIn("Riya:", created["preview"])
+
+        list_response = self.client.get(
+            f"/api/agent/conversations/{conversation_id}/context-sources"
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["count"], 1)
+
+    def test_whatsapp_parser_supports_multiline_exports(self) -> None:
+        messages = parse_whatsapp_export(sample_whatsapp_export())
+
+        self.assertEqual(len(messages), 6)
+        self.assertEqual(messages[0].sender, "Aarav")
+        self.assertIn("second line", messages[2].content)
+
+        summary = build_whatsapp_style_summary(sample_whatsapp_export(), "Aarav")
+        self.assertEqual(summary.metadata["selected_sender"], "Aarav")
+        self.assertFalse(summary.metadata["raw_chat_stored"])
+        self.assertIn("User messages analyzed: 3", summary.content)
+
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")
 
@@ -230,6 +269,16 @@ def sample_submission() -> dict[str, object]:
         },
         "summary": "Looking for a serious relationship.",
     }
+
+
+def sample_whatsapp_export() -> str:
+    return """12/06/2026, 10:00 AM - Aarav: hey I am running late but I will call you
+12/06/2026, 10:01 AM - Riya: no problem
+12/06/2026, 10:02 AM - Aarav: also I was thinking about that plan
+second line of same message
+12/06/2026, 10:03 AM - Riya: what plan?
+12/06/2026, 10:04 AM - Aarav: coffee first, then walk?
+12/06/2026, 10:05 AM - Riya: okay"""
 
 
 if __name__ == "__main__":
