@@ -1006,6 +1006,10 @@ p {
   overflow: hidden;
 }
 
+.usage-panel-wide {
+  grid-column: 1 / -1;
+}
+
 .panel-heading {
   padding: 18px;
   border-bottom: 1px solid var(--line);

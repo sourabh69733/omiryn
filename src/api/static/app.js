@@ -73,6 +73,7 @@ const usageCost = document.querySelector("#usage-cost");
 const usageCostDetail = document.querySelector("#usage-cost-detail");
 const usageFailures = document.querySelector("#usage-failures");
 const providerList = document.querySelector("#provider-list");
+const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 
 const saveDraft = document.querySelector("#save-draft");
@@ -665,16 +666,23 @@ async function loadUsageDashboard() {
 
   usageEvents.innerHTML = '<tr><td colspan="6">Loading usage...</td></tr>';
   providerList.innerHTML = '<div class="loading-row">Loading provider mix...</div>';
+  if (usageMinuteBuckets) {
+    usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Loading usage...</td></tr>';
+  }
 
   try {
     const response = await fetch("/api/agent/usage");
     const data = await response.json();
     renderUsageSummary(data.summary || {});
     renderProviderMix(data.events || []);
+    renderTokensByMinute(data.events || []);
     renderUsageEvents(data.events || []);
   } catch (error) {
     usageEvents.innerHTML = `<tr><td colspan="6">Could not load usage. ${escapeHtml(error.message)}</td></tr>`;
     providerList.innerHTML = '<div class="loading-row">Usage unavailable.</div>';
+    if (usageMinuteBuckets) {
+      usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Usage unavailable.</td></tr>';
+    }
   }
 }
 
@@ -748,6 +756,55 @@ function renderProviderMix(events) {
   `;
 }
 
+function renderTokensByMinute(events) {
+  if (!usageMinuteBuckets) return;
+
+  const buckets = events.reduce((accumulator, event) => {
+    if (!event.created_at) return accumulator;
+
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return accumulator;
+
+    createdAt.setSeconds(0, 0);
+    const key = createdAt.getTime();
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        minute: createdAt,
+        calls: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+    }
+
+    accumulator[key].calls += 1;
+    accumulator[key].promptTokens += event.prompt_tokens || 0;
+    accumulator[key].completionTokens += event.completion_tokens || 0;
+    accumulator[key].totalTokens += event.total_tokens || 0;
+    return accumulator;
+  }, {});
+
+  const rows = Object.values(buckets).sort((first, second) => second.minute - first.minute);
+  if (!rows.length) {
+    usageMinuteBuckets.innerHTML = '<tr><td class="table-empty" colspan="4">No token minutes yet.</td></tr>';
+    return;
+  }
+
+  usageMinuteBuckets.innerHTML = rows
+    .slice(0, 30)
+    .map(
+      (row) => `
+        <tr>
+          <td>${formatMinute(row.minute)}</td>
+          <td class="mono">${formatNumber(row.calls)}</td>
+          <td class="mono">${formatNumber(row.totalTokens)}</td>
+          <td class="mono">${formatNumber(row.promptTokens)} in / ${formatNumber(row.completionTokens)} out</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
 function renderUsageEvents(events) {
   if (!events.length) {
     usageEvents.innerHTML = '<tr><td class="table-empty" colspan="6">No agent calls logged yet.</td></tr>';
@@ -785,6 +842,15 @@ function formatUsd(value) {
 
 function formatInr(value) {
   return `₹${Number(value).toFixed(4)}`;
+}
+
+function formatMinute(value) {
+  return value.toLocaleString([], {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function escapeHtml(value) {

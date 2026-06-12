@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260612-context-import-fallback" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260612-token-minutes" />
   </head>
   <body>
     <div class="app-shell">
@@ -318,6 +318,32 @@ Rules:
             <section class="usage-panel">
               <div class="panel-heading">
                 <div>
+                  <p class="eyebrow">Rate</p>
+                  <h2>Tokens by minute</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="provider-table">
+                  <thead>
+                    <tr>
+                      <th>Minute</th>
+                      <th>Calls</th>
+                      <th>Tokens</th>
+                      <th>Input / Output</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-minute-buckets">
+                    <tr>
+                      <td colspan="4">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
                   <p class="eyebrow">Ledger</p>
                   <h2>Recent agent calls</h2>
                 </div>
@@ -347,6 +373,6 @@ Rules:
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260612-context-import-fallback"></script>
+    <script src="/static/app.js?v=20260612-token-minutes"></script>
   </body>
 </html>
