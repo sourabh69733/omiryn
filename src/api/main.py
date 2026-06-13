@@ -40,6 +40,7 @@ from storage import (
 
 STATIC_DIR = Path(__file__).parent / "static"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
+AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
 
 Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
@@ -143,15 +144,18 @@ class AgentConversation(BaseModel):
     status: Literal["active", "extracted"] = "active"
     agent_provider: str | None = None
     agent_model: str | None = None
+    agent_mode: AgentMode = "know_me"
     messages: list[dict[str, str]] = Field(default_factory=list)
 
 
 class AgentConversationCreate(BaseModel):
     agent_model: str | None = None
+    agent_mode: AgentMode = "know_me"
 
 
 class AgentConversationSettings(BaseModel):
-    agent_model: str
+    agent_model: str | None = None
+    agent_mode: AgentMode | None = None
 
 
 class UserMessage(BaseModel):
@@ -273,6 +277,7 @@ def create_agent_conversation(payload: AgentConversationCreate | None = None) ->
         id=conversation_id,
         agent_provider=str(runtime["provider"]),
         agent_model=selected_model,
+        agent_mode=payload.agent_mode if payload else "know_me",
         messages=[
             {
                 "role": "assistant",
@@ -304,7 +309,10 @@ def update_agent_conversation_settings(
 
     runtime = agent_runtime_status()
     conversation.agent_provider = str(runtime["provider"])
-    conversation.agent_model = _normalize_selected_model(payload.agent_model, runtime)
+    if payload.agent_model is not None:
+        conversation.agent_model = _normalize_selected_model(payload.agent_model, runtime)
+    if payload.agent_mode is not None:
+        conversation.agent_mode = payload.agent_mode
     save_conversation(conversation.model_dump(mode="json"))
     return conversation
 
@@ -325,6 +333,7 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
             conversation.messages,
             conversation_id=conversation.id,
             model=conversation.agent_model,
+            agent_mode=conversation.agent_mode,
             context_sources=list_context_sources(conversation.id),
         )
     except (AgentProviderError, Exception) as error:

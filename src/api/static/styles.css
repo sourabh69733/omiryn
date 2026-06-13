@@ -301,6 +301,59 @@ p {
   font-size: 12px;
 }
 
+.active-memory {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.memory-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.memory-heading span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.memory-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memory-item,
+.memory-empty {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.memory-item strong,
+.memory-item span {
+  display: block;
+}
+
+.memory-item strong {
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.memory-item span,
+.memory-empty {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.memory-item span {
+  margin-top: 4px;
+}
+
 .side-link {
   display: block;
   margin-top: 12px;

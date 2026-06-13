@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260612-whatsapp-feedback" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260613-agent-modes" />
   </head>
   <body>
     <div class="app-shell">
@@ -64,6 +64,15 @@
                 <p class="quiet-note">
                   Extraction creates a draft. Nothing enters matching until you approve it.
                 </p>
+                <div class="active-memory">
+                  <div class="memory-heading">
+                    <p class="eyebrow">Active Memory</p>
+                    <span id="active-memory-count">0 sources</span>
+                  </div>
+                  <div class="memory-list" id="active-memory-list">
+                    <div class="memory-empty">No imported memory yet.</div>
+                  </div>
+                </div>
               </section>
 
               <section class="side-panel" data-side-panel="context" hidden>
@@ -181,6 +190,15 @@ Rules:
                   <p class="agent-status" id="agent-status">Checking agent...</p>
                 </div>
                 <div class="chat-controls">
+                  <label class="model-picker">
+                    <span>Mode</span>
+                    <select id="agent-mode-select" aria-label="Choose agent mode">
+                      <option value="know_me">Know me</option>
+                      <option value="coach_me">Coach me</option>
+                      <option value="match_me">Match me</option>
+                      <option value="talk_like_me">Talk like me</option>
+                    </select>
+                  </label>
                   <label class="model-picker">
                     <span>Model</span>
                     <select id="agent-model-select" aria-label="Choose agent model"></select>
@@ -395,6 +413,6 @@ Rules:
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260612-whatsapp-feedback"></script>
+    <script src="/static/app.js?v=20260613-agent-modes"></script>
   </body>
 </html>

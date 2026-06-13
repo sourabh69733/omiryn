@@ -109,6 +109,7 @@ async def generate_agent_reply(
     messages: list[dict[str, str]],
     conversation_id: str | None = None,
     model: str | None = None,
+    agent_mode: str = "know_me",
     context_sources: list[dict[str, Any]] | None = None,
 ) -> str:
     provider = _provider_name()
@@ -137,7 +138,7 @@ async def generate_agent_reply(
         return _mock_reply(messages)
     if provider == "groq":
         return await _groq_chat(
-            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources),
+            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources, agent_mode),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -145,7 +146,7 @@ async def generate_agent_reply(
         )
     if provider == "ollama":
         return await _ollama_chat(
-            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources),
+            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources, agent_mode),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -316,19 +317,45 @@ def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dic
 def _system_prompt_with_context(
     system_prompt: str,
     context_sources: list[dict[str, Any]] | None,
+    agent_mode: str = "know_me",
 ) -> str:
     context_text = _context_sources_text(context_sources)
+    mode_text = _agent_mode_prompt(agent_mode)
     if not context_text:
-        return system_prompt
+        return f"{system_prompt}\n\n{mode_text}"
     return (
-        f"{system_prompt}\n\n"
+        f"{system_prompt}\n\n{mode_text}\n\n"
         "Additional user-provided context is available below. Use it only to ask better "
         "questions, understand the user, and lightly adapt tone when speaking-style context "
         "is present. If WhatsApp context is present, you may discuss broad recent topics from "
         "the processed summary, but be clear you do not have live WhatsApp access or a full "
-        "raw transcript. Do not quote private source text back unless the user explicitly asks.\n"
+        "raw transcript. When imported context influenced your answer, briefly say so in natural "
+        "language, for example 'from your imported WhatsApp summary' or 'from your saved profile'. "
+        "Do not quote private source text back unless the user explicitly asks.\n"
         f"{context_text}"
     )
+
+
+def _agent_mode_prompt(agent_mode: str) -> str:
+    prompts = {
+        "know_me": (
+            "Current agent mode: Know me. Ask one focused question at a time to understand "
+            "the user's personality, values, lifestyle, communication style, and relationship goals."
+        ),
+        "coach_me": (
+            "Current agent mode: Coach me. Help the user reflect on patterns and choices. "
+            "Be practical, kind, and direct. Avoid therapy claims or diagnosis."
+        ),
+        "match_me": (
+            "Current agent mode: Match me. Focus on what partner traits, relationship dynamics, "
+            "and compatibility signals may fit the user. Explain uncertainty clearly."
+        ),
+        "talk_like_me": (
+            "Current agent mode: Talk like me. Prioritize mirroring the user's pacing, wording, "
+            "and conversational energy from imported speaking-style context while staying respectful."
+        ),
+    }
+    return prompts.get(agent_mode, prompts["know_me"])
 
 
 def _conversation_and_context_text(

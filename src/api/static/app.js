@@ -42,6 +42,7 @@ const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
 const agentModelSelect = document.querySelector("#agent-model-select");
+const agentModeSelect = document.querySelector("#agent-mode-select");
 const resetChat = document.querySelector("#reset-chat");
 const sidebarResetChat = document.querySelector("#sidebar-reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
@@ -53,6 +54,8 @@ const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
+const activeMemoryCount = document.querySelector("#active-memory-count");
+const activeMemoryList = document.querySelector("#active-memory-list");
 const contextPrompt = document.querySelector("#context-prompt");
 const copyContextPrompt = document.querySelector("#copy-context-prompt");
 const contextSourceType = document.querySelector("#context-source-type");
@@ -148,7 +151,10 @@ async function startConversation() {
   const response = await fetch("/api/agent/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ agent_model: selectedAgentModel() })
+    body: JSON.stringify({
+      agent_model: selectedAgentModel(),
+      agent_mode: selectedAgentMode()
+    })
   });
   const conversation = await response.json();
   hydrateConversation(conversation);
@@ -182,6 +188,9 @@ function hydrateConversation(conversation) {
   messages = conversation.messages;
   if (conversation.agent_model && agentModelSelect) {
     agentModelSelect.value = conversation.agent_model;
+  }
+  if (conversation.agent_mode && agentModeSelect) {
+    agentModeSelect.value = conversation.agent_mode;
   }
   updateAgentStatusModel();
   chatInput.disabled = false;
@@ -237,26 +246,46 @@ function selectedAgentModel() {
   return agentModelSelect ? agentModelSelect.value : null;
 }
 
+function selectedAgentMode() {
+  return agentModeSelect ? agentModeSelect.value : "know_me";
+}
+
 function updateAgentStatusModel() {
   if (!agentStatus) return;
 
   const provider = agentStatus.dataset.provider || "Agent";
-  agentStatus.textContent = `${provider} · ${selectedAgentModel() || "no model"}`;
+  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${selectedAgentModel() || "no model"}`;
 }
 
 async function updateConversationModel() {
-  if (!conversationId || !selectedAgentModel()) return;
+  if (!conversationId) return;
 
   const response = await fetch(`/api/agent/conversations/${conversationId}/settings`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ agent_model: selectedAgentModel() })
+    body: JSON.stringify({
+      agent_model: selectedAgentModel(),
+      agent_mode: selectedAgentMode()
+    })
   });
   const conversation = await response.json();
   if (conversation.agent_model && agentModelSelect) {
     agentModelSelect.value = conversation.agent_model;
   }
+  if (conversation.agent_mode && agentModeSelect) {
+    agentModeSelect.value = conversation.agent_mode;
+  }
   updateAgentStatusModel();
+}
+
+function agentModeLabel(mode) {
+  const labels = {
+    know_me: "Know me",
+    coach_me: "Coach me",
+    match_me: "Match me",
+    talk_like_me: "Talk like me"
+  };
+  return labels[mode] || "Know me";
 }
 
 function titleCase(value) {
@@ -356,6 +385,7 @@ async function loadContextSources() {
     }
     const data = await response.json();
     renderContextSources(data.sources || []);
+    renderActiveMemory(data.sources || []);
   } catch (error) {
     setContextStatus(error.message);
   }
@@ -539,6 +569,29 @@ function contextSourceLabel(sourceType) {
     whatsapp_chat: "WhatsApp style"
   };
   return labels[sourceType] || sourceType || "Context";
+}
+
+function renderActiveMemory(sources) {
+  if (!activeMemoryList || !activeMemoryCount) return;
+
+  activeMemoryCount.textContent = `${sources.length} source${sources.length === 1 ? "" : "s"}`;
+  if (!sources.length) {
+    activeMemoryList.innerHTML = '<div class="memory-empty">No imported memory yet.</div>';
+    return;
+  }
+
+  activeMemoryList.innerHTML = sources
+    .slice(0, 5)
+    .map((source) => {
+      const label = contextSourceLabel(source.source_type);
+      return `
+        <div class="memory-item">
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(source.title)} · ${formatNumber(source.content_length)} chars</span>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function setContextStatus(message) {
@@ -1063,6 +1116,7 @@ sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });
 agentModelSelect.addEventListener("change", updateConversationModel);
+agentModeSelect?.addEventListener("change", updateConversationModel);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
 saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
