@@ -126,19 +126,21 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
             "/api/agent/conversations",
-            json={"agent_model": "mock"},
+            json={"agent_model": "mock", "agent_mode": "coach_me"},
         )
 
         self.assertEqual(response.status_code, 201)
         conversation = response.json()
         self.assertEqual(conversation["agent_model"], "mock")
+        self.assertEqual(conversation["agent_mode"], "coach_me")
 
         update_response = self.client.patch(
             f"/api/agent/conversations/{conversation['id']}/settings",
-            json={"agent_model": "mock"},
+            json={"agent_model": "mock", "agent_mode": "talk_like_me"},
         )
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["agent_model"], "mock")
+        self.assertEqual(update_response.json()["agent_mode"], "talk_like_me")
 
     def test_conversation_can_import_external_context(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
