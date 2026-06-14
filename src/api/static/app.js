@@ -89,7 +89,10 @@ const usageTokenDetail = document.querySelector("#usage-token-detail");
 const usageCost = document.querySelector("#usage-cost");
 const usageCostDetail = document.querySelector("#usage-cost-detail");
 const usageFailures = document.querySelector("#usage-failures");
+const usageRateLimits = document.querySelector("#usage-rate-limits");
+const usageRateLimitDetail = document.querySelector("#usage-rate-limit-detail");
 const providerList = document.querySelector("#provider-list");
+const rateLimitGrid = document.querySelector("#rate-limit-grid");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 
@@ -1106,15 +1109,96 @@ async function loadUsageDashboard() {
     const data = await response.json();
     renderUsageSummary(data.summary || {});
     renderProviderMix(data.events || []);
+    renderGroqRateLimitHealth(data.events || []);
     renderTokensByMinute(data.events || []);
     renderUsageEvents(data.events || []);
   } catch (error) {
     usageEvents.innerHTML = `<tr><td colspan="6">Could not load usage. ${escapeHtml(error.message)}</td></tr>`;
     providerList.innerHTML = '<div class="loading-row">Usage unavailable.</div>';
+    if (rateLimitGrid) {
+      rateLimitGrid.innerHTML = '<div class="table-empty">Rate-limit data unavailable.</div>';
+    }
     if (usageMinuteBuckets) {
       usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Usage unavailable.</td></tr>';
     }
   }
+}
+
+function renderGroqRateLimitHealth(events) {
+  if (!rateLimitGrid) return;
+
+  const groqEvents = events.filter((event) => event.provider === "groq");
+  const rateLimitedEvents = groqEvents.filter((event) => isRateLimitEvent(event));
+  if (usageRateLimits) {
+    usageRateLimits.textContent = formatNumber(rateLimitedEvents.length);
+  }
+  if (usageRateLimitDetail) {
+    usageRateLimitDetail.textContent = rateLimitedEvents.length
+      ? `${formatNumber(rateLimitedEvents.length)} recent 429 errors`
+      : "No recent throttling";
+  }
+
+  const latestHeadersEvent = groqEvents.find((event) => groqRateLimitHeaders(event));
+  const headers = latestHeadersEvent ? groqRateLimitHeaders(latestHeadersEvent) : null;
+  const localRate = localGroqRate(groqEvents);
+
+  if (!groqEvents.length) {
+    rateLimitGrid.innerHTML = '<div class="table-empty">No Groq calls logged yet.</div>';
+    return;
+  }
+
+  rateLimitGrid.innerHTML = `
+    ${rateLimitMetric("Local RPM", localRate.rpm, "Groq calls in the busiest recent minute")}
+    ${rateLimitMetric("Local TPM", formatNumber(localRate.tpm), "Input + output tokens in busiest recent minute")}
+    ${rateLimitMetric("429 errors", formatNumber(rateLimitedEvents.length), "Too Many Requests responses")}
+    ${rateLimitMetric("Retry after", headers?.["retry-after"] ? `${escapeHtml(headers["retry-after"])}s` : "-", "From latest 429 response")}
+    ${rateLimitMetric("Request limit", escapeHtml(headers?.["x-ratelimit-limit-requests"] || "-"), "Groq header: daily request limit")}
+    ${rateLimitMetric("Requests left", escapeHtml(headers?.["x-ratelimit-remaining-requests"] || "-"), "Groq header: remaining requests")}
+    ${rateLimitMetric("Token limit", escapeHtml(headers?.["x-ratelimit-limit-tokens"] || "-"), "Groq header: tokens per minute")}
+    ${rateLimitMetric("Tokens left", escapeHtml(headers?.["x-ratelimit-remaining-tokens"] || "-"), "Groq header: remaining tokens")}
+    ${rateLimitMetric("Request reset", escapeHtml(headers?.["x-ratelimit-reset-requests"] || "-"), "Time until request window reset")}
+    ${rateLimitMetric("Token reset", escapeHtml(headers?.["x-ratelimit-reset-tokens"] || "-"), "Time until token window reset")}
+  `;
+}
+
+function rateLimitMetric(label, value, detail) {
+  return `
+    <article class="rate-limit-card">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${detail}</small>
+    </article>
+  `;
+}
+
+function groqRateLimitHeaders(event) {
+  return event.raw_usage?.rate_limit || null;
+}
+
+function isRateLimitEvent(event) {
+  const error = `${event.error || ""} ${JSON.stringify(event.raw_usage?.error || {})}`;
+  return error.includes("429") || error.toLowerCase().includes("too many requests");
+}
+
+function localGroqRate(events) {
+  const buckets = events.reduce((accumulator, event) => {
+    if (!event.created_at) return accumulator;
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return accumulator;
+    createdAt.setSeconds(0, 0);
+    const key = createdAt.getTime();
+    if (!accumulator[key]) {
+      accumulator[key] = { calls: 0, tokens: 0 };
+    }
+    accumulator[key].calls += 1;
+    accumulator[key].tokens += event.total_tokens || 0;
+    return accumulator;
+  }, {});
+  const rows = Object.values(buckets);
+  return {
+    rpm: formatNumber(Math.max(0, ...rows.map((row) => row.calls))),
+    tpm: Math.max(0, ...rows.map((row) => row.tokens))
+  };
 }
 
 function renderUsageSummary(summary) {

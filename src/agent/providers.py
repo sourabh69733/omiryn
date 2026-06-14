@@ -540,6 +540,10 @@ async def _groq_chat(
             logger.info("agent.groq.response status_code=%s", response.status_code)
             data = response.json()
             usage = data.get("usage") or {}
+            raw_usage = {
+                **usage,
+                "rate_limit": _groq_rate_limit_headers(response),
+            }
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -547,12 +551,31 @@ async def _groq_chat(
                 model=payload["model"],
                 success=True,
                 latency_ms=latency_ms,
-                raw_usage=usage,
+                raw_usage=raw_usage,
                 prompt_tokens=usage.get("prompt_tokens"),
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
             return data["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as error:
+            raw_usage = {}
+            if error.response is not None:
+                raw_usage["rate_limit"] = _groq_rate_limit_headers(error.response)
+                try:
+                    raw_usage["error"] = error.response.json()
+                except ValueError:
+                    raw_usage["error_text"] = error.response.text[:500]
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="groq",
+                model=payload["model"],
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                raw_usage=raw_usage,
+                error=str(error),
+            )
+            raise
         except Exception as error:
             _record_usage_event(
                 conversation_id=conversation_id,
@@ -564,6 +587,23 @@ async def _groq_chat(
                 error=str(error),
             )
             raise
+
+
+def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
+    header_names = [
+        "retry-after",
+        "x-ratelimit-limit-requests",
+        "x-ratelimit-limit-tokens",
+        "x-ratelimit-remaining-requests",
+        "x-ratelimit-remaining-tokens",
+        "x-ratelimit-reset-requests",
+        "x-ratelimit-reset-tokens",
+    ]
+    return {
+        name: response.headers[name]
+        for name in header_names
+        if name in response.headers
+    }
 
 
 async def _ollama_chat(

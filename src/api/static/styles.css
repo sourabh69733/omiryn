@@ -1150,7 +1150,7 @@ p {
 
 .usage-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin-bottom: 18px;
 }
@@ -1210,6 +1210,47 @@ p {
 
 .provider-list {
   padding: 0;
+}
+
+.rate-limit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.rate-limit-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf9;
+  padding: 14px;
+}
+
+.rate-limit-card span,
+.rate-limit-card small {
+  display: block;
+  color: var(--muted);
+}
+
+.rate-limit-card span {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.rate-limit-card strong {
+  display: block;
+  margin: 8px 0 6px;
+  color: var(--ink);
+  font-family: var(--font-terminal);
+  font-size: 21px;
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+.rate-limit-card small {
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .provider-row {

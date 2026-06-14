@@ -1,9 +1,10 @@
 import unittest
 
+import httpx
 from fastapi.testclient import TestClient
 
 from api.main import _smart_reply_context_sources, app
-from agent.providers import _context_sources_text, _provider_messages
+from agent.providers import _context_sources_text, _groq_rate_limit_headers, _provider_messages
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import reset_db
 
@@ -189,6 +190,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("[friend_style] Sanjay-style", context_text)
         self.assertIn("[llm_profile] Profile", context_text)
         self.assertLess(len(context_text), 3800)
+
+    def test_groq_rate_limit_headers_are_captured(self) -> None:
+        response = httpx.Response(
+            429,
+            headers={
+                "retry-after": "2",
+                "x-ratelimit-limit-requests": "14400",
+                "x-ratelimit-remaining-requests": "14399",
+                "x-ratelimit-limit-tokens": "18000",
+                "x-ratelimit-remaining-tokens": "12000",
+                "x-ratelimit-reset-requests": "2m",
+                "x-ratelimit-reset-tokens": "7s",
+                "ignored-header": "nope",
+            },
+        )
+
+        headers = _groq_rate_limit_headers(response)
+
+        self.assertEqual(headers["retry-after"], "2")
+        self.assertEqual(headers["x-ratelimit-limit-requests"], "14400")
+        self.assertEqual(headers["x-ratelimit-remaining-tokens"], "12000")
+        self.assertNotIn("ignored-header", headers)
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")

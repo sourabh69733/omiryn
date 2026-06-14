@@ -374,9 +374,26 @@ Rules:
               <strong id="usage-failures">0</strong>
               <small>Provider/network errors</small>
             </article>
+            <article class="metric-card">
+              <span>Groq 429s</span>
+              <strong id="usage-rate-limits">0</strong>
+              <small id="usage-rate-limit-detail">No recent throttling</small>
+            </article>
           </div>
 
           <div class="usage-panels">
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Groq Limits</p>
+                  <h2>Rate-limit health</h2>
+                </div>
+              </div>
+              <div class="rate-limit-grid" id="rate-limit-grid">
+                <div class="table-empty">Rate-limit headers will appear after new Groq calls.</div>
+              </div>
+            </section>
+
             <section class="usage-panel">
               <div class="panel-heading">
                 <div>
