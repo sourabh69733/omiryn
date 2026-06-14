@@ -41,6 +41,16 @@ from storage import (
 STATIC_DIR = Path(__file__).parent / "static"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
 AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
+AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
+ContextSourceType = Literal[
+    "llm_profile",
+    "chat_export",
+    "manual_notes",
+    "whatsapp_chat",
+    "friend_style",
+]
+WhatsappStyleKind = Literal["user_style", "friend_style"]
+STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
 
 Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
@@ -145,17 +155,23 @@ class AgentConversation(BaseModel):
     agent_provider: str | None = None
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
+    agent_tone: AgentTone = "auto"
+    agent_style_source_id: str | None = None
     messages: list[dict[str, str]] = Field(default_factory=list)
 
 
 class AgentConversationCreate(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
+    agent_tone: AgentTone = "auto"
+    agent_style_source_id: str | None = None
 
 
 class AgentConversationSettings(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode | None = None
+    agent_tone: AgentTone | None = None
+    agent_style_source_id: str | None = None
 
 
 class UserMessage(BaseModel):
@@ -163,7 +179,7 @@ class UserMessage(BaseModel):
 
 
 class ContextSourceCreate(BaseModel):
-    source_type: Literal["llm_profile", "chat_export", "manual_notes", "whatsapp_chat"] = "llm_profile"
+    source_type: ContextSourceType = "llm_profile"
     title: str = Field(default="Imported context", min_length=1, max_length=120)
     content: str = Field(min_length=20, max_length=50000)
 
@@ -171,6 +187,8 @@ class ContextSourceCreate(BaseModel):
 class WhatsappChatImportCreate(BaseModel):
     title: str = Field(default="WhatsApp speaking style", min_length=1, max_length=120)
     user_sender: str | None = Field(default=None, max_length=120)
+    style_name: str | None = Field(default=None, max_length=120)
+    style_kind: WhatsappStyleKind = "user_style"
     content: str = Field(min_length=50, max_length=WHATSAPP_IMPORT_MAX_CHARS)
 
 
@@ -216,6 +234,18 @@ def get_conversation_context_sources(conversation_id: str) -> dict[str, object]:
     }
 
 
+@app.get("/api/agent/conversations/{conversation_id}/tone")
+def get_conversation_tone(conversation_id: str) -> dict[str, object]:
+    conversation = _get_existing_conversation(conversation_id)
+    return {
+        "selected_tone": conversation.agent_tone,
+        "detected_tone": _detect_conversation_tone(
+            conversation.messages,
+            list_context_sources(conversation_id),
+        ),
+    }
+
+
 @app.post("/api/agent/conversations/{conversation_id}/context-sources", status_code=201)
 def create_conversation_context_source(
     conversation_id: str,
@@ -251,10 +281,20 @@ def create_whatsapp_context_source(
     source = save_context_source(
         {
             "conversation_id": conversation_id,
-            "source_type": "whatsapp_chat",
+            "source_type": "friend_style"
+            if payload.style_kind == "friend_style"
+            else "whatsapp_chat",
             "title": payload.title,
-            "content": style_summary.content,
-            "metadata": style_summary.metadata,
+            "content": _whatsapp_style_context_content(
+                style_summary.content,
+                payload.style_kind,
+                payload.style_name or payload.title,
+            ),
+            "metadata": {
+                **style_summary.metadata,
+                "style_kind": payload.style_kind,
+                "style_name": payload.style_name,
+            },
         }
     )
     return _context_source_summary(source)
@@ -278,6 +318,8 @@ def create_agent_conversation(payload: AgentConversationCreate | None = None) ->
         agent_provider=str(runtime["provider"]),
         agent_model=selected_model,
         agent_mode=payload.agent_mode if payload else "know_me",
+        agent_tone=payload.agent_tone if payload else "auto",
+        agent_style_source_id=payload.agent_style_source_id if payload else None,
         messages=[
             {
                 "role": "assistant",
@@ -313,6 +355,12 @@ def update_agent_conversation_settings(
         conversation.agent_model = _normalize_selected_model(payload.agent_model, runtime)
     if payload.agent_mode is not None:
         conversation.agent_mode = payload.agent_mode
+    if payload.agent_tone is not None:
+        conversation.agent_tone = payload.agent_tone
+    if "agent_style_source_id" in payload.model_fields_set:
+        style_source_id = payload.agent_style_source_id or None
+        _validate_style_source(conversation_id, style_source_id)
+        conversation.agent_style_source_id = style_source_id
     save_conversation(conversation.model_dump(mode="json"))
     return conversation
 
@@ -334,7 +382,11 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
             conversation_id=conversation.id,
             model=conversation.agent_model,
             agent_mode=conversation.agent_mode,
-            context_sources=list_context_sources(conversation.id),
+            agent_tone=conversation.agent_tone,
+            context_sources=_reply_context_sources(
+                conversation.id,
+                conversation.agent_style_source_id,
+            ),
         )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -582,8 +634,108 @@ def _profile_extraction_context_sources(conversation_id: str) -> list[dict[str, 
     return [
         source
         for source in list_context_sources(conversation_id)
-        if source.get("source_type") != "whatsapp_chat"
+        if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
     ]
+
+
+def _reply_context_sources(
+    conversation_id: str,
+    style_source_id: str | None,
+) -> list[dict[str, object]]:
+    sources = list_context_sources(conversation_id)
+    if not style_source_id:
+        return sources
+
+    selected_style = next(
+        (
+            source
+            for source in sources
+            if source.get("id") == style_source_id
+            and source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+        ),
+        None,
+    )
+    if not selected_style:
+        return sources
+
+    non_style_sources = [
+        source for source in sources if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
+    ]
+    return [selected_style] + non_style_sources
+
+
+def _validate_style_source(conversation_id: str, style_source_id: str | None) -> None:
+    if not style_source_id:
+        return
+    for source in list_context_sources(conversation_id):
+        if (
+            source.get("id") == style_source_id
+            and source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+        ):
+            return
+    raise HTTPException(status_code=400, detail="Selected reply style was not found.")
+
+
+def _whatsapp_style_context_content(
+    summary_content: str,
+    style_kind: WhatsappStyleKind,
+    style_name: str,
+) -> str:
+    if style_kind == "user_style":
+        return (
+            "WhatsApp speaking-style context for the current user. Use this to adapt "
+            "tone and pacing only.\n\n"
+            f"{summary_content}"
+        )
+
+    return (
+        f"Friend-style text profile: {style_name}.\n"
+        "Use this only as a texting-style reference for rhythm, warmth, brevity, emoji "
+        "habits, and phrasing patterns. Never claim to be this person, never imply this "
+        "person is present, and never say they wrote or approved any message.\n\n"
+        f"{summary_content}"
+    )
+
+
+def _detect_conversation_tone(
+    messages: list[dict[str, str]],
+    context_sources: list[dict[str, object]],
+) -> dict[str, object]:
+    user_text = " ".join(
+        message.get("content", "")
+        for message in messages[-20:]
+        if message.get("role") == "user"
+    ).lower()
+    whatsapp_text = " ".join(
+        str(source.get("content") or "")
+        for source in context_sources
+        if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+    ).lower()
+    text = f"{user_text} {whatsapp_text}".strip()
+
+    scores = {
+        "casual": _tone_score(text, ["bro", "yaar", "haha", "lol", "hey", "btw", "gonna"]),
+        "warm": _tone_score(text, ["thanks", "feel", "care", "kind", "calm", "understand"]),
+        "formal": _tone_score(text, ["please", "regards", "would", "could", "kindly", "request"]),
+        "direct": _tone_score(text, ["need", "tell", "clear", "exact", "simple", "short"]),
+        "playful": _tone_score(text, ["haha", "lol", "fun", "joke", "crazy", "cool"]),
+    }
+    if not text:
+        return {"tone": "warm", "confidence": 0.2, "reason": "Not enough conversation yet."}
+
+    best_tone, best_score = max(scores.items(), key=lambda item: item[1])
+    if best_score == 0:
+        return {"tone": "warm", "confidence": 0.35, "reason": "Defaulting to warm from limited tone signal."}
+    confidence = min(0.9, round(0.45 + best_score * 0.12, 2))
+    return {
+        "tone": best_tone,
+        "confidence": confidence,
+        "reason": "Detected from recent messages and imported speaking-style context.",
+    }
+
+
+def _tone_score(text: str, markers: list[str]) -> int:
+    return sum(text.count(marker) for marker in markers)
 
 
 def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> str | None:

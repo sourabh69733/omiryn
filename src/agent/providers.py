@@ -110,6 +110,7 @@ async def generate_agent_reply(
     conversation_id: str | None = None,
     model: str | None = None,
     agent_mode: str = "know_me",
+    agent_tone: str = "auto",
     context_sources: list[dict[str, Any]] | None = None,
 ) -> str:
     provider = _provider_name()
@@ -138,7 +139,12 @@ async def generate_agent_reply(
         return _mock_reply(messages)
     if provider == "groq":
         return await _groq_chat(
-            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources, agent_mode),
+            _system_prompt_with_context(
+                ONBOARDING_SYSTEM_PROMPT,
+                context_sources,
+                agent_mode,
+                agent_tone,
+            ),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -146,7 +152,12 @@ async def generate_agent_reply(
         )
     if provider == "ollama":
         return await _ollama_chat(
-            _system_prompt_with_context(ONBOARDING_SYSTEM_PROMPT, context_sources, agent_mode),
+            _system_prompt_with_context(
+                ONBOARDING_SYSTEM_PROMPT,
+                context_sources,
+                agent_mode,
+                agent_tone,
+            ),
             messages,
             conversation_id=conversation_id,
             request_kind="chat_reply",
@@ -314,24 +325,40 @@ def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dic
     ]
 
 
+def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    provider_messages = []
+    for message in messages:
+        role = message.get("role")
+        content = message.get("content")
+        if role not in {"assistant", "user", "system"} or content is None:
+            continue
+        provider_messages.append({"role": role, "content": str(content)})
+    return provider_messages
+
+
 def _system_prompt_with_context(
     system_prompt: str,
     context_sources: list[dict[str, Any]] | None,
     agent_mode: str = "know_me",
+    agent_tone: str = "auto",
 ) -> str:
     context_text = _context_sources_text(context_sources)
     mode_text = _agent_mode_prompt(agent_mode)
+    tone_text = _agent_tone_prompt(agent_tone)
     if not context_text:
-        return f"{system_prompt}\n\n{mode_text}"
+        return f"{system_prompt}\n\n{mode_text}\n\n{tone_text}"
     return (
-        f"{system_prompt}\n\n{mode_text}\n\n"
+        f"{system_prompt}\n\n{mode_text}\n\n{tone_text}\n\n"
         "Additional user-provided context is available below. Use it only to ask better "
         "questions, understand the user, and lightly adapt tone when speaking-style context "
         "is present. If WhatsApp context is present, you may discuss broad recent topics from "
         "the processed summary, but be clear you do not have live WhatsApp access or a full "
-        "raw transcript. When imported context influenced your answer, briefly say so in natural "
-        "language, for example 'from your imported WhatsApp summary' or 'from your saved profile'. "
-        "Do not quote private source text back unless the user explicitly asks.\n"
+        "raw transcript. If a friend-style text profile is present, use it only as a writing-style "
+        "reference for rhythm, warmth, brevity, and phrasing. Never claim to be that friend, never "
+        "roleplay as that person, and never imply they wrote or approved your reply. When imported "
+        "context influenced your answer, briefly say so in natural language, for example 'from your "
+        "imported WhatsApp summary' or 'from your saved profile'. Do not quote private source text "
+        "back unless the user explicitly asks.\n"
         f"{context_text}"
     )
 
@@ -356,6 +383,21 @@ def _agent_mode_prompt(agent_mode: str) -> str:
         ),
     }
     return prompts.get(agent_mode, prompts["know_me"])
+
+
+def _agent_tone_prompt(agent_tone: str) -> str:
+    prompts = {
+        "auto": (
+            "Tone setting: Auto. Match the user's natural tone from recent messages and imported "
+            "speaking-style context. If signals conflict, stay warm, clear, and concise."
+        ),
+        "casual": "Tone setting: Casual. Use relaxed, simple language without sounding sloppy.",
+        "warm": "Tone setting: Warm. Be gentle, supportive, and emotionally clear.",
+        "formal": "Tone setting: Formal. Be polished, structured, and respectful.",
+        "direct": "Tone setting: Direct. Be concise, specific, and low-fluff.",
+        "playful": "Tone setting: Playful. Be light and witty while staying respectful.",
+    }
+    return prompts.get(agent_tone, prompts["auto"])
 
 
 def _conversation_and_context_text(
@@ -397,7 +439,7 @@ async def _groq_chat(
 
     payload = {
         "model": model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
-        "messages": [{"role": "system", "content": system_prompt}] + messages,
+        "messages": [{"role": "system", "content": system_prompt}] + _provider_messages(messages),
         "temperature": temperature,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -458,7 +500,7 @@ async def _ollama_chat(
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     payload = {
         "model": model or os.getenv("OLLAMA_MODEL", "llama3.1"),
-        "messages": [{"role": "system", "content": system_prompt}] + messages,
+        "messages": [{"role": "system", "content": system_prompt}] + _provider_messages(messages),
         "stream": False,
         "options": {"temperature": temperature},
     }

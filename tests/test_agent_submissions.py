@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from agent.providers import _provider_messages
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import reset_db
 
@@ -112,6 +113,24 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(usage["events"][0]["request_kind"], "input_guardrail")
         self.assertEqual(usage["events"][0]["provider"], "guardrail")
 
+    def test_provider_messages_strip_internal_metadata(self) -> None:
+        messages = _provider_messages(
+            [
+                {"role": "assistant", "content": "Question"},
+                {"role": "user", "content": "knl", "quality": "low_information"},
+                {"role": "user", "content": "I want something serious."},
+            ]
+        )
+
+        self.assertEqual(
+            messages,
+            [
+                {"role": "assistant", "content": "Question"},
+                {"role": "user", "content": "knl"},
+                {"role": "user", "content": "I want something serious."},
+            ],
+        )
+
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")
 
@@ -126,21 +145,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
             "/api/agent/conversations",
-            json={"agent_model": "mock", "agent_mode": "coach_me"},
+            json={"agent_model": "mock", "agent_mode": "coach_me", "agent_tone": "casual"},
         )
 
         self.assertEqual(response.status_code, 201)
         conversation = response.json()
         self.assertEqual(conversation["agent_model"], "mock")
         self.assertEqual(conversation["agent_mode"], "coach_me")
+        self.assertEqual(conversation["agent_tone"], "casual")
 
         update_response = self.client.patch(
             f"/api/agent/conversations/{conversation['id']}/settings",
-            json={"agent_model": "mock", "agent_mode": "talk_like_me"},
+            json={"agent_model": "mock", "agent_mode": "talk_like_me", "agent_tone": "direct"},
         )
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["agent_model"], "mock")
         self.assertEqual(update_response.json()["agent_mode"], "talk_like_me")
+        self.assertEqual(update_response.json()["agent_tone"], "direct")
+
+        tone_response = self.client.get(f"/api/agent/conversations/{conversation['id']}/tone")
+        self.assertEqual(tone_response.status_code, 200)
+        self.assertEqual(tone_response.json()["selected_tone"], "direct")
+        self.assertIn("detected_tone", tone_response.json())
 
     def test_conversation_can_import_external_context(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
@@ -199,6 +225,40 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["count"], 1)
+
+    def test_friend_style_import_can_be_selected_for_replies(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Sanjay-style",
+                "user_sender": "Aarav",
+                "style_name": "Sanjay-style",
+                "style_kind": "friend_style",
+                "content": sample_whatsapp_export(),
+            },
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        style_source = create_response.json()
+        self.assertEqual(style_source["source_type"], "friend_style")
+        self.assertIn("Friend-style text profile", style_source["preview"])
+
+        update_response = self.client.patch(
+            f"/api/agent/conversations/{conversation_id}/settings",
+            json={"agent_style_source_id": style_source["id"]},
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["agent_style_source_id"], style_source["id"])
+
+        clear_response = self.client.patch(
+            f"/api/agent/conversations/{conversation_id}/settings",
+            json={"agent_style_source_id": None},
+        )
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertIsNone(clear_response.json()["agent_style_source_id"])
 
     def test_whatsapp_parser_supports_multiline_exports(self) -> None:
         messages = parse_whatsapp_export(sample_whatsapp_export())

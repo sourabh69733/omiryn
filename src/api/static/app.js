@@ -2,6 +2,7 @@ let messages = [];
 let conversationId = null;
 let activeDraftId = null;
 let isSendingMessage = false;
+let pendingAgentStyleSourceId = "";
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -43,6 +44,8 @@ const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
 const agentModelSelect = document.querySelector("#agent-model-select");
 const agentModeSelect = document.querySelector("#agent-mode-select");
+const agentToneSelect = document.querySelector("#agent-tone-select");
+const agentStyleSelect = document.querySelector("#agent-style-select");
 const resetChat = document.querySelector("#reset-chat");
 const sidebarResetChat = document.querySelector("#sidebar-reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
@@ -56,6 +59,8 @@ const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
 const activeMemoryCount = document.querySelector("#active-memory-count");
 const activeMemoryList = document.querySelector("#active-memory-list");
+const toneSuggestion = document.querySelector("#tone-suggestion");
+const applyDetectedTone = document.querySelector("#apply-detected-tone");
 const contextPrompt = document.querySelector("#context-prompt");
 const copyContextPrompt = document.querySelector("#copy-context-prompt");
 const contextSourceType = document.querySelector("#context-source-type");
@@ -65,6 +70,7 @@ const saveContextSource = document.querySelector("#save-context-source");
 const contextStatus = document.querySelector("#context-status");
 const contextSourceList = document.querySelector("#context-source-list");
 const whatsappSender = document.querySelector("#whatsapp-sender");
+const whatsappStyleName = document.querySelector("#whatsapp-style-name");
 const whatsappFiles = document.querySelector("#whatsapp-files");
 const whatsappContent = document.querySelector("#whatsapp-content");
 const saveWhatsappImport = document.querySelector("#save-whatsapp-import");
@@ -153,7 +159,9 @@ async function startConversation() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       agent_model: selectedAgentModel(),
-      agent_mode: selectedAgentMode()
+      agent_mode: selectedAgentMode(),
+      agent_tone: selectedAgentTone(),
+      agent_style_source_id: selectedAgentStyleSourceId()
     })
   });
   const conversation = await response.json();
@@ -192,6 +200,13 @@ function hydrateConversation(conversation) {
   if (conversation.agent_mode && agentModeSelect) {
     agentModeSelect.value = conversation.agent_mode;
   }
+  if (conversation.agent_tone && agentToneSelect) {
+    agentToneSelect.value = conversation.agent_tone;
+  }
+  pendingAgentStyleSourceId = conversation.agent_style_source_id || "";
+  if (agentStyleSelect) {
+    agentStyleSelect.value = pendingAgentStyleSourceId;
+  }
   updateAgentStatusModel();
   chatInput.disabled = false;
   extractProfile.disabled = false;
@@ -200,6 +215,7 @@ function hydrateConversation(conversation) {
   updateSidebarMeta();
   loadContextImportPrompt();
   loadContextSources();
+  loadDetectedTone();
   loadAgentUsage();
   focusChatInput();
 }
@@ -250,32 +266,62 @@ function selectedAgentMode() {
   return agentModeSelect ? agentModeSelect.value : "know_me";
 }
 
+function selectedAgentTone() {
+  return agentToneSelect ? agentToneSelect.value : "auto";
+}
+
+function selectedAgentStyleSourceId() {
+  return agentStyleSelect ? agentStyleSelect.value || null : null;
+}
+
 function updateAgentStatusModel() {
   if (!agentStatus) return;
 
   const provider = agentStatus.dataset.provider || "Agent";
-  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${selectedAgentModel() || "no model"}`;
+  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${agentToneLabel(selectedAgentTone())} · ${agentStyleLabel()} · ${selectedAgentModel() || "no model"}`;
 }
 
 async function updateConversationModel() {
   if (!conversationId) return;
 
-  const response = await fetch(`/api/agent/conversations/${conversationId}/settings`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      agent_model: selectedAgentModel(),
-      agent_mode: selectedAgentMode()
-    })
-  });
-  const conversation = await response.json();
-  if (conversation.agent_model && agentModelSelect) {
-    agentModelSelect.value = conversation.agent_model;
+  const requestedStyleSourceId = selectedAgentStyleSourceId();
+  pendingAgentStyleSourceId = requestedStyleSourceId || "";
+
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agent_model: selectedAgentModel(),
+        agent_mode: selectedAgentMode(),
+        agent_tone: selectedAgentTone(),
+        agent_style_source_id: requestedStyleSourceId
+      })
+    });
+    const conversation = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(conversation.detail, "Could not update agent settings."));
+    }
+    if (conversation.agent_model && agentModelSelect) {
+      agentModelSelect.value = conversation.agent_model;
+    }
+    if (conversation.agent_mode && agentModeSelect) {
+      agentModeSelect.value = conversation.agent_mode;
+    }
+    if (conversation.agent_tone && agentToneSelect) {
+      agentToneSelect.value = conversation.agent_tone;
+    }
+    pendingAgentStyleSourceId = conversation.agent_style_source_id || "";
+    if (agentStyleSelect) {
+      agentStyleSelect.value = pendingAgentStyleSourceId;
+    }
+    updateAgentStatusModel();
+    loadDetectedTone();
+  } catch (error) {
+    if (agentStatus) {
+      agentStatus.textContent = error.message;
+    }
   }
-  if (conversation.agent_mode && agentModeSelect) {
-    agentModeSelect.value = conversation.agent_mode;
-  }
-  updateAgentStatusModel();
 }
 
 function agentModeLabel(mode) {
@@ -286,6 +332,26 @@ function agentModeLabel(mode) {
     talk_like_me: "Talk like me"
   };
   return labels[mode] || "Know me";
+}
+
+function agentToneLabel(tone) {
+  const labels = {
+    auto: "Auto tone",
+    casual: "Casual",
+    warm: "Warm",
+    formal: "Formal",
+    direct: "Direct",
+    playful: "Playful"
+  };
+  return labels[tone] || "Auto tone";
+}
+
+function agentStyleLabel() {
+  if (!agentStyleSelect || !agentStyleSelect.value) {
+    return "Default style";
+  }
+  const selected = agentStyleSelect.options[agentStyleSelect.selectedIndex];
+  return selected?.textContent || "Saved style";
 }
 
 function titleCase(value) {
@@ -373,7 +439,7 @@ async function copyContextImportPrompt() {
 }
 
 async function loadContextSources() {
-  if (!conversationId || !contextSourceList) return;
+  if (!conversationId) return;
 
   try {
     const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`);
@@ -386,9 +452,43 @@ async function loadContextSources() {
     const data = await response.json();
     renderContextSources(data.sources || []);
     renderActiveMemory(data.sources || []);
+    renderReplyStyleOptions(data.sources || []);
+    loadDetectedTone();
   } catch (error) {
     setContextStatus(error.message);
   }
+}
+
+async function loadDetectedTone() {
+  if (!conversationId || !toneSuggestion) return;
+
+  try {
+    const response = await fetch(`/api/agent/conversations/${conversationId}/tone`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Tone unavailable.");
+    }
+    const detected = data.detected_tone || {};
+    toneSuggestion.textContent = `Detected: ${agentToneLabel(detected.tone)} · ${Math.round((detected.confidence || 0) * 100)}% · Selected: ${agentToneLabel(data.selected_tone)}`;
+    if (applyDetectedTone) {
+      applyDetectedTone.hidden = !detected.tone || data.selected_tone !== "auto";
+      applyDetectedTone.dataset.tone = detected.tone || "";
+    }
+  } catch {
+    toneSuggestion.textContent = "Detected tone unavailable.";
+    if (applyDetectedTone) {
+      applyDetectedTone.hidden = true;
+      applyDetectedTone.dataset.tone = "";
+    }
+  }
+}
+
+async function applyDetectedToneSelection() {
+  const tone = applyDetectedTone?.dataset.tone;
+  if (!tone || !agentToneSelect) return;
+
+  agentToneSelect.value = tone;
+  await updateConversationModel();
 }
 
 async function saveConversationContextSource() {
@@ -465,14 +565,24 @@ async function saveWhatsappStyleImport() {
     if (whatsappFiles) {
       whatsappFiles.value = "";
     }
+    if (whatsappStyleName) {
+      whatsappStyleName.value = "";
+    }
     if (whatsappContent) {
       whatsappContent.value = "";
     }
+    pendingAgentStyleSourceId = imported[0]?.id || pendingAgentStyleSourceId;
+    await loadContextSources();
+    if (agentStyleSelect && imported[0]?.id) {
+      agentStyleSelect.value = imported[0].id;
+      pendingAgentStyleSourceId = imported[0].id;
+      await updateConversationModel();
+    }
     setWhatsappStatus(
-      `${imports.length} WhatsApp style source${imports.length === 1 ? "" : "s"} imported. Future replies can use them.`,
+      `${imports.length} text style${imports.length === 1 ? "" : "s"} imported and selected.`,
       "success"
     );
-    await loadContextSources();
+    await loadDetectedTone();
   } catch (error) {
     setWhatsappStatus(error.message, "error");
   } finally {
@@ -489,9 +599,11 @@ async function whatsappImportPayloads() {
   const content = whatsappContent?.value.trim() || "";
   if (!content) return [];
   validateWhatsappImportSize(content, "Pasted export");
+  const styleName = normalizedWhatsappStyleName("Pasted export");
   return [
     {
-      title: "WhatsApp speaking style",
+      title: styleName,
+      style_name: styleName,
       content
     }
   ];
@@ -504,10 +616,18 @@ async function whatsappPayloadFromFile(file) {
 
   const content = (await file.text()).trim();
   validateWhatsappImportSize(content, file.name);
+  const fileLabel = file.name.replace(/\.[^.]+$/, "");
+  const styleName = normalizedWhatsappStyleName(fileLabel);
   return {
-    title: `WhatsApp style: ${file.name.replace(/\.[^.]+$/, "")}`,
+    title: styleName,
+    style_name: styleName,
     content
   };
+}
+
+function normalizedWhatsappStyleName(fallbackLabel) {
+  const rawName = whatsappStyleName?.value.trim() || whatsappSender?.value.trim() || fallbackLabel;
+  return rawName.toLowerCase().endsWith("style") ? rawName : `${rawName}-style`;
 }
 
 function validateWhatsappImportSize(content, label) {
@@ -528,6 +648,8 @@ async function importWhatsappPayload(item) {
     body: JSON.stringify({
       title: item.title,
       user_sender: whatsappSender?.value.trim() || null,
+      style_name: item.style_name,
+      style_kind: "friend_style",
       content: item.content
     })
   });
@@ -566,9 +688,43 @@ function contextSourceLabel(sourceType) {
     llm_profile: "LLM profile",
     chat_export: "Short chat summary",
     manual_notes: "Manual notes",
-    whatsapp_chat: "WhatsApp style"
+    whatsapp_chat: "My WhatsApp style",
+    friend_style: "Friend text style"
   };
   return labels[sourceType] || sourceType || "Context";
+}
+
+function renderReplyStyleOptions(sources) {
+  if (!agentStyleSelect) return;
+
+  const styleSources = sources.filter((source) =>
+    ["whatsapp_chat", "friend_style"].includes(source.source_type)
+  );
+  const currentValue = agentStyleSelect.value || "";
+  const activeValue = currentValue || pendingAgentStyleSourceId || "";
+  agentStyleSelect.innerHTML = "";
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Default";
+  agentStyleSelect.appendChild(defaultOption);
+
+  styleSources.forEach((source) => {
+    const option = document.createElement("option");
+    option.value = source.id;
+    option.textContent = source.title;
+    agentStyleSelect.appendChild(option);
+  });
+
+  const hasActiveValue = styleSources.some((source) => source.id === activeValue);
+  agentStyleSelect.value = hasActiveValue ? activeValue : "";
+  pendingAgentStyleSourceId = agentStyleSelect.value;
+  updateAgentStatusModel();
+}
+
+function handleAgentStyleSelectionChange() {
+  pendingAgentStyleSourceId = selectedAgentStyleSourceId() || "";
+  updateConversationModel();
 }
 
 function renderActiveMemory(sources) {
@@ -693,6 +849,7 @@ async function sendUserMessage() {
     renderMessages();
     updateReadiness();
     loadAgentUsage();
+    loadDetectedTone();
     focusChatInput();
   }
 }
@@ -1117,6 +1274,9 @@ sideTabButtons.forEach((button) => {
 });
 agentModelSelect.addEventListener("change", updateConversationModel);
 agentModeSelect?.addEventListener("change", updateConversationModel);
+agentToneSelect?.addEventListener("change", updateConversationModel);
+agentStyleSelect?.addEventListener("change", handleAgentStyleSelectionChange);
+applyDetectedTone?.addEventListener("click", applyDetectedToneSelection);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
 saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);

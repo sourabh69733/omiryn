@@ -45,6 +45,8 @@ agent_conversations = Table(
     Column("agent_provider", String, nullable=True),
     Column("agent_model", String, nullable=True),
     Column("agent_mode", String, nullable=True),
+    Column("agent_tone", String, nullable=True),
+    Column("agent_style_source_id", String, nullable=True),
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
@@ -157,6 +159,8 @@ def save_conversation(conversation: dict[str, Any]) -> None:
         "agent_provider": conversation.get("agent_provider"),
         "agent_model": conversation.get("agent_model"),
         "agent_mode": conversation.get("agent_mode") or "know_me",
+        "agent_tone": conversation.get("agent_tone") or "auto",
+        "agent_style_source_id": conversation.get("agent_style_source_id"),
         "messages_json": conversation["messages"],
     }
     with ENGINE.begin() as connection:
@@ -172,6 +176,8 @@ def save_conversation(conversation: dict[str, Any]) -> None:
                     agent_provider=payload["agent_provider"],
                     agent_model=payload["agent_model"],
                     agent_mode=payload["agent_mode"],
+                    agent_tone=payload["agent_tone"],
+                    agent_style_source_id=payload["agent_style_source_id"],
                     messages_json=payload["messages_json"],
                     updated_at=func.now(),
                 )
@@ -193,6 +199,8 @@ def get_conversation(conversation_id: str) -> dict[str, Any] | None:
         "agent_provider": row.get("agent_provider"),
         "agent_model": row.get("agent_model"),
         "agent_mode": row.get("agent_mode") or "know_me",
+        "agent_tone": row.get("agent_tone") or "auto",
+        "agent_style_source_id": row.get("agent_style_source_id"),
         "messages": row["messages_json"],
     }
 
@@ -203,7 +211,13 @@ def _ensure_agent_conversation_columns() -> None:
     }
     missing_columns = [
         column_name
-        for column_name in ("agent_provider", "agent_model", "agent_mode")
+        for column_name in (
+            "agent_provider",
+            "agent_model",
+            "agent_mode",
+            "agent_tone",
+            "agent_style_source_id",
+        )
         if column_name not in existing_columns
     ]
     if not missing_columns:

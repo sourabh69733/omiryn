@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260613-agent-modes" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260614-friend-style" />
   </head>
   <body>
     <div class="app-shell">
@@ -73,6 +73,12 @@
                     <div class="memory-empty">No imported memory yet.</div>
                   </div>
                 </div>
+                <div class="tone-suggestion" id="tone-suggestion">
+                  Detected tone will appear after a few messages.
+                </div>
+                <button class="secondary-button primary-wide" id="apply-detected-tone" type="button" hidden>
+                  Apply detected tone
+                </button>
               </section>
 
               <section class="side-panel" data-side-panel="context" hidden>
@@ -135,20 +141,28 @@ Rules:
 
                 <div class="context-divider"></div>
                 <p class="eyebrow">WhatsApp Style</p>
-                <h2>Learn my tone</h2>
+                <h2>Learn a text style</h2>
                 <p class="quiet-note">
-                  Import normal 1:1 WhatsApp text exports. Omiryn stores only compact speaking-style summaries.
+                  Import a normal 1:1 WhatsApp text export. Omiryn stores a compact style summary and will not pretend to be that person.
                 </p>
                 <label class="context-field">
-                  Your name in export
-                  <input id="whatsapp-sender" type="text" placeholder="Exact sender name, optional" />
+                  Sender to learn
+                  <input id="whatsapp-sender" type="text" placeholder="Exact WhatsApp sender name, optional" />
+                </label>
+                <label class="context-field">
+                  Style name
+                  <input id="whatsapp-style-name" type="text" placeholder="Sanjay-style, Nikhil-style..." />
                 </label>
                 <label class="context-field">
                   WhatsApp .txt files
                   <input id="whatsapp-files" type="file" accept=".txt,text/plain" multiple />
                 </label>
+                <label class="context-field">
+                  Or paste export
+                  <textarea id="whatsapp-content" rows="5" placeholder="Paste WhatsApp exported text here..."></textarea>
+                </label>
                 <button class="secondary-button primary-wide" id="save-whatsapp-import" type="button">
-                  Import WhatsApp style
+                  Import text style
                 </button>
                 <p class="quiet-note" id="whatsapp-status">
                   V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context.
@@ -197,6 +211,23 @@ Rules:
                       <option value="coach_me">Coach me</option>
                       <option value="match_me">Match me</option>
                       <option value="talk_like_me">Talk like me</option>
+                    </select>
+                  </label>
+                  <label class="model-picker">
+                    <span>Tone</span>
+                    <select id="agent-tone-select" aria-label="Choose agent tone">
+                      <option value="auto">Auto</option>
+                      <option value="casual">Casual</option>
+                      <option value="warm">Warm</option>
+                      <option value="formal">Formal</option>
+                      <option value="direct">Direct</option>
+                      <option value="playful">Playful</option>
+                    </select>
+                  </label>
+                  <label class="model-picker">
+                    <span>Reply Style</span>
+                    <select id="agent-style-select" aria-label="Choose reply style">
+                      <option value="">Default</option>
                     </select>
                   </label>
                   <label class="model-picker">
@@ -413,6 +444,6 @@ Rules:
       </main>
     </div>
 
-    <script src="/static/app.js?v=20260613-agent-modes"></script>
+    <script src="/static/app.js?v=20260614-friend-style"></script>
   </body>
 </html>
