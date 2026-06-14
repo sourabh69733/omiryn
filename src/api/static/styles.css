@@ -910,6 +910,67 @@ p {
   line-height: 1.6;
 }
 
+.sidebar-usage-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sidebar-usage-total strong {
+  color: var(--ink);
+  font-family: var(--font-terminal);
+  font-size: 18px;
+}
+
+.sidebar-usage-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sidebar-usage-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.sidebar-usage-item.failed {
+  border-left-color: #d66b5d;
+}
+
+.sidebar-usage-item strong,
+.sidebar-usage-item span {
+  display: block;
+}
+
+.sidebar-usage-item strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.sidebar-usage-item span,
+.sidebar-usage-empty {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sidebar-usage-tokens {
+  min-width: 88px;
+  text-align: right;
+}
+
+.sidebar-usage-tokens strong {
+  font-family: var(--font-terminal);
+  font-size: 14px;
+}
+
 .review-card {
   overflow: hidden;
 }

@@ -53,6 +53,7 @@ const readinessScore = document.querySelector("#readiness-score");
 const readinessMeter = document.querySelector("#readiness-meter");
 const signalList = document.querySelector("#signal-list");
 const usageSummary = document.querySelector("#usage-summary");
+const sidebarUsageList = document.querySelector("#sidebar-usage-list");
 const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
@@ -866,20 +867,62 @@ async function loadAgentUsage() {
     const response = await fetch(`/api/agent/conversations/${conversationId}/usage`);
     const data = await response.json();
     const summary = data.summary || {};
+    const events = data.events || [];
     const cost = summary.estimated_cost_usd
       ? ` · $${summary.estimated_cost_usd.toFixed(6)}`
       : "";
     const inrCost = summary.estimated_cost_inr
       ? ` / ₹${summary.estimated_cost_inr.toFixed(4)}`
       : "";
-    usageSummary.textContent = [
-      `${summary.request_count || 0} agent requests`,
-      `${summary.total_tokens || 0} total tokens`,
-      `${summary.prompt_tokens || 0} in / ${summary.completion_tokens || 0} out${cost}${inrCost}`
-    ].join(" · ");
+    usageSummary.innerHTML = `
+      <div class="sidebar-usage-total">
+        <strong>${formatNumber(summary.total_tokens || 0)}</strong>
+        <span>total tokens</span>
+      </div>
+      <div>${formatNumber(summary.request_count || 0)} requests · ${formatNumber(summary.successful_request_count || 0)} successful</div>
+      <div>${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output${cost}${inrCost}</div>
+    `;
+    renderSidebarUsageEvents(events);
   } catch {
     usageSummary.textContent = "Usage unavailable";
+    renderSidebarUsageEvents([]);
   }
+}
+
+function renderSidebarUsageEvents(events) {
+  if (!sidebarUsageList) return;
+
+  if (!events.length) {
+    sidebarUsageList.innerHTML = '<div class="sidebar-usage-empty">No calls yet.</div>';
+    return;
+  }
+
+  sidebarUsageList.innerHTML = events
+    .slice(0, 6)
+    .map((event, index) => {
+      const createdAt = event.created_at ? new Date(event.created_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      }) : "";
+      const tokenText = event.total_tokens
+        ? `${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out`
+        : "tokens unavailable";
+      const totalText = event.total_tokens ? formatNumber(event.total_tokens) : "-";
+      const status = event.success ? "ok" : "failed";
+      return `
+        <div class="sidebar-usage-item ${status}">
+          <div>
+            <strong>#${events.length - index} ${escapeHtml(event.request_kind || "agent_call")}</strong>
+            <span>${escapeHtml(createdAt)} · ${escapeHtml(event.model || event.provider || "-")}</span>
+          </div>
+          <div class="sidebar-usage-tokens">
+            <strong>${totalText}</strong>
+            <span>${tokenText}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function focusChatInput() {
