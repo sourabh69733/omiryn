@@ -99,6 +99,8 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
         return _quality_result("I did not catch that. Could you answer in a few words?")
     if normalized in allowed_short_answers:
         return {"valid": True}
+    if normalized in {"yes", "no", "ok", "okay", "haan", "ha", "nahi"} and _previous_prompt_allows_short_confirmation(messages):
+        return {"valid": True}
     if normalized in vague_answers:
         return _quality_result("That is a little too vague. Could you say what you mean in one sentence?")
     if normalized in junk_answers:
@@ -321,6 +323,34 @@ def _looks_like_gibberish(normalized: str) -> bool:
     if len(set(compact)) <= 2 and len(compact) >= 4:
         return True
     return False
+
+
+def _previous_prompt_allows_short_confirmation(messages: list[dict[str, str]]) -> bool:
+    previous_assistant_message = next(
+        (
+            message
+            for message in reversed(messages[:-1])
+            if message.get("role") == "assistant" and message.get("content")
+        ),
+        None,
+    )
+    if not previous_assistant_message:
+        return False
+
+    prompt = _normalized_user_text(previous_assistant_message.get("content", ""))
+    confirmation_markers = {
+        "sahi samajh raha hu",
+        "sahi samajh raha hun",
+        "samajh raha hu",
+        "samajh raha hun",
+        "right",
+        "correct",
+        "is that right",
+        "does that sound right",
+        "am i understanding",
+        "did i get that",
+    }
+    return any(marker in prompt for marker in confirmation_markers)
 
 
 def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dict[str, str]]:

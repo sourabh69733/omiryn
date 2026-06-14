@@ -113,6 +113,32 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(usage["events"][0]["request_kind"], "input_guardrail")
         self.assertEqual(usage["events"][0]["provider"], "guardrail")
 
+    def test_yes_is_allowed_after_confirmation_question(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation = conversation_response.json()
+        conversation_id = conversation["id"]
+        conversation["messages"] = [
+            {
+                "role": "assistant",
+                "content": (
+                    "koi bhi city thik hai, tu flexible hai, aur priority career aur "
+                    "relationship ki mutual respect hai, sahi samajh raha hu?"
+                ),
+            }
+        ]
+        from storage import save_conversation
+
+        save_conversation(conversation)
+
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "yes"},
+        )
+
+        self.assertEqual(message_response.status_code, 200)
+        messages = message_response.json()["messages"]
+        self.assertNotEqual(messages[-2].get("quality"), "low_information")
+
     def test_provider_messages_strip_internal_metadata(self) -> None:
         messages = _provider_messages(
             [
