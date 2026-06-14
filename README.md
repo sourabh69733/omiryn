@@ -64,6 +64,15 @@ Production target:
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/omiryn
 ```
 
+Reset local runtime data:
+
+```bash
+./scripts/reset-data.sh --yes
+```
+
+This clears conversations, imported context, drafts, and usage logs for the
+configured `DATABASE_URL`.
+
 ## Agent Providers
 
 The app now supports the first Omiryn-owned agent flow:
