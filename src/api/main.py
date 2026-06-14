@@ -51,6 +51,29 @@ ContextSourceType = Literal[
 ]
 WhatsappStyleKind = Literal["user_style", "friend_style"]
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
+MEMORY_RETRIEVAL_LIMIT = 2
+MEMORY_TRIGGER_TERMS = {
+    "context",
+    "memory",
+    "remember",
+    "saved",
+    "imported",
+    "upload",
+    "uploaded",
+    "whatsapp",
+    "chatgpt",
+    "claude",
+    "gemini",
+    "summary",
+    "profile",
+    "about me",
+    "know about me",
+    "what do you know",
+    "last topic",
+    "last message",
+    "past chat",
+    "conversation",
+}
 LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
 
 Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
@@ -391,9 +414,10 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
             model=conversation.agent_model,
             agent_mode=conversation.agent_mode,
             agent_tone=conversation.agent_tone,
-            context_sources=_reply_context_sources(
+            context_sources=_smart_reply_context_sources(
                 conversation.id,
                 conversation.agent_style_source_id,
+                payload.message,
             ),
         )
     except (AgentProviderError, Exception) as error:
@@ -646,15 +670,30 @@ def _profile_extraction_context_sources(conversation_id: str) -> list[dict[str, 
     ]
 
 
-def _reply_context_sources(
+def _smart_reply_context_sources(
     conversation_id: str,
     style_source_id: str | None,
+    user_text: str,
 ) -> list[dict[str, object]]:
     sources = list_context_sources(conversation_id)
-    if not style_source_id:
-        return sources
+    selected_style = _selected_style_source(sources, style_source_id)
+    retrieved_sources = _relevant_memory_sources(sources, user_text)
 
-    selected_style = next(
+    if selected_style:
+        return [selected_style] + [
+            source for source in retrieved_sources if source.get("id") != selected_style.get("id")
+        ]
+
+    return retrieved_sources
+
+
+def _selected_style_source(
+    sources: list[dict[str, object]],
+    style_source_id: str | None,
+) -> dict[str, object] | None:
+    if not style_source_id:
+        return None
+    return next(
         (
             source
             for source in sources
@@ -663,13 +702,84 @@ def _reply_context_sources(
         ),
         None,
     )
-    if not selected_style:
-        return sources
 
-    non_style_sources = [
-        source for source in sources if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
+
+def _relevant_memory_sources(
+    sources: list[dict[str, object]],
+    user_text: str,
+) -> list[dict[str, object]]:
+    if not _should_retrieve_memory(user_text):
+        return []
+
+    scored_sources = [
+        (score, source)
+        for source in sources
+        if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
+        for score in [_memory_source_score(source, user_text)]
+        if score > 0
     ]
-    return [selected_style] + non_style_sources
+    scored_sources.sort(key=lambda item: item[0], reverse=True)
+    return [source for _, source in scored_sources[:MEMORY_RETRIEVAL_LIMIT]]
+
+
+def _should_retrieve_memory(user_text: str) -> bool:
+    normalized = _normalized_memory_text(user_text)
+    return any(term in normalized for term in MEMORY_TRIGGER_TERMS)
+
+
+def _memory_source_score(source: dict[str, object], user_text: str) -> int:
+    query_terms = _memory_terms(user_text)
+    if not query_terms:
+        return 0
+    source_text = _normalized_memory_text(
+        " ".join(
+            [
+                str(source.get("title") or ""),
+                str(source.get("source_type") or ""),
+                str(source.get("content") or ""),
+            ]
+        )
+    )
+    score = sum(source_text.count(term) for term in query_terms)
+    source_type = source.get("source_type")
+    if source_type == "llm_profile" and any(term in query_terms for term in {"profile", "about", "me"}):
+        score += 2
+    if source_type == "chat_export" and any(term in query_terms for term in {"chat", "conversation", "topic"}):
+        score += 2
+    return score
+
+
+def _memory_terms(text: str) -> set[str]:
+    normalized = _normalized_memory_text(text)
+    stop_words = {
+        "the",
+        "and",
+        "for",
+        "you",
+        "your",
+        "about",
+        "with",
+        "from",
+        "what",
+        "that",
+        "this",
+        "tell",
+        "me",
+        "my",
+        "can",
+        "please",
+    }
+    return {
+        term
+        for term in normalized.split()
+        if len(term) >= 3 and term not in stop_words
+    }
+
+
+def _normalized_memory_text(text: str) -> str:
+    return " ".join(
+        "".join(character.lower() if character.isalnum() else " " for character in text).split()
+    )
 
 
 def _validate_style_source(conversation_id: str, style_source_id: str | None) -> None:

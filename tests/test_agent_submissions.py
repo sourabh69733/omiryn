@@ -2,7 +2,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from api.main import app
+from api.main import _smart_reply_context_sources, app
 from agent.providers import _context_sources_text, _provider_messages
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import reset_db
@@ -258,6 +258,51 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["count"], 1)
+
+    def test_reply_context_ignores_imports_until_memory_is_requested(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "Career profile",
+                "content": "The user is focused on career growth and calm communication.",
+            },
+        )
+
+        sources = _smart_reply_context_sources(conversation_id, None, "haan, sounds good")
+
+        self.assertEqual(sources, [])
+
+    def test_reply_context_retrieves_relevant_imported_memory(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "Career profile",
+                "content": "The user is focused on career growth and calm communication.",
+            },
+        )
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "manual_notes",
+                "title": "Food notes",
+                "content": "The user likes spicy street food.",
+            },
+        )
+
+        sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "what do you know about my career from imported memory?",
+        )
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]["title"], "Career profile")
 
     def test_whatsapp_export_import_creates_style_context(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
