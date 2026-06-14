@@ -260,6 +260,23 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(clear_response.status_code, 200)
         self.assertIsNone(clear_response.json()["agent_style_source_id"])
 
+    def test_friend_style_import_requires_sender_to_learn(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Sanjay-style",
+                "style_name": "Sanjay-style",
+                "style_kind": "friend_style",
+                "content": sample_whatsapp_export(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("exact WhatsApp sender", response.json()["detail"])
+
     def test_whatsapp_parser_supports_multiline_exports(self) -> None:
         messages = parse_whatsapp_export(sample_whatsapp_export())
 

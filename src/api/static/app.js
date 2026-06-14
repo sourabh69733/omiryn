@@ -591,6 +591,11 @@ async function saveWhatsappStyleImport() {
 }
 
 async function whatsappImportPayloads() {
+  const senderToLearn = whatsappSender?.value.trim() || "";
+  if (!senderToLearn) {
+    throw new Error("Enter the exact WhatsApp sender to learn, for example Sanjay.");
+  }
+
   const files = Array.from(whatsappFiles?.files || []);
   if (files.length) {
     return Promise.all(files.map(whatsappPayloadFromFile));
@@ -647,7 +652,7 @@ async function importWhatsappPayload(item) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title: item.title,
-      user_sender: whatsappSender?.value.trim() || null,
+      user_sender: whatsappSender?.value.trim(),
       style_name: item.style_name,
       style_kind: "friend_style",
       content: item.content

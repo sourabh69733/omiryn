@@ -270,6 +270,14 @@ def create_whatsapp_context_source(
     payload: WhatsappChatImportCreate,
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id)
+    if payload.style_kind == "friend_style" and not (payload.user_sender or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Enter the exact WhatsApp sender to learn, for example Sanjay. "
+                "Omiryn needs to know which side of the chat should define the style."
+            ),
+        )
     try:
         style_summary = build_whatsapp_style_summary(
             payload.content,
@@ -692,7 +700,9 @@ def _whatsapp_style_context_content(
         f"Friend-style text profile: {style_name}.\n"
         "Use this only as a texting-style reference for rhythm, warmth, brevity, emoji "
         "habits, and phrasing patterns. Never claim to be this person, never imply this "
-        "person is present, and never say they wrote or approved any message.\n\n"
+        "person is present, and never say they wrote or approved any message. If the user "
+        "expects a different person or the selected sender seems wrong, ask which WhatsApp "
+        "sender/style they want to use.\n\n"
         f"{summary_content}"
     )
 
