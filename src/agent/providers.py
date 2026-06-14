@@ -13,6 +13,12 @@ from storage import save_agent_usage_event
 
 logger = logging.getLogger(__name__)
 
+RECENT_CHAT_MESSAGE_LIMIT = int(os.getenv("AGENT_RECENT_MESSAGE_LIMIT", "12"))
+CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
+CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
+STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
+STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
+
 ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private matchmaking interviewer.
 Your job is to understand the user well enough to build a structured dating profile
 for real-world matching.
@@ -333,6 +339,34 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         if role not in {"assistant", "user", "system"} or content is None:
             continue
         provider_messages.append({"role": role, "content": str(content)})
+    if len(provider_messages) <= RECENT_CHAT_MESSAGE_LIMIT:
+        return provider_messages
+
+    older_messages = provider_messages[:-RECENT_CHAT_MESSAGE_LIMIT]
+    recent_messages = provider_messages[-RECENT_CHAT_MESSAGE_LIMIT:]
+    return [_conversation_summary_message(older_messages)] + recent_messages
+
+
+def _conversation_summary_message(messages: list[dict[str, str]]) -> dict[str, str]:
+    user_lines = [
+        _truncate_for_context(message["content"], 160)
+        for message in messages
+        if message["role"] == "user"
+    ][-8:]
+    assistant_lines = [
+        _truncate_for_context(message["content"], 120)
+        for message in messages
+        if message["role"] == "assistant"
+    ][-4:]
+    parts = [
+        "Earlier conversation summary, compacted locally to save tokens.",
+        "Use this only as rough continuity; prefer the recent messages for exact wording.",
+    ]
+    if user_lines:
+        parts.append("Earlier user messages: " + " | ".join(user_lines))
+    if assistant_lines:
+        parts.append("Earlier assistant prompts: " + " | ".join(assistant_lines))
+    return {"role": "system", "content": "\n".join(parts)}
     return provider_messages
 
 
@@ -418,12 +452,24 @@ def _context_sources_text(context_sources: list[dict[str, Any]] | None) -> str:
     if not context_sources:
         return ""
     sections = []
-    for source in context_sources[:5]:
+    for source in context_sources[:CONTEXT_SOURCE_LIMIT]:
         title = source.get("title") or "Untitled source"
         source_type = source.get("source_type") or "context"
-        content = str(source.get("content") or "")[:4000]
+        content_limit = (
+            STYLE_CONTEXT_CHAR_LIMIT
+            if source_type in STYLE_CONTEXT_TYPES
+            else CONTEXT_SOURCE_CHAR_LIMIT
+        )
+        content = _truncate_for_context(str(source.get("content") or ""), content_limit)
         sections.append(f"[{source_type}] {title}\n{content}")
     return "User-provided context sources:\n" + "\n\n".join(sections)
+
+
+def _truncate_for_context(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
 
 
 async def _groq_chat(

@@ -3,7 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from api.main import app
-from agent.providers import _provider_messages
+from agent.providers import _context_sources_text, _provider_messages
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import reset_db
 
@@ -130,6 +130,39 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 {"role": "user", "content": "I want something serious."},
             ],
         )
+
+    def test_provider_messages_compact_old_history(self) -> None:
+        messages = [
+            {"role": "user" if index % 2 else "assistant", "content": f"message {index}"}
+            for index in range(18)
+        ]
+
+        compacted = _provider_messages(messages)
+
+        self.assertEqual(len(compacted), 13)
+        self.assertEqual(compacted[0]["role"], "system")
+        self.assertIn("Earlier conversation summary", compacted[0]["content"])
+        self.assertEqual(compacted[-1]["content"], "message 17")
+
+    def test_context_sources_are_capped_before_provider_call(self) -> None:
+        context_text = _context_sources_text(
+            [
+                {
+                    "source_type": "friend_style",
+                    "title": "Sanjay-style",
+                    "content": "style " * 1000,
+                },
+                {
+                    "source_type": "llm_profile",
+                    "title": "Profile",
+                    "content": "profile " * 1000,
+                },
+            ]
+        )
+
+        self.assertIn("[friend_style] Sanjay-style", context_text)
+        self.assertIn("[llm_profile] Profile", context_text)
+        self.assertLess(len(context_text), 3800)
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")
