@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timezone
 from uuid import uuid4
 from pathlib import Path
 from typing import Any
@@ -271,7 +272,7 @@ def list_agent_usage_events(conversation_id: str | None = None) -> list[dict[str
             "estimated_cost_usd": row["estimated_cost_usd"],
             "error": row["error"],
             "raw_usage": row["raw_usage_json"],
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "created_at": _isoformat_utc(row["created_at"]),
         }
         for row in rows
     ]
@@ -341,5 +342,13 @@ def _context_source_from_row(row: Any) -> dict[str, Any]:
         "title": row["title"],
         "content": row["content"],
         "metadata": row["metadata_json"],
-        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        "created_at": _isoformat_utc(row["created_at"]),
     }
+
+
+def _isoformat_utc(value: Any) -> str | None:
+    if not value:
+        return None
+    if value.tzinfo is None:
+        return f"{value.isoformat()}Z"
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")

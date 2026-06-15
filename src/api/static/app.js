@@ -93,9 +93,9 @@ const usageRateLimits = document.querySelector("#usage-rate-limits");
 const usageRateLimitDetail = document.querySelector("#usage-rate-limit-detail");
 const providerList = document.querySelector("#provider-list");
 const rateLimitGrid = document.querySelector("#rate-limit-grid");
-const usageRowLimit = document.querySelector("#usage-row-limit");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
+const usageTableRowLimit = 20;
 
 const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
@@ -1110,7 +1110,7 @@ async function loadUsageDashboard() {
     const data = await response.json();
     renderUsageSummary(data.summary || {});
     renderProviderMix(data.events || []);
-    renderGroqRateLimitHealth(data.events || []);
+    renderGroqRateLimitHealth(data.events || [], data.limits || {});
     renderTokensByMinute(data.events || []);
     renderUsageEvents(data.events || []);
   } catch (error) {
@@ -1125,22 +1125,22 @@ async function loadUsageDashboard() {
   }
 }
 
-function renderGroqRateLimitHealth(events) {
+function renderGroqRateLimitHealth(events, limits = {}) {
   if (!rateLimitGrid) return;
 
   const groqEvents = events.filter((event) => event.provider === "groq");
   const rateLimitedEvents = groqEvents.filter((event) => isRateLimitEvent(event));
+  const localDaily = localGroqDaily(groqEvents);
+  const todayRateLimitedEvents = localDaily.events.filter((event) => isRateLimitEvent(event));
   if (usageRateLimits) {
-    usageRateLimits.textContent = formatNumber(rateLimitedEvents.length);
+    usageRateLimits.textContent = formatNumber(todayRateLimitedEvents.length);
   }
   if (usageRateLimitDetail) {
-    usageRateLimitDetail.textContent = rateLimitedEvents.length
-      ? `${formatNumber(rateLimitedEvents.length)} recent 429 errors`
+    usageRateLimitDetail.textContent = todayRateLimitedEvents.length
+      ? `${formatNumber(todayRateLimitedEvents.length)} today · ${formatNumber(rateLimitedEvents.length)} logged`
       : "No recent throttling";
   }
 
-  const latestHeadersEvent = groqEvents.find((event) => groqRateLimitHeaders(event));
-  const headers = latestHeadersEvent ? groqRateLimitHeaders(latestHeadersEvent) : null;
   const localRate = localGroqRate(groqEvents);
 
   if (!groqEvents.length) {
@@ -1149,16 +1149,30 @@ function renderGroqRateLimitHealth(events) {
   }
 
   rateLimitGrid.innerHTML = `
-    ${rateLimitMetric("Local RPM", localRate.rpm, "Groq calls in the busiest recent minute")}
-    ${rateLimitMetric("Local TPM", formatNumber(localRate.tpm), "Input + output tokens in busiest recent minute")}
-    ${rateLimitMetric("429 errors", formatNumber(rateLimitedEvents.length), "Too Many Requests responses")}
-    ${rateLimitMetric("Retry after", headers?.["retry-after"] ? `${escapeHtml(headers["retry-after"])}s` : "-", "From latest 429 response")}
-    ${rateLimitMetric("Request limit", escapeHtml(headers?.["x-ratelimit-limit-requests"] || "-"), "Groq header: daily request limit")}
-    ${rateLimitMetric("Requests left", escapeHtml(headers?.["x-ratelimit-remaining-requests"] || "-"), "Groq header: remaining requests")}
-    ${rateLimitMetric("Token limit", escapeHtml(headers?.["x-ratelimit-limit-tokens"] || "-"), "Groq header: tokens per minute")}
-    ${rateLimitMetric("Tokens left", escapeHtml(headers?.["x-ratelimit-remaining-tokens"] || "-"), "Groq header: remaining tokens")}
-    ${rateLimitMetric("Request reset", escapeHtml(headers?.["x-ratelimit-reset-requests"] || "-"), "Time until request window reset")}
-    ${rateLimitMetric("Token reset", escapeHtml(headers?.["x-ratelimit-reset-tokens"] || "-"), "Time until token window reset")}
+    ${usageLimitMetric("RPM", localRate.rpmValue, limits.groq_rpm, "Requests consumed in last 60 seconds")}
+    ${usageLimitMetric("RPD", localDaily.requests, limits.groq_rpd, "Requests consumed today")}
+    ${usageLimitMetric("TPM", localRate.tpm, limits.groq_tpm, "Tokens consumed in last 60 seconds")}
+    ${usageLimitMetric("TPD", localDaily.tokens, limits.groq_tpd, `${formatNumber(localDaily.promptTokens)} input / ${formatNumber(localDaily.completionTokens)} output today`)}
+    ${rateLimitMetric("Total requests", formatNumber(groqEvents.length), "All logged Groq requests")}
+    ${rateLimitMetric("Total tokens", formatNumber(totalGroqTokens(groqEvents)), "All logged Groq input + output tokens")}
+    ${rateLimitMetric("429 today", formatNumber(todayRateLimitedEvents.length), `${formatNumber(rateLimitedEvents.length)} total 429 responses logged`)}
+  `;
+}
+
+function usageLimitMetric(label, used, limit, fallbackDetail) {
+  if (!limit) {
+    return rateLimitMetric(label, formatNumber(used), `${fallbackDetail} · set ${usageLimitEnvName(label)} to show remaining`);
+  }
+
+  const remaining = Math.max(0, limit - used);
+  const percent = Math.min(100, Math.round((used / limit) * 100));
+  const state = percent >= 90 ? "danger" : percent >= 75 ? "warning" : "ok";
+  return `
+    <article class="rate-limit-card ${state}">
+      <span>${label}</span>
+      <strong>${formatNumber(used)} / ${formatNumber(limit)}</strong>
+      <small>${formatNumber(remaining)} remaining · ${percent}% used</small>
+    </article>
   `;
 }
 
@@ -1176,30 +1190,59 @@ function groqRateLimitHeaders(event) {
   return event.raw_usage?.rate_limit || null;
 }
 
+function usageLimitEnvName(label) {
+  const envNames = {
+    RPM: "GROQ_RPM_LIMIT",
+    RPD: "GROQ_RPD_LIMIT",
+    TPM: "GROQ_TPM_LIMIT",
+    TPD: "GROQ_TPD_LIMIT"
+  };
+  return envNames[label] || "GROQ_*_LIMIT";
+}
+
 function isRateLimitEvent(event) {
   const error = `${event.error || ""} ${JSON.stringify(event.raw_usage?.error || {})}`;
   return error.includes("429") || error.toLowerCase().includes("too many requests");
 }
 
 function localGroqRate(events) {
-  const buckets = events.reduce((accumulator, event) => {
-    if (!event.created_at) return accumulator;
+  const now = Date.now();
+  const windowStart = now - 60_000;
+  const windowEvents = events.filter((event) => {
+    if (!event.created_at) return false;
     const createdAt = new Date(event.created_at);
-    if (Number.isNaN(createdAt.getTime())) return accumulator;
-    createdAt.setSeconds(0, 0);
-    const key = createdAt.getTime();
-    if (!accumulator[key]) {
-      accumulator[key] = { calls: 0, tokens: 0 };
-    }
-    accumulator[key].calls += 1;
-    accumulator[key].tokens += event.total_tokens || 0;
-    return accumulator;
-  }, {});
-  const rows = Object.values(buckets);
+    if (Number.isNaN(createdAt.getTime())) return false;
+    const timestamp = createdAt.getTime();
+    return timestamp >= windowStart && timestamp <= now + 5_000;
+  });
+  const tokens = windowEvents.reduce((total, event) => total + (event.total_tokens || 0), 0);
   return {
-    rpm: formatNumber(Math.max(0, ...rows.map((row) => row.calls))),
-    tpm: Math.max(0, ...rows.map((row) => row.tokens))
+    rpm: formatNumber(windowEvents.length),
+    rpmValue: windowEvents.length,
+    tpm: tokens
   };
+}
+
+function localGroqDaily(events) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayEvents = events.filter((event) => {
+    if (!event.created_at) return false;
+    const createdAt = new Date(event.created_at);
+    return !Number.isNaN(createdAt.getTime()) && createdAt >= startOfToday;
+  });
+
+  return {
+    events: todayEvents,
+    requests: todayEvents.length,
+    promptTokens: todayEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0),
+    completionTokens: todayEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0),
+    tokens: todayEvents.reduce((total, event) => total + (event.total_tokens || 0), 0)
+  };
+}
+
+function totalGroqTokens(events) {
+  return events.reduce((total, event) => total + (event.total_tokens || 0), 0);
 }
 
 function renderUsageSummary(summary) {
@@ -1307,7 +1350,7 @@ function renderTokensByMinute(events) {
   }
 
   usageMinuteBuckets.innerHTML = rows
-    .slice(0, selectedUsageRowLimit())
+    .slice(0, usageTableRowLimit)
     .map(
       (row) => `
         <tr>
@@ -1328,7 +1371,7 @@ function renderUsageEvents(events) {
   }
 
   usageEvents.innerHTML = events
-    .slice(0, selectedUsageRowLimit())
+    .slice(0, usageTableRowLimit)
     .map((event) => {
       const statusClass = event.success ? "success" : "failed";
       const statusText = event.success ? "Success" : "Failed";
@@ -1346,11 +1389,6 @@ function renderUsageEvents(events) {
       `;
     })
     .join("");
-}
-
-function selectedUsageRowLimit() {
-  const value = Number.parseInt(usageRowLimit?.value || "20", 10);
-  return Number.isFinite(value) ? value : 20;
 }
 
 function formatNumber(value) {
@@ -1407,7 +1445,6 @@ approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
 refreshMatches.addEventListener("click", loadMatches);
 refreshUsage.addEventListener("click", loadUsageDashboard);
-usageRowLimit?.addEventListener("change", loadUsageDashboard);
 sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from typing import Literal
 from uuid import uuid4
 
@@ -230,6 +231,7 @@ def agent_usage(conversation_id: str | None = None) -> dict[str, object]:
     return {
         "summary": summarize_agent_usage(conversation_id),
         "events": list_agent_usage_events(conversation_id),
+        "limits": _configured_usage_limits(),
     }
 
 
@@ -239,6 +241,7 @@ def conversation_agent_usage(conversation_id: str) -> dict[str, object]:
     return {
         "summary": summarize_agent_usage(conversation_id),
         "events": list_agent_usage_events(conversation_id),
+        "limits": _configured_usage_limits(),
     }
 
 
@@ -882,3 +885,25 @@ def _context_source_summary(source: dict[str, object]) -> dict[str, object]:
         "preview": content[:240],
         "created_at": source["created_at"],
     }
+
+
+def _configured_usage_limits() -> dict[str, int | None]:
+    return {
+        "groq_rpd": _int_env("GROQ_RPD_LIMIT"),
+        "groq_tpd": _int_env("GROQ_TPD_LIMIT"),
+        "groq_rpm": _int_env("GROQ_RPM_LIMIT"),
+        "groq_tpm": _int_env("GROQ_TPM_LIMIT"),
+        "groq_input_tpd": _int_env("GROQ_INPUT_TPD_LIMIT"),
+        "groq_output_tpd": _int_env("GROQ_OUTPUT_TPD_LIMIT"),
+    }
+
+
+def _int_env(name: str) -> int | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return None
+    return value if value > 0 else None

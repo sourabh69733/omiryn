@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
@@ -212,6 +213,25 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(headers["x-ratelimit-limit-requests"], "14400")
         self.assertEqual(headers["x-ratelimit-remaining-tokens"], "12000")
         self.assertNotIn("ignored-header", headers)
+
+    def test_usage_response_includes_configured_limits(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "GROQ_RPD_LIMIT": "1000",
+                "GROQ_TPD_LIMIT": "100000",
+                "GROQ_RPM_LIMIT": "30",
+                "GROQ_TPM_LIMIT": "6000",
+            },
+        ):
+            response = self.client.get("/api/agent/usage")
+
+        self.assertEqual(response.status_code, 200)
+        limits = response.json()["limits"]
+        self.assertEqual(limits["groq_rpd"], 1000)
+        self.assertEqual(limits["groq_tpd"], 100000)
+        self.assertEqual(limits["groq_rpm"], 30)
+        self.assertEqual(limits["groq_tpm"], 6000)
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")

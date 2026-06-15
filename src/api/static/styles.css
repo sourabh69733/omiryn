@@ -1198,31 +1198,6 @@ p {
   grid-column: 1 / -1;
 }
 
-.usage-table-controls {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 18px;
-}
-
-.usage-row-limit {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.usage-row-limit select {
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--ink);
-  background: #ffffff;
-  font: inherit;
-  padding: 0 32px 0 10px;
-}
-
 .panel-heading {
   padding: 18px;
   border-bottom: 1px solid var(--line);
@@ -1249,6 +1224,16 @@ p {
   border-radius: 8px;
   background: #f8faf9;
   padding: 14px;
+}
+
+.rate-limit-card.warning {
+  border-color: #d9a441;
+  background: #fffaf0;
+}
+
+.rate-limit-card.danger {
+  border-color: #d66b5d;
+  background: #fff4f1;
 }
 
 .rate-limit-card span,
