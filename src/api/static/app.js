@@ -93,6 +93,7 @@ const usageRateLimits = document.querySelector("#usage-rate-limits");
 const usageRateLimitDetail = document.querySelector("#usage-rate-limit-detail");
 const providerList = document.querySelector("#provider-list");
 const rateLimitGrid = document.querySelector("#rate-limit-grid");
+const usageRowLimit = document.querySelector("#usage-row-limit");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 
@@ -1306,7 +1307,7 @@ function renderTokensByMinute(events) {
   }
 
   usageMinuteBuckets.innerHTML = rows
-    .slice(0, 30)
+    .slice(0, selectedUsageRowLimit())
     .map(
       (row) => `
         <tr>
@@ -1327,7 +1328,7 @@ function renderUsageEvents(events) {
   }
 
   usageEvents.innerHTML = events
-    .slice(0, 40)
+    .slice(0, selectedUsageRowLimit())
     .map((event) => {
       const statusClass = event.success ? "success" : "failed";
       const statusText = event.success ? "Success" : "Failed";
@@ -1345,6 +1346,11 @@ function renderUsageEvents(events) {
       `;
     })
     .join("");
+}
+
+function selectedUsageRowLimit() {
+  const value = Number.parseInt(usageRowLimit?.value || "20", 10);
+  return Number.isFinite(value) ? value : 20;
 }
 
 function formatNumber(value) {
@@ -1401,6 +1407,7 @@ approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
 refreshMatches.addEventListener("click", loadMatches);
 refreshUsage.addEventListener("click", loadUsageDashboard);
+usageRowLimit?.addEventListener("change", loadUsageDashboard);
 sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });

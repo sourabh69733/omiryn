@@ -1198,6 +1198,31 @@ p {
   grid-column: 1 / -1;
 }
 
+.usage-table-controls {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 18px;
+}
+
+.usage-row-limit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.usage-row-limit select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  padding: 0 32px 0 10px;
+}
+
 .panel-heading {
   padding: 18px;
   border-bottom: 1px solid var(--line);
