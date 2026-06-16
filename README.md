@@ -84,6 +84,38 @@ Reset local runtime data:
 This clears conversations, imported context, drafts, and usage logs for the
 configured `DATABASE_URL`.
 
+## Authentication
+
+Omiryn is being prepared for Supabase Auth with Google OAuth.
+
+Add these values to `.env` for local development:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_JWT_AUDIENCE=authenticated
+
+# Keep false while developing auth incrementally.
+AUTH_REQUIRED=false
+```
+
+In Supabase, enable Google OAuth and add local redirect URLs:
+
+```text
+http://127.0.0.1:8000
+http://localhost:8000
+```
+
+For deployment, also add the production app URL, for example:
+
+```text
+https://your-app.vercel.app
+```
+
+Do not commit Supabase service-role keys. The frontend should use only the
+public anon key, and the API should verify user access tokens before user data
+is scoped.
+
 ## Agent Providers
 
 The app now supports the first Omiryn-owned agent flow:
