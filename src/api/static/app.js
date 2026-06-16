@@ -7,6 +7,7 @@ let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
 let supabaseClient = null;
 let authSession = null;
+let authRequired = false;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -105,6 +106,10 @@ const rateLimitGrid = document.querySelector("#rate-limit-grid");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 const usageTableRowLimit = 20;
+const appShell = document.querySelector("#app-shell");
+const authScreen = document.querySelector("#auth-screen");
+const authScreenLogin = document.querySelector("#auth-screen-login");
+const authScreenStatus = document.querySelector("#auth-screen-status");
 const loginGoogle = document.querySelector("#login-google");
 const logoutUser = document.querySelector("#logout-user");
 const authUser = document.querySelector("#auth-user");
@@ -152,8 +157,10 @@ async function initializeAuth() {
       throw new Error("Auth config unavailable.");
     }
     const config = await response.json();
+    authRequired = Boolean(config.auth_required);
     if (!config.supabase_url || !config.supabase_anon_key) {
       renderSignedOutAuth("Auth not configured");
+      renderAuthGate();
       return;
     }
     if (!window.supabase?.createClient) {
@@ -173,6 +180,7 @@ async function initializeAuth() {
     });
   } catch (error) {
     renderSignedOutAuth(error.message);
+    renderAuthGate(error.message);
   }
 }
 
@@ -180,6 +188,7 @@ function renderAuthState() {
   const user = authSession?.user || null;
   if (!user) {
     renderSignedOutAuth("Continue with Google");
+    renderAuthGate();
     return;
   }
 
@@ -201,6 +210,7 @@ function renderAuthState() {
     logoutUser.hidden = false;
     logoutUser.disabled = false;
   }
+  renderAuthGate();
 }
 
 function renderSignedOutAuth(label) {
@@ -216,13 +226,39 @@ function renderSignedOutAuth(label) {
     logoutUser.hidden = true;
     logoutUser.disabled = false;
   }
+  if (authScreenStatus) {
+    authScreenStatus.textContent = label || "Sign in to continue.";
+  }
+}
+
+function renderAuthGate(message) {
+  const signedIn = Boolean(authSession?.user);
+  const shouldGate = authRequired && !signedIn;
+  if (appShell) {
+    appShell.hidden = shouldGate;
+  }
+  if (authScreen) {
+    authScreen.hidden = !shouldGate;
+  }
+  if (authScreenLogin) {
+    authScreenLogin.disabled = !supabaseClient;
+  }
+  if (authScreenStatus) {
+    authScreenStatus.textContent = message || (signedIn ? "Signed in." : "Sign in to continue.");
+  }
 }
 
 async function signInWithGoogle() {
   if (!supabaseClient) return;
 
   loginGoogle.disabled = true;
+  if (authScreenLogin) {
+    authScreenLogin.disabled = true;
+  }
   loginGoogle.textContent = "Opening Google...";
+  if (authScreenStatus) {
+    authScreenStatus.textContent = "Opening Google...";
+  }
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -231,7 +267,13 @@ async function signInWithGoogle() {
   });
   if (error) {
     loginGoogle.disabled = false;
+    if (authScreenLogin) {
+      authScreenLogin.disabled = false;
+    }
     loginGoogle.textContent = "Continue with Google";
+    if (authScreenStatus) {
+      authScreenStatus.textContent = error.message;
+    }
   }
 }
 
@@ -1765,6 +1807,7 @@ whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
 confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
 cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
 loginGoogle?.addEventListener("click", signInWithGoogle);
+authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 deleteSessionDialog?.addEventListener("click", (event) => {
   if (event.target === deleteSessionDialog) {

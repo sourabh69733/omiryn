@@ -7,7 +7,22 @@
     <link rel="stylesheet" href="/static/styles.css?v=20260614-friend-style" />
   </head>
   <body>
-    <div class="app-shell">
+    <section class="auth-screen" id="auth-screen" hidden>
+      <div class="auth-panel">
+        <span class="brand-mark auth-mark" aria-hidden="true">O</span>
+        <p class="eyebrow">Private AI matchmaking</p>
+        <h1>Sign in to Omiryn</h1>
+        <p>
+          Your chats, imported context, and matchmaking signals stay attached to your account.
+        </p>
+        <button class="auth-primary" id="auth-screen-login" type="button">
+          Continue with Google
+        </button>
+        <p class="auth-status" id="auth-screen-status">Checking sign-in...</p>
+      </div>
+    </section>
+
+    <div class="app-shell" id="app-shell" hidden>
       <header class="app-header">
         <a class="brand" href="/" aria-label="Omiryn home">
           <span class="brand-mark" aria-hidden="true">O</span>
