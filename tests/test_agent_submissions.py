@@ -70,6 +70,32 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(self.client.get(f"/api/drafts/{draft_id}").status_code, 404)
 
+    def test_conversation_can_be_deleted_with_context(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation_id = conversation_response.json()["id"]
+
+        context_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "manual_notes",
+                "title": "Preference notes",
+                "content": "A calm lifestyle and thoughtful communication matter a lot.",
+            },
+        )
+        self.assertEqual(context_response.status_code, 201)
+
+        delete_response = self.client.delete(f"/api/agent/conversations/{conversation_id}")
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.json()["status"], "deleted")
+        self.assertEqual(
+            self.client.get(f"/api/agent/conversations/{conversation_id}").status_code,
+            404,
+        )
+        conversations = self.client.get("/api/agent/conversations").json()["conversations"]
+        self.assertEqual(conversations, [])
+
     def test_omiryn_agent_conversation_extracts_to_review_draft(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         self.assertEqual(conversation_response.status_code, 201)

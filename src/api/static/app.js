@@ -3,6 +3,8 @@ let conversationId = null;
 let activeDraftId = null;
 let isSendingMessage = false;
 let pendingAgentStyleSourceId = "";
+let pendingDeleteConversationId = null;
+let lastDeleteTrigger = null;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -57,6 +59,10 @@ const sidebarUsageList = document.querySelector("#sidebar-usage-list");
 const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
 const historyList = document.querySelector("#history-list");
+const deleteSessionDialog = document.querySelector("#delete-session-dialog");
+const deleteSessionId = document.querySelector("#delete-session-id");
+const confirmDeleteSession = document.querySelector("#confirm-delete-session");
+const cancelDeleteSession = document.querySelector("#cancel-delete-session");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
 const activeMemoryCount = document.querySelector("#active-memory-count");
@@ -172,13 +178,15 @@ async function startConversation() {
   });
   const conversation = await response.json();
   hydrateConversation(conversation);
+  return conversation;
 }
 
 async function restoreOrStartConversation() {
   await loadAgentStatus();
   const savedConversationId = storedConversationId();
   if (!savedConversationId) {
-    await startConversation();
+    prepareEmptyConversation();
+    await loadConversationHistory();
     return;
   }
 
@@ -193,8 +201,25 @@ async function restoreOrStartConversation() {
     hydrateConversation(conversation);
   } catch {
     forgetStoredConversation();
-    await startConversation();
+    prepareEmptyConversation();
+    await loadConversationHistory();
   }
+}
+
+function prepareEmptyConversation() {
+  conversationId = null;
+  messages = [];
+  pendingAgentStyleSourceId = "";
+  chatInput.disabled = false;
+  extractProfile.disabled = true;
+  renderMessages();
+  updateReadiness();
+  updateSidebarMeta();
+  loadContextImportPrompt();
+  renderContextSources([]);
+  renderActiveMemory([]);
+  renderReplyStyleOptions([]);
+  focusChatInput();
 }
 
 function hydrateConversation(conversation) {
@@ -436,32 +461,111 @@ async function loadConversationHistory() {
 function renderConversationHistory(conversations) {
   if (!historyList) return;
 
-  if (!conversations.length) {
+  const visibleConversations = conversations.filter(
+    (conversation) =>
+      conversation.id === conversationId ||
+      conversation.user_message_count > 0 ||
+      conversation.context_source_count > 0
+  );
+
+  if (!visibleConversations.length) {
     historyList.innerHTML = '<div class="history-empty">No saved conversations yet.</div>';
     return;
   }
 
   historyList.innerHTML = "";
-  conversations.forEach((conversation) => {
-    const item = document.createElement("button");
-    item.type = "button";
+  visibleConversations.forEach((conversation) => {
+    const item = document.createElement("div");
     item.className = "history-item";
     item.classList.toggle("active", conversation.id === conversationId);
+    item.setAttribute("role", "button");
+    item.tabIndex = 0;
     const updatedAt = conversation.updated_at
       ? new Date(conversation.updated_at).toLocaleString()
       : "No timestamp";
     item.innerHTML = `
-      <strong>Session ${escapeHtml(conversation.id.slice(0, 8))}</strong>
-      <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
-      <small>${escapeHtml(updatedAt)}</small>
+      <div class="history-item-copy">
+        <strong>Session ${escapeHtml(conversation.id.slice(0, 8))}</strong>
+        <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
+        <small>${escapeHtml(updatedAt)}</small>
+      </div>
+      <button class="history-delete" type="button" aria-label="Delete session ${escapeHtml(conversation.id.slice(0, 8))}" title="Delete session">
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+          <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
+        </svg>
+      </button>
     `;
     item.addEventListener("click", () => {
       loadConversation(conversation.id).catch((error) => {
         historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
       });
     });
+    item.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      loadConversation(conversation.id).catch((error) => {
+        historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+      });
+    });
+    item.querySelector(".history-delete")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openDeleteSessionDialog(conversation.id, event.currentTarget);
+    });
     historyList.appendChild(item);
   });
+}
+
+function openDeleteSessionDialog(id, trigger) {
+  if (!id) return;
+
+  pendingDeleteConversationId = id;
+  lastDeleteTrigger = trigger || null;
+  if (deleteSessionId) {
+    deleteSessionId.textContent = `Session ${id.slice(0, 8)}`;
+  }
+  if (deleteSessionDialog) {
+    deleteSessionDialog.hidden = false;
+  }
+  confirmDeleteSession?.focus();
+}
+
+function closeDeleteSessionDialog() {
+  if (deleteSessionDialog) {
+    deleteSessionDialog.hidden = true;
+  }
+  pendingDeleteConversationId = null;
+  if (lastDeleteTrigger && document.contains(lastDeleteTrigger)) {
+    lastDeleteTrigger.focus();
+  }
+  lastDeleteTrigger = null;
+}
+
+async function confirmDeleteConversation() {
+  const id = pendingDeleteConversationId;
+  if (!id) return;
+
+  confirmDeleteSession.disabled = true;
+  cancelDeleteSession.disabled = true;
+
+  const response = await fetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
+  confirmDeleteSession.disabled = false;
+  cancelDeleteSession.disabled = false;
+
+  if (!response.ok) {
+    if (deleteSessionId) {
+      deleteSessionId.textContent = "Could not delete. Refresh and try again.";
+    }
+    return;
+  }
+
+  closeDeleteSessionDialog();
+  if (id === conversationId) {
+    forgetStoredConversation();
+    prepareEmptyConversation();
+  }
+  await loadConversationHistory();
 }
 
 async function loadConversation(id) {
@@ -510,7 +614,12 @@ async function copyContextImportPrompt() {
 }
 
 async function loadContextSources() {
-  if (!conversationId) return;
+  if (!conversationId) {
+    renderContextSources([]);
+    renderActiveMemory([]);
+    renderReplyStyleOptions([]);
+    return;
+  }
 
   try {
     const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`);
@@ -563,7 +672,11 @@ async function applyDetectedToneSelection() {
 }
 
 async function saveConversationContextSource() {
-  if (!conversationId || !contextContent || !saveContextSource) return;
+  if (!contextContent || !saveContextSource) return;
+  if (!conversationId) {
+    setContextStatus("Send one message first, then save context to that session.");
+    return;
+  }
 
   const content = contextContent.value.trim();
   if (content.length < 20) {
@@ -603,7 +716,7 @@ async function saveConversationContextSource() {
 async function saveWhatsappStyleImport() {
   if (!saveWhatsappImport) return;
   if (!conversationId) {
-    setWhatsappStatus("Conversation is still loading. Try again in a moment.", "error");
+    setWhatsappStatus("Send one message first, then import a text style.", "error");
     return;
   }
 
@@ -893,7 +1006,7 @@ async function sendUserMessage() {
   if (isSendingMessage) return;
 
   const text = chatInput.value.trim();
-  if (!text || !conversationId) return;
+  if (!text) return;
 
   messages.push({ role: "user", content: text });
   chatInput.value = "";
@@ -903,6 +1016,12 @@ async function sendUserMessage() {
   focusChatInput();
 
   try {
+    if (!conversationId) {
+      const conversation = await startConversation();
+      messages = [...(conversation.messages || []), { role: "user", content: text }];
+      renderMessages();
+      updateReadiness();
+    }
     const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -926,6 +1045,7 @@ async function sendUserMessage() {
     updateReadiness();
     loadAgentUsage();
     loadDetectedTone();
+    loadConversationHistory();
     focusChatInput();
   }
 }
@@ -1523,6 +1643,18 @@ copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
 saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
 whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
+confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
+cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
+deleteSessionDialog?.addEventListener("click", (event) => {
+  if (event.target === deleteSessionDialog) {
+    closeDeleteSessionDialog();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && deleteSessionDialog && !deleteSessionDialog.hidden) {
+    closeDeleteSessionDialog();
+  }
+});
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {

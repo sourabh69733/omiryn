@@ -28,6 +28,7 @@ from agent.providers import (
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
+    delete_conversation as storage_delete_conversation,
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
     init_db,
@@ -413,6 +414,13 @@ def list_agent_conversations() -> dict[str, object]:
 @app.get("/api/agent/conversations/{conversation_id}")
 def get_agent_conversation(conversation_id: str) -> AgentConversation:
     return _get_existing_conversation(conversation_id)
+
+
+@app.delete("/api/agent/conversations/{conversation_id}")
+def delete_agent_conversation(conversation_id: str) -> dict[str, str]:
+    if not storage_delete_conversation(conversation_id):
+        raise HTTPException(status_code=404, detail="Agent conversation not found.")
+    return {"conversation_id": conversation_id, "status": "deleted"}
 
 
 @app.patch("/api/agent/conversations/{conversation_id}/settings")

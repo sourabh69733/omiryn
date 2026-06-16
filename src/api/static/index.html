@@ -462,6 +462,37 @@ Rules:
       </main>
     </div>
 
+    <div class="confirm-overlay" id="delete-session-dialog" hidden>
+      <section
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-session-title"
+        aria-describedby="delete-session-copy"
+      >
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+            <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <p class="eyebrow">Delete Session</p>
+          <h2 id="delete-session-title">Remove this chat history?</h2>
+          <p id="delete-session-copy">
+            This will remove the chat, imported context, and usage log for this session.
+          </p>
+          <p class="confirm-session" id="delete-session-id">Session</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="secondary-button" id="cancel-delete-session" type="button">Cancel</button>
+          <button class="danger-button" id="confirm-delete-session" type="button">
+            Delete session
+          </button>
+        </div>
+      </section>
+    </div>
+
     <script src="/static/app.js?v=20260614-friend-style"></script>
   </body>
 </html>

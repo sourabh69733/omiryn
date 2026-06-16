@@ -237,6 +237,28 @@ def list_conversations() -> list[dict[str, Any]]:
     ]
 
 
+def delete_conversation(conversation_id: str) -> bool:
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(agent_conversations.c.id).where(agent_conversations.c.id == conversation_id)
+        ).first()
+        if not existing:
+            return False
+
+        connection.execute(
+            conversation_context_sources.delete().where(
+                conversation_context_sources.c.conversation_id == conversation_id
+            )
+        )
+        connection.execute(
+            agent_usage_events.delete().where(agent_usage_events.c.conversation_id == conversation_id)
+        )
+        connection.execute(
+            agent_conversations.delete().where(agent_conversations.c.id == conversation_id)
+        )
+    return True
+
+
 def _ensure_agent_conversation_columns() -> None:
     existing_columns = {
         column["name"] for column in inspect(ENGINE).get_columns("agent_conversations")
