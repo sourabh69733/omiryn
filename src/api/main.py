@@ -145,6 +145,8 @@ class AgentProfileSubmission(BaseModel):
     agent_user_reference: str | None = None
     display_name: str | None = None
     age: int | None = Field(default=None, ge=18, le=100)
+    gender: SourcedString = Field(default_factory=lambda: SourcedString(value="unknown"))
+    interested_in: SourcedString = Field(default_factory=lambda: SourcedString(value="unknown"))
     city: SourcedString = Field(default_factory=lambda: SourcedString(value="unknown"))
     relationship_intent: SourcedString = Field(
         default_factory=lambda: SourcedString(value="unknown")
@@ -168,6 +170,8 @@ class DraftProfile(BaseModel):
 
 class DraftPatch(BaseModel):
     display_name: str | None = None
+    gender: str | None = None
+    interested_in: str | None = None
     city: str | None = None
     relationship_intent: str | None = None
     communication_style: str | None = None
@@ -577,6 +581,7 @@ async def extract_agent_conversation(
             context_sources=_profile_extraction_context_sources(conversation.id, _user_id(user)),
         )
         submission = AgentProfileSubmission.model_validate(raw_profile)
+        _apply_dating_basics(submission, user)
     except (AgentProviderError, ValueError, TypeError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
@@ -599,6 +604,7 @@ async def submit_agent_profile(
     submission: AgentProfileSubmission,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, str]:
+    _apply_dating_basics(submission, user)
     draft_id = str(uuid4())
     save_draft(
         DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json"),
@@ -634,6 +640,14 @@ async def update_draft(
 
     if patch.display_name is not None:
         data.display_name = patch.display_name
+    if patch.gender is not None:
+        data.gender.value = patch.gender
+        data.gender.source = "user_stated"
+        data.gender.confidence = 1
+    if patch.interested_in is not None:
+        data.interested_in.value = patch.interested_in
+        data.interested_in.source = "user_stated"
+        data.interested_in.confidence = 1
     if patch.city is not None:
         data.city.value = patch.city
         data.city.source = "user_stated"
@@ -807,6 +821,26 @@ async def demo_matches(user: CurrentUser | None = Depends(current_user)) -> dict
 
 def _user_id(user: CurrentUser | None) -> str | None:
     return user.id if user else None
+
+
+def _apply_dating_basics(submission: AgentProfileSubmission, user: CurrentUser | None) -> None:
+    if not user:
+        return
+    profile = get_user_profile(user.id)
+    if not profile:
+        return
+    if profile.get("gender"):
+        submission.gender = SourcedString(
+            value=profile["gender"],
+            source="user_stated",
+            confidence=1,
+        )
+    if profile.get("interested_in"):
+        submission.interested_in = SourcedString(
+            value=profile["interested_in"],
+            source="user_stated",
+            confidence=1,
+        )
 
 
 def _get_existing_draft(draft_id: str, user: CurrentUser | None = None) -> DraftProfile:

@@ -131,6 +131,8 @@ const warningList = document.querySelector("#warning-list");
 const reviewNav = document.querySelector("#review-nav");
 const draftInputs = {
   name: document.querySelector("#draft-name"),
+  gender: document.querySelector("#draft-gender"),
+  interestedIn: document.querySelector("#draft-interested-in"),
   city: document.querySelector("#draft-city"),
   intent: document.querySelector("#draft-intent"),
   communication: document.querySelector("#draft-communication"),
@@ -1434,6 +1436,8 @@ function renderExtractionWarnings(warnings) {
 function fillDraftForm(draft) {
   const submission = draft.submission;
   draftInputs.name.value = submission.display_name || "";
+  draftInputs.gender.value = submission.gender?.value || "unknown";
+  draftInputs.interestedIn.value = submission.interested_in?.value || "unknown";
   draftInputs.city.value = submission.city.value;
   draftInputs.intent.value = submission.relationship_intent.value;
   draftInputs.communication.value = submission.communication_style.value;
@@ -1448,6 +1452,8 @@ function fillDraftForm(draft) {
 function draftPatchFromForm() {
   return {
     display_name: draftInputs.name.value.trim(),
+    gender: draftInputs.gender.value,
+    interested_in: draftInputs.interestedIn.value,
     city: draftInputs.city.value.trim(),
     relationship_intent: draftInputs.intent.value.trim(),
     communication_style: draftInputs.communication.value.trim(),

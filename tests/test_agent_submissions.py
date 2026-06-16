@@ -54,6 +54,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         update_response = self.client.patch(
             f"/api/drafts/{draft_id}",
             json={
+                "gender": "woman",
+                "interested_in": "men",
                 "city": "Mumbai",
                 "values": ["family", "kindness"],
                 "summary": "Updated by user review.",
@@ -62,6 +64,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(update_response.status_code, 200)
         updated = update_response.json()
+        self.assertEqual(updated["submission"]["gender"]["value"], "woman")
+        self.assertEqual(updated["submission"]["interested_in"]["value"], "men")
         self.assertEqual(updated["submission"]["city"]["value"], "Mumbai")
         self.assertEqual(updated["submission"]["city"]["source"], "user_stated")
 
@@ -188,6 +192,24 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["complete"])
+
+    def test_draft_profile_includes_user_dating_basics(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        self.client.put(
+            "/api/me/dating-basics",
+            json={"gender": "man", "interested_in": "women"},
+        )
+
+        draft_id = self._create_draft()
+        draft = self.client.get(f"/api/drafts/{draft_id}").json()
+
+        self.assertEqual(draft["submission"]["gender"]["value"], "man")
+        self.assertEqual(draft["submission"]["gender"]["source"], "user_stated")
+        self.assertEqual(draft["submission"]["interested_in"]["value"], "women")
+        self.assertEqual(draft["submission"]["interested_in"]["source"], "user_stated")
 
     def test_omiryn_agent_conversation_extracts_to_review_draft(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")

@@ -4,6 +4,8 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "gender",
+    "interested_in",
     "relationship_intent",
     "values",
     "lifestyle",
@@ -16,6 +18,14 @@
     "confidence"
   ],
   "properties": {
+    "gender": {
+      "type": "string",
+      "enum": ["man", "woman", "non_binary", "prefer_not_to_say", "unknown"]
+    },
+    "interested_in": {
+      "type": "string",
+      "enum": ["men", "women", "everyone", "unknown"]
+    },
     "relationship_intent": {
       "type": "string",
       "enum": ["long_term", "marriage", "exploring", "casual", "unsure", "unknown"]
