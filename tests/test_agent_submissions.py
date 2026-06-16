@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -12,6 +13,7 @@ from storage import _normalize_database_url, reset_db
 
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
+        os.environ["AUTH_REQUIRED"] = "false"
         reset_db()
         self.client = TestClient(app)
 
@@ -304,6 +306,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "auth_required": True,
             },
         )
+
+    def test_auth_required_blocks_anonymous_user_data_routes(self) -> None:
+        with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
+            response = self.client.get("/api/agent/conversations")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Sign in to continue.")
 
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(

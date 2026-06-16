@@ -3,7 +3,7 @@ import os
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -25,6 +25,7 @@ from agent.providers import (
     extract_profile,
     generate_agent_reply,
 )
+from auth import CurrentUser, current_user
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
@@ -253,7 +254,10 @@ def auth_config() -> dict[str, object]:
 
 
 @app.get("/api/agent/usage")
-def agent_usage(conversation_id: str | None = None) -> dict[str, object]:
+async def agent_usage(
+    conversation_id: str | None = None,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
     return {
         "summary": summarize_agent_usage(conversation_id),
         "events": list_agent_usage_events(conversation_id),
@@ -262,7 +266,10 @@ def agent_usage(conversation_id: str | None = None) -> dict[str, object]:
 
 
 @app.get("/api/agent/conversations/{conversation_id}/usage")
-def conversation_agent_usage(conversation_id: str) -> dict[str, object]:
+async def conversation_agent_usage(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
     _get_existing_conversation(conversation_id)
     return {
         "summary": summarize_agent_usage(conversation_id),
@@ -277,7 +284,10 @@ def context_import_prompt() -> dict[str, str]:
 
 
 @app.get("/api/agent/conversations/{conversation_id}/context-sources")
-def get_conversation_context_sources(conversation_id: str) -> dict[str, object]:
+async def get_conversation_context_sources(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
     _get_existing_conversation(conversation_id)
     sources = list_context_sources(conversation_id)
     return {
@@ -287,7 +297,10 @@ def get_conversation_context_sources(conversation_id: str) -> dict[str, object]:
 
 
 @app.get("/api/agent/conversations/{conversation_id}/tone")
-def get_conversation_tone(conversation_id: str) -> dict[str, object]:
+async def get_conversation_tone(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
     conversation = _get_existing_conversation(conversation_id)
     return {
         "selected_tone": conversation.agent_tone,
@@ -302,6 +315,7 @@ def get_conversation_tone(conversation_id: str) -> dict[str, object]:
 def create_conversation_context_source(
     conversation_id: str,
     payload: ContextSourceCreate,
+    user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id)
     source = save_context_source(
@@ -320,6 +334,7 @@ def create_conversation_context_source(
 def create_whatsapp_context_source(
     conversation_id: str,
     payload: WhatsappChatImportCreate,
+    user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id)
     if payload.style_kind == "friend_style" and not (payload.user_sender or "").strip():
@@ -366,7 +381,10 @@ def root() -> FileResponse:
 
 
 @app.post("/api/agent/conversations", status_code=201)
-def create_agent_conversation(payload: AgentConversationCreate | None = None) -> AgentConversation:
+async def create_agent_conversation(
+    payload: AgentConversationCreate | None = None,
+    user: CurrentUser | None = Depends(current_user),
+) -> AgentConversation:
     conversation_id = str(uuid4())
     runtime = agent_runtime_status()
     selected_model = _normalize_selected_model(
@@ -396,7 +414,9 @@ def create_agent_conversation(payload: AgentConversationCreate | None = None) ->
 
 
 @app.get("/api/agent/conversations")
-def list_agent_conversations() -> dict[str, object]:
+async def list_agent_conversations(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
     conversations = storage_list_conversations()
     summaries = []
     for conversation in conversations:
@@ -421,12 +441,18 @@ def list_agent_conversations() -> dict[str, object]:
 
 
 @app.get("/api/agent/conversations/{conversation_id}")
-def get_agent_conversation(conversation_id: str) -> AgentConversation:
+async def get_agent_conversation(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> AgentConversation:
     return _get_existing_conversation(conversation_id)
 
 
 @app.delete("/api/agent/conversations/{conversation_id}")
-def delete_agent_conversation(conversation_id: str) -> dict[str, str]:
+async def delete_agent_conversation(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
     if not storage_delete_conversation(conversation_id):
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return {"conversation_id": conversation_id, "status": "deleted"}
@@ -436,6 +462,7 @@ def delete_agent_conversation(conversation_id: str) -> dict[str, str]:
 def update_agent_conversation_settings(
     conversation_id: str,
     payload: AgentConversationSettings,
+    user: CurrentUser | None = Depends(current_user),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id)
     if conversation.status != "active":
@@ -458,7 +485,11 @@ def update_agent_conversation_settings(
 
 
 @app.post("/api/agent/conversations/{conversation_id}/messages")
-async def send_agent_message(conversation_id: str, payload: UserMessage) -> AgentConversation:
+async def send_agent_message(
+    conversation_id: str,
+    payload: UserMessage,
+    user: CurrentUser | None = Depends(current_user),
+) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
@@ -490,7 +521,10 @@ async def send_agent_message(conversation_id: str, payload: UserMessage) -> Agen
 
 
 @app.post("/api/agent/conversations/{conversation_id}/extract")
-async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
+async def extract_agent_conversation(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id)
     try:
         raw_profile = await extract_profile(
@@ -517,7 +551,10 @@ async def extract_agent_conversation(conversation_id: str) -> dict[str, str]:
 
 
 @app.post("/api/agent-submissions/profile", status_code=201)
-def submit_agent_profile(submission: AgentProfileSubmission) -> dict[str, str]:
+async def submit_agent_profile(
+    submission: AgentProfileSubmission,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
     draft_id = str(uuid4())
     save_draft(
         DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json")
@@ -531,12 +568,19 @@ def submit_agent_profile(submission: AgentProfileSubmission) -> dict[str, str]:
 
 
 @app.get("/api/drafts/{draft_id}")
-def get_draft(draft_id: str) -> DraftProfile:
+async def get_draft(
+    draft_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> DraftProfile:
     return _get_existing_draft(draft_id)
 
 
 @app.patch("/api/drafts/{draft_id}")
-def update_draft(draft_id: str, patch: DraftPatch) -> DraftProfile:
+async def update_draft(
+    draft_id: str,
+    patch: DraftPatch,
+    user: CurrentUser | None = Depends(current_user),
+) -> DraftProfile:
     draft = _get_existing_draft(draft_id)
     if draft.status != "draft":
         raise HTTPException(status_code=409, detail="Only draft profiles can be edited.")
@@ -590,7 +634,10 @@ def update_draft(draft_id: str, patch: DraftPatch) -> DraftProfile:
 
 
 @app.post("/api/drafts/{draft_id}/approve")
-def approve_draft(draft_id: str) -> DraftProfile:
+async def approve_draft(
+    draft_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> DraftProfile:
     draft = _get_existing_draft(draft_id)
     if draft.status != "draft":
         raise HTTPException(status_code=409, detail="Only draft profiles can be approved.")
@@ -601,7 +648,10 @@ def approve_draft(draft_id: str) -> DraftProfile:
 
 
 @app.delete("/api/drafts/{draft_id}")
-def delete_draft(draft_id: str) -> dict[str, str]:
+async def delete_draft(
+    draft_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
     draft = _get_existing_draft(draft_id)
     save_draft(
         DraftProfile(id=draft.id, status="deleted", submission=draft.submission).model_dump(
@@ -628,7 +678,7 @@ def usage_page() -> FileResponse:
 
 
 @app.get("/api/demo/matches")
-def demo_matches() -> dict[str, object]:
+async def demo_matches(user: CurrentUser | None = Depends(current_user)) -> dict[str, object]:
     user = MatchProfile(
         id="user-demo",
         age=29,
