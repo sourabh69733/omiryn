@@ -5,6 +5,8 @@ let isSendingMessage = false;
 let pendingAgentStyleSourceId = "";
 let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
+let supabaseClient = null;
+let authSession = null;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -103,6 +105,11 @@ const rateLimitGrid = document.querySelector("#rate-limit-grid");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 const usageTableRowLimit = 20;
+const loginGoogle = document.querySelector("#login-google");
+const logoutUser = document.querySelector("#logout-user");
+const authUser = document.querySelector("#auth-user");
+const authAvatar = document.querySelector("#auth-avatar");
+const authEmail = document.querySelector("#auth-email");
 
 const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
@@ -137,6 +144,118 @@ function currentDraftIdFromPath() {
   return match ? match[1] : null;
 }
 
+async function initializeAuth() {
+  renderSignedOutAuth("Checking...");
+  try {
+    const response = await fetch("/api/auth/config");
+    if (!response.ok) {
+      throw new Error("Auth config unavailable.");
+    }
+    const config = await response.json();
+    if (!config.supabase_url || !config.supabase_anon_key) {
+      renderSignedOutAuth("Auth not configured");
+      return;
+    }
+    if (!window.supabase?.createClient) {
+      throw new Error("Supabase client unavailable.");
+    }
+
+    supabaseClient = window.supabase.createClient(
+      config.supabase_url,
+      config.supabase_anon_key
+    );
+    const { data } = await supabaseClient.auth.getSession();
+    authSession = data.session || null;
+    renderAuthState();
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      authSession = session || null;
+      renderAuthState();
+    });
+  } catch (error) {
+    renderSignedOutAuth(error.message);
+  }
+}
+
+function renderAuthState() {
+  const user = authSession?.user || null;
+  if (!user) {
+    renderSignedOutAuth("Continue with Google");
+    return;
+  }
+
+  const email = user.email || "Signed in";
+  if (authUser) {
+    authUser.hidden = false;
+  }
+  if (authEmail) {
+    authEmail.textContent = email;
+  }
+  if (authAvatar) {
+    authAvatar.textContent = email.slice(0, 1).toUpperCase();
+  }
+  if (loginGoogle) {
+    loginGoogle.hidden = true;
+    loginGoogle.disabled = false;
+  }
+  if (logoutUser) {
+    logoutUser.hidden = false;
+    logoutUser.disabled = false;
+  }
+}
+
+function renderSignedOutAuth(label) {
+  if (authUser) {
+    authUser.hidden = true;
+  }
+  if (loginGoogle) {
+    loginGoogle.hidden = false;
+    loginGoogle.disabled = label === "Checking..." || label === "Auth not configured";
+    loginGoogle.textContent = label || "Continue with Google";
+  }
+  if (logoutUser) {
+    logoutUser.hidden = true;
+    logoutUser.disabled = false;
+  }
+}
+
+async function signInWithGoogle() {
+  if (!supabaseClient) return;
+
+  loginGoogle.disabled = true;
+  loginGoogle.textContent = "Opening Google...";
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+  if (error) {
+    loginGoogle.disabled = false;
+    loginGoogle.textContent = "Continue with Google";
+  }
+}
+
+async function signOutUser() {
+  if (!supabaseClient) return;
+
+  logoutUser.disabled = true;
+  await supabaseClient.auth.signOut();
+  authSession = null;
+  renderAuthState();
+}
+
+async function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = authSession?.access_token;
+  if (token && String(url).startsWith("/api/")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(url, {
+    ...options,
+    headers
+  });
+}
+
 function storedConversationId() {
   try {
     return window.localStorage.getItem(activeConversationStorageKey);
@@ -166,7 +285,7 @@ async function startConversation() {
   await loadAgentStatus();
   chatInput.disabled = true;
   extractProfile.disabled = true;
-  const response = await fetch("/api/agent/conversations", {
+  const response = await apiFetch("/api/agent/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -193,7 +312,7 @@ async function restoreOrStartConversation() {
   chatInput.disabled = true;
   extractProfile.disabled = true;
   try {
-    const response = await fetch(`/api/agent/conversations/${savedConversationId}`);
+    const response = await apiFetch(`/api/agent/conversations/${savedConversationId}`);
     if (!response.ok) {
       throw new Error("Stored conversation was not found.");
     }
@@ -256,7 +375,7 @@ async function loadAgentStatus() {
   if (!agentStatus) return;
 
   try {
-    const response = await fetch("/api/agent/status");
+    const response = await apiFetch("/api/agent/status");
     const status = await response.json();
     const provider = titleCase(status.provider || "unknown");
     const model = status.model || "no model";
@@ -320,7 +439,7 @@ async function updateConversationModel() {
   pendingAgentStyleSourceId = requestedStyleSourceId || "";
 
   try {
-    const response = await fetch(`/api/agent/conversations/${conversationId}/settings`, {
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -447,7 +566,7 @@ async function loadConversationHistory() {
   if (!historyList) return;
 
   try {
-    const response = await fetch("/api/agent/conversations");
+    const response = await apiFetch("/api/agent/conversations");
     if (!response.ok) {
       throw new Error("Could not load chat history.");
     }
@@ -549,7 +668,7 @@ async function confirmDeleteConversation() {
   confirmDeleteSession.disabled = true;
   cancelDeleteSession.disabled = true;
 
-  const response = await fetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
+  const response = await apiFetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
   confirmDeleteSession.disabled = false;
   cancelDeleteSession.disabled = false;
 
@@ -573,7 +692,7 @@ async function loadConversation(id) {
 
   chatInput.disabled = true;
   extractProfile.disabled = true;
-  const response = await fetch(`/api/agent/conversations/${id}`);
+  const response = await apiFetch(`/api/agent/conversations/${id}`);
   if (!response.ok) {
     chatInput.disabled = false;
     extractProfile.disabled = false;
@@ -588,7 +707,7 @@ async function loadContextImportPrompt() {
 
   contextPrompt.value = contextPrompt.value.trim() || contextImportPromptFallback;
   try {
-    const response = await fetch("/api/context-import-prompt");
+    const response = await apiFetch("/api/context-import-prompt");
     if (!response.ok) {
       throw new Error("Prompt API unavailable.");
     }
@@ -622,7 +741,7 @@ async function loadContextSources() {
   }
 
   try {
-    const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`);
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/context-sources`);
     if (response.status === 404) {
       throw new Error("Restart the app server to enable context import.");
     }
@@ -643,7 +762,7 @@ async function loadDetectedTone() {
   if (!conversationId || !toneSuggestion) return;
 
   try {
-    const response = await fetch(`/api/agent/conversations/${conversationId}/tone`);
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/tone`);
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.detail || "Tone unavailable.");
@@ -687,7 +806,7 @@ async function saveConversationContextSource() {
   saveContextSource.disabled = true;
   setContextStatus("Saving context...");
   try {
-    const response = await fetch(`/api/agent/conversations/${conversationId}/context-sources`, {
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/context-sources`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -831,7 +950,7 @@ function validateWhatsappImportSize(content, label) {
 }
 
 async function importWhatsappPayload(item) {
-  const response = await fetch(`/api/agent/conversations/${conversationId}/whatsapp-import`, {
+  const response = await apiFetch(`/api/agent/conversations/${conversationId}/whatsapp-import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1022,7 +1141,7 @@ async function sendUserMessage() {
       renderMessages();
       updateReadiness();
     }
-    const response = await fetch(`/api/agent/conversations/${conversationId}/messages`, {
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text })
@@ -1054,7 +1173,7 @@ async function loadAgentUsage() {
   if (!usageSummary || !conversationId) return;
 
   try {
-    const response = await fetch(`/api/agent/conversations/${conversationId}/usage`);
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/usage`);
     const data = await response.json();
     const summary = data.summary || {};
     const events = data.events || [];
@@ -1127,7 +1246,7 @@ async function extractConversationDraft() {
   extractProfile.disabled = true;
   extractProfile.textContent = "Extracting...";
   await loadAgentUsage();
-  const response = await fetch(`/api/agent/conversations/${conversationId}/extract`, {
+  const response = await apiFetch(`/api/agent/conversations/${conversationId}/extract`, {
     method: "POST"
   });
   const data = await response.json();
@@ -1141,7 +1260,7 @@ async function extractConversationDraft() {
 }
 
 async function loadDraft(draftId) {
-  const response = await fetch(`/api/drafts/${draftId}`);
+  const response = await apiFetch(`/api/drafts/${draftId}`);
   if (!response.ok) {
     setDraftStatus("Draft not found.", "deleted");
     setDraftButtons("deleted");
@@ -1225,7 +1344,7 @@ function setDraftButtons(status) {
 
 async function saveDraftEdits() {
   if (!activeDraftId) return;
-  const response = await fetch(`/api/drafts/${activeDraftId}`, {
+  const response = await apiFetch(`/api/drafts/${activeDraftId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(draftPatchFromForm())
@@ -1237,14 +1356,14 @@ async function saveDraftEdits() {
 
 async function approveCurrentDraft() {
   if (!activeDraftId) return;
-  await fetch(`/api/drafts/${activeDraftId}/approve`, { method: "POST" });
+  await apiFetch(`/api/drafts/${activeDraftId}/approve`, { method: "POST" });
   await loadDraft(activeDraftId);
   window.location.href = "/matches";
 }
 
 async function deleteCurrentDraft() {
   if (!activeDraftId) return;
-  await fetch(`/api/drafts/${activeDraftId}`, { method: "DELETE" });
+  await apiFetch(`/api/drafts/${activeDraftId}`, { method: "DELETE" });
   activeDraftId = null;
   setDraftStatus("Deleted. This draft will not enter matching.", "deleted");
   setDraftButtons("deleted");
@@ -1252,7 +1371,7 @@ async function deleteCurrentDraft() {
 
 async function loadMatches() {
   matchList.innerHTML = '<div class="loading-row">Loading suggestions...</div>';
-  const response = await fetch("/api/demo/matches");
+  const response = await apiFetch("/api/demo/matches");
   const data = await response.json();
 
   matchList.innerHTML = "";
@@ -1292,7 +1411,7 @@ async function loadUsageDashboard() {
   }
 
   try {
-    const response = await fetch("/api/agent/usage");
+    const response = await apiFetch("/api/agent/usage");
     const data = await response.json();
     renderUsageSummary(data.summary || {});
     renderProviderMix(data.events || []);
@@ -1645,6 +1764,8 @@ saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
 whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
 confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
 cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
+loginGoogle?.addEventListener("click", signInWithGoogle);
+logoutUser?.addEventListener("click", signOutUser);
 deleteSessionDialog?.addEventListener("click", (event) => {
   if (event.target === deleteSessionDialog) {
     closeDeleteSessionDialog();
@@ -1655,6 +1776,8 @@ document.addEventListener("keydown", (event) => {
     closeDeleteSessionDialog();
   }
 });
+
+initializeAuth();
 
 const draftId = currentDraftIdFromPath();
 if (draftId) {

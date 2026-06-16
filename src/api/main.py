@@ -243,6 +243,15 @@ def agent_status() -> dict[str, object]:
     return agent_runtime_status()
 
 
+@app.get("/api/auth/config")
+def auth_config() -> dict[str, object]:
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL", ""),
+        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", ""),
+        "auth_required": os.getenv("AUTH_REQUIRED", "false").lower() == "true",
+    }
+
+
 @app.get("/api/agent/usage")
 def agent_usage(conversation_id: str | None = None) -> dict[str, object]:
     return {

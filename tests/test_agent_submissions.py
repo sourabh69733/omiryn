@@ -284,6 +284,27 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("groq_api_key_loaded", data)
         self.assertNotIn("groq_api_key", data)
 
+    def test_auth_config_exposes_public_supabase_settings(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_ANON_KEY": "anon-public-key",
+                "AUTH_REQUIRED": "true",
+            },
+        ):
+            response = self.client.get("/api/auth/config")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "supabase_url": "https://example.supabase.co",
+                "supabase_anon_key": "anon-public-key",
+                "auth_required": True,
+            },
+        )
+
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
             "/api/agent/conversations",

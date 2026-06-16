@@ -17,12 +17,27 @@
           </span>
         </a>
 
-        <nav class="progress-nav" aria-label="Matchmaking progress">
-          <a data-nav="interview" href="/">Interview</a>
-          <a data-nav="review" href="#" id="review-nav">Review</a>
-          <a data-nav="matches" href="/matches">Matches</a>
-          <a data-nav="usage" href="/usage">Usage</a>
-        </nav>
+        <div class="header-actions">
+          <nav class="progress-nav" aria-label="Matchmaking progress">
+            <a data-nav="interview" href="/">Interview</a>
+            <a data-nav="review" href="#" id="review-nav">Review</a>
+            <a data-nav="matches" href="/matches">Matches</a>
+            <a data-nav="usage" href="/usage">Usage</a>
+          </nav>
+
+          <div class="auth-control" id="auth-control">
+            <div class="auth-user" id="auth-user" hidden>
+              <span class="auth-avatar" id="auth-avatar" aria-hidden="true">O</span>
+              <span class="auth-email" id="auth-email">Signed in</span>
+            </div>
+            <button class="secondary-button auth-button" id="login-google" type="button">
+              Continue with Google
+            </button>
+            <button class="secondary-button auth-button" id="logout-user" type="button" hidden>
+              Sign out
+            </button>
+          </div>
+        </div>
       </header>
 
       <main>
@@ -493,6 +508,7 @@ Rules:
       </section>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/static/app.js?v=20260614-friend-style"></script>
   </body>
 </html>
