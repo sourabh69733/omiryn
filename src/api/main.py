@@ -437,6 +437,8 @@ async def create_agent_conversation(
         payload.agent_model if payload else None,
         runtime,
     )
+    user_profile = get_user_profile(user.id) if user else None
+    persona = _agent_persona_for_profile(user_profile)
     conversation = AgentConversation(
         id=conversation_id,
         agent_provider=str(runtime["provider"]),
@@ -447,11 +449,7 @@ async def create_agent_conversation(
         messages=[
             {
                 "role": "assistant",
-                "content": (
-                    "Hi, I am Omiryn. I will ask a few short questions and turn your "
-                    "answers into profile signals when you are ready. Are you looking "
-                    "for long-term dating, marriage, exploring, or something else?"
-                ),
+                "content": _initial_agent_message(persona),
             }
         ],
     )
@@ -558,6 +556,7 @@ async def send_agent_message(
                 payload.message,
                 _user_id(user),
             ),
+            user_profile=get_user_profile(user.id) if user else None,
         )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -1088,6 +1087,24 @@ def _context_source_summary(source: dict[str, object]) -> dict[str, object]:
         "preview": content[:240],
         "created_at": source["created_at"],
     }
+
+
+def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, str]:
+    interested_in = str((profile or {}).get("interested_in") or "")
+    if interested_in == "women":
+        return {"name": "Annie", "presentation": "girl"}
+    if interested_in == "men":
+        return {"name": "Arjun", "presentation": "boy"}
+    return {"name": "Mira", "presentation": "companion"}
+
+
+def _initial_agent_message(persona: dict[str, str]) -> str:
+    name = persona["name"]
+    if name == "Annie":
+        return "Hey, I'm Annie. We can just talk normally first, no interview vibes."
+    if name == "Arjun":
+        return "Hey, I'm Arjun. Let's just talk normally first, no interview vibes."
+    return "Hey, I'm Mira. We can just talk normally first, no interview vibes."
 
 
 def _configured_usage_limits() -> dict[str, int | None]:

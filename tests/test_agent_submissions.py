@@ -6,7 +6,13 @@ import httpx
 from fastapi.testclient import TestClient
 
 from api.main import _smart_reply_context_sources, app, current_user
-from agent.providers import _context_sources_text, _groq_rate_limit_headers, _provider_messages
+from agent.providers import (
+    _compact_chat_reply,
+    _context_sources_text,
+    _groq_rate_limit_headers,
+    _mock_reply,
+    _provider_messages,
+)
 from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import _normalize_database_url, reset_db
@@ -173,6 +179,21 @@ class AgentSubmissionApiTest(unittest.TestCase):
         loaded_response = self.client.get("/api/me/dating-basics")
         self.assertEqual(loaded_response.json()["profile"]["gender"], "man")
         self.assertEqual(loaded_response.json()["profile"]["interested_in"], "women")
+
+    def test_agent_initial_persona_uses_interested_gender(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        self.client.put(
+            "/api/me/dating-basics",
+            json={"gender": "man", "interested_in": "women"},
+        )
+
+        response = self.client.post("/api/agent/conversations")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("Annie", response.json()["messages"][0]["content"])
 
     def test_dating_basics_are_scoped_to_authenticated_user(self) -> None:
         async def user_a() -> CurrentUser:
@@ -346,6 +367,32 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("[friend_style] Sanjay-style", context_text)
         self.assertIn("[llm_profile] Profile", context_text)
         self.assertLess(len(context_text), 3800)
+
+    def test_chat_replies_are_compacted_for_normal_messages(self) -> None:
+        reply = _compact_chat_reply(
+            (
+                "That makes sense, and I can see why this matters to you. "
+                "The right person should probably respect your work, your pace, "
+                "your family expectations, and your communication style before "
+                "anything gets serious. We can slowly figure that out together."
+            ),
+            [{"role": "user", "content": "yes"}],
+        )
+
+        self.assertLessEqual(len(reply.split()), 35)
+        self.assertNotIn("slowly figure", reply)
+
+    def test_mock_companion_reply_stays_short(self) -> None:
+        reply = _mock_reply(
+            [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "Hey, I'm Annie."},
+                {"role": "user", "content": "career matters to me"},
+            ],
+            {"interested_in": "women"},
+        )
+
+        self.assertLessEqual(len(reply.split()), 6)
 
     def test_groq_rate_limit_headers_are_captured(self) -> None:
         response = httpx.Response(

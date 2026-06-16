@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from time import perf_counter
 from typing import Any
 
@@ -17,21 +18,27 @@ RECENT_CHAT_MESSAGE_LIMIT = int(os.getenv("AGENT_RECENT_MESSAGE_LIMIT", "12"))
 CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
+CHAT_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35"))
+CHAT_ADVICE_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_ADVICE_REPLY_WORD_LIMIT", "80"))
 STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
 
-ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private matchmaking interviewer.
-Your job is to understand the user well enough to build a structured dating profile
-for real-world matching.
+ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private dating companion.
+Your job is to talk naturally, make the user feel less alone, and slowly understand
+them well enough to help them find a real-world match.
 
 Behavior:
-- Read the full conversation before replying. Do not follow a fixed questionnaire.
-- Keep replies warm, natural, and short: usually 1-3 sentences.
-- Ask only one clear question at a time.
-- If the user only greets you, greets back briefly and ask the first useful question.
-- If the user gives a vague answer, ask a focused follow-up before moving on.
-- If the user answers clearly, acknowledge the answer in a few words and ask the next missing topic.
-- Do not repeat questions that the user has already answered.
+- Read the conversation before replying. Do not follow a fixed questionnaire.
+- Default to one short WhatsApp-like reply. Use 1 sentence unless the user asks for detail.
+- Match the user's message length. If they say "yes", "hmm", or one line, answer briefly.
+- Do not ask a question every turn. Sometimes react, joke lightly, reassure, or share a small opinion.
+- Ask at most one soft question when it feels natural.
+- Learn the user's personality, choices, and partner preferences gradually through normal conversation.
+- Avoid repeating the same question pattern or validation phrases.
+- Do not summarize the user every turn.
+- Avoid phrases like "I'm learning your pattern", "this helps build your profile", or "compatibility signals".
+- Never write a long paragraph in normal chat.
 - Do not flirt, roleplay as a partner, or pretend to be a match.
+- You may feel like a friendly girl/boy companion based on persona, but be honest you are an AI if asked.
 
 Collect these topics over time:
 relationship intent, values, lifestyle, communication style, conflict style,
@@ -120,6 +127,7 @@ async def generate_agent_reply(
     agent_mode: str = "know_me",
     agent_tone: str = "auto",
     context_sources: list[dict[str, Any]] | None = None,
+    user_profile: dict[str, Any] | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -144,7 +152,7 @@ async def generate_agent_reply(
             success=True,
             latency_ms=0,
         )
-        return _mock_reply(messages)
+        return _mock_reply(messages, user_profile)
     if provider == "groq":
         return await _groq_chat(
             _system_prompt_with_context(
@@ -152,6 +160,7 @@ async def generate_agent_reply(
                 context_sources,
                 agent_mode,
                 agent_tone,
+                user_profile,
             ),
             messages,
             conversation_id=conversation_id,
@@ -165,6 +174,7 @@ async def generate_agent_reply(
                 context_sources,
                 agent_mode,
                 agent_tone,
+                user_profile,
             ),
             messages,
             conversation_id=conversation_id,
@@ -405,14 +415,16 @@ def _system_prompt_with_context(
     context_sources: list[dict[str, Any]] | None,
     agent_mode: str = "know_me",
     agent_tone: str = "auto",
+    user_profile: dict[str, Any] | None = None,
 ) -> str:
     context_text = _context_sources_text(context_sources)
+    persona_text = _agent_persona_prompt(user_profile)
     mode_text = _agent_mode_prompt(agent_mode)
     tone_text = _agent_tone_prompt(agent_tone)
     if not context_text:
-        return f"{system_prompt}\n\n{mode_text}\n\n{tone_text}"
+        return f"{system_prompt}\n\n{persona_text}\n\n{mode_text}\n\n{tone_text}"
     return (
-        f"{system_prompt}\n\n{mode_text}\n\n{tone_text}\n\n"
+        f"{system_prompt}\n\n{persona_text}\n\n{mode_text}\n\n{tone_text}\n\n"
         "Additional user-provided context is available below. Use it only to ask better "
         "questions, understand the user, and lightly adapt tone when speaking-style context "
         "is present. If WhatsApp context is present, you may discuss broad recent topics from "
@@ -428,11 +440,33 @@ def _system_prompt_with_context(
     )
 
 
+def _agent_persona_prompt(user_profile: dict[str, Any] | None) -> str:
+    gender = (user_profile or {}).get("gender") or "unknown"
+    interested_in = (user_profile or {}).get("interested_in") or "unknown"
+    persona = _agent_persona_for_interest(str(interested_in))
+    return (
+        f"User basics: gender={gender}, interested_in={interested_in}.\n"
+        f"Agent persona: name={persona['name']}, presentation={persona['presentation']}.\n"
+        "Speak from this persona in a casual WhatsApp-like way. Use small replies, not big paragraphs. "
+        "Do not keep saying your name. Do not turn every reply into a dating interview. "
+        "Do not repeat the same supportive line again and again."
+    )
+
+
+def _agent_persona_for_interest(interested_in: str) -> dict[str, str]:
+    if interested_in == "women":
+        return {"name": "Annie", "presentation": "girl/woman companion"}
+    if interested_in == "men":
+        return {"name": "Arjun", "presentation": "boy/man companion"}
+    return {"name": "Mira", "presentation": "warm neutral companion"}
+
+
 def _agent_mode_prompt(agent_mode: str) -> str:
     prompts = {
         "know_me": (
-            "Current agent mode: Know me. Ask one focused question at a time to understand "
-            "the user's personality, values, lifestyle, communication style, and relationship goals."
+            "Current agent mode: Companion. Talk normally first. Quietly learn the user's "
+            "personality, values, lifestyle, communication style, and relationship goals over time. "
+            "Let the conversation breathe; do not force a profile question every turn."
         ),
         "coach_me": (
             "Current agent mode: Coach me. Help the user reflect on patterns and choices. "
@@ -454,7 +488,7 @@ def _agent_tone_prompt(agent_tone: str) -> str:
     prompts = {
         "auto": (
             "Tone setting: Auto. Match the user's natural tone from recent messages and imported "
-            "speaking-style context. If signals conflict, stay warm, clear, and concise."
+            "speaking-style context. If signals conflict, stay warm, clear, brief, and natural."
         ),
         "casual": "Tone setting: Casual. Use relaxed, simple language without sounding sloppy.",
         "warm": "Tone setting: Warm. Be gentle, supportive, and emotionally clear.",
@@ -556,7 +590,10 @@ async def _groq_chat(
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
+            if request_kind == "chat_reply":
+                return _compact_chat_reply(content, messages)
+            return content
         except httpx.HTTPStatusError as error:
             raw_usage = {}
             if error.response is not None:
@@ -643,7 +680,10 @@ async def _ollama_chat(
                 completion_tokens=completion_tokens,
                 total_tokens=_sum_optional_ints(prompt_tokens, completion_tokens),
             )
-            return data["message"]["content"]
+            content = data["message"]["content"]
+            if request_kind == "chat_reply":
+                return _compact_chat_reply(content, messages)
+            return content
         except Exception as error:
             _record_usage_event(
                 conversation_id=conversation_id,
@@ -747,22 +787,82 @@ def _parse_json_object(content: str) -> dict[str, Any]:
     return json.loads(cleaned[start : end + 1])
 
 
-def _mock_reply(messages: list[dict[str, str]]) -> str:
+def _mock_reply(
+    messages: list[dict[str, str]],
+    user_profile: dict[str, Any] | None = None,
+) -> str:
     user_messages = [message for message in messages if message["role"] == "user"]
+    persona = _agent_persona_for_interest(str((user_profile or {}).get("interested_in") or ""))
     if user_messages and _is_greeting_only(user_messages[-1]["content"]):
-        return (
-            "Hi, good to meet you. Are you looking for long-term dating, marriage, "
-            "exploring, or something else?"
-        )
+        return f"Hey, I'm {persona['name']}. Chill, we can talk normally first."
 
     prompts = [
-        "Are you looking for long-term dating, marriage, exploring, or something else?",
-        "What values matter most to you in a partner?",
-        "What kind of communication makes you feel respected during conflict?",
-        "What are your hard dealbreakers?",
-        "How should family, children, and location fit into your future relationship?",
+        "hmm okay, fair.",
+        "haan, that feels clear.",
+        "acha, got it.",
+        "fair enough, I like that honestly.",
+        "sahi hai, keep going.",
     ]
     return prompts[min(len(user_messages), len(prompts) - 1)]
+
+
+def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
+    cleaned = " ".join(content.strip().split())
+    if not cleaned:
+        return cleaned
+
+    limit = _chat_reply_word_limit(messages)
+    words = cleaned.split()
+    if len(words) <= limit:
+        return cleaned
+
+    sentence_parts = re.split(r"(?<=[.!?।])\s+", cleaned)
+    kept: list[str] = []
+    count = 0
+    for sentence in sentence_parts:
+        sentence_words = sentence.split()
+        if not sentence_words:
+            continue
+        if kept and count + len(sentence_words) > limit:
+            break
+        kept.append(sentence)
+        count += len(sentence_words)
+        if count >= limit:
+            break
+
+    compact = " ".join(kept).strip()
+    if compact:
+        return compact
+    return " ".join(words[:limit]).rstrip(" ,;:")
+
+
+def _chat_reply_word_limit(messages: list[dict[str, str]]) -> int:
+    latest_user_text = _latest_user_text(messages)
+    advice_markers = {
+        "advice",
+        "detail",
+        "explain",
+        "help",
+        "how",
+        "plan",
+        "suggest",
+        "why",
+    }
+    if any(marker in latest_user_text for marker in advice_markers):
+        return CHAT_ADVICE_REPLY_WORD_LIMIT
+    return CHAT_REPLY_WORD_LIMIT
+
+
+def _latest_user_text(messages: list[dict[str, str]]) -> str:
+    latest = next(
+        (
+            message.get("content", "")
+            for message in reversed(messages)
+            if message.get("role") == "user"
+        ),
+        "",
+    )
+    return _normalized_user_text(str(latest))
 
 
 def _is_greeting_only(text: str) -> bool:
