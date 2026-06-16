@@ -32,6 +32,7 @@ from storage import (
     get_draft as storage_get_draft,
     init_db,
     list_context_sources,
+    list_conversations as storage_list_conversations,
     list_agent_usage_events,
     save_context_source,
     save_conversation,
@@ -196,6 +197,21 @@ class AgentConversationSettings(BaseModel):
     agent_mode: AgentMode | None = None
     agent_tone: AgentTone | None = None
     agent_style_source_id: str | None = None
+
+
+class AgentConversationSummary(BaseModel):
+    id: str
+    status: Literal["active", "extracted"]
+    agent_provider: str | None = None
+    agent_model: str | None = None
+    agent_mode: AgentMode = "know_me"
+    agent_tone: AgentTone = "auto"
+    agent_style_source_id: str | None = None
+    message_count: int = 0
+    user_message_count: int = 0
+    context_source_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class UserMessage(BaseModel):
@@ -367,6 +383,31 @@ def create_agent_conversation(payload: AgentConversationCreate | None = None) ->
     )
     save_conversation(conversation.model_dump(mode="json"))
     return conversation
+
+
+@app.get("/api/agent/conversations")
+def list_agent_conversations() -> dict[str, object]:
+    conversations = storage_list_conversations()
+    summaries = []
+    for conversation in conversations:
+        messages = conversation["messages"]
+        summaries.append(
+            AgentConversationSummary(
+                id=conversation["id"],
+                status=conversation["status"],
+                agent_provider=conversation["agent_provider"],
+                agent_model=conversation["agent_model"],
+                agent_mode=conversation["agent_mode"],
+                agent_tone=conversation["agent_tone"],
+                agent_style_source_id=conversation["agent_style_source_id"],
+                message_count=len(messages),
+                user_message_count=sum(1 for message in messages if message.get("role") == "user"),
+                context_source_count=len(list_context_sources(conversation["id"])),
+                created_at=conversation["created_at"],
+                updated_at=conversation["updated_at"],
+            ).model_dump()
+        )
+    return {"count": len(summaries), "conversations": summaries}
 
 
 @app.get("/api/agent/conversations/{conversation_id}")

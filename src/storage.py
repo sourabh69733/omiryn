@@ -86,7 +86,15 @@ conversation_context_sources = Table(
 
 
 def database_url() -> str:
-    return os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    return _normalize_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
+
+
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgres://")
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    return url
 
 
 def engine() -> Engine:
@@ -204,6 +212,29 @@ def get_conversation(conversation_id: str) -> dict[str, Any] | None:
         "agent_style_source_id": row.get("agent_style_source_id"),
         "messages": row["messages_json"],
     }
+
+
+def list_conversations() -> list[dict[str, Any]]:
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(agent_conversations).order_by(agent_conversations.c.updated_at.desc())
+        ).mappings().all()
+
+    return [
+        {
+            "id": row["id"],
+            "status": row["status"],
+            "agent_provider": row.get("agent_provider"),
+            "agent_model": row.get("agent_model"),
+            "agent_mode": row.get("agent_mode") or "know_me",
+            "agent_tone": row.get("agent_tone") or "auto",
+            "agent_style_source_id": row.get("agent_style_source_id"),
+            "messages": row["messages_json"],
+            "created_at": _isoformat_utc(row["created_at"]),
+            "updated_at": _isoformat_utc(row["updated_at"]),
+        }
+        for row in rows
+    ]
 
 
 def _ensure_agent_conversation_columns() -> None:

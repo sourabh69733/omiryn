@@ -56,6 +56,7 @@ const usageSummary = document.querySelector("#usage-summary");
 const sidebarUsageList = document.querySelector("#sidebar-usage-list");
 const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
+const historyList = document.querySelector("#history-list");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
 const activeMemoryCount = document.querySelector("#active-memory-count");
@@ -222,6 +223,7 @@ function hydrateConversation(conversation) {
   loadContextSources();
   loadDetectedTone();
   loadAgentUsage();
+  loadConversationHistory();
   focusChatInput();
 }
 
@@ -411,6 +413,70 @@ function showSidePanel(name) {
     loadContextImportPrompt();
     loadContextSources();
   }
+  if (name === "history") {
+    loadConversationHistory();
+  }
+}
+
+async function loadConversationHistory() {
+  if (!historyList) return;
+
+  try {
+    const response = await fetch("/api/agent/conversations");
+    if (!response.ok) {
+      throw new Error("Could not load chat history.");
+    }
+    const data = await response.json();
+    renderConversationHistory(data.conversations || []);
+  } catch (error) {
+    historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderConversationHistory(conversations) {
+  if (!historyList) return;
+
+  if (!conversations.length) {
+    historyList.innerHTML = '<div class="history-empty">No saved conversations yet.</div>';
+    return;
+  }
+
+  historyList.innerHTML = "";
+  conversations.forEach((conversation) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "history-item";
+    item.classList.toggle("active", conversation.id === conversationId);
+    const updatedAt = conversation.updated_at
+      ? new Date(conversation.updated_at).toLocaleString()
+      : "No timestamp";
+    item.innerHTML = `
+      <strong>Session ${escapeHtml(conversation.id.slice(0, 8))}</strong>
+      <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
+      <small>${escapeHtml(updatedAt)}</small>
+    `;
+    item.addEventListener("click", () => {
+      loadConversation(conversation.id).catch((error) => {
+        historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+      });
+    });
+    historyList.appendChild(item);
+  });
+}
+
+async function loadConversation(id) {
+  if (!id || id === conversationId) return;
+
+  chatInput.disabled = true;
+  extractProfile.disabled = true;
+  const response = await fetch(`/api/agent/conversations/${id}`);
+  if (!response.ok) {
+    chatInput.disabled = false;
+    extractProfile.disabled = false;
+    throw new Error("Could not load that conversation.");
+  }
+  const conversation = await response.json();
+  hydrateConversation(conversation);
 }
 
 async function loadContextImportPrompt() {
