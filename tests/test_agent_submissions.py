@@ -5,8 +5,9 @@ from unittest.mock import patch
 import httpx
 from fastapi.testclient import TestClient
 
-from api.main import _smart_reply_context_sources, app
+from api.main import _smart_reply_context_sources, app, current_user
 from agent.providers import _context_sources_text, _groq_rate_limit_headers, _provider_messages
+from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import _normalize_database_url, reset_db
 
@@ -14,8 +15,12 @@ from storage import _normalize_database_url, reset_db
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
         os.environ["AUTH_REQUIRED"] = "false"
+        app.dependency_overrides.clear()
         reset_db()
         self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())
@@ -97,6 +102,52 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         conversations = self.client.get("/api/agent/conversations").json()["conversations"]
         self.assertEqual(conversations, [])
+
+    def test_conversations_are_scoped_to_authenticated_user(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        async def user_b() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_response = self.client.post("/api/agent/conversations")
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation_id = conversation_response.json()["id"]
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "manual_notes",
+                "title": "Private notes",
+                "content": "This context belongs only to user A.",
+            },
+        )
+
+        app.dependency_overrides[current_user] = user_b
+        list_response = self.client.get("/api/agent/conversations")
+        get_response = self.client.get(f"/api/agent/conversations/{conversation_id}")
+        context_response = self.client.get(
+            f"/api/agent/conversations/{conversation_id}/context-sources"
+        )
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["conversations"], [])
+        self.assertEqual(get_response.status_code, 404)
+        self.assertEqual(context_response.status_code, 404)
+
+        app.dependency_overrides[current_user] = user_a
+        list_response = self.client.get("/api/agent/conversations")
+        self.assertEqual(len(list_response.json()["conversations"]), 1)
+
+    def test_auth_me_returns_current_user(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        response = self.client.get("/api/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"id": "user-a", "email": "a@example.com"})
 
     def test_omiryn_agent_conversation_extracts_to_review_draft(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")

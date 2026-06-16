@@ -8,6 +8,7 @@ let lastDeleteTrigger = null;
 let supabaseClient = null;
 let authSession = null;
 let authRequired = false;
+let datingBasicsComplete = null;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -110,6 +111,12 @@ const appShell = document.querySelector("#app-shell");
 const authScreen = document.querySelector("#auth-screen");
 const authScreenLogin = document.querySelector("#auth-screen-login");
 const authScreenStatus = document.querySelector("#auth-screen-status");
+const datingBasicsScreen = document.querySelector("#dating-basics-screen");
+const datingBasicsForm = document.querySelector("#dating-basics-form");
+const profileGender = document.querySelector("#profile-gender");
+const profileInterestedIn = document.querySelector("#profile-interested-in");
+const datingBasicsStatus = document.querySelector("#dating-basics-status");
+const saveDatingBasics = document.querySelector("#save-dating-basics");
 const loginGoogle = document.querySelector("#login-google");
 const logoutUser = document.querySelector("#logout-user");
 const authUser = document.querySelector("#auth-user");
@@ -187,6 +194,7 @@ async function initializeAuth() {
 function renderAuthState() {
   const user = authSession?.user || null;
   if (!user) {
+    datingBasicsComplete = null;
     renderSignedOutAuth("Continue with Google");
     renderAuthGate();
     return;
@@ -211,6 +219,7 @@ function renderAuthState() {
     logoutUser.disabled = false;
   }
   renderAuthGate();
+  loadDatingBasicsStatus();
 }
 
 function renderSignedOutAuth(label) {
@@ -233,18 +242,104 @@ function renderSignedOutAuth(label) {
 
 function renderAuthGate(message) {
   const signedIn = Boolean(authSession?.user);
-  const shouldGate = authRequired && !signedIn;
+  const shouldAuthGate = authRequired && !signedIn;
+  const shouldBasicsGate = signedIn && datingBasicsComplete === false;
+  const shouldHideApp = shouldAuthGate || shouldBasicsGate;
   if (appShell) {
-    appShell.hidden = shouldGate;
+    appShell.hidden = shouldHideApp;
   }
   if (authScreen) {
-    authScreen.hidden = !shouldGate;
+    authScreen.hidden = !shouldAuthGate;
+  }
+  if (datingBasicsScreen) {
+    datingBasicsScreen.hidden = !shouldBasicsGate;
   }
   if (authScreenLogin) {
     authScreenLogin.disabled = !supabaseClient;
   }
   if (authScreenStatus) {
     authScreenStatus.textContent = message || (signedIn ? "Signed in." : "Sign in to continue.");
+  }
+}
+
+async function loadDatingBasicsStatus() {
+  if (!authSession?.user) return;
+
+  try {
+    const response = await apiFetch("/api/me/dating-basics");
+    if (!response.ok) {
+      throw new Error("Could not load dating basics.");
+    }
+    const data = await response.json();
+    datingBasicsComplete = Boolean(data.complete);
+    if (data.profile) {
+      if (profileGender) profileGender.value = data.profile.gender || "";
+      if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
+    }
+    renderAuthGate();
+    if (!datingBasicsComplete) {
+      profileGender?.focus();
+    }
+  } catch (error) {
+    datingBasicsComplete = false;
+    if (datingBasicsStatus) {
+      datingBasicsStatus.textContent = error.message;
+    }
+    renderAuthGate();
+  }
+}
+
+function defaultInterestedIn(gender) {
+  if (gender === "man") return "women";
+  if (gender === "woman") return "men";
+  return "everyone";
+}
+
+function updateInterestedInDefault() {
+  if (!profileGender || !profileInterestedIn) return;
+  profileInterestedIn.value = defaultInterestedIn(profileGender.value);
+}
+
+async function saveDatingBasicsProfile(event) {
+  event.preventDefault();
+  if (!profileGender || !profileInterestedIn || !saveDatingBasics) return;
+
+  if (!profileGender.value || !profileInterestedIn.value) {
+    if (datingBasicsStatus) {
+      datingBasicsStatus.textContent = "Choose both fields to continue.";
+    }
+    return;
+  }
+
+  saveDatingBasics.disabled = true;
+  if (datingBasicsStatus) {
+    datingBasicsStatus.textContent = "Saving...";
+  }
+  try {
+    const response = await apiFetch("/api/me/dating-basics", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gender: profileGender.value,
+        interested_in: profileInterestedIn.value
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not save dating basics.");
+    }
+    datingBasicsComplete = true;
+    if (datingBasicsStatus) {
+      datingBasicsStatus.textContent = "";
+    }
+    renderAuthGate();
+    focusChatInput();
+  } catch (error) {
+    if (datingBasicsStatus) {
+      datingBasicsStatus.textContent = error.message;
+    }
+  } finally {
+    saveDatingBasics.disabled = false;
   }
 }
 
@@ -1809,6 +1904,8 @@ cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
 loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
+profileGender?.addEventListener("change", updateInterestedInDefault);
+datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
 deleteSessionDialog?.addEventListener("click", (event) => {
   if (event.target === deleteSessionDialog) {
     closeDeleteSessionDialog();

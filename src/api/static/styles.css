@@ -121,6 +121,35 @@ p {
   font-weight: 700;
 }
 
+.basics-panel {
+  display: block;
+}
+
+.basics-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.basics-field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  padding: 0 12px;
+  outline: none;
+}
+
+.basics-field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(31, 95, 91, 0.12);
+}
+
 .app-header {
   display: flex;
   align-items: center;

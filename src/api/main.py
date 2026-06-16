@@ -32,6 +32,7 @@ from storage import (
     delete_conversation as storage_delete_conversation,
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
+    get_user_profile,
     init_db,
     list_context_sources,
     list_conversations as storage_list_conversations,
@@ -39,6 +40,7 @@ from storage import (
     save_context_source,
     save_conversation,
     save_draft,
+    save_user_profile,
     summarize_agent_usage,
 )
 
@@ -54,6 +56,8 @@ ContextSourceType = Literal[
     "friend_style",
 ]
 WhatsappStyleKind = Literal["user_style", "friend_style"]
+Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
+InterestedIn = Literal["men", "women", "everyone"]
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
 MEMORY_TRIGGER_TERMS = {
@@ -234,6 +238,11 @@ class WhatsappChatImportCreate(BaseModel):
     content: str = Field(min_length=50, max_length=WHATSAPP_IMPORT_MAX_CHARS)
 
 
+class DatingBasics(BaseModel):
+    gender: Gender
+    interested_in: InterestedIn
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -253,14 +262,45 @@ def auth_config() -> dict[str, object]:
     }
 
 
+@app.get("/api/auth/me")
+async def auth_me(user: CurrentUser | None = Depends(current_user)) -> dict[str, str | None]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return {"id": user.id, "email": user.email}
+
+
+@app.get("/api/me/dating-basics")
+async def get_dating_basics(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = get_user_profile(user.id)
+    return {
+        "complete": bool(profile and profile.get("gender") and profile.get("interested_in")),
+        "profile": profile,
+    }
+
+
+@app.put("/api/me/dating-basics")
+async def put_dating_basics(
+    payload: DatingBasics,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = save_user_profile(user.id, payload.gender, payload.interested_in)
+    return {"complete": True, "profile": profile}
+
+
 @app.get("/api/agent/usage")
 async def agent_usage(
     conversation_id: str | None = None,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
     return {
-        "summary": summarize_agent_usage(conversation_id),
-        "events": list_agent_usage_events(conversation_id),
+        "summary": summarize_agent_usage(conversation_id, _user_id(user)),
+        "events": list_agent_usage_events(conversation_id, _user_id(user)),
         "limits": _configured_usage_limits(),
     }
 
@@ -270,10 +310,10 @@ async def conversation_agent_usage(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    _get_existing_conversation(conversation_id)
+    _get_existing_conversation(conversation_id, user)
     return {
-        "summary": summarize_agent_usage(conversation_id),
-        "events": list_agent_usage_events(conversation_id),
+        "summary": summarize_agent_usage(conversation_id, _user_id(user)),
+        "events": list_agent_usage_events(conversation_id, _user_id(user)),
         "limits": _configured_usage_limits(),
     }
 
@@ -288,8 +328,8 @@ async def get_conversation_context_sources(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    _get_existing_conversation(conversation_id)
-    sources = list_context_sources(conversation_id)
+    _get_existing_conversation(conversation_id, user)
+    sources = list_context_sources(conversation_id, _user_id(user))
     return {
         "count": len(sources),
         "sources": [_context_source_summary(source) for source in sources],
@@ -301,12 +341,12 @@ async def get_conversation_tone(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    conversation = _get_existing_conversation(conversation_id)
+    conversation = _get_existing_conversation(conversation_id, user)
     return {
         "selected_tone": conversation.agent_tone,
         "detected_tone": _detect_conversation_tone(
             conversation.messages,
-            list_context_sources(conversation_id),
+            list_context_sources(conversation_id, _user_id(user)),
         ),
     }
 
@@ -317,9 +357,10 @@ def create_conversation_context_source(
     payload: ContextSourceCreate,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    _get_existing_conversation(conversation_id)
+    _get_existing_conversation(conversation_id, user)
     source = save_context_source(
         {
+            "user_id": _user_id(user),
             "conversation_id": conversation_id,
             "source_type": payload.source_type,
             "title": payload.title,
@@ -336,7 +377,7 @@ def create_whatsapp_context_source(
     payload: WhatsappChatImportCreate,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    _get_existing_conversation(conversation_id)
+    _get_existing_conversation(conversation_id, user)
     if payload.style_kind == "friend_style" and not (payload.user_sender or "").strip():
         raise HTTPException(
             status_code=400,
@@ -355,6 +396,7 @@ def create_whatsapp_context_source(
 
     source = save_context_source(
         {
+            "user_id": _user_id(user),
             "conversation_id": conversation_id,
             "source_type": "friend_style"
             if payload.style_kind == "friend_style"
@@ -409,7 +451,7 @@ async def create_agent_conversation(
             }
         ],
     )
-    save_conversation(conversation.model_dump(mode="json"))
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     return conversation
 
 
@@ -417,7 +459,7 @@ async def create_agent_conversation(
 async def list_agent_conversations(
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
-    conversations = storage_list_conversations()
+    conversations = storage_list_conversations(_user_id(user))
     summaries = []
     for conversation in conversations:
         messages = conversation["messages"]
@@ -432,7 +474,7 @@ async def list_agent_conversations(
                 agent_style_source_id=conversation["agent_style_source_id"],
                 message_count=len(messages),
                 user_message_count=sum(1 for message in messages if message.get("role") == "user"),
-                context_source_count=len(list_context_sources(conversation["id"])),
+                context_source_count=len(list_context_sources(conversation["id"], _user_id(user))),
                 created_at=conversation["created_at"],
                 updated_at=conversation["updated_at"],
             ).model_dump()
@@ -445,7 +487,7 @@ async def get_agent_conversation(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> AgentConversation:
-    return _get_existing_conversation(conversation_id)
+    return _get_existing_conversation(conversation_id, user)
 
 
 @app.delete("/api/agent/conversations/{conversation_id}")
@@ -453,7 +495,7 @@ async def delete_agent_conversation(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, str]:
-    if not storage_delete_conversation(conversation_id):
+    if not storage_delete_conversation(conversation_id, _user_id(user)):
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return {"conversation_id": conversation_id, "status": "deleted"}
 
@@ -464,7 +506,7 @@ def update_agent_conversation_settings(
     payload: AgentConversationSettings,
     user: CurrentUser | None = Depends(current_user),
 ) -> AgentConversation:
-    conversation = _get_existing_conversation(conversation_id)
+    conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
 
@@ -478,9 +520,9 @@ def update_agent_conversation_settings(
         conversation.agent_tone = payload.agent_tone
     if "agent_style_source_id" in payload.model_fields_set:
         style_source_id = payload.agent_style_source_id or None
-        _validate_style_source(conversation_id, style_source_id)
+        _validate_style_source(conversation_id, style_source_id, _user_id(user))
         conversation.agent_style_source_id = style_source_id
-    save_conversation(conversation.model_dump(mode="json"))
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     return conversation
 
 
@@ -490,7 +532,7 @@ async def send_agent_message(
     payload: UserMessage,
     user: CurrentUser | None = Depends(current_user),
 ) -> AgentConversation:
-    conversation = _get_existing_conversation(conversation_id)
+    conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
 
@@ -510,13 +552,14 @@ async def send_agent_message(
                 conversation.id,
                 conversation.agent_style_source_id,
                 payload.message,
+                _user_id(user),
             ),
         )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     conversation.messages.append({"role": "assistant", "content": reply})
-    save_conversation(conversation.model_dump(mode="json"))
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     return conversation
 
 
@@ -525,13 +568,13 @@ async def extract_agent_conversation(
     conversation_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, str]:
-    conversation = _get_existing_conversation(conversation_id)
+    conversation = _get_existing_conversation(conversation_id, user)
     try:
         raw_profile = await extract_profile(
             conversation.messages,
             conversation_id=conversation.id,
             model=conversation.agent_model,
-            context_sources=_profile_extraction_context_sources(conversation.id),
+            context_sources=_profile_extraction_context_sources(conversation.id, _user_id(user)),
         )
         submission = AgentProfileSubmission.model_validate(raw_profile)
     except (AgentProviderError, ValueError, TypeError) as error:
@@ -539,10 +582,11 @@ async def extract_agent_conversation(
 
     draft_id = str(uuid4())
     save_draft(
-        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json")
+        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json"),
+        _user_id(user),
     )
     conversation.status = "extracted"
-    save_conversation(conversation.model_dump(mode="json"))
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     return {
         "draft_id": draft_id,
         "status": "draft",
@@ -557,7 +601,8 @@ async def submit_agent_profile(
 ) -> dict[str, str]:
     draft_id = str(uuid4())
     save_draft(
-        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json")
+        DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json"),
+        _user_id(user),
     )
 
     return {
@@ -572,7 +617,7 @@ async def get_draft(
     draft_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> DraftProfile:
-    return _get_existing_draft(draft_id)
+    return _get_existing_draft(draft_id, user)
 
 
 @app.patch("/api/drafts/{draft_id}")
@@ -581,7 +626,7 @@ async def update_draft(
     patch: DraftPatch,
     user: CurrentUser | None = Depends(current_user),
 ) -> DraftProfile:
-    draft = _get_existing_draft(draft_id)
+    draft = _get_existing_draft(draft_id, user)
     if draft.status != "draft":
         raise HTTPException(status_code=409, detail="Only draft profiles can be edited.")
 
@@ -629,7 +674,7 @@ async def update_draft(
         data.summary = patch.summary
 
     updated = DraftProfile(id=draft.id, status=draft.status, submission=data)
-    save_draft(updated.model_dump(mode="json"))
+    save_draft(updated.model_dump(mode="json"), _user_id(user))
     return updated
 
 
@@ -638,12 +683,12 @@ async def approve_draft(
     draft_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> DraftProfile:
-    draft = _get_existing_draft(draft_id)
+    draft = _get_existing_draft(draft_id, user)
     if draft.status != "draft":
         raise HTTPException(status_code=409, detail="Only draft profiles can be approved.")
 
     approved = DraftProfile(id=draft.id, status="approved", submission=draft.submission)
-    save_draft(approved.model_dump(mode="json"))
+    save_draft(approved.model_dump(mode="json"), _user_id(user))
     return approved
 
 
@@ -652,11 +697,12 @@ async def delete_draft(
     draft_id: str,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, str]:
-    draft = _get_existing_draft(draft_id)
+    draft = _get_existing_draft(draft_id, user)
     save_draft(
         DraftProfile(id=draft.id, status="deleted", submission=draft.submission).model_dump(
             mode="json"
-        )
+        ),
+        _user_id(user),
     )
     return {"draft_id": draft_id, "status": "deleted"}
 
@@ -759,24 +805,34 @@ async def demo_matches(user: CurrentUser | None = Depends(current_user)) -> dict
     }
 
 
-def _get_existing_draft(draft_id: str) -> DraftProfile:
-    draft = storage_get_draft(draft_id)
+def _user_id(user: CurrentUser | None) -> str | None:
+    return user.id if user else None
+
+
+def _get_existing_draft(draft_id: str, user: CurrentUser | None = None) -> DraftProfile:
+    draft = storage_get_draft(draft_id, _user_id(user))
     if not draft or draft["status"] == "deleted":
         raise HTTPException(status_code=404, detail="Draft profile not found.")
     return DraftProfile.model_validate(draft)
 
 
-def _get_existing_conversation(conversation_id: str) -> AgentConversation:
-    conversation = storage_get_conversation(conversation_id)
+def _get_existing_conversation(
+    conversation_id: str,
+    user: CurrentUser | None = None,
+) -> AgentConversation:
+    conversation = storage_get_conversation(conversation_id, _user_id(user))
     if not conversation:
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return AgentConversation.model_validate(conversation)
 
 
-def _profile_extraction_context_sources(conversation_id: str) -> list[dict[str, object]]:
+def _profile_extraction_context_sources(
+    conversation_id: str,
+    user_id: str | None = None,
+) -> list[dict[str, object]]:
     return [
         source
-        for source in list_context_sources(conversation_id)
+        for source in list_context_sources(conversation_id, user_id)
         if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
     ]
 
@@ -785,8 +841,9 @@ def _smart_reply_context_sources(
     conversation_id: str,
     style_source_id: str | None,
     user_text: str,
+    user_id: str | None = None,
 ) -> list[dict[str, object]]:
-    sources = list_context_sources(conversation_id)
+    sources = list_context_sources(conversation_id, user_id)
     selected_style = _selected_style_source(sources, style_source_id)
     retrieved_sources = _relevant_memory_sources(sources, user_text)
 
@@ -893,10 +950,14 @@ def _normalized_memory_text(text: str) -> str:
     )
 
 
-def _validate_style_source(conversation_id: str, style_source_id: str | None) -> None:
+def _validate_style_source(
+    conversation_id: str,
+    style_source_id: str | None,
+    user_id: str | None = None,
+) -> None:
     if not style_source_id:
         return
-    for source in list_context_sources(conversation_id):
+    for source in list_context_sources(conversation_id, user_id):
         if (
             source.get("id") == style_source_id
             and source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES

@@ -22,6 +22,43 @@
       </div>
     </section>
 
+    <section class="auth-screen" id="dating-basics-screen" hidden>
+      <form class="auth-panel basics-panel" id="dating-basics-form">
+        <span class="brand-mark auth-mark" aria-hidden="true">O</span>
+        <p class="eyebrow">Dating Basics</p>
+        <h1>Set your match direction</h1>
+        <p>
+          Omiryn needs these two basics before it can keep your profile and matches clear.
+        </p>
+
+        <label class="basics-field">
+          Gender
+          <select id="profile-gender" required>
+            <option value="">Select gender</option>
+            <option value="man">Man</option>
+            <option value="woman">Woman</option>
+            <option value="non_binary">Non-binary</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
+        </label>
+
+        <label class="basics-field">
+          Interested in
+          <select id="profile-interested-in" required>
+            <option value="">Select preference</option>
+            <option value="women">Women</option>
+            <option value="men">Men</option>
+            <option value="everyone">Everyone</option>
+          </select>
+        </label>
+
+        <button class="auth-primary" id="save-dating-basics" type="submit">
+          Continue
+        </button>
+        <p class="auth-status" id="dating-basics-status"></p>
+      </form>
+    </section>
+
     <div class="app-shell" id="app-shell" hidden>
       <header class="app-header">
         <a class="brand" href="/" aria-label="Omiryn home">

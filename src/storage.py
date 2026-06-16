@@ -32,6 +32,7 @@ draft_profiles = Table(
     "draft_profiles",
     metadata,
     Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
     Column("status", String, nullable=False),
     Column("submission_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
@@ -42,6 +43,7 @@ agent_conversations = Table(
     "agent_conversations",
     metadata,
     Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
     Column("status", String, nullable=False),
     Column("agent_provider", String, nullable=True),
     Column("agent_model", String, nullable=True),
@@ -57,6 +59,7 @@ agent_usage_events = Table(
     "agent_usage_events",
     metadata,
     Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
     Column("conversation_id", String, nullable=True),
     Column("request_kind", String, nullable=False),
     Column("provider", String, nullable=False),
@@ -76,12 +79,23 @@ conversation_context_sources = Table(
     "conversation_context_sources",
     metadata,
     Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
     Column("conversation_id", String, nullable=False),
     Column("source_type", String, nullable=False),
     Column("title", String, nullable=False),
     Column("content", String, nullable=False),
     Column("metadata_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+user_profiles = Table(
+    "user_profiles",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("gender", String, nullable=True),
+    Column("interested_in", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 
@@ -115,7 +129,7 @@ ENGINE = engine()
 
 def init_db() -> None:
     metadata.create_all(ENGINE)
-    _ensure_agent_conversation_columns()
+    _ensure_runtime_columns()
 
 
 def reset_db() -> None:
@@ -123,9 +137,10 @@ def reset_db() -> None:
     metadata.create_all(ENGINE)
 
 
-def save_draft(draft: dict[str, Any]) -> None:
+def save_draft(draft: dict[str, Any], user_id: str | None = None) -> None:
     payload = {
         "id": draft["id"],
+        "user_id": user_id,
         "status": draft["status"],
         "submission_json": draft["submission"],
     }
@@ -137,33 +152,33 @@ def save_draft(draft: dict[str, Any]) -> None:
             connection.execute(
                 draft_profiles.update()
                 .where(draft_profiles.c.id == draft["id"])
-                .values(
-                    status=payload["status"],
-                    submission_json=payload["submission_json"],
-                    updated_at=func.now(),
-                )
+                .values(**_owned_update_values(payload, "user_id"), updated_at=func.now())
             )
         else:
             connection.execute(draft_profiles.insert().values(**payload))
 
 
-def get_draft(draft_id: str) -> dict[str, Any] | None:
+def get_draft(draft_id: str, user_id: str | None = None) -> dict[str, Any] | None:
+    statement = select(draft_profiles).where(draft_profiles.c.id == draft_id)
+    if user_id is not None:
+        statement = statement.where(draft_profiles.c.user_id == user_id)
+
     with ENGINE.begin() as connection:
-        row = connection.execute(
-            select(draft_profiles).where(draft_profiles.c.id == draft_id)
-        ).mappings().first()
+        row = connection.execute(statement).mappings().first()
     if not row:
         return None
     return {
         "id": row["id"],
+        "user_id": row["user_id"],
         "status": row["status"],
         "submission": row["submission_json"],
     }
 
 
-def save_conversation(conversation: dict[str, Any]) -> None:
+def save_conversation(conversation: dict[str, Any], user_id: str | None = None) -> None:
     payload = {
         "id": conversation["id"],
+        "user_id": user_id,
         "status": conversation["status"],
         "agent_provider": conversation.get("agent_provider"),
         "agent_model": conversation.get("agent_model"),
@@ -180,30 +195,24 @@ def save_conversation(conversation: dict[str, Any]) -> None:
             connection.execute(
                 agent_conversations.update()
                 .where(agent_conversations.c.id == conversation["id"])
-                .values(
-                    status=payload["status"],
-                    agent_provider=payload["agent_provider"],
-                    agent_model=payload["agent_model"],
-                    agent_mode=payload["agent_mode"],
-                    agent_tone=payload["agent_tone"],
-                    agent_style_source_id=payload["agent_style_source_id"],
-                    messages_json=payload["messages_json"],
-                    updated_at=func.now(),
-                )
+                .values(**_owned_update_values(payload, "user_id"), updated_at=func.now())
             )
         else:
             connection.execute(agent_conversations.insert().values(**payload))
 
 
-def get_conversation(conversation_id: str) -> dict[str, Any] | None:
+def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[str, Any] | None:
+    statement = select(agent_conversations).where(agent_conversations.c.id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_conversations.c.user_id == user_id)
+
     with ENGINE.begin() as connection:
-        row = connection.execute(
-            select(agent_conversations).where(agent_conversations.c.id == conversation_id)
-        ).mappings().first()
+        row = connection.execute(statement).mappings().first()
     if not row:
         return None
     return {
         "id": row["id"],
+        "user_id": row["user_id"],
         "status": row["status"],
         "agent_provider": row.get("agent_provider"),
         "agent_model": row.get("agent_model"),
@@ -214,15 +223,18 @@ def get_conversation(conversation_id: str) -> dict[str, Any] | None:
     }
 
 
-def list_conversations() -> list[dict[str, Any]]:
+def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
+    statement = select(agent_conversations).order_by(agent_conversations.c.updated_at.desc())
+    if user_id is not None:
+        statement = statement.where(agent_conversations.c.user_id == user_id)
+
     with ENGINE.begin() as connection:
-        rows = connection.execute(
-            select(agent_conversations).order_by(agent_conversations.c.updated_at.desc())
-        ).mappings().all()
+        rows = connection.execute(statement).mappings().all()
 
     return [
         {
             "id": row["id"],
+            "user_id": row["user_id"],
             "status": row["status"],
             "agent_provider": row.get("agent_provider"),
             "agent_model": row.get("agent_model"),
@@ -237,11 +249,13 @@ def list_conversations() -> list[dict[str, Any]]:
     ]
 
 
-def delete_conversation(conversation_id: str) -> bool:
+def delete_conversation(conversation_id: str, user_id: str | None = None) -> bool:
+    statement = select(agent_conversations.c.id).where(agent_conversations.c.id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_conversations.c.user_id == user_id)
+
     with ENGINE.begin() as connection:
-        existing = connection.execute(
-            select(agent_conversations.c.id).where(agent_conversations.c.id == conversation_id)
-        ).first()
+        existing = connection.execute(statement).first()
         if not existing:
             return False
 
@@ -259,32 +273,34 @@ def delete_conversation(conversation_id: str) -> bool:
     return True
 
 
-def _ensure_agent_conversation_columns() -> None:
-    existing_columns = {
-        column["name"] for column in inspect(ENGINE).get_columns("agent_conversations")
-    }
-    missing_columns = [
-        column_name
-        for column_name in (
+def _ensure_runtime_columns() -> None:
+    required_columns = {
+        "user_profiles": ("gender", "interested_in"),
+        "draft_profiles": ("user_id",),
+        "agent_usage_events": ("user_id",),
+        "conversation_context_sources": ("user_id",),
+        "agent_conversations": (
+            "user_id",
             "agent_provider",
             "agent_model",
             "agent_mode",
             "agent_tone",
             "agent_style_source_id",
-        )
-        if column_name not in existing_columns
-    ]
-    if not missing_columns:
-        return
-
+        ),
+    }
     with ENGINE.begin() as connection:
-        for column_name in missing_columns:
-            connection.execute(text(f"ALTER TABLE agent_conversations ADD COLUMN {column_name} VARCHAR"))
+        for table_name, column_names in required_columns.items():
+            existing_columns = {column["name"] for column in inspect(ENGINE).get_columns(table_name)}
+            for column_name in column_names:
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR"))
 
 
 def save_agent_usage_event(event: dict[str, Any]) -> None:
+    user_id = event.get("user_id") or _conversation_user_id(event.get("conversation_id"))
     payload = {
         "id": event.get("id") or str(uuid4()),
+        "user_id": user_id,
         "conversation_id": event.get("conversation_id"),
         "request_kind": event["request_kind"],
         "provider": event["provider"],
@@ -302,10 +318,53 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
         connection.execute(agent_usage_events.insert().values(**payload))
 
 
-def list_agent_usage_events(conversation_id: str | None = None) -> list[dict[str, Any]]:
+def get_user_profile(user_id: str) -> dict[str, Any] | None:
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(user_profiles).where(user_profiles.c.user_id == user_id)
+        ).mappings().first()
+    if not row:
+        return None
+    return {
+        "user_id": row["user_id"],
+        "gender": row["gender"],
+        "interested_in": row["interested_in"],
+        "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def save_user_profile(user_id: str, gender: str, interested_in: str) -> dict[str, Any]:
+    payload = {
+        "user_id": user_id,
+        "gender": gender,
+        "interested_in": interested_in,
+    }
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(user_profiles.c.user_id).where(user_profiles.c.user_id == user_id)
+        ).first()
+        if existing:
+            connection.execute(
+                user_profiles.update()
+                .where(user_profiles.c.user_id == user_id)
+                .values(gender=gender, interested_in=interested_in, updated_at=func.now())
+            )
+        else:
+            connection.execute(user_profiles.insert().values(**payload))
+
+    return get_user_profile(user_id) or payload
+
+
+def list_agent_usage_events(
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
     statement = select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
     if conversation_id:
         statement = statement.where(agent_usage_events.c.conversation_id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_usage_events.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -313,6 +372,7 @@ def list_agent_usage_events(conversation_id: str | None = None) -> list[dict[str
     return [
         {
             "id": row["id"],
+            "user_id": row["user_id"],
             "conversation_id": row["conversation_id"],
             "request_kind": row["request_kind"],
             "provider": row["provider"],
@@ -331,8 +391,11 @@ def list_agent_usage_events(conversation_id: str | None = None) -> list[dict[str
     ]
 
 
-def summarize_agent_usage(conversation_id: str | None = None) -> dict[str, Any]:
-    events = list_agent_usage_events(conversation_id)
+def summarize_agent_usage(
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    events = list_agent_usage_events(conversation_id, user_id)
     successful_events = [event for event in events if event["success"]]
     estimated_cost_usd = round(
         sum(event["estimated_cost_usd"] or 0 for event in events),
@@ -361,6 +424,7 @@ def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:
 def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
     payload = {
         "id": source.get("id") or str(uuid4()),
+        "user_id": source.get("user_id") or _conversation_user_id(source["conversation_id"]),
         "conversation_id": source["conversation_id"],
         "source_type": source["source_type"],
         "title": source["title"],
@@ -377,19 +441,24 @@ def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
     return _context_source_from_row(row)
 
 
-def list_context_sources(conversation_id: str) -> list[dict[str, Any]]:
+def list_context_sources(conversation_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    statement = (
+        select(conversation_context_sources)
+        .where(conversation_context_sources.c.conversation_id == conversation_id)
+        .order_by(conversation_context_sources.c.created_at.desc())
+    )
+    if user_id is not None:
+        statement = statement.where(conversation_context_sources.c.user_id == user_id)
+
     with ENGINE.begin() as connection:
-        rows = connection.execute(
-            select(conversation_context_sources)
-            .where(conversation_context_sources.c.conversation_id == conversation_id)
-            .order_by(conversation_context_sources.c.created_at.desc())
-        ).mappings().all()
+        rows = connection.execute(statement).mappings().all()
     return [_context_source_from_row(row) for row in rows]
 
 
 def _context_source_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
+        "user_id": row["user_id"],
         "conversation_id": row["conversation_id"],
         "source_type": row["source_type"],
         "title": row["title"],
@@ -397,6 +466,25 @@ def _context_source_from_row(row: Any) -> dict[str, Any]:
         "metadata": row["metadata_json"],
         "created_at": _isoformat_utc(row["created_at"]),
     }
+
+
+def _owned_update_values(payload: dict[str, Any], owner_key: str) -> dict[str, Any]:
+    values = {key: value for key, value in payload.items() if key != "id"}
+    if values.get(owner_key) is None:
+        values.pop(owner_key, None)
+    return values
+
+
+def _conversation_user_id(conversation_id: str | None) -> str | None:
+    if not conversation_id:
+        return None
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(agent_conversations.c.user_id).where(
+                agent_conversations.c.id == conversation_id
+            )
+        ).first()
+    return row[0] if row else None
 
 
 def _isoformat_utc(value: Any) -> str | None:
