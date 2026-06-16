@@ -92,6 +92,7 @@ user_profiles = Table(
     "user_profiles",
     metadata,
     Column("user_id", String, primary_key=True),
+    Column("display_name", String, nullable=True),
     Column("gender", String, nullable=True),
     Column("interested_in", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
@@ -275,7 +276,7 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
 
 def _ensure_runtime_columns() -> None:
     required_columns = {
-        "user_profiles": ("gender", "interested_in"),
+        "user_profiles": ("display_name", "gender", "interested_in"),
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
@@ -327,6 +328,7 @@ def get_user_profile(user_id: str) -> dict[str, Any] | None:
         return None
     return {
         "user_id": row["user_id"],
+        "display_name": row["display_name"],
         "gender": row["gender"],
         "interested_in": row["interested_in"],
         "created_at": _isoformat_utc(row["created_at"]),
@@ -334,9 +336,15 @@ def get_user_profile(user_id: str) -> dict[str, Any] | None:
     }
 
 
-def save_user_profile(user_id: str, gender: str, interested_in: str) -> dict[str, Any]:
+def save_user_profile(
+    user_id: str,
+    gender: str,
+    interested_in: str,
+    display_name: str | None = None,
+) -> dict[str, Any]:
     payload = {
         "user_id": user_id,
+        "display_name": display_name,
         "gender": gender,
         "interested_in": interested_in,
     }
@@ -348,12 +356,32 @@ def save_user_profile(user_id: str, gender: str, interested_in: str) -> dict[str
             connection.execute(
                 user_profiles.update()
                 .where(user_profiles.c.user_id == user_id)
-                .values(gender=gender, interested_in=interested_in, updated_at=func.now())
+                .values(
+                    **_owned_update_values(payload, "display_name"),
+                    updated_at=func.now(),
+                )
             )
         else:
             connection.execute(user_profiles.insert().values(**payload))
 
     return get_user_profile(user_id) or payload
+
+
+def list_user_context_sources(
+    user_id: str,
+    source_types: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    statement = (
+        select(conversation_context_sources)
+        .where(conversation_context_sources.c.user_id == user_id)
+        .order_by(conversation_context_sources.c.created_at.desc())
+    )
+    if source_types:
+        statement = statement.where(conversation_context_sources.c.source_type.in_(source_types))
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_context_source_from_row(row) for row in rows]
 
 
 def list_agent_usage_events(

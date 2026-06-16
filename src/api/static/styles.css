@@ -1453,6 +1453,89 @@ p {
   grid-column: 1 / -1;
 }
 
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.profile-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.profile-panel-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.profile-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-form input,
+.profile-form select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  padding: 0 12px;
+  outline: none;
+}
+
+.profile-form input:read-only {
+  color: var(--muted);
+  background: var(--soft);
+}
+
+.profile-source-list {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.profile-source-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 13px;
+}
+
+.profile-source-item strong,
+.profile-source-item span {
+  display: block;
+}
+
+.profile-source-item strong {
+  font-size: 14px;
+}
+
+.profile-source-item span,
+.profile-source-item p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.profile-source-item p {
+  margin-top: 8px;
+}
+
 .panel-heading {
   padding: 18px;
   border-bottom: 1px solid var(--line);
@@ -1640,7 +1723,8 @@ p {
   .match-list,
   .chat-workspace,
   .usage-grid,
-  .usage-panels {
+  .usage-panels,
+  .profile-layout {
     grid-template-columns: 1fr;
   }
 

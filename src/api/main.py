@@ -36,6 +36,7 @@ from storage import (
     init_db,
     list_context_sources,
     list_conversations as storage_list_conversations,
+    list_user_context_sources,
     list_agent_usage_events,
     save_context_source,
     save_conversation,
@@ -247,6 +248,12 @@ class DatingBasics(BaseModel):
     interested_in: InterestedIn
 
 
+class UserProfilePatch(BaseModel):
+    display_name: str | None = Field(default=None, max_length=120)
+    gender: Gender
+    interested_in: InterestedIn
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -295,6 +302,46 @@ async def put_dating_basics(
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     profile = save_user_profile(user.id, payload.gender, payload.interested_in)
     return {"complete": True, "profile": profile}
+
+
+@app.get("/api/me/profile")
+async def get_me_profile(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = get_user_profile(user.id)
+    sources = list_user_context_sources(user.id)
+    return {
+        "user": {"id": user.id, "email": user.email},
+        "profile": profile,
+        "style_sources": [
+            _context_source_summary(source)
+            for source in sources
+            if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+        ],
+        "memory_sources": [
+            _context_source_summary(source)
+            for source in sources
+            if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
+        ],
+    }
+
+
+@app.put("/api/me/profile")
+async def put_me_profile(
+    payload: UserProfilePatch,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = save_user_profile(
+        user.id,
+        payload.gender,
+        payload.interested_in,
+        payload.display_name.strip() if payload.display_name else None,
+    )
+    return {"profile": profile}
 
 
 @app.get("/api/agent/usage")
@@ -728,6 +775,11 @@ def draft_review_page(draft_id: str) -> FileResponse:
 
 @app.get("/matches")
 def matches_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
+
+
+@app.get("/profile")
+def profile_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 

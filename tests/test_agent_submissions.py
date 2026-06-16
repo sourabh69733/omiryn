@@ -214,6 +214,48 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["complete"])
 
+    def test_profile_page_data_includes_account_and_learned_sources(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        save_response = self.client.put(
+            "/api/me/profile",
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+            },
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "manual_notes",
+                "title": "Preference memory",
+                "content": "The user prefers calm plans and thoughtful conversations.",
+            },
+        )
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "My text style",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+
+        profile_response = self.client.get("/api/me/profile")
+
+        self.assertEqual(profile_response.status_code, 200)
+        data = profile_response.json()
+        self.assertEqual(data["user"], {"id": "user-a", "email": "a@example.com"})
+        self.assertEqual(data["profile"]["display_name"], "Aarav")
+        self.assertEqual(len(data["memory_sources"]), 1)
+        self.assertEqual(len(data["style_sources"]), 1)
+
     def test_draft_profile_includes_user_dating_basics(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")

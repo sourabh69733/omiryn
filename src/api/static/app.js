@@ -40,6 +40,7 @@ const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
   matches: document.querySelector("#matches-screen"),
+  profile: document.querySelector("#profile-screen"),
   usage: document.querySelector("#usage-screen")
 };
 
@@ -115,6 +116,14 @@ const datingBasicsScreen = document.querySelector("#dating-basics-screen");
 const datingBasicsForm = document.querySelector("#dating-basics-form");
 const profileGender = document.querySelector("#profile-gender");
 const profileInterestedIn = document.querySelector("#profile-interested-in");
+const profileForm = document.querySelector("#profile-form");
+const profileName = document.querySelector("#profile-name");
+const profileEmail = document.querySelector("#profile-email");
+const accountGender = document.querySelector("#account-gender");
+const accountInterestedIn = document.querySelector("#account-interested-in");
+const profileStatus = document.querySelector("#profile-status");
+const profileStyleList = document.querySelector("#profile-style-list");
+const profileMemoryList = document.querySelector("#profile-memory-list");
 const datingBasicsStatus = document.querySelector("#dating-basics-status");
 const saveDatingBasics = document.querySelector("#save-dating-basics");
 const loginGoogle = document.querySelector("#login-google");
@@ -151,6 +160,9 @@ function showScreen(name) {
   document.querySelectorAll("[data-nav]").forEach((link) => {
     link.classList.toggle("active", link.dataset.nav === name);
   });
+  if (name === "profile") {
+    loadProfilePage();
+  }
 }
 
 function currentDraftIdFromPath() {
@@ -222,6 +234,9 @@ function renderAuthState() {
   }
   renderAuthGate();
   loadDatingBasicsStatus();
+  if (window.location.pathname === "/profile") {
+    loadProfilePage();
+  }
 }
 
 function renderSignedOutAuth(label) {
@@ -302,6 +317,11 @@ function updateInterestedInDefault() {
   profileInterestedIn.value = defaultInterestedIn(profileGender.value);
 }
 
+function updateAccountInterestedInDefault() {
+  if (!accountGender || !accountInterestedIn) return;
+  accountInterestedIn.value = defaultInterestedIn(accountGender.value);
+}
+
 async function saveDatingBasicsProfile(event) {
   event.preventDefault();
   if (!profileGender || !profileInterestedIn || !saveDatingBasics) return;
@@ -331,6 +351,8 @@ async function saveDatingBasicsProfile(event) {
       throw new Error(data.detail || "Could not save dating basics.");
     }
     datingBasicsComplete = true;
+    if (accountGender) accountGender.value = profileGender.value;
+    if (accountInterestedIn) accountInterestedIn.value = profileInterestedIn.value;
     if (datingBasicsStatus) {
       datingBasicsStatus.textContent = "";
     }
@@ -343,6 +365,89 @@ async function saveDatingBasicsProfile(event) {
   } finally {
     saveDatingBasics.disabled = false;
   }
+}
+
+async function loadProfilePage() {
+  if (!profileForm || !authSession?.user) return;
+
+  if (profileStatus) {
+    profileStatus.textContent = "Loading profile...";
+  }
+  try {
+    const response = await apiFetch("/api/me/profile");
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not load profile.");
+    }
+
+    const profile = data.profile || {};
+    if (profileName) profileName.value = profile.display_name || "";
+    if (profileEmail) profileEmail.value = data.user?.email || "";
+    if (accountGender) accountGender.value = profile.gender || "prefer_not_to_say";
+    if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
+    renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
+    renderProfileSources(profileMemoryList, data.memory_sources || [], "No imported memory yet.");
+    if (profileStatus) {
+      profileStatus.textContent = "Profile loaded.";
+    }
+  } catch (error) {
+    if (profileStatus) {
+      profileStatus.textContent = error.message;
+    }
+  }
+}
+
+async function saveProfilePage(event) {
+  event.preventDefault();
+  if (!profileForm || !accountGender || !accountInterestedIn) return;
+
+  if (profileStatus) {
+    profileStatus.textContent = "Saving profile...";
+  }
+  try {
+    const response = await apiFetch("/api/me/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        display_name: profileName?.value.trim() || null,
+        gender: accountGender.value,
+        interested_in: accountInterestedIn.value
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not save profile.");
+    }
+    datingBasicsComplete = true;
+    if (profileGender) profileGender.value = data.profile.gender || "";
+    if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
+    if (profileStatus) {
+      profileStatus.textContent = "Profile saved.";
+    }
+  } catch (error) {
+    if (profileStatus) {
+      profileStatus.textContent = error.message;
+    }
+  }
+}
+
+function renderProfileSources(container, sources, emptyText) {
+  if (!container) return;
+  if (!sources.length) {
+    container.innerHTML = `<div class="table-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  container.innerHTML = sources
+    .map((source) => `
+      <article class="profile-source-item">
+        <div>
+          <strong>${escapeHtml(source.title)}</strong>
+          <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length || 0)} chars</span>
+        </div>
+        <p>${escapeHtml(source.preview || "")}</p>
+      </article>
+    `)
+    .join("");
 }
 
 async function signInWithGoogle() {
@@ -1911,7 +2016,9 @@ loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 profileGender?.addEventListener("change", updateInterestedInDefault);
+accountGender?.addEventListener("change", updateAccountInterestedInDefault);
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
+profileForm?.addEventListener("submit", saveProfilePage);
 deleteSessionDialog?.addEventListener("click", (event) => {
   if (event.target === deleteSessionDialog) {
     closeDeleteSessionDialog();
@@ -1932,6 +2039,8 @@ if (draftId) {
 } else if (window.location.pathname === "/matches") {
   showScreen("matches");
   loadMatches();
+} else if (window.location.pathname === "/profile") {
+  showScreen("profile");
 } else if (window.location.pathname === "/usage") {
   showScreen("usage");
   loadUsageDashboard();

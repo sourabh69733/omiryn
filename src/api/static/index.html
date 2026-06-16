@@ -74,6 +74,7 @@
             <a data-nav="interview" href="/">Interview</a>
             <a data-nav="review" href="#" id="review-nav">Review</a>
             <a data-nav="matches" href="/matches">Matches</a>
+            <a data-nav="profile" href="/profile">Profile</a>
             <a data-nav="usage" href="/usage">Usage</a>
           </nav>
 
@@ -427,6 +428,80 @@ Rules:
             <button id="refresh-matches" type="button">Refresh suggestions</button>
           </div>
           <div class="match-list" id="match-list"></div>
+        </section>
+
+        <section class="screen profile-screen" id="profile-screen" hidden>
+          <div class="usage-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Profile</p>
+              <h1>Your Omiryn memory.</h1>
+              <p>Manage account basics, match direction, and the context the agent has learned.</p>
+            </div>
+          </div>
+
+          <div class="profile-layout">
+            <section class="profile-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Account</p>
+                  <h2>Basic info</h2>
+                </div>
+              </div>
+              <form class="profile-form" id="profile-form">
+                <label>
+                  Name
+                  <input id="profile-name" type="text" placeholder="Your name" />
+                </label>
+                <label>
+                  Email
+                  <input id="profile-email" type="email" readonly />
+                </label>
+                <label>
+                  Gender
+                  <select id="account-gender" required>
+                    <option value="man">Man</option>
+                    <option value="woman">Woman</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+                <label>
+                  Interested in
+                  <select id="account-interested-in" required>
+                    <option value="women">Women</option>
+                    <option value="men">Men</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
+                </label>
+                <button type="submit">Save profile</button>
+                <p class="quiet-note" id="profile-status">Profile details will appear after login.</p>
+              </form>
+            </section>
+
+            <section class="profile-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Learned Style</p>
+                  <h2>How the agent can speak</h2>
+                </div>
+              </div>
+              <div class="profile-source-list" id="profile-style-list">
+                <div class="table-empty">No learned text style yet.</div>
+              </div>
+            </section>
+
+            <section class="profile-panel profile-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Imported Memory</p>
+                  <h2>Context available to Omiryn</h2>
+                </div>
+              </div>
+              <div class="profile-source-list" id="profile-memory-list">
+                <div class="table-empty">No imported memory yet.</div>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section class="screen usage-screen" id="usage-screen" hidden>
