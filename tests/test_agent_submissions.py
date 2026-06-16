@@ -149,6 +149,46 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"id": "user-a", "email": "a@example.com"})
 
+    def test_dating_basics_are_required_profile_data(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        initial_response = self.client.get("/api/me/dating-basics")
+        self.assertEqual(initial_response.status_code, 200)
+        self.assertFalse(initial_response.json()["complete"])
+
+        save_response = self.client.put(
+            "/api/me/dating-basics",
+            json={"gender": "man", "interested_in": "women"},
+        )
+        self.assertEqual(save_response.status_code, 200)
+        self.assertTrue(save_response.json()["complete"])
+
+        loaded_response = self.client.get("/api/me/dating-basics")
+        self.assertEqual(loaded_response.json()["profile"]["gender"], "man")
+        self.assertEqual(loaded_response.json()["profile"]["interested_in"], "women")
+
+    def test_dating_basics_are_scoped_to_authenticated_user(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        async def user_b() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        self.client.put(
+            "/api/me/dating-basics",
+            json={"gender": "woman", "interested_in": "men"},
+        )
+
+        app.dependency_overrides[current_user] = user_b
+        response = self.client.get("/api/me/dating-basics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["complete"])
+
     def test_omiryn_agent_conversation_extracts_to_review_draft(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         self.assertEqual(conversation_response.status_code, 201)
