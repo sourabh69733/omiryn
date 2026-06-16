@@ -72,7 +72,7 @@
         <div class="header-actions">
           <nav class="progress-nav" aria-label="Matchmaking progress">
             <a data-nav="interview" href="/">Interview</a>
-            <a data-nav="review" href="#" id="review-nav">Review</a>
+            <!-- <a data-nav="review" href="#" id="review-nav">Review</a> -->
             <a data-nav="matches" href="/matches">Matches</a>
             <a data-nav="profile" href="/profile">Profile</a>
             <a data-nav="usage" href="/usage">Usage</a>
@@ -103,51 +103,10 @@
               </div>
 
               <div class="side-tabs" role="tablist" aria-label="Chat details">
-                <button class="active" data-side-tab="signals" type="button">Signals</button>
                 <button data-side-tab="context" type="button">Context</button>
-                <button data-side-tab="history" type="button">History</button>
+                <button class="active" data-side-tab="history" type="button">History</button>
                 <button data-side-tab="usage" type="button">Usage</button>
               </div>
-
-              <section class="side-panel active" data-side-panel="signals">
-                <p class="eyebrow">Collected Signals</p>
-                <h2 id="signals-title">Profile readiness</h2>
-
-                <div class="readiness">
-                  <span id="readiness-score">20%</span>
-                  <div class="meter"><i id="readiness-meter"></i></div>
-                </div>
-
-                <ul class="signal-list" id="signal-list">
-                  <li data-signal="intent">Relationship intent</li>
-                  <li data-signal="values">Values</li>
-                  <li data-signal="communication">Communication style</li>
-                  <li data-signal="dealbreakers">Dealbreakers</li>
-                  <li data-signal="family">Family and future</li>
-                </ul>
-
-                <button class="primary-wide" id="extract-profile" type="button">
-                  Extract review draft
-                </button>
-                <p class="quiet-note">
-                  Extraction creates a draft. Nothing enters matching until you approve it.
-                </p>
-                <div class="active-memory">
-                  <div class="memory-heading">
-                    <p class="eyebrow">Active Memory</p>
-                    <span id="active-memory-count">0 sources</span>
-                  </div>
-                  <div class="memory-list" id="active-memory-list">
-                    <div class="memory-empty">No imported memory yet.</div>
-                  </div>
-                </div>
-                <div class="tone-suggestion" id="tone-suggestion">
-                  Detected tone will appear after a few messages.
-                </div>
-                <button class="secondary-button primary-wide" id="apply-detected-tone" type="button" hidden>
-                  Apply detected tone
-                </button>
-              </section>
 
               <section class="side-panel" data-side-panel="context" hidden>
                 <p class="eyebrow">Import Context</p>
@@ -238,7 +197,7 @@ Rules:
                 <div class="whatsapp-import-log" id="whatsapp-import-log"></div>
               </section>
 
-              <section class="side-panel" data-side-panel="history" hidden>
+              <section class="side-panel active" data-side-panel="history">
                 <p class="eyebrow">Chat History</p>
                 <h2>Current session</h2>
                 <div class="history-list" id="history-list">
@@ -251,6 +210,12 @@ Rules:
                 <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button" hidden>
                   New conversation
                 </button>
+                <button class="primary-wide" id="extract-profile" type="button" disabled>
+                  Extract review draft
+                </button>
+                <p class="quiet-note">
+                  Creates a draft you can edit and approve before matching.
+                </p>
                 <p class="quiet-note" id="sidebar-conversation-id">No conversation started.</p>
               </section>
 

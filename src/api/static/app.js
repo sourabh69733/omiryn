@@ -137,7 +137,6 @@ const approveDraft = document.querySelector("#approve-draft");
 const deleteDraft = document.querySelector("#delete-draft");
 const draftStatus = document.querySelector("#draft-status");
 const warningList = document.querySelector("#warning-list");
-const reviewNav = document.querySelector("#review-nav");
 const draftInputs = {
   name: document.querySelector("#draft-name"),
   gender: document.querySelector("#draft-gender"),
@@ -528,7 +527,7 @@ function forgetStoredConversation() {
 async function startConversation() {
   await loadAgentStatus();
   chatInput.disabled = true;
-  extractProfile.disabled = true;
+  if (extractProfile) extractProfile.disabled = true;
   const response = await apiFetch("/api/agent/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -554,7 +553,7 @@ async function restoreOrStartConversation() {
   }
 
   chatInput.disabled = true;
-  extractProfile.disabled = true;
+  if (extractProfile) extractProfile.disabled = true;
   try {
     const response = await apiFetch(`/api/agent/conversations/${savedConversationId}`);
     if (!response.ok) {
@@ -574,7 +573,7 @@ function prepareEmptyConversation() {
   messages = [];
   pendingAgentStyleSourceId = "";
   chatInput.disabled = false;
-  extractProfile.disabled = true;
+  if (extractProfile) extractProfile.disabled = true;
   renderMessages();
   updateReadiness();
   updateSidebarMeta();
@@ -603,7 +602,7 @@ function hydrateConversation(conversation) {
   }
   updateAgentStatusModel();
   chatInput.disabled = false;
-  extractProfile.disabled = false;
+  if (extractProfile) extractProfile.disabled = false;
   renderMessages();
   updateReadiness();
   updateSidebarMeta();
@@ -935,11 +934,11 @@ async function loadConversation(id) {
   if (!id || id === conversationId) return;
 
   chatInput.disabled = true;
-  extractProfile.disabled = true;
+  if (extractProfile) extractProfile.disabled = true;
   const response = await apiFetch(`/api/agent/conversations/${id}`);
   if (!response.ok) {
     chatInput.disabled = false;
-    extractProfile.disabled = false;
+    if (extractProfile) extractProfile.disabled = false;
     throw new Error("Could not load that conversation.");
   }
   const conversation = await response.json();
@@ -1353,6 +1352,8 @@ function apiErrorMessage(detail, fallback) {
 }
 
 function updateReadiness() {
+  if (!readinessScore || !readinessMeter || !signalList) return;
+
   const userMessageCount = messages.filter(
     (message) => message.role === "user" && message.quality !== "low_information"
   ).length;
@@ -1487,15 +1488,19 @@ function focusChatInput() {
 async function extractConversationDraft() {
   if (!conversationId) return;
 
-  extractProfile.disabled = true;
-  extractProfile.textContent = "Extracting...";
+  if (extractProfile) {
+    extractProfile.disabled = true;
+    extractProfile.textContent = "Extracting...";
+  }
   await loadAgentUsage();
   const response = await apiFetch(`/api/agent/conversations/${conversationId}/extract`, {
     method: "POST"
   });
   const data = await response.json();
-  extractProfile.disabled = false;
-  extractProfile.textContent = "Extract review draft";
+  if (extractProfile) {
+    extractProfile.disabled = false;
+    extractProfile.textContent = "Extract review draft";
+  }
   await loadAgentUsage();
 
   if (data.review_url) {
@@ -1513,7 +1518,6 @@ async function loadDraft(draftId) {
 
   const draft = await response.json();
   activeDraftId = draft.id;
-  reviewNav.href = `/drafts/${draft.id}`;
   fillDraftForm(draft);
   renderExtractionWarnings(draft.submission.extraction_warnings || []);
   setDraftStatus(
@@ -1992,7 +1996,7 @@ sendMessage.addEventListener("click", () => {
 });
 resetChat?.addEventListener("click", startConversation);
 sidebarResetChat?.addEventListener("click", startConversation);
-extractProfile.addEventListener("click", extractConversationDraft);
+extractProfile?.addEventListener("click", extractConversationDraft);
 saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
