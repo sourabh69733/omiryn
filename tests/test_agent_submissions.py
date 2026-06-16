@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from api.main import _smart_reply_context_sources, app
 from agent.providers import _context_sources_text, _groq_rate_limit_headers, _provider_messages
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
-from storage import reset_db
+from storage import _normalize_database_url, reset_db
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
@@ -26,6 +26,20 @@ class AgentSubmissionApiTest(unittest.TestCase):
         draft_response = self.client.get(f"/api/drafts/{data['draft_id']}")
         self.assertEqual(draft_response.status_code, 200)
         self.assertEqual(draft_response.json()["submission"]["display_name"], "Aarav")
+
+    def test_database_url_normalizes_postgres_driver(self) -> None:
+        self.assertEqual(
+            _normalize_database_url("postgres://user:pass@localhost:5432/omiryn"),
+            "postgresql+psycopg://user:pass@localhost:5432/omiryn",
+        )
+        self.assertEqual(
+            _normalize_database_url("postgresql://user:pass@localhost:5432/omiryn"),
+            "postgresql+psycopg://user:pass@localhost:5432/omiryn",
+        )
+        self.assertEqual(
+            _normalize_database_url("postgresql+psycopg://user:pass@localhost:5432/omiryn"),
+            "postgresql+psycopg://user:pass@localhost:5432/omiryn",
+        )
 
     def test_user_can_edit_then_approve_draft(self) -> None:
         draft_id = self._create_draft()
