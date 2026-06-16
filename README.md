@@ -64,6 +64,17 @@ Production target:
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/omiryn
 ```
 
+Local Postgres service:
+
+```bash
+./scripts/db-up.sh
+DATABASE_URL=postgresql+psycopg://omiryn:omiryn@localhost:5432/omiryn ./scripts/db-init.sh
+DATABASE_URL=postgresql+psycopg://omiryn:omiryn@localhost:5432/omiryn ./scripts/db-check.sh
+```
+
+If your hosting provider gives a `postgres://...` or `postgresql://...` URL, the app
+normalizes it to the installed `psycopg` driver automatically.
+
 Reset local runtime data:
 
 ```bash
