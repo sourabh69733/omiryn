@@ -1619,6 +1619,141 @@ p {
   font-size: 19px;
 }
 
+.profile-facts-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-fact-total {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.profile-fact-groups {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.profile-fact-group {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-fact-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-fact-group-heading h3 {
+  font-size: 15px;
+}
+
+.profile-fact-group-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.profile-fact-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.profile-fact-card,
+.profile-facts-empty {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.profile-fact-card {
+  display: grid;
+  gap: 12px;
+  min-height: 112px;
+  padding: 14px;
+}
+
+.profile-fact-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profile-fact-card-top strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.confidence-pill {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+}
+
+.confidence-pill.high {
+  background: #e5f5ee;
+  color: #176049;
+}
+
+.confidence-pill.medium {
+  background: #fff3d4;
+  color: #805b00;
+}
+
+.confidence-pill.low {
+  background: #f1f4f6;
+  color: var(--muted);
+}
+
+.profile-fact-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-fact-meta span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 8px;
+}
+
+.profile-facts-empty {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+}
+
+.profile-facts-empty strong {
+  font-size: 15px;
+}
+
+.profile-facts-empty span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .provider-list {
   padding: 0;
 }
@@ -1848,6 +1983,17 @@ p {
     flex: 1;
     text-align: center;
     padding: 9px 6px;
+  }
+
+  .profile-facts-heading,
+  .profile-fact-group-heading,
+  .profile-fact-card-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-fact-list {
+    grid-template-columns: 1fr;
   }
 
   .screen-copy h1 {

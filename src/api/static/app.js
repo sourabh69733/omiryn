@@ -125,6 +125,8 @@ const accountInterestedIn = document.querySelector("#account-interested-in");
 const profileStatus = document.querySelector("#profile-status");
 const profileStyleList = document.querySelector("#profile-style-list");
 const profileMemoryList = document.querySelector("#profile-memory-list");
+const profileFactTotal = document.querySelector("#profile-fact-total");
+const profileFactGroups = document.querySelector("#profile-fact-groups");
 const datingBasicsStatus = document.querySelector("#dating-basics-status");
 const saveDatingBasics = document.querySelector("#save-dating-basics");
 const loginGoogle = document.querySelector("#login-google");
@@ -387,6 +389,7 @@ async function loadProfilePage() {
     if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
     renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
     renderProfileSources(profileMemoryList, data.memory_sources || [], "No imported memory yet.");
+    renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
     if (profileStatus) {
       profileStatus.textContent = "Profile loaded.";
     }
@@ -448,6 +451,116 @@ function renderProfileSources(container, sources, emptyText) {
       </article>
     `)
     .join("");
+}
+
+function renderProfileFacts(groups, facts) {
+  if (!profileFactGroups) return;
+  const factList = Array.isArray(facts) ? facts : [];
+  if (profileFactTotal) {
+    profileFactTotal.textContent = `${formatNumber(factList.length)} ${factList.length === 1 ? "fact" : "facts"}`;
+  }
+  if (!factList.length) {
+    profileFactGroups.innerHTML = `
+      <div class="profile-facts-empty">
+        <strong>No learned signals yet.</strong>
+        <span>Chat naturally with Omiryn and this section will fill with internal matching signals.</span>
+      </div>
+    `;
+    return;
+  }
+
+  const orderedGroups = Object.entries(groups || {})
+    .filter(([, groupFacts]) => Array.isArray(groupFacts) && groupFacts.length)
+    .sort(([left], [right]) => profileFactCategoryOrder(left) - profileFactCategoryOrder(right));
+
+  profileFactGroups.innerHTML = orderedGroups
+    .map(([category, groupFacts]) => `
+      <section class="profile-fact-group">
+        <div class="profile-fact-group-heading">
+          <h3>${escapeHtml(profileFactCategoryLabel(category))}</h3>
+          <span>${formatNumber(groupFacts.length)} ${groupFacts.length === 1 ? "signal" : "signals"}</span>
+        </div>
+        <div class="profile-fact-list">
+          ${groupFacts.map(renderProfileFactCard).join("")}
+        </div>
+      </section>
+    `)
+    .join("");
+}
+
+function renderProfileFactCard(fact) {
+  const evidenceCount = Array.isArray(fact.evidence) ? fact.evidence.length : 0;
+  const confidence = Number(fact.confidence || 0);
+  const confidencePercent = Math.round(confidence * 100);
+  return `
+    <article class="profile-fact-card">
+      <div class="profile-fact-card-top">
+        <strong>${escapeHtml(fact.label || profileFactCategoryLabel(fact.key || "Signal"))}</strong>
+        <span class="confidence-pill ${confidenceClass(confidence)}">${confidencePercent}%</span>
+      </div>
+      <div class="profile-fact-meta">
+        <span>${escapeHtml(profileFactKeyLabel(fact.key))}</span>
+        <span>${formatNumber(evidenceCount)} ${evidenceCount === 1 ? "evidence" : "evidence"}</span>
+        <span>${escapeHtml(profileFactStatusLabel(fact.status))}</span>
+      </div>
+    </article>
+  `;
+}
+
+function profileFactCategoryOrder(category) {
+  const order = [
+    "dating_intent",
+    "values",
+    "preferences",
+    "dealbreakers",
+    "communication",
+    "lifestyle",
+    "location"
+  ];
+  const index = order.indexOf(category);
+  return index === -1 ? order.length : index;
+}
+
+function profileFactCategoryLabel(category) {
+  const labels = {
+    dating_intent: "Dating intent",
+    values: "Values",
+    preferences: "Preferences",
+    dealbreakers: "Dealbreakers",
+    communication: "Communication",
+    lifestyle: "Lifestyle",
+    location: "Location"
+  };
+  return labels[category] || titleize(category);
+}
+
+function profileFactKeyLabel(key) {
+  return titleize(key || "signal");
+}
+
+function profileFactStatusLabel(status) {
+  const labels = {
+    active: "Active",
+    user_confirmed: "Confirmed",
+    needs_review: "Needs review",
+    user_rejected: "Rejected",
+    archived: "Archived"
+  };
+  return labels[status] || titleize(status || "active");
+}
+
+function confidenceClass(confidence) {
+  if (confidence >= 0.8) return "high";
+  if (confidence >= 0.6) return "medium";
+  return "low";
+}
+
+function titleize(value) {
+  return String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 async function signInWithGoogle() {
