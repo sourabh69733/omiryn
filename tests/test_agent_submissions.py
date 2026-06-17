@@ -573,6 +573,53 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["count"], 1)
+        self.assertEqual(len(list_response.json()["available_sources"]), 1)
+        self.assertTrue(list_response.json()["available_sources"][0]["attached"])
+
+    def test_user_context_can_attach_to_another_session(self) -> None:
+        first_response = self.client.post("/api/agent/conversations")
+        first_conversation_id = first_response.json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{first_conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "Reusable profile",
+                "content": "The user cares about career growth and calm communication.",
+            },
+        )
+        source_id = create_response.json()["id"]
+        second_response = self.client.post("/api/agent/conversations")
+        second_conversation_id = second_response.json()["id"]
+
+        list_response = self.client.get(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources"
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["count"], 0)
+        self.assertFalse(list_response.json()["available_sources"][0]["attached"])
+
+        attach_response = self.client.put(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources/attachments",
+            json={"source_ids": [source_id]},
+        )
+        self.assertEqual(attach_response.status_code, 200)
+        self.assertEqual(attach_response.json()["count"], 1)
+        self.assertTrue(attach_response.json()["available_sources"][0]["attached"])
+
+        sources = _smart_reply_context_sources(
+            second_conversation_id,
+            None,
+            "what do you know about my career?",
+        )
+        self.assertEqual(sources[0]["title"], "Reusable profile")
+
+        detach_response = self.client.put(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources/attachments",
+            json={"source_ids": []},
+        )
+        self.assertEqual(detach_response.status_code, 200)
+        self.assertEqual(detach_response.json()["count"], 0)
+        self.assertFalse(detach_response.json()["available_sources"][0]["attached"])
 
     def test_reply_context_ignores_imports_until_memory_is_requested(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
