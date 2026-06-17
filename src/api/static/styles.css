@@ -821,6 +821,79 @@ p {
   box-shadow: 0 0 0 3px rgba(100, 216, 203, 0.12);
 }
 
+.context-multiselect {
+  position: relative;
+  min-width: 230px;
+}
+
+.context-picker-button {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #2d4548;
+  border-radius: 8px;
+  color: #d8ebe8;
+  background: #132127;
+  font-family: var(--font-terminal);
+  font-size: 11px;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.context-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  width: min(340px, 88vw);
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #2d4548;
+  border-radius: 8px;
+  background: #0f1b20;
+  box-shadow: 0 18px 60px rgba(2, 8, 12, 0.4);
+  padding: 8px;
+}
+
+.context-picker-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border-radius: 8px;
+  padding: 8px;
+  color: #d8ebe8;
+}
+
+.context-picker-option:hover {
+  background: rgba(100, 216, 203, 0.08);
+}
+
+.context-picker-option input {
+  margin-top: 2px;
+}
+
+.context-picker-option strong,
+.context-picker-option small {
+  display: block;
+}
+
+.context-picker-option strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.context-picker-option small,
+.context-picker-empty {
+  color: #8aa5a7;
+  font-size: 11px;
+}
+
+.context-picker-empty {
+  padding: 10px;
+}
+
 .chat-title-lockup {
   display: grid;
   grid-template-columns: 12px auto;

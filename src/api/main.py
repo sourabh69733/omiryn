@@ -29,6 +29,7 @@ from auth import CurrentUser, current_user
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
+    delete_context_source,
     delete_conversation as storage_delete_conversation,
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
@@ -235,6 +236,10 @@ class ContextSourceCreate(BaseModel):
     content: str = Field(min_length=20, max_length=50000)
 
 
+class ContextSourceAttachmentsUpdate(BaseModel):
+    source_ids: list[str] = Field(default_factory=list)
+
+
 class WhatsappChatImportCreate(BaseModel):
     title: str = Field(default="WhatsApp speaking style", min_length=1, max_length=120)
     user_sender: str | None = Field(default=None, max_length=120)
@@ -381,9 +386,18 @@ async def get_conversation_context_sources(
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     sources = list_context_sources(conversation_id, _user_id(user))
+    user_sources = _reusable_context_sources(list_user_context_sources(_user_id(user)))
+    attached_ids = _attached_context_source_ids(sources)
     return {
         "count": len(sources),
-        "sources": [_context_source_summary(source) for source in sources],
+        "sources": [
+            _context_source_summary(source, attached=True)
+            for source in sources
+        ],
+        "available_sources": [
+            _context_source_summary(source, attached=source["id"] in attached_ids)
+            for source in user_sources
+        ],
     }
 
 
@@ -420,6 +434,65 @@ def create_conversation_context_source(
         }
     )
     return _context_source_summary(source)
+
+
+@app.put("/api/agent/conversations/{conversation_id}/context-sources/attachments")
+def update_conversation_context_attachments(
+    conversation_id: str,
+    payload: ContextSourceAttachmentsUpdate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    _get_existing_conversation(conversation_id, user)
+    user_id = _user_id(user)
+    requested_ids = list(dict.fromkeys(payload.source_ids))
+    reusable_sources = _reusable_context_sources(list_user_context_sources(user_id))
+    reusable_by_id = {str(source["id"]): source for source in reusable_sources}
+    unknown_ids = [source_id for source_id in requested_ids if source_id not in reusable_by_id]
+    if unknown_ids:
+        raise HTTPException(status_code=404, detail="One or more saved context items were not found.")
+
+    attached_sources = list_context_sources(conversation_id, user_id)
+    for source_id in requested_ids:
+        source = reusable_by_id[source_id]
+        if source["conversation_id"] == conversation_id:
+            continue
+        if _attached_context_source_by_original_id(attached_sources, source_id):
+            continue
+        save_context_source(
+            {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "source_type": source["source_type"],
+                "title": source["title"],
+                "content": source["content"],
+                "metadata": {
+                    **(source.get("metadata") or {}),
+                    "original_source_id": source["id"],
+                    "attached_from_conversation_id": source["conversation_id"],
+                },
+            }
+        )
+
+    for source in attached_sources:
+        metadata = source.get("metadata") or {}
+        original_source_id = metadata.get("original_source_id") if isinstance(metadata, dict) else None
+        if original_source_id and original_source_id not in requested_ids:
+            delete_context_source(str(source["id"]), conversation_id, user_id)
+
+    sources = list_context_sources(conversation_id, user_id)
+    user_sources = _reusable_context_sources(list_user_context_sources(user_id))
+    attached_ids = _attached_context_source_ids(sources)
+    return {
+        "count": len(sources),
+        "sources": [
+            _context_source_summary(source, attached=True)
+            for source in sources
+        ],
+        "available_sources": [
+            _context_source_summary(source, attached=source["id"] in attached_ids)
+            for source in user_sources
+        ],
+    }
 
 
 @app.post("/api/agent/conversations/{conversation_id}/whatsapp-import", status_code=201)
@@ -929,32 +1002,29 @@ def _smart_reply_context_sources(
     user_id: str | None = None,
 ) -> list[dict[str, object]]:
     sources = list_context_sources(conversation_id, user_id)
-    selected_style = _selected_style_source(sources, style_source_id)
+    selected_styles = _selected_style_sources(sources, style_source_id)
     retrieved_sources = _relevant_memory_sources(sources, user_text)
 
-    if selected_style:
-        return [selected_style] + [
-            source for source in retrieved_sources if source.get("id") != selected_style.get("id")
+    if selected_styles:
+        selected_style_ids = {source.get("id") for source in selected_styles}
+        return selected_styles + [
+            source for source in retrieved_sources if source.get("id") not in selected_style_ids
         ]
 
     return retrieved_sources
 
 
-def _selected_style_source(
+def _selected_style_sources(
     sources: list[dict[str, object]],
     style_source_id: str | None,
-) -> dict[str, object] | None:
+) -> list[dict[str, object]]:
+    style_sources = [
+        source for source in sources if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+    ]
     if not style_source_id:
-        return None
-    return next(
-        (
-            source
-            for source in sources
-            if source.get("id") == style_source_id
-            and source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
-        ),
-        None,
-    )
+        return style_sources[:MEMORY_RETRIEVAL_LIMIT]
+    selected = [source for source in style_sources if source.get("id") == style_source_id]
+    return selected or style_sources[:MEMORY_RETRIEVAL_LIMIT]
 
 
 def _relevant_memory_sources(
@@ -1128,9 +1198,12 @@ def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> 
     return selected or None
 
 
-def _context_source_summary(source: dict[str, object]) -> dict[str, object]:
+def _context_source_summary(
+    source: dict[str, object],
+    attached: bool | None = None,
+) -> dict[str, object]:
     content = str(source.get("content") or "")
-    return {
+    summary = {
         "id": source["id"],
         "conversation_id": source["conversation_id"],
         "source_type": source["source_type"],
@@ -1139,6 +1212,45 @@ def _context_source_summary(source: dict[str, object]) -> dict[str, object]:
         "preview": content[:240],
         "created_at": source["created_at"],
     }
+    if attached is not None:
+        summary["attached"] = attached
+    return summary
+
+
+def _attached_context_source_ids(sources: list[dict[str, object]]) -> set[str]:
+    attached_ids = set()
+    for source in sources:
+        attached_ids.add(str(source.get("id")))
+        metadata = source.get("metadata") or {}
+        if isinstance(metadata, dict) and metadata.get("original_source_id"):
+            attached_ids.add(str(metadata["original_source_id"]))
+    return attached_ids
+
+
+def _attached_context_source_by_original_id(
+    sources: list[dict[str, object]],
+    original_source_id: str,
+) -> dict[str, object] | None:
+    return next(
+        (
+            source
+            for source in sources
+            if isinstance(source.get("metadata"), dict)
+            and source["metadata"].get("original_source_id") == original_source_id
+        ),
+        None,
+    )
+
+
+def _reusable_context_sources(sources: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [
+        source
+        for source in sources
+        if not (
+            isinstance(source.get("metadata"), dict)
+            and source["metadata"].get("original_source_id")
+        )
+    ]
 
 
 def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, str]:

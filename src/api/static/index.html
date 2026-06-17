@@ -206,9 +206,8 @@ Rules:
                     <span id="sidebar-message-count">0 messages</span>
                   </div>
                 </div>
-                <!-- Later: re-enable manual new conversation control. -->
-                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button" hidden>
-                  New conversation
+                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button">
+                  New chat session
                 </button>
                 <button class="primary-wide" id="extract-profile" type="button" disabled>
                   Extract review draft
@@ -258,12 +257,13 @@ Rules:
                       <option value="playful">Playful</option>
                     </select>
                   </label>
-                  <label class="model-picker">
-                    <span>Reply Style</span>
-                    <select id="agent-style-select" aria-label="Choose reply style">
-                      <option value="">Default</option>
-                    </select>
-                  </label>
+                  <div class="model-picker context-multiselect" id="agent-context-picker">
+                    <span>Context</span>
+                    <button class="context-picker-button" id="agent-context-button" type="button" aria-haspopup="true" aria-expanded="false">
+                      No context
+                    </button>
+                    <div class="context-picker-menu" id="agent-context-menu" hidden></div>
+                  </div>
                   <label class="model-picker">
                     <span>Model</span>
                     <select id="agent-model-select" aria-label="Choose agent model"></select>

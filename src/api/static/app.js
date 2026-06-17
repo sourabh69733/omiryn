@@ -2,7 +2,7 @@ let messages = [];
 let conversationId = null;
 let activeDraftId = null;
 let isSendingMessage = false;
-let pendingAgentStyleSourceId = "";
+let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
 let supabaseClient = null;
@@ -52,7 +52,8 @@ const agentStatus = document.querySelector("#agent-status");
 const agentModelSelect = document.querySelector("#agent-model-select");
 const agentModeSelect = document.querySelector("#agent-mode-select");
 const agentToneSelect = document.querySelector("#agent-tone-select");
-const agentStyleSelect = document.querySelector("#agent-style-select");
+const agentContextButton = document.querySelector("#agent-context-button");
+const agentContextMenu = document.querySelector("#agent-context-menu");
 const resetChat = document.querySelector("#reset-chat");
 const sidebarResetChat = document.querySelector("#sidebar-reset-chat");
 const extractProfile = document.querySelector("#extract-profile");
@@ -534,8 +535,7 @@ async function startConversation() {
     body: JSON.stringify({
       agent_model: selectedAgentModel(),
       agent_mode: selectedAgentMode(),
-      agent_tone: selectedAgentTone(),
-      agent_style_source_id: selectedAgentStyleSourceId()
+      agent_tone: selectedAgentTone()
     })
   });
   const conversation = await response.json();
@@ -571,7 +571,7 @@ async function restoreOrStartConversation() {
 function prepareEmptyConversation() {
   conversationId = null;
   messages = [];
-  pendingAgentStyleSourceId = "";
+  pendingContextSourceIds = [];
   chatInput.disabled = false;
   if (extractProfile) extractProfile.disabled = true;
   renderMessages();
@@ -580,7 +580,7 @@ function prepareEmptyConversation() {
   loadContextImportPrompt();
   renderContextSources([]);
   renderActiveMemory([]);
-  renderReplyStyleOptions([]);
+  renderContextPickerOptions([]);
   focusChatInput();
 }
 
@@ -596,10 +596,7 @@ function hydrateConversation(conversation) {
   if (conversation.agent_tone && agentToneSelect) {
     agentToneSelect.value = conversation.agent_tone;
   }
-  pendingAgentStyleSourceId = conversation.agent_style_source_id || "";
-  if (agentStyleSelect) {
-    agentStyleSelect.value = pendingAgentStyleSourceId;
-  }
+  pendingContextSourceIds = [];
   updateAgentStatusModel();
   chatInput.disabled = false;
   if (extractProfile) extractProfile.disabled = false;
@@ -664,22 +661,15 @@ function selectedAgentTone() {
   return agentToneSelect ? agentToneSelect.value : "auto";
 }
 
-function selectedAgentStyleSourceId() {
-  return agentStyleSelect ? agentStyleSelect.value || null : null;
-}
-
 function updateAgentStatusModel() {
   if (!agentStatus) return;
 
   const provider = agentStatus.dataset.provider || "Agent";
-  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${agentToneLabel(selectedAgentTone())} · ${agentStyleLabel()} · ${selectedAgentModel() || "no model"}`;
+  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${agentToneLabel(selectedAgentTone())} · ${contextSelectionLabel()} · ${selectedAgentModel() || "no model"}`;
 }
 
 async function updateConversationModel() {
   if (!conversationId) return;
-
-  const requestedStyleSourceId = selectedAgentStyleSourceId();
-  pendingAgentStyleSourceId = requestedStyleSourceId || "";
 
   try {
     const response = await apiFetch(`/api/agent/conversations/${conversationId}/settings`, {
@@ -688,8 +678,7 @@ async function updateConversationModel() {
       body: JSON.stringify({
         agent_model: selectedAgentModel(),
         agent_mode: selectedAgentMode(),
-        agent_tone: selectedAgentTone(),
-        agent_style_source_id: requestedStyleSourceId
+        agent_tone: selectedAgentTone()
       })
     });
     const conversation = await response.json();
@@ -704,10 +693,6 @@ async function updateConversationModel() {
     }
     if (conversation.agent_tone && agentToneSelect) {
       agentToneSelect.value = conversation.agent_tone;
-    }
-    pendingAgentStyleSourceId = conversation.agent_style_source_id || "";
-    if (agentStyleSelect) {
-      agentStyleSelect.value = pendingAgentStyleSourceId;
     }
     updateAgentStatusModel();
     loadDetectedTone();
@@ -740,12 +725,9 @@ function agentToneLabel(tone) {
   return labels[tone] || "Auto tone";
 }
 
-function agentStyleLabel() {
-  if (!agentStyleSelect || !agentStyleSelect.value) {
-    return "Default style";
-  }
-  const selected = agentStyleSelect.options[agentStyleSelect.selectedIndex];
-  return selected?.textContent || "Saved style";
+function contextSelectionLabel() {
+  const count = pendingContextSourceIds.length;
+  return count ? `${count} context` : "No context";
 }
 
 function titleCase(value) {
@@ -979,7 +961,7 @@ async function loadContextSources() {
   if (!conversationId) {
     renderContextSources([]);
     renderActiveMemory([]);
-    renderReplyStyleOptions([]);
+    renderContextPickerOptions([]);
     return;
   }
 
@@ -992,9 +974,9 @@ async function loadContextSources() {
       throw new Error("Could not load imported context.");
     }
     const data = await response.json();
-    renderContextSources(data.sources || []);
+    renderContextSources(data.available_sources || data.sources || []);
     renderActiveMemory(data.sources || []);
-    renderReplyStyleOptions(data.sources || []);
+    renderContextPickerOptions(data.available_sources || data.sources || []);
     loadDetectedTone();
   } catch (error) {
     setContextStatus(error.message);
@@ -1117,15 +1099,9 @@ async function saveWhatsappStyleImport() {
     if (whatsappContent) {
       whatsappContent.value = "";
     }
-    pendingAgentStyleSourceId = imported[0]?.id || pendingAgentStyleSourceId;
     await loadContextSources();
-    if (agentStyleSelect && imported[0]?.id) {
-      agentStyleSelect.value = imported[0].id;
-      pendingAgentStyleSourceId = imported[0].id;
-      await updateConversationModel();
-    }
     setWhatsappStatus(
-      `${imports.length} text style${imports.length === 1 ? "" : "s"} imported and selected.`,
+      `${imports.length} text style${imports.length === 1 ? "" : "s"} imported.`,
       "success"
     );
     await loadDetectedTone();
@@ -1227,11 +1203,11 @@ function renderContextSources(sources) {
     .map((source) => `
       <div class="context-source-item">
         <strong>${escapeHtml(source.title)}</strong>
-        <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars</span>
+        <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars${source.attached ? " · attached here" : ""}</span>
       </div>
     `)
     .join("");
-  setContextStatus(`${sources.length} context source${sources.length === 1 ? "" : "s"} saved.`);
+  setContextStatus(`${sources.length} uploaded context item${sources.length === 1 ? "" : "s"}.`);
 }
 
 function contextSourceLabel(sourceType) {
@@ -1245,37 +1221,84 @@ function contextSourceLabel(sourceType) {
   return labels[sourceType] || sourceType || "Context";
 }
 
-function renderReplyStyleOptions(sources) {
-  if (!agentStyleSelect) return;
+function renderContextPickerOptions(sources = []) {
+  if (!agentContextButton || !agentContextMenu) return;
 
-  const styleSources = sources.filter((source) =>
-    ["whatsapp_chat", "friend_style"].includes(source.source_type)
-  );
-  const currentValue = agentStyleSelect.value || "";
-  const activeValue = currentValue || pendingAgentStyleSourceId || "";
-  agentStyleSelect.innerHTML = "";
+  if (!sources.length) {
+    pendingContextSourceIds = [];
+    agentContextButton.textContent = "No context";
+    agentContextMenu.innerHTML = '<div class="context-picker-empty">No uploaded context yet.</div>';
+    updateAgentStatusModel();
+    return;
+  }
 
-  const defaultOption = document.createElement("option");
-  defaultOption.value = "";
-  defaultOption.textContent = "Default";
-  agentStyleSelect.appendChild(defaultOption);
-
-  styleSources.forEach((source) => {
-    const option = document.createElement("option");
-    option.value = source.id;
-    option.textContent = source.title;
-    agentStyleSelect.appendChild(option);
+  pendingContextSourceIds = sources.filter((source) => source.attached).map((source) => source.id);
+  agentContextButton.textContent = pendingContextSourceIds.length
+    ? `${pendingContextSourceIds.length} selected`
+    : "No context";
+  agentContextMenu.innerHTML = sources
+    .map((source) => `
+      <label class="context-picker-option">
+        <input type="checkbox" value="${escapeHtml(source.id)}" ${source.attached ? "checked" : ""} />
+        <span>
+          <strong>${escapeHtml(source.title)}</strong>
+          <small>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars</small>
+        </span>
+      </label>
+    `)
+    .join("");
+  agentContextMenu.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.addEventListener("change", syncContextAttachments);
   });
-
-  const hasActiveValue = styleSources.some((source) => source.id === activeValue);
-  agentStyleSelect.value = hasActiveValue ? activeValue : "";
-  pendingAgentStyleSourceId = agentStyleSelect.value;
   updateAgentStatusModel();
 }
 
-function handleAgentStyleSelectionChange() {
-  pendingAgentStyleSourceId = selectedAgentStyleSourceId() || "";
-  updateConversationModel();
+function selectedContextSourceIds() {
+  if (!agentContextMenu) return [];
+  return Array.from(agentContextMenu.querySelectorAll('input[type="checkbox"]:checked'))
+    .map((checkbox) => checkbox.value)
+    .filter(Boolean);
+}
+
+async function syncContextAttachments() {
+  if (!conversationId) return;
+  const selectedIds = selectedContextSourceIds();
+  pendingContextSourceIds = selectedIds;
+  if (agentContextButton) {
+    agentContextButton.textContent = selectedIds.length ? `${selectedIds.length} selected` : "No context";
+  }
+  updateAgentStatusModel();
+
+  try {
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/context-sources/attachments`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_ids: selectedIds })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not update chat context.");
+    }
+    renderContextSources(data.available_sources || data.sources || []);
+    renderActiveMemory(data.sources || []);
+    renderContextPickerOptions(data.available_sources || []);
+    loadDetectedTone();
+  } catch (error) {
+    setContextStatus(error.message);
+  }
+}
+
+function toggleContextPicker() {
+  if (!agentContextButton || !agentContextMenu) return;
+  const willOpen = agentContextMenu.hidden;
+  agentContextMenu.hidden = !willOpen;
+  agentContextButton.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closeContextPicker() {
+  if (!agentContextButton || !agentContextMenu) return;
+  agentContextMenu.hidden = true;
+  agentContextButton.setAttribute("aria-expanded", "false");
 }
 
 function renderActiveMemory(sources) {
@@ -2008,7 +2031,10 @@ sideTabButtons.forEach((button) => {
 agentModelSelect.addEventListener("change", updateConversationModel);
 agentModeSelect?.addEventListener("change", updateConversationModel);
 agentToneSelect?.addEventListener("change", updateConversationModel);
-agentStyleSelect?.addEventListener("change", handleAgentStyleSelectionChange);
+agentContextButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleContextPicker();
+});
 applyDetectedTone?.addEventListener("click", applyDetectedToneSelection);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
@@ -2031,6 +2057,20 @@ deleteSessionDialog?.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && deleteSessionDialog && !deleteSessionDialog.hidden) {
     closeDeleteSessionDialog();
+  }
+  if (event.key === "Escape") {
+    closeContextPicker();
+  }
+});
+document.addEventListener("click", (event) => {
+  if (
+    agentContextMenu &&
+    agentContextButton &&
+    !agentContextMenu.hidden &&
+    !agentContextMenu.contains(event.target) &&
+    !agentContextButton.contains(event.target)
+  ) {
+    closeContextPicker();
   }
 });
 

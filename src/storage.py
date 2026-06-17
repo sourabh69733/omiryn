@@ -483,6 +483,19 @@ def list_context_sources(conversation_id: str, user_id: str | None = None) -> li
     return [_context_source_from_row(row) for row in rows]
 
 
+def delete_context_source(source_id: str, conversation_id: str, user_id: str | None = None) -> bool:
+    statement = conversation_context_sources.delete().where(
+        conversation_context_sources.c.id == source_id,
+        conversation_context_sources.c.conversation_id == conversation_id,
+    )
+    if user_id is not None:
+        statement = statement.where(conversation_context_sources.c.user_id == user_id)
+
+    with ENGINE.begin() as connection:
+        result = connection.execute(statement)
+    return result.rowcount > 0
+
+
 def _context_source_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
