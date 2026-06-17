@@ -25,6 +25,7 @@ from agent.providers import (
     extract_profile,
     generate_agent_reply,
 )
+from agent.profile_facts import extract_profile_facts_from_message
 from auth import CurrentUser, current_user
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
@@ -43,6 +44,7 @@ from storage import (
     save_context_source,
     save_conversation,
     save_draft,
+    upsert_profile_fact,
     save_user_profile,
     summarize_agent_usage,
 )
@@ -677,6 +679,13 @@ async def send_agent_message(
     if not quality["valid"]:
         user_message["quality"] = "low_information"
     conversation.messages.append(user_message)
+    _capture_profile_facts_from_user_message(
+        conversation.id,
+        user,
+        payload.message,
+        len(conversation.messages) - 1,
+        bool(quality["valid"]),
+    )
     try:
         reply = await generate_agent_reply(
             conversation.messages,
@@ -1229,6 +1238,26 @@ def _context_source_summary(
     if attached is not None:
         summary["attached"] = attached
     return summary
+
+
+def _capture_profile_facts_from_user_message(
+    conversation_id: str,
+    user: CurrentUser | None,
+    message: str,
+    message_index: int,
+    quality_valid: bool,
+) -> None:
+    if not user or not quality_valid:
+        return
+
+    facts = extract_profile_facts_from_message(
+        user.id,
+        conversation_id,
+        message,
+        message_index,
+    )
+    for fact in facts:
+        upsert_profile_fact(fact)
 
 
 def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:

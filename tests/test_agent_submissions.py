@@ -392,6 +392,76 @@ class AgentSubmissionApiTest(unittest.TestCase):
             {"chat_reply", "profile_extract"},
         )
 
+    def test_chat_message_creates_profile_facts_for_authenticated_user(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={
+                "message": (
+                    "I want a long-term relationship in Bengaluru. Family and emotional "
+                    "maturity matter to me, I prefer calm people, and smoking is a dealbreaker."
+                )
+            },
+        )
+        facts_response = self.client.get("/api/me/profile-facts")
+
+        self.assertEqual(message_response.status_code, 200)
+        self.assertEqual(facts_response.status_code, 200)
+        facts = facts_response.json()["facts"]
+        fact_keys = {(fact["category"], fact["key"]) for fact in facts}
+        self.assertIn(("dating_intent", "relationship_intent"), fact_keys)
+        self.assertIn(("location", "city"), fact_keys)
+        self.assertIn(("values", "family"), fact_keys)
+        self.assertIn(("communication", "calm_low_drama"), fact_keys)
+        self.assertIn(("preferences", "calm_partner"), fact_keys)
+        self.assertIn(("dealbreakers", "smoking"), fact_keys)
+
+    def test_repeated_chat_fact_merges_evidence(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "I really value honest and direct communication."},
+        )
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "Honesty matters a lot to me in relationships."},
+        )
+
+        facts = self.client.get("/api/me/profile-facts").json()["facts"]
+        honesty_facts = [
+            fact for fact in facts if fact["category"] == "values" and fact["key"] == "honesty"
+        ]
+
+        self.assertEqual(len(honesty_facts), 1)
+        self.assertEqual(len(honesty_facts[0]["evidence"]), 2)
+
+    def test_low_quality_message_does_not_create_profile_facts(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "knl"},
+        )
+
+        facts_response = self.client.get("/api/me/profile-facts")
+
+        self.assertEqual(facts_response.status_code, 200)
+        self.assertEqual(facts_response.json()["facts"], [])
+
     def test_low_quality_agent_answer_is_rejected_before_model_call(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
