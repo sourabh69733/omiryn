@@ -5,6 +5,8 @@ let isSendingMessage = false;
 let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
+let profileFactsById = new Map();
+let lastEvidenceTrigger = null;
 let supabaseClient = null;
 let authSession = null;
 let authRequired = false;
@@ -69,6 +71,11 @@ const deleteSessionDialog = document.querySelector("#delete-session-dialog");
 const deleteSessionId = document.querySelector("#delete-session-id");
 const confirmDeleteSession = document.querySelector("#confirm-delete-session");
 const cancelDeleteSession = document.querySelector("#cancel-delete-session");
+const factEvidenceDialog = document.querySelector("#fact-evidence-dialog");
+const factEvidenceTitle = document.querySelector("#fact-evidence-title");
+const factEvidenceSummary = document.querySelector("#fact-evidence-summary");
+const factEvidenceList = document.querySelector("#fact-evidence-list");
+const closeFactEvidence = document.querySelector("#close-fact-evidence");
 const sidebarMessageCount = document.querySelector("#sidebar-message-count");
 const sidebarConversationId = document.querySelector("#sidebar-conversation-id");
 const activeMemoryCount = document.querySelector("#active-memory-count");
@@ -456,6 +463,7 @@ function renderProfileSources(container, sources, emptyText) {
 function renderProfileFacts(groups, facts) {
   if (!profileFactGroups) return;
   const factList = Array.isArray(facts) ? facts : [];
+  profileFactsById = new Map(factList.map((fact) => [String(fact.id), fact]));
   if (profileFactTotal) {
     profileFactTotal.textContent = `${formatNumber(factList.length)} ${factList.length === 1 ? "fact" : "facts"}`;
   }
@@ -492,6 +500,7 @@ function renderProfileFactCard(fact) {
   const evidenceCount = Array.isArray(fact.evidence) ? fact.evidence.length : 0;
   const confidence = Number(fact.confidence || 0);
   const confidencePercent = Math.round(confidence * 100);
+  const evidenceLabel = `${formatNumber(evidenceCount)} ${evidenceCount === 1 ? "evidence" : "evidence"}`;
   return `
     <article class="profile-fact-card">
       <div class="profile-fact-card-top">
@@ -499,12 +508,74 @@ function renderProfileFactCard(fact) {
         <span class="confidence-pill ${confidenceClass(confidence)}">${confidencePercent}%</span>
       </div>
       <div class="profile-fact-meta">
-        <span>${escapeHtml(profileFactKeyLabel(fact.key))}</span>
-        <span>${formatNumber(evidenceCount)} ${evidenceCount === 1 ? "evidence" : "evidence"}</span>
-        <span>${escapeHtml(profileFactStatusLabel(fact.status))}</span>
+        <span class="fact-tag fact-tag-key">${escapeHtml(profileFactKeyLabel(fact.key))}</span>
+        <button
+          class="fact-tag fact-evidence-trigger"
+          type="button"
+          data-fact-id="${escapeHtml(fact.id)}"
+          ${evidenceCount ? "" : "disabled"}
+        >
+          ${escapeHtml(evidenceLabel)}
+        </button>
+        <span class="fact-tag fact-tag-status">${escapeHtml(profileFactStatusLabel(fact.status))}</span>
       </div>
     </article>
   `;
+}
+
+function openFactEvidenceDialog(fact, trigger) {
+  if (!factEvidenceDialog || !fact) return;
+  lastEvidenceTrigger = trigger || null;
+  const evidence = Array.isArray(fact.evidence) ? fact.evidence : [];
+  const confidence = Math.round(Number(fact.confidence || 0) * 100);
+
+  if (factEvidenceTitle) {
+    factEvidenceTitle.textContent = fact.label || "Profile signal evidence";
+  }
+  if (factEvidenceSummary) {
+    factEvidenceSummary.innerHTML = `
+      <span>${escapeHtml(profileFactCategoryLabel(fact.category))}</span>
+      <span>${confidence}% confidence</span>
+      <span>${formatNumber(evidence.length)} ${evidence.length === 1 ? "source" : "sources"}</span>
+    `;
+  }
+  if (factEvidenceList) {
+    factEvidenceList.innerHTML = evidence.length
+      ? evidence.map((item, index) => renderEvidenceItem(item, index)).join("")
+      : `<div class="evidence-empty">No saved quote is attached to this signal yet.</div>`;
+  }
+  factEvidenceDialog.hidden = false;
+  closeFactEvidence?.focus();
+}
+
+function renderEvidenceItem(item, index) {
+  const quote = String(item?.quote || "").trim();
+  const conversationId = String(item?.conversation_id || "");
+  const messageIndex = Number.isFinite(Number(item?.message_index))
+    ? Number(item.message_index) + 1
+    : null;
+  return `
+    <article class="evidence-item">
+      <div class="evidence-item-body">
+        <span class="evidence-item-index">${index + 1}</span>
+        <blockquote>${escapeHtml(quote || "No quote saved.")}</blockquote>
+        <p>
+          ${conversationId ? `Chat ${escapeHtml(conversationId.slice(0, 8))}` : "Chat"}
+          ${messageIndex ? ` · message ${formatNumber(messageIndex)}` : ""}
+        </p>
+      </div>
+    </article>
+  `;
+}
+
+function closeFactEvidenceDialog() {
+  if (factEvidenceDialog) {
+    factEvidenceDialog.hidden = true;
+  }
+  if (lastEvidenceTrigger && document.contains(lastEvidenceTrigger)) {
+    lastEvidenceTrigger.focus();
+  }
+  lastEvidenceTrigger = null;
 }
 
 function profileFactCategoryOrder(category) {
@@ -2155,6 +2226,32 @@ saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
 whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
 confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
 cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
+closeFactEvidence?.addEventListener("click", closeFactEvidenceDialog);
+profileFactGroups?.addEventListener("click", (event) => {
+  const trigger = event.target.closest(".fact-evidence-trigger");
+  if (!trigger) return;
+  const fact = profileFactsById.get(String(trigger.dataset.factId));
+  openFactEvidenceDialog(fact, trigger);
+});
+factEvidenceDialog?.addEventListener("click", (event) => {
+  if (event.target === factEvidenceDialog) {
+    closeFactEvidenceDialog();
+  }
+});
+deleteSessionDialog?.addEventListener("click", (event) => {
+  if (event.target === deleteSessionDialog) {
+    closeDeleteSessionDialog();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (factEvidenceDialog && !factEvidenceDialog.hidden) {
+    closeFactEvidenceDialog();
+  }
+  if (deleteSessionDialog && !deleteSessionDialog.hidden) {
+    closeDeleteSessionDialog();
+  }
+});
 loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);

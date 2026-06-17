@@ -635,6 +635,36 @@ Rules:
       </section>
     </div>
 
+    <div class="confirm-overlay" id="fact-evidence-dialog" hidden>
+      <section
+        class="evidence-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fact-evidence-title"
+        aria-describedby="fact-evidence-copy"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Evidence</p>
+            <h2 id="fact-evidence-title">Why Omiryn believes this</h2>
+            <p id="fact-evidence-copy">
+              These are the chat snippets connected to this internal matching signal.
+            </p>
+          </div>
+          <button
+            class="evidence-close"
+            id="close-fact-evidence"
+            type="button"
+            aria-label="Close evidence"
+          >
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="evidence-summary" id="fact-evidence-summary"></div>
+        <div class="evidence-list" id="fact-evidence-list"></div>
+      </section>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/static/app.js?v=20260614-friend-style"></script>
   </body>

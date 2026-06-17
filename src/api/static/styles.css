@@ -556,6 +556,158 @@ p {
   padding-top: 2px;
 }
 
+.evidence-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 44px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(23, 32, 38, 0.28);
+}
+
+.evidence-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 18px 18px 16px;
+}
+
+.evidence-dialog-header h2 {
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.evidence-dialog-header p:not(.eyebrow) {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.evidence-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--soft);
+  cursor: pointer;
+}
+
+.evidence-close span {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.evidence-close span::before,
+.evidence-close span::after {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+.evidence-close span::before {
+  transform: rotate(45deg);
+}
+
+.evidence-close span::after {
+  transform: rotate(-45deg);
+}
+
+.evidence-close:hover {
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.evidence-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 18px;
+}
+
+.evidence-summary span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.evidence-list {
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  padding: 0 18px 18px;
+}
+
+.evidence-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 16px;
+}
+
+.evidence-item-body {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: start;
+}
+
+.evidence-item-index {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--teal);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.evidence-item blockquote {
+  grid-column: 2;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.evidence-item p {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.evidence-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--soft);
+  padding: 16px;
+  font-size: 13px;
+}
+
 .active-memory {
   margin-top: 18px;
   border-top: 1px solid var(--line);
@@ -1701,23 +1853,28 @@ p {
 .confidence-pill {
   flex: 0 0 auto;
   border-radius: 999px;
+  border: 1px solid transparent;
   font-size: 11px;
   font-weight: 900;
-  padding: 5px 8px;
+  letter-spacing: 0;
+  padding: 6px 9px;
 }
 
 .confidence-pill.high {
-  background: #e5f5ee;
+  border-color: #bfe2d5;
+  background: #e9f7f1;
   color: #176049;
 }
 
 .confidence-pill.medium {
-  background: #fff3d4;
-  color: #805b00;
+  border-color: #ecd896;
+  background: #fff7dc;
+  color: #715410;
 }
 
 .confidence-pill.low {
-  background: #f1f4f6;
+  border-color: var(--line);
+  background: #f5f7f7;
   color: var(--muted);
 }
 
@@ -1727,15 +1884,46 @@ p {
   gap: 6px;
 }
 
-.profile-fact-meta span {
-  border: 1px solid var(--line);
+.fact-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid #d8e3e0;
   border-radius: 999px;
-  background: #ffffff;
-  color: var(--muted);
-  font-size: 11px;
+  background: #fbfdfc;
+  color: #5d6a71;
+  font-size: 12px;
   font-weight: 800;
-  line-height: 1;
-  padding: 7px 8px;
+  line-height: 1.1;
+  padding: 6px 10px;
+}
+
+.fact-tag-key {
+  color: #495b62;
+  background: #ffffff;
+}
+
+.fact-tag-status {
+  border-color: #bdded4;
+  color: #1f6656;
+  background: #edf8f4;
+}
+
+.fact-evidence-trigger {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fact-evidence-trigger:hover,
+.fact-evidence-trigger:focus-visible {
+  border-color: #b9d6ce;
+  color: var(--teal);
+  background: #eef8f3;
+}
+
+.fact-evidence-trigger:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 .profile-facts-empty {
