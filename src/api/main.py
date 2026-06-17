@@ -37,6 +37,7 @@ from storage import (
     init_db,
     list_context_sources,
     list_conversations as storage_list_conversations,
+    list_profile_facts,
     list_user_context_sources,
     list_agent_usage_events,
     save_context_source,
@@ -317,9 +318,12 @@ async def get_me_profile(
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     profile = get_user_profile(user.id)
     sources = list_user_context_sources(user.id)
+    facts = list_profile_facts(user.id)
     return {
         "user": {"id": user.id, "email": user.email},
         "profile": profile,
+        "learned_facts": facts,
+        "learned_fact_groups": _group_profile_facts(facts),
         "style_sources": [
             _context_source_summary(source)
             for source in sources
@@ -347,6 +351,16 @@ async def put_me_profile(
         payload.display_name.strip() if payload.display_name else None,
     )
     return {"profile": profile}
+
+
+@app.get("/api/me/profile-facts")
+async def get_me_profile_facts(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    facts = list_profile_facts(user.id)
+    return {"facts": facts, "groups": _group_profile_facts(facts)}
 
 
 @app.get("/api/agent/usage")
@@ -1215,6 +1229,14 @@ def _context_source_summary(
     if attached is not None:
         summary["attached"] = attached
     return summary
+
+
+def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    groups: dict[str, list[dict[str, object]]] = {}
+    for fact in facts:
+        category = str(fact.get("category") or "other")
+        groups.setdefault(category, []).append(fact)
+    return groups
 
 
 def _attached_context_source_ids(sources: list[dict[str, object]]) -> set[str]:

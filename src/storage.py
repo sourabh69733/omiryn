@@ -99,6 +99,26 @@ user_profiles = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+profile_facts = Table(
+    "profile_facts",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("category", String, nullable=False),
+    Column("key", String, nullable=False),
+    Column("value_json", JSON, nullable=False),
+    Column("label", String, nullable=False),
+    Column("confidence", Float, nullable=False),
+    Column("source_kind", String, nullable=False),
+    Column("source_id", String, nullable=True),
+    Column("evidence_json", JSON, nullable=False),
+    Column("status", String, nullable=False),
+    Column("visibility", String, nullable=False),
+    Column("used_for_matching", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 
 def database_url() -> str:
     return _normalize_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
@@ -295,6 +315,133 @@ def _ensure_runtime_columns() -> None:
             for column_name in column_names:
                 if column_name not in existing_columns:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR"))
+
+
+def upsert_profile_fact(fact: dict[str, Any]) -> dict[str, Any]:
+    payload = _profile_fact_payload(fact)
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(profile_facts).where(
+                profile_facts.c.user_id == payload["user_id"],
+                profile_facts.c.category == payload["category"],
+                profile_facts.c.key == payload["key"],
+            )
+        ).mappings().first()
+        if existing:
+            merged = _merge_profile_fact(existing, payload)
+            connection.execute(
+                profile_facts.update()
+                .where(profile_facts.c.id == existing["id"])
+                .values(**merged, updated_at=func.now())
+            )
+            fact_id = existing["id"]
+        else:
+            fact_id = payload["id"]
+            connection.execute(profile_facts.insert().values(**payload))
+
+        row = connection.execute(
+            select(profile_facts).where(profile_facts.c.id == fact_id)
+        ).mappings().first()
+    return _profile_fact_from_row(row)
+
+
+def list_profile_facts(
+    user_id: str,
+    statuses: set[str] | None = None,
+    used_for_matching: bool | None = None,
+) -> list[dict[str, Any]]:
+    statement = (
+        select(profile_facts)
+        .where(profile_facts.c.user_id == user_id)
+        .order_by(
+            profile_facts.c.category.asc(),
+            profile_facts.c.confidence.desc(),
+            profile_facts.c.updated_at.desc(),
+        )
+    )
+    if statuses:
+        statement = statement.where(profile_facts.c.status.in_(statuses))
+    if used_for_matching is not None:
+        statement = statement.where(profile_facts.c.used_for_matching == used_for_matching)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_profile_fact_from_row(row) for row in rows]
+
+
+def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": fact.get("id") or str(uuid4()),
+        "user_id": fact["user_id"],
+        "category": fact["category"],
+        "key": fact["key"],
+        "value_json": fact.get("value") or fact.get("value_json") or {},
+        "label": fact["label"],
+        "confidence": _bounded_confidence(fact.get("confidence", 0.5)),
+        "source_kind": fact.get("source_kind") or "agent_chat",
+        "source_id": fact.get("source_id"),
+        "evidence_json": fact.get("evidence") or fact.get("evidence_json") or [],
+        "status": fact.get("status") or "active",
+        "visibility": fact.get("visibility") or "internal",
+        "used_for_matching": bool(fact.get("used_for_matching", True)),
+    }
+
+
+def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, Any]:
+    evidence = _dedupe_evidence(
+        list(existing["evidence_json"] or []) + list(incoming["evidence_json"] or [])
+    )
+    return {
+        "value_json": incoming["value_json"],
+        "label": incoming["label"],
+        "confidence": max(existing["confidence"] or 0, incoming["confidence"]),
+        "source_kind": incoming["source_kind"],
+        "source_id": incoming["source_id"] or existing["source_id"],
+        "evidence_json": evidence,
+        "status": incoming["status"] or existing["status"],
+        "visibility": incoming["visibility"] or existing["visibility"],
+        "used_for_matching": incoming["used_for_matching"],
+    }
+
+
+def _dedupe_evidence(evidence_items: list[Any]) -> list[Any]:
+    seen: set[str] = set()
+    deduped: list[Any] = []
+    for item in evidence_items:
+        key = repr(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _bounded_confidence(value: Any) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        confidence = 0.5
+    return max(0.0, min(1.0, confidence))
+
+
+def _profile_fact_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "category": row["category"],
+        "key": row["key"],
+        "value": row["value_json"],
+        "label": row["label"],
+        "confidence": row["confidence"],
+        "source_kind": row["source_kind"],
+        "source_id": row["source_id"],
+        "evidence": row["evidence_json"],
+        "status": row["status"],
+        "visibility": row["visibility"],
+        "used_for_matching": row["used_for_matching"],
+        "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
 
 
 def save_agent_usage_event(event: dict[str, Any]) -> None:

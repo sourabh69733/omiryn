@@ -15,7 +15,7 @@ from agent.providers import (
 )
 from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
-from storage import _normalize_database_url, reset_db
+from storage import _normalize_database_url, reset_db, upsert_profile_fact
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
@@ -255,6 +255,85 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["profile"]["display_name"], "Aarav")
         self.assertEqual(len(data["memory_sources"]), 1)
         self.assertEqual(len(data["style_sources"]), 1)
+
+    def test_profile_facts_are_grouped_and_scoped_to_user(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        async def user_b() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "conflict_style_preference",
+                "value": {"kind": "calm_direct_low_drama"},
+                "label": "Prefers calm, low-drama conflict resolution",
+                "confidence": 0.72,
+                "source_kind": "agent_chat",
+                "source_id": "conversation-a",
+                "evidence": [{"quote": "I do not enjoy dramatic fights."}],
+            }
+        )
+        upsert_profile_fact(
+            {
+                "user_id": "user-b",
+                "category": "values",
+                "key": "family_orientation",
+                "value": {"kind": "high"},
+                "label": "Values family involvement",
+                "confidence": 0.8,
+            }
+        )
+
+        app.dependency_overrides[current_user] = user_a
+        response = self.client.get("/api/me/profile-facts")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data["facts"]), 1)
+        self.assertEqual(data["facts"][0]["user_id"], "user-a")
+        self.assertEqual(data["facts"][0]["category"], "communication")
+        self.assertEqual(len(data["groups"]["communication"]), 1)
+        self.assertNotIn("values", data["groups"])
+
+    def test_profile_fact_upsert_merges_evidence_and_confidence(self) -> None:
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "emotional_maturity",
+                "value": {"importance": "medium"},
+                "label": "Values emotional maturity",
+                "confidence": 0.55,
+                "evidence": [{"message_id": "m1"}],
+            }
+        )
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "emotional_maturity",
+                "value": {"importance": "high"},
+                "label": "Strongly values emotional maturity",
+                "confidence": 0.81,
+                "evidence": [{"message_id": "m2"}],
+            }
+        )
+
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        response = self.client.get("/api/me/profile")
+
+        self.assertEqual(response.status_code, 200)
+        facts = response.json()["learned_facts"]
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0]["label"], "Strongly values emotional maturity")
+        self.assertEqual(facts[0]["confidence"], 0.81)
+        self.assertEqual(len(facts[0]["evidence"]), 2)
 
     def test_draft_profile_includes_user_dating_basics(self) -> None:
         async def signed_in_user() -> CurrentUser:
