@@ -130,16 +130,24 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
         "longterm",
         "long_term",
         "marriage",
+        "yes",
+        "no",
+        "haan",
+        "ha",
+        "han",
+        "nahi",
+        "nhi",
+        "na",
         "serious",
     }
-    vague_answers = {"idk", "dont know", "don't know", "maybe", "yes", "no", "ok", "okay"}
+    vague_answers = {""}
     junk_answers = {"asdf", "qwerty", "test", "knl", "blah", "random"}
 
     if not normalized:
         return _quality_result("I did not catch that. Could you answer in a few words?")
     if normalized in allowed_short_answers:
         return {"valid": True}
-    if normalized in {"yes", "no", "ok", "okay", "haan", "ha", "nahi"} and _previous_prompt_allows_short_confirmation(messages):
+    if normalized in {"ok", "okay"} and _previous_prompt_allows_short_confirmation(messages):
         return {"valid": True}
     if normalized in vague_answers:
         return _quality_result("That is a little too vague. Could you say what you mean in one sentence?")

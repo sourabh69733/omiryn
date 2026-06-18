@@ -567,6 +567,24 @@ class AgentSubmissionApiTest(unittest.TestCase):
         messages = message_response.json()["messages"]
         self.assertNotEqual(messages[-2].get("quality"), "low_information")
 
+    def test_short_no_answers_are_not_marked_low_information(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        first_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "nhi,"},
+        )
+        second_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "no"},
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertNotEqual(first_response.json()["messages"][-2].get("quality"), "low_information")
+        self.assertNotEqual(second_response.json()["messages"][-2].get("quality"), "low_information")
+
     def test_provider_messages_strip_internal_metadata(self) -> None:
         messages = _provider_messages(
             [
