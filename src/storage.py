@@ -119,7 +119,6 @@ profile_facts = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
-
 def database_url() -> str:
     return _normalize_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
 
@@ -366,7 +365,7 @@ def list_profile_facts(
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
-    return [_profile_fact_from_row(row) for row in rows]
+    return _dedupe_profile_fact_dicts([_profile_fact_from_row(row) for row in rows])
 
 
 def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
@@ -380,7 +379,9 @@ def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
         "confidence": _bounded_confidence(fact.get("confidence", 0.5)),
         "source_kind": fact.get("source_kind") or "agent_chat",
         "source_id": fact.get("source_id"),
-        "evidence_json": fact.get("evidence") or fact.get("evidence_json") or [],
+        "evidence_json": _normalize_evidence_items(
+            fact.get("evidence") or fact.get("evidence_json") or []
+        ),
         "status": fact.get("status") or "active",
         "visibility": fact.get("visibility") or "internal",
         "used_for_matching": bool(fact.get("used_for_matching", True)),
@@ -407,13 +408,109 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
 def _dedupe_evidence(evidence_items: list[Any]) -> list[Any]:
     seen: set[str] = set()
     deduped: list[Any] = []
-    for item in evidence_items:
+    for item in _normalize_evidence_items(evidence_items):
         key = repr(item)
         if key in seen:
             continue
         seen.add(key)
         deduped.append(item)
     return deduped
+
+
+def _normalize_evidence_items(evidence_items: list[Any]) -> list[Any]:
+    normalized_items = []
+    for item in evidence_items:
+        if not isinstance(item, dict):
+            normalized_items.append(item)
+            continue
+        normalized = dict(item)
+        text = str(normalized.get("text") or normalized.get("quote") or "").strip()
+        if text:
+            normalized["text"] = text
+            normalized["quote"] = text
+        normalized_items.append(normalized)
+    return normalized_items
+
+
+def _dedupe_profile_fact_dicts(facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[tuple[str, str], dict[str, Any]] = {}
+    for fact in facts:
+        identity = _profile_fact_identity(fact)
+        existing = deduped.get(identity)
+        if not existing:
+            deduped[identity] = fact
+            continue
+        deduped[identity] = _merge_profile_fact_dict(existing, fact)
+    return list(deduped.values())
+
+
+def _merge_profile_fact_dict(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    if float(incoming.get("confidence") or 0) > float(existing.get("confidence") or 0):
+        base = {**existing, **incoming}
+    else:
+        base = dict(existing)
+    base["confidence"] = max(
+        float(existing.get("confidence") or 0),
+        float(incoming.get("confidence") or 0),
+    )
+    base["evidence"] = _dedupe_evidence(
+        list(existing.get("evidence") or []) + list(incoming.get("evidence") or [])
+    )
+    return base
+
+
+def _profile_fact_identity(fact: dict[str, Any]) -> tuple[str, str]:
+    user_id = str(fact.get("user_id") or "")
+    category = _normalized_fact_terms(str(fact.get("category") or ""))
+    label_terms = _normalized_fact_terms(str(fact.get("label") or ""))
+    value_terms = _normalized_fact_terms(_fact_value_text(fact.get("value")))
+    key_terms = _normalized_fact_terms(str(fact.get("key") or ""))
+    meaning = label_terms or value_terms or key_terms
+    return user_id, f"{category}:{meaning}"
+
+
+def _fact_value_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(str(part) for part in value.values())
+    if isinstance(value, list):
+        return " ".join(str(part) for part in value)
+    return str(value or "")
+
+
+def _normalized_fact_terms(text_value: str) -> str:
+    stopwords = {
+        "a",
+        "an",
+        "and",
+        "are",
+        "be",
+        "for",
+        "has",
+        "is",
+        "of",
+        "the",
+        "to",
+        "use",
+        "uses",
+        "using",
+        "with",
+    }
+    words = [
+        _singularize_token(token)
+        for token in "".join(
+            character.lower() if character.isalnum() else " " for character in text_value
+        ).split()
+        if token not in stopwords
+    ]
+    return "_".join(sorted(dict.fromkeys(words)))
+
+
+def _singularize_token(token: str) -> str:
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 3 and token.endswith("s"):
+        return token[:-1]
+    return token
 
 
 def _bounded_confidence(value: Any) -> float:

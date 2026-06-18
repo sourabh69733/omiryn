@@ -336,6 +336,45 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(facts[0]["confidence"], 0.81)
         self.assertEqual(len(facts[0]["evidence"]), 2)
 
+    def test_profile_fact_duplicates_are_deduped_and_evidence_text_is_normalized(self) -> None:
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "behavior",
+                "key": "dating_app",
+                "value": {"kind": "dating_app"},
+                "label": "Using dating app",
+                "confidence": 0.85,
+                "evidence": [{"text": "I am using dating apps right now."}],
+            }
+        )
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "behavior",
+                "key": "dating_app_use",
+                "value": {"kind": "dating_app_use"},
+                "label": "Using dating app",
+                "confidence": 0.9,
+                "evidence": [{"quote": "Dating app use matters here."}],
+            }
+        )
+
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        facts = self.client.get("/api/me/profile-facts").json()["facts"]
+
+        self.assertEqual(len(facts), 1)
+        self.assertIn(facts[0]["key"], {"dating_app", "dating_app_use"})
+        self.assertEqual(facts[0]["confidence"], 0.9)
+        self.assertEqual(len(facts[0]["evidence"]), 2)
+        evidence_quotes = {item["quote"] for item in facts[0]["evidence"]}
+        evidence_texts = {item["text"] for item in facts[0]["evidence"]}
+        self.assertIn("I am using dating apps right now.", evidence_quotes)
+        self.assertIn("I am using dating apps right now.", evidence_texts)
+
     def test_raw_profile_data_points_are_env_gated(self) -> None:
         upsert_profile_fact(
             {
