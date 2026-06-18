@@ -10,7 +10,13 @@ from typing import Any
 import httpx
 
 from agent.extraction import normalize_extracted_profile
-from agent.usage import CHAT_REPLY, INPUT_GUARDRAIL, PROFILE_EXTRACT, PROFILE_EXTRACT_REPAIR
+from agent.usage import (
+    CHAT_REPLY,
+    INPUT_GUARDRAIL,
+    PROFILE_EXTRACT,
+    PROFILE_EXTRACT_REPAIR,
+    PROFILE_FACT_EXTRACT,
+)
 from storage import save_agent_usage_event
 
 logger = logging.getLogger(__name__)
@@ -73,6 +79,32 @@ Rules:
 - Do not invent age, city, religion, family preference, children preference, or dealbreakers.
 - Keep values and lifestyle as short snake_case strings.
 - Keep summary under 40 words."""
+
+DEEP_FACT_EXTRACTION_SYSTEM_PROMPT = """Extract private Omiryn matching memory facts from the conversation.
+Return only valid JSON. Do not include markdown.
+Use this shape:
+{
+  "facts": [
+    {
+      "category": "values",
+      "key": "mutual_respect",
+      "label": "Values mutual respect",
+      "value": {"kind": "mutual_respect", "detail": "Short detail"},
+      "confidence": 0.72,
+      "evidence": "Short user quote or paraphrase"
+    }
+  ]
+}
+Rules:
+- Extract only facts about the user, not the assistant or other people.
+- Prefer many small facts over broad summaries.
+- Useful categories: dating_intent, values, lifestyle, communication, conflict_style,
+  attachment_style, emotional_patterns, family_context, partner_preferences,
+  dealbreakers, attraction_patterns, goals, constraints, personality.
+- Do not invent. If weakly inferred, confidence must be <= 0.45.
+- Do not diagnose medical or mental health conditions.
+- Keep labels under 12 words and evidence under 30 words.
+- Return at most 25 facts."""
 
 
 class AgentProviderError(RuntimeError):
@@ -257,6 +289,56 @@ async def extract_profile(
         raw_profile = _parse_json_object(content)
 
     return normalize_extracted_profile(raw_profile, provider)
+
+
+async def extract_deep_profile_facts(
+    messages: list[dict[str, str]],
+    user_id: str,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> list[dict[str, Any]]:
+    provider = _provider_name()
+    logger.info("agent.deep_facts provider=%s user_messages=%s", provider, _user_message_count(messages))
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=PROFILE_FACT_EXTRACT,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        return _mock_deep_profile_facts(messages, user_id, conversation_id)
+
+    extraction_messages = [
+        {
+            "role": "user",
+            "content": _deep_fact_extraction_text(messages),
+        }
+    ]
+    if provider == "groq":
+        content = await _groq_chat(
+            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=PROFILE_FACT_EXTRACT,
+            model=model,
+        )
+    elif provider == "ollama":
+        content = await _ollama_chat(
+            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=PROFILE_FACT_EXTRACT,
+            model=model,
+        )
+    else:
+        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+
+    raw = _parse_json_object(content)
+    return _normalize_deep_profile_facts(raw, user_id, conversation_id)
 
 
 def _provider_name() -> str:
@@ -511,6 +593,93 @@ def _conversation_and_context_text(
     if not context_text:
         return conversation_text
     return f"{context_text}\n\nConversation:\n{conversation_text}"
+
+
+def _deep_fact_extraction_text(messages: list[dict[str, str]]) -> str:
+    profile_messages = _messages_for_profile_extraction(messages)
+    recent_messages = profile_messages[-24:]
+    conversation_text = "\n".join(
+        f"{message.get('role', 'unknown')}: {message.get('content', '')}"
+        for message in recent_messages
+        if message.get("content")
+    )
+    return (
+        "Conversation for fact extraction. Extract durable matching facts only from the "
+        "user's own words and behavior.\n\n"
+        f"{conversation_text}"
+    )
+
+
+def _normalize_deep_profile_facts(
+    raw: dict[str, Any],
+    user_id: str,
+    conversation_id: str | None,
+) -> list[dict[str, Any]]:
+    raw_facts = raw.get("facts")
+    if not isinstance(raw_facts, list):
+        return []
+
+    facts = []
+    for index, raw_fact in enumerate(raw_facts[:30]):
+        if not isinstance(raw_fact, dict):
+            continue
+        fact = _normalize_deep_profile_fact(raw_fact, user_id, conversation_id, index)
+        if fact:
+            facts.append(fact)
+    return facts
+
+
+def _normalize_deep_profile_fact(
+    raw_fact: dict[str, Any],
+    user_id: str,
+    conversation_id: str | None,
+    index: int,
+) -> dict[str, Any] | None:
+    category = _snake_key(str(raw_fact.get("category") or "other")) or "other"
+    label = str(raw_fact.get("label") or raw_fact.get("key") or "").strip()
+    key = _snake_key(str(raw_fact.get("key") or label or f"deep_fact_{index + 1}"))
+    if not key or not label:
+        return None
+
+    value = raw_fact.get("value")
+    if not isinstance(value, dict):
+        value = {"kind": key, "detail": str(value or label)}
+    value.setdefault("kind", key)
+
+    evidence_text = str(raw_fact.get("evidence") or label).strip()
+    confidence = _safe_confidence(raw_fact.get("confidence"), 0.55)
+    return {
+        "user_id": user_id,
+        "category": category[:80],
+        "key": key[:120],
+        "value": value,
+        "label": label[:160],
+        "confidence": confidence,
+        "source_kind": "agent_deep_memory",
+        "source_id": conversation_id,
+        "evidence": [
+            {
+                "conversation_id": conversation_id,
+                "message_index": None,
+                "text": evidence_text[:320],
+            }
+        ],
+        "status": "active",
+        "visibility": "internal",
+        "used_for_matching": True,
+    }
+
+
+def _snake_key(value: str) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", value.lower())).strip("_")
+
+
+def _safe_confidence(value: Any, fallback: float) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        confidence = fallback
+    return max(0.0, min(0.95, confidence))
 
 
 def _context_sources_text(context_sources: list[dict[str, Any]] | None) -> str:
@@ -805,6 +974,56 @@ def _mock_reply(
         "sahi hai, keep going.",
     ]
     return prompts[min(len(user_messages), len(prompts) - 1)]
+
+
+def _mock_deep_profile_facts(
+    messages: list[dict[str, str]],
+    user_id: str,
+    conversation_id: str | None,
+) -> list[dict[str, Any]]:
+    text = " ".join(
+        str(message.get("content", "")).lower()
+        for message in _messages_for_profile_extraction(messages)
+        if message.get("role") == "user"
+    )
+    raw_facts = []
+    if "career" in text or "growth" in text:
+        raw_facts.append(
+            {
+                "category": "goals",
+                "key": "career_growth",
+                "label": "Values career growth",
+                "value": {
+                    "kind": "career_growth",
+                    "detail": "User repeatedly mentions career or growth.",
+                },
+                "confidence": 0.72,
+                "evidence": "Mentions career or growth as important.",
+            }
+        )
+    if "respect" in text:
+        raw_facts.append(
+            {
+                "category": "values",
+                "key": "mutual_respect",
+                "label": "Values mutual respect",
+                "value": {"kind": "mutual_respect"},
+                "confidence": 0.74,
+                "evidence": "Mentions mutual respect.",
+            }
+        )
+    if not raw_facts:
+        raw_facts.append(
+            {
+                "category": "personality",
+                "key": "open_to_reflection",
+                "label": "Open to reflection",
+                "value": {"kind": "open_to_reflection"},
+                "confidence": 0.42,
+                "evidence": "Continues the onboarding conversation.",
+            }
+        )
+    return _normalize_deep_profile_facts({"facts": raw_facts}, user_id, conversation_id)
 
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:

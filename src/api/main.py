@@ -1,14 +1,16 @@
 from pathlib import Path
+import logging
 import os
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -22,6 +24,7 @@ from agent.providers import (
     AgentProviderError,
     agent_runtime_status,
     assess_user_message_quality,
+    extract_deep_profile_facts,
     extract_profile,
     generate_agent_reply,
 )
@@ -65,6 +68,7 @@ Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
 InterestedIn = Literal["men", "women", "everyone"]
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
+DEEP_FACT_EXTRACTION_INTERVAL = int(os.getenv("PROFILE_FACT_DEEP_EXTRACT_INTERVAL", "5"))
 MEMORY_TRIGGER_TERMS = {
     "context",
     "memory",
@@ -674,6 +678,7 @@ def update_agent_conversation_settings(
 async def send_agent_message(
     conversation_id: str,
     payload: UserMessage,
+    background_tasks: BackgroundTasks,
     user: CurrentUser | None = Depends(current_user),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
@@ -712,6 +717,14 @@ async def send_agent_message(
 
     conversation.messages.append({"role": "assistant", "content": reply})
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    if _should_run_deep_profile_fact_extraction(user, conversation.messages, bool(quality["valid"])):
+        background_tasks.add_task(
+            _capture_deep_profile_facts_from_conversation,
+            conversation.id,
+            user.id,
+            conversation.messages,
+            conversation.agent_model,
+        )
     return conversation
 
 
@@ -1264,6 +1277,40 @@ def _capture_profile_facts_from_user_message(
     )
     for fact in facts:
         upsert_profile_fact(fact)
+
+
+def _should_run_deep_profile_fact_extraction(
+    user: CurrentUser | None,
+    messages: list[dict[str, object]],
+    quality_valid: bool,
+) -> bool:
+    if not user or not quality_valid or DEEP_FACT_EXTRACTION_INTERVAL <= 0:
+        return False
+    valid_user_messages = sum(
+        1
+        for message in messages
+        if message.get("role") == "user" and message.get("quality") != "low_information"
+    )
+    return valid_user_messages > 0 and valid_user_messages % DEEP_FACT_EXTRACTION_INTERVAL == 0
+
+
+async def _capture_deep_profile_facts_from_conversation(
+    conversation_id: str,
+    user_id: str,
+    messages: list[dict[str, object]],
+    model: str | None,
+) -> None:
+    try:
+        facts = await extract_deep_profile_facts(
+            messages,  # type: ignore[arg-type]
+            user_id,
+            conversation_id=conversation_id,
+            model=model,
+        )
+        for fact in facts:
+            upsert_profile_fact(fact)
+    except Exception:
+        logger.exception("agent.deep_facts.capture_failed conversation_id=%s", conversation_id)
 
 
 def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:

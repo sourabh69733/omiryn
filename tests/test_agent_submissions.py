@@ -451,6 +451,35 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn(("preferences", "calm_partner"), fact_keys)
         self.assertIn(("dealbreakers", "smoking"), fact_keys)
 
+    def test_deep_profile_fact_extraction_runs_every_fifth_valid_message(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        with patch.dict(os.environ, {"AGENT_PROVIDER": "mock"}):
+            for index in range(5):
+                response = self.client.post(
+                    f"/api/agent/conversations/{conversation_id}/messages",
+                    json={
+                        "message": (
+                            f"Career growth, mutual respect, and calm communication matter "
+                            f"to me in relationships. Detail {index}."
+                        )
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+
+        usage = self.client.get(f"/api/agent/conversations/{conversation_id}/usage").json()
+        request_kinds = [event["request_kind"] for event in usage["events"]]
+        self.assertIn("profile_fact_extract", request_kinds)
+
+        facts = self.client.get("/api/me/profile-facts").json()["facts"]
+        fact_keys = {(fact["category"], fact["key"]) for fact in facts}
+        self.assertIn(("goals", "career_growth"), fact_keys)
+        self.assertIn(("values", "mutual_respect"), fact_keys)
+
     def test_repeated_chat_fact_merges_evidence(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
