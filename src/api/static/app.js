@@ -10,6 +10,7 @@ let lastEvidenceTrigger = null;
 let supabaseClient = null;
 let authSession = null;
 let authRequired = false;
+let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
@@ -134,6 +135,9 @@ const profileStyleList = document.querySelector("#profile-style-list");
 const profileMemoryList = document.querySelector("#profile-memory-list");
 const profileFactTotal = document.querySelector("#profile-fact-total");
 const profileFactGroups = document.querySelector("#profile-fact-groups");
+const rawProfileDataPanel = document.querySelector("#raw-profile-data-panel");
+const rawProfileDataTotal = document.querySelector("#raw-profile-data-total");
+const rawProfileDataList = document.querySelector("#raw-profile-data-list");
 const datingBasicsStatus = document.querySelector("#dating-basics-status");
 const saveDatingBasics = document.querySelector("#save-dating-basics");
 const loginGoogle = document.querySelector("#login-google");
@@ -188,6 +192,7 @@ async function initializeAuth() {
     }
     const config = await response.json();
     authRequired = Boolean(config.auth_required);
+    profileDebugDataEnabled = Boolean(config.profile_debug_data_enabled);
     if (!config.supabase_url || !config.supabase_anon_key) {
       renderSignedOutAuth("Auth not configured");
       renderAuthGate();
@@ -397,6 +402,7 @@ async function loadProfilePage() {
     renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
     renderProfileSources(profileMemoryList, data.memory_sources || [], "No imported memory yet.");
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
+    renderRawProfileDataPoints(data.raw_internal_data_points || []);
     if (profileStatus) {
       profileStatus.textContent = "Profile loaded.";
     }
@@ -521,6 +527,56 @@ function renderProfileFactCard(fact) {
       </div>
     </article>
   `;
+}
+
+function renderRawProfileDataPoints(points) {
+  if (!rawProfileDataPanel || !rawProfileDataList) return;
+  const pointList = profileDebugDataEnabled && Array.isArray(points) ? points : [];
+  rawProfileDataPanel.hidden = !profileDebugDataEnabled;
+  if (!profileDebugDataEnabled) {
+    return;
+  }
+
+  if (rawProfileDataTotal) {
+    rawProfileDataTotal.textContent = `${formatNumber(pointList.length)} ${pointList.length === 1 ? "point" : "points"}`;
+  }
+  if (!pointList.length) {
+    rawProfileDataList.innerHTML = `
+      <div class="profile-facts-empty">
+        <strong>No raw data points yet.</strong>
+        <span>Internal data points will appear here when conversation facts are captured.</span>
+      </div>
+    `;
+    return;
+  }
+
+  rawProfileDataList.innerHTML = pointList
+    .map((point) => `
+      <article class="raw-data-item">
+        <div class="raw-data-item-main">
+          <span>${escapeHtml(profileFactCategoryLabel(point.category))}</span>
+          <strong>${escapeHtml(point.key || "unknown")}</strong>
+          <code>${escapeHtml(rawDataValue(point.value))}</code>
+        </div>
+        <div class="raw-data-item-meta">
+          <span>${Math.round(Number(point.confidence || 0) * 100)}%</span>
+          <span>${escapeHtml(point.status || "active")}</span>
+          <span>${formatNumber(point.evidence_count || 0)} ev</span>
+          <span>${point.used_for_matching ? "matching" : "ignored"}</span>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function rawDataValue(value) {
+  if (value === null || value === undefined) return "{}";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return String(value);
+  }
 }
 
 function openFactEvidenceDialog(fact, trigger) {

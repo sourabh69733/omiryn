@@ -335,6 +335,35 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(facts[0]["confidence"], 0.81)
         self.assertEqual(len(facts[0]["evidence"]), 2)
 
+    def test_raw_profile_data_points_are_env_gated(self) -> None:
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "tone_preference",
+                "value": {"kind": "casual"},
+                "label": "Prefers casual conversation",
+                "confidence": 0.7,
+                "evidence": [{"message_id": "m1"}],
+            }
+        )
+
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        with patch.dict("os.environ", {"PROFILE_DEBUG_DATA_ENABLED": "false"}):
+            hidden_response = self.client.get("/api/me/profile")
+        self.assertNotIn("raw_internal_data_points", hidden_response.json())
+
+        with patch.dict("os.environ", {"PROFILE_DEBUG_DATA_ENABLED": "true"}):
+            visible_response = self.client.get("/api/me/profile")
+        raw_points = visible_response.json()["raw_internal_data_points"]
+        self.assertEqual(len(raw_points), 1)
+        self.assertEqual(raw_points[0]["key"], "tone_preference")
+        self.assertEqual(raw_points[0]["evidence_count"], 1)
+
     def test_draft_profile_includes_user_dating_basics(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -644,6 +673,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "SUPABASE_URL": "https://example.supabase.co",
                 "SUPABASE_ANON_KEY": "anon-public-key",
                 "AUTH_REQUIRED": "true",
+                "PROFILE_DEBUG_DATA_ENABLED": "true",
             },
         ):
             response = self.client.get("/api/auth/config")
@@ -655,6 +685,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "supabase_url": "https://example.supabase.co",
                 "supabase_anon_key": "anon-public-key",
                 "auth_required": True,
+                "profile_debug_data_enabled": True,
             },
         )
 

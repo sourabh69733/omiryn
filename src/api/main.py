@@ -278,6 +278,7 @@ def auth_config() -> dict[str, object]:
         "supabase_url": os.getenv("SUPABASE_URL", ""),
         "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", ""),
         "auth_required": os.getenv("AUTH_REQUIRED", "false").lower() == "true",
+        "profile_debug_data_enabled": _profile_debug_data_enabled(),
     }
 
 
@@ -321,7 +322,7 @@ async def get_me_profile(
     profile = get_user_profile(user.id)
     sources = list_user_context_sources(user.id)
     facts = list_profile_facts(user.id)
-    return {
+    response = {
         "user": {"id": user.id, "email": user.email},
         "profile": profile,
         "learned_facts": facts,
@@ -337,6 +338,9 @@ async def get_me_profile(
             if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
         ],
     }
+    if _profile_debug_data_enabled():
+        response["raw_internal_data_points"] = _raw_profile_data_points(facts)
+    return response
 
 
 @app.put("/api/me/profile")
@@ -1266,6 +1270,30 @@ def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[
         category = str(fact.get("category") or "other")
         groups.setdefault(category, []).append(fact)
     return groups
+
+
+def _profile_debug_data_enabled() -> bool:
+    return os.getenv("PROFILE_DEBUG_DATA_ENABLED", "false").lower() == "true"
+
+
+def _raw_profile_data_points(facts: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [
+        {
+            "id": fact.get("id"),
+            "category": fact.get("category"),
+            "key": fact.get("key"),
+            "value": fact.get("value"),
+            "confidence": fact.get("confidence"),
+            "status": fact.get("status"),
+            "source_kind": fact.get("source_kind"),
+            "source_id": fact.get("source_id"),
+            "used_for_matching": fact.get("used_for_matching"),
+            "evidence_count": len(fact.get("evidence") or []),
+            "visibility": fact.get("visibility"),
+            "updated_at": fact.get("updated_at"),
+        }
+        for fact in facts
+    ]
 
 
 def _attached_context_source_ids(sources: list[dict[str, object]]) -> set[str]:
