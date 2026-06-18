@@ -7,6 +7,7 @@ let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
 let profileFactsById = new Map();
 let lastEvidenceTrigger = null;
+let pendingMessageHighlightIndex = null;
 let supabaseClient = null;
 let authSession = null;
 let authRequired = false;
@@ -181,6 +182,19 @@ function showScreen(name) {
 function currentDraftIdFromPath() {
   const match = window.location.pathname.match(/^\/drafts\/([^/]+)$/);
   return match ? match[1] : null;
+}
+
+function linkedConversationTargetFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const conversation = params.get("conversation");
+  const message = Number(params.get("message"));
+  if (!conversation || !Number.isFinite(message) || message < 1) {
+    return null;
+  }
+  return {
+    conversationId: conversation,
+    messageIndex: message - 1
+  };
 }
 
 async function initializeAuth() {
@@ -610,14 +624,18 @@ function renderEvidenceItem(item, index) {
   const messageIndex = Number.isFinite(Number(item?.message_index))
     ? Number(item.message_index) + 1
     : null;
+  const href = conversationId && messageIndex
+    ? `/?conversation=${encodeURIComponent(conversationId)}&message=${encodeURIComponent(messageIndex)}`
+    : "";
   return `
     <article class="evidence-item">
       <div class="evidence-item-body">
         <span class="evidence-item-index">${index + 1}</span>
         <blockquote>${escapeHtml(quote || "No quote saved.")}</blockquote>
         <p>
-          ${conversationId ? `Chat ${escapeHtml(conversationId.slice(0, 8))}` : "Chat"}
-          ${messageIndex ? ` · message ${formatNumber(messageIndex)}` : ""}
+          ${href
+            ? `<a class="evidence-chat-link" href="${escapeHtml(href)}">Open chat ${escapeHtml(conversationId.slice(0, 8))} · message ${formatNumber(messageIndex)}</a>`
+            : "Chat source unavailable"}
         </p>
       </div>
     </article>
@@ -785,7 +803,8 @@ async function startConversation() {
 
 async function restoreOrStartConversation() {
   await loadAgentStatus();
-  const savedConversationId = storedConversationId();
+  const linkedTarget = linkedConversationTargetFromUrl();
+  const savedConversationId = linkedTarget?.conversationId || storedConversationId();
   if (!savedConversationId) {
     prepareEmptyConversation();
     await loadConversationHistory();
@@ -800,7 +819,7 @@ async function restoreOrStartConversation() {
       throw new Error("Stored conversation was not found.");
     }
     const conversation = await response.json();
-    hydrateConversation(conversation);
+    hydrateConversation(conversation, { highlightMessageIndex: linkedTarget?.messageIndex });
   } catch {
     forgetStoredConversation();
     prepareEmptyConversation();
@@ -824,9 +843,12 @@ function prepareEmptyConversation() {
   focusChatInput();
 }
 
-function hydrateConversation(conversation) {
+function hydrateConversation(conversation, options = {}) {
   rememberConversation(conversation.id);
   messages = conversation.messages;
+  pendingMessageHighlightIndex = Number.isFinite(Number(options.highlightMessageIndex))
+    ? Number(options.highlightMessageIndex)
+    : null;
   if (conversation.agent_model && agentModelSelect) {
     agentModelSelect.value = conversation.agent_model;
   }
@@ -841,6 +863,7 @@ function hydrateConversation(conversation) {
   chatInput.disabled = false;
   if (extractProfile) extractProfile.disabled = false;
   renderMessages();
+  scrollToHighlightedMessage();
   updateReadiness();
   updateSidebarMeta();
   loadContextImportPrompt();
@@ -979,6 +1002,10 @@ function renderMessages() {
   messages.forEach((message, index) => {
     const bubble = document.createElement("div");
     bubble.className = `message ${message.role === "assistant" ? "agent" : "user"}`;
+    bubble.dataset.messageIndex = String(index);
+    if (index === pendingMessageHighlightIndex) {
+      bubble.classList.add("evidence-highlight");
+    }
     if (message.quality === "low_information") {
       bubble.classList.add("low-information");
     }
@@ -994,6 +1021,14 @@ function renderMessages() {
   });
   chatLog.scrollTop = chatLog.scrollHeight;
   updateSidebarMeta();
+}
+
+function scrollToHighlightedMessage() {
+  if (!chatLog || pendingMessageHighlightIndex === null) return;
+  const target = chatLog.querySelector(`[data-message-index="${pendingMessageHighlightIndex}"]`);
+  if (!target) return;
+  target.scrollIntoView({ block: "center", behavior: "smooth" });
+  pendingMessageHighlightIndex = null;
 }
 
 function updateSidebarMeta() {
@@ -1153,7 +1188,11 @@ async function confirmDeleteConversation() {
 }
 
 async function loadConversation(id) {
-  if (!id || id === conversationId) return;
+  if (!id) return;
+  if (id === conversationId) {
+    renderMessages();
+    return;
+  }
 
   chatInput.disabled = true;
   if (extractProfile) extractProfile.disabled = true;

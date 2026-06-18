@@ -703,6 +703,18 @@ p {
   font-weight: 800;
 }
 
+.evidence-chat-link {
+  color: #1f6656;
+  text-decoration: none;
+}
+
+.evidence-chat-link:hover,
+.evidence-chat-link:focus-visible {
+  color: var(--teal);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .evidence-empty {
   border: 1px dashed var(--line);
   border-radius: 8px;
@@ -1206,6 +1218,12 @@ p {
   color: #7f9094;
   font-size: 10px;
   content: "ignored";
+}
+
+.agentic-chat .message.evidence-highlight {
+  outline: 2px solid #74e0d3;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(100, 216, 203, 0.12);
 }
 
 .message-chips {
