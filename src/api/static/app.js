@@ -525,7 +525,7 @@ function renderProfileFacts(groups, facts) {
 }
 
 function renderProfileFactCard(fact) {
-  const evidenceCount = Array.isArray(fact.evidence) ? fact.evidence.length : 0;
+  const evidenceCount = profileFactEvidenceItems(fact).length;
   const confidence = Number(fact.confidence || 0);
   const confidencePercent = Math.round(confidence * 100);
   const evidenceLabel = `${formatNumber(evidenceCount)} ${evidenceCount === 1 ? "evidence" : "evidence"}`;
@@ -604,7 +604,7 @@ function rawDataValue(value) {
 function openFactEvidenceDialog(fact, trigger) {
   if (!factEvidenceDialog || !fact) return;
   lastEvidenceTrigger = trigger || null;
-  const evidence = Array.isArray(fact.evidence) ? fact.evidence : [];
+  const evidence = profileFactEvidenceItems(fact);
   const confidence = Math.round(Number(fact.confidence || 0) * 100);
 
   if (factEvidenceTitle) {
@@ -627,7 +627,7 @@ function openFactEvidenceDialog(fact, trigger) {
 }
 
 function renderEvidenceItem(item, index) {
-  const quote = String(item?.quote || "").trim();
+  const quote = evidenceItemText(item);
   const conversationId = String(item?.conversation_id || "");
   const messageIndex = Number.isFinite(Number(item?.message_index))
     ? Number(item.message_index) + 1
@@ -639,7 +639,7 @@ function renderEvidenceItem(item, index) {
     <article class="evidence-item">
       <div class="evidence-item-body">
         <span class="evidence-item-index">${index + 1}</span>
-        <blockquote>${escapeHtml(quote || "No quote saved.")}</blockquote>
+        <blockquote>${escapeHtml(quote)}</blockquote>
         <p>
           ${href
             ? `<a class="evidence-chat-link" href="${escapeHtml(href)}">Open chat ${escapeHtml(conversationId.slice(0, 8))} · message ${formatNumber(messageIndex)}</a>`
@@ -648,6 +648,15 @@ function renderEvidenceItem(item, index) {
       </div>
     </article>
   `;
+}
+
+function profileFactEvidenceItems(fact) {
+  const evidence = Array.isArray(fact?.evidence) ? fact.evidence : [];
+  return evidence.filter((item) => evidenceItemText(item));
+}
+
+function evidenceItemText(item) {
+  return String(item?.quote || item?.text || "").trim();
 }
 
 function closeFactEvidenceDialog() {
