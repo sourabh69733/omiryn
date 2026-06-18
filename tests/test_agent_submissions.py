@@ -15,7 +15,7 @@ from agent.providers import (
 )
 from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
-from storage import _normalize_database_url, reset_db, upsert_profile_fact
+from storage import _normalize_database_url, reset_db, save_agent_usage_event, upsert_profile_fact
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
@@ -654,6 +654,38 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(limits["groq_tpd"], 100000)
         self.assertEqual(limits["groq_rpm"], 30)
         self.assertEqual(limits["groq_tpm"], 6000)
+
+    def test_main_usage_dashboard_is_app_wide(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": None,
+                "request_kind": "chat_reply",
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "success": True,
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "total_tokens": 120,
+                "latency_ms": 50,
+                "raw_usage": {},
+            }
+        )
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.get("/api/agent/usage")
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.json()["summary"]
+        self.assertEqual(summary["request_count"], 1)
+        self.assertEqual(summary["total_tokens"], 120)
+        self.assertEqual(summary["chat_message_count"], 1)
+        self.assertEqual(summary["average_tokens_per_message"], 120)
+        self.assertEqual(summary["average_prompt_tokens_per_message"], 100)
+        self.assertEqual(summary["average_completion_tokens_per_message"], 20)
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")

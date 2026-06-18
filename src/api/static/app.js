@@ -108,6 +108,8 @@ const usageRequests = document.querySelector("#usage-requests");
 const usageRequestDetail = document.querySelector("#usage-request-detail");
 const usageTotalTokens = document.querySelector("#usage-total-tokens");
 const usageTokenDetail = document.querySelector("#usage-token-detail");
+const usageAverageInputTokens = document.querySelector("#usage-average-input-tokens");
+const usageAverageOutputTokens = document.querySelector("#usage-average-output-tokens");
 const usageCost = document.querySelector("#usage-cost");
 const usageCostDetail = document.querySelector("#usage-cost-detail");
 const usageFailures = document.querySelector("#usage-failures");
@@ -239,6 +241,9 @@ function renderAuthState() {
     datingBasicsComplete = null;
     renderSignedOutAuth("Continue with Google");
     renderAuthGate();
+    if (!authRequired && window.location.pathname === "/usage") {
+      loadUsageDashboard();
+    }
     return;
   }
 
@@ -264,6 +269,9 @@ function renderAuthState() {
   loadDatingBasicsStatus();
   if (window.location.pathname === "/profile") {
     loadProfilePage();
+  }
+  if (window.location.pathname === "/usage") {
+    loadUsageDashboard();
   }
 }
 
@@ -1730,10 +1738,19 @@ async function loadAgentUsage() {
     const inrCost = summary.estimated_cost_inr
       ? ` / ₹${summary.estimated_cost_inr.toFixed(4)}`
       : "";
+    const averageUsage = averageChatUsage(events, summary);
     usageSummary.innerHTML = `
       <div class="sidebar-usage-total">
         <strong>${formatNumber(summary.total_tokens || 0)}</strong>
         <span>total tokens</span>
+      </div>
+      <div class="sidebar-usage-total">
+        <strong>${formatNumber(averageUsage.prompt)}</strong>
+        <span>avg input / msg</span>
+      </div>
+      <div class="sidebar-usage-total">
+        <strong>${formatNumber(averageUsage.completion)}</strong>
+        <span>avg output / msg</span>
       </div>
       <div>${formatNumber(summary.request_count || 0)} requests · ${formatNumber(summary.successful_request_count || 0)} successful</div>
       <div>${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output${cost}${inrCost}</div>
@@ -1967,7 +1984,7 @@ async function loadUsageDashboard() {
   try {
     const response = await apiFetch("/api/agent/usage");
     const data = await response.json();
-    renderUsageSummary(data.summary || {});
+    renderUsageSummary(data.summary || {}, data.events || []);
     renderProviderMix(data.events || []);
     renderGroqRateLimitHealth(data.events || [], data.limits || {});
     renderTokensByMinute(data.events || []);
@@ -2001,11 +2018,6 @@ function renderGroqRateLimitHealth(events, limits = {}) {
   }
 
   const localRate = localGroqRate(groqEvents);
-
-  if (!groqEvents.length) {
-    rateLimitGrid.innerHTML = '<div class="table-empty">No Groq calls logged yet.</div>';
-    return;
-  }
 
   rateLimitGrid.innerHTML = `
     ${usageLimitMetric("RPM", localRate.rpmValue, limits.groq_rpm, "Requests consumed in last 60 seconds")}
@@ -2104,11 +2116,18 @@ function totalGroqTokens(events) {
   return events.reduce((total, event) => total + (event.total_tokens || 0), 0);
 }
 
-function renderUsageSummary(summary) {
+function renderUsageSummary(summary, events = []) {
+  const averageUsage = averageChatUsage(events, summary);
   usageRequests.textContent = formatNumber(summary.request_count || 0);
   usageRequestDetail.textContent = `${formatNumber(summary.successful_request_count || 0)} successful`;
   usageTotalTokens.textContent = formatNumber(summary.total_tokens || 0);
   usageTokenDetail.textContent = `${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output`;
+  if (usageAverageInputTokens) {
+    usageAverageInputTokens.textContent = formatNumber(averageUsage.prompt);
+  }
+  if (usageAverageOutputTokens) {
+    usageAverageOutputTokens.textContent = formatNumber(averageUsage.completion);
+  }
   usageFailures.textContent = formatNumber(summary.failed_request_count || 0);
 
   if (summary.estimated_cost_usd) {
@@ -2120,6 +2139,29 @@ function renderUsageSummary(summary) {
     usageCost.textContent = "$0.000000";
     usageCostDetail.textContent = "Set pricing env for estimates";
   }
+}
+
+function averageChatUsage(events, summary = {}) {
+  if (summary.average_tokens_per_message || summary.average_prompt_tokens_per_message || summary.average_completion_tokens_per_message) {
+    return {
+      total: summary.average_tokens_per_message || 0,
+      prompt: summary.average_prompt_tokens_per_message || 0,
+      completion: summary.average_completion_tokens_per_message || 0
+    };
+  }
+
+  const chatEvents = events.filter((event) =>
+    event.success && event.request_kind === "chat_reply" && event.total_tokens
+  );
+  if (!chatEvents.length) {
+    return { total: 0, prompt: 0, completion: 0 };
+  }
+
+  return {
+    total: Math.round(chatEvents.reduce((total, event) => total + (event.total_tokens || 0), 0) / chatEvents.length),
+    prompt: Math.round(chatEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0) / chatEvents.length),
+    completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
+  };
 }
 
 function renderProviderMix(events) {
@@ -2392,7 +2434,6 @@ if (draftId) {
   showScreen("profile");
 } else if (window.location.pathname === "/usage") {
   showScreen("usage");
-  loadUsageDashboard();
 } else {
   showScreen("interview");
   restoreOrStartConversation();

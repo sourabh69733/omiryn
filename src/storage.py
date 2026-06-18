@@ -572,6 +572,15 @@ def summarize_agent_usage(
 ) -> dict[str, Any]:
     events = list_agent_usage_events(conversation_id, user_id)
     successful_events = [event for event in events if event["success"]]
+    successful_chat_events = [
+        event for event in successful_events if event["request_kind"] == "chat_reply"
+    ]
+    chat_message_count = len(successful_chat_events)
+    chat_prompt_tokens = sum(event["prompt_tokens"] or 0 for event in successful_chat_events)
+    chat_completion_tokens = sum(
+        event["completion_tokens"] or 0 for event in successful_chat_events
+    )
+    chat_total_tokens = sum(event["total_tokens"] or 0 for event in successful_chat_events)
     estimated_cost_usd = round(
         sum(event["estimated_cost_usd"] or 0 for event in events),
         8,
@@ -584,9 +593,22 @@ def summarize_agent_usage(
         "prompt_tokens": sum(event["prompt_tokens"] or 0 for event in events),
         "completion_tokens": sum(event["completion_tokens"] or 0 for event in events),
         "total_tokens": sum(event["total_tokens"] or 0 for event in events),
+        "chat_message_count": chat_message_count,
+        "average_tokens_per_message": _average_int(chat_total_tokens, chat_message_count),
+        "average_prompt_tokens_per_message": _average_int(chat_prompt_tokens, chat_message_count),
+        "average_completion_tokens_per_message": _average_int(
+            chat_completion_tokens,
+            chat_message_count,
+        ),
         "estimated_cost_usd": estimated_cost_usd,
         "estimated_cost_inr": _estimated_cost_inr(estimated_cost_usd),
     }
+
+
+def _average_int(total: int, count: int) -> int:
+    if count <= 0:
+        return 0
+    return round(total / count)
 
 
 def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:
