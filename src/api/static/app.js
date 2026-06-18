@@ -1785,7 +1785,7 @@ function renderSidebarUsageEvents(events) {
       return `
         <div class="sidebar-usage-item ${status}">
           <div>
-            <strong>#${events.length - index} ${escapeHtml(event.request_kind || "agent_call")}</strong>
+            <strong>#${events.length - index} ${escapeHtml(usageRequestKindLabel(event.request_kind))}</strong>
             <span>${escapeHtml(createdAt)} · ${escapeHtml(event.model || event.provider || "-")}</span>
           </div>
           <div class="sidebar-usage-tokens">
@@ -2280,7 +2280,7 @@ function renderUsageEvents(events) {
       const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
       return `
         <tr>
-          <td>${escapeHtml(event.request_kind || "-")}<small>${escapeHtml(createdAt)}</small></td>
+          <td>${escapeHtml(usageRequestKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small></td>
           <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
           <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
           <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
@@ -2294,6 +2294,21 @@ function renderUsageEvents(events) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function usageRequestKindLabel(kind) {
+  const labels = {
+    chat_reply: "Chat reply",
+    input_guardrail: "Input guardrail",
+    profile_extract: "Profile draft extraction",
+    profile_extract_repair: "Profile extraction repair",
+    profile_signal_extract: "Profile signal extraction",
+    profile_signal_backfill: "Profile signal backfill",
+    profile_fact_aggregate: "Profile fact aggregation",
+    match_snapshot_generate: "Match snapshot generation"
+  };
+  if (!kind) return "Agent call";
+  return labels[kind] || titleize(String(kind).replaceAll("_", " "));
 }
 
 function formatUsd(value) {

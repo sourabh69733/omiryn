@@ -13,6 +13,7 @@ from agent.providers import (
     _mock_reply,
     _provider_messages,
 )
+from agent.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
 from storage import _normalize_database_url, reset_db, save_agent_usage_event, upsert_profile_fact
@@ -674,18 +675,35 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "raw_usage": {},
             }
         )
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": None,
+                "request_kind": PROFILE_SIGNAL_BACKFILL,
+                "provider": "groq",
+                "model": "llama-3.1-8b-instant",
+                "success": True,
+                "prompt_tokens": 400,
+                "completion_tokens": 80,
+                "total_tokens": 480,
+                "latency_ms": 120,
+                "raw_usage": {},
+            }
+        )
         app.dependency_overrides[current_user] = signed_in_user
 
         response = self.client.get("/api/agent/usage")
 
         self.assertEqual(response.status_code, 200)
         summary = response.json()["summary"]
-        self.assertEqual(summary["request_count"], 1)
-        self.assertEqual(summary["total_tokens"], 120)
+        events = response.json()["events"]
+        self.assertEqual(summary["request_count"], 2)
+        self.assertEqual(summary["total_tokens"], 600)
         self.assertEqual(summary["chat_message_count"], 1)
         self.assertEqual(summary["average_tokens_per_message"], 120)
         self.assertEqual(summary["average_prompt_tokens_per_message"], 100)
         self.assertEqual(summary["average_completion_tokens_per_message"], 20)
+        self.assertIn(PROFILE_SIGNAL_BACKFILL, {event["request_kind"] for event in events})
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")

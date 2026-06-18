@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from agent.extraction import normalize_extracted_profile
+from agent.usage import CHAT_REPLY, INPUT_GUARDRAIL, PROFILE_EXTRACT, PROFILE_EXTRACT_REPAIR
 from storage import save_agent_usage_event
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ async def generate_agent_reply(
     if not quality["valid"]:
         _record_usage_event(
             conversation_id=conversation_id,
-            request_kind="input_guardrail",
+            request_kind=INPUT_GUARDRAIL,
             provider="guardrail",
             model="local",
             success=True,
@@ -146,7 +147,7 @@ async def generate_agent_reply(
     if provider == "mock":
         _record_usage_event(
             conversation_id=conversation_id,
-            request_kind="chat_reply",
+            request_kind=CHAT_REPLY,
             provider=provider,
             model=model or "mock",
             success=True,
@@ -164,7 +165,7 @@ async def generate_agent_reply(
             ),
             messages,
             conversation_id=conversation_id,
-            request_kind="chat_reply",
+            request_kind=CHAT_REPLY,
             model=model,
         )
     if provider == "ollama":
@@ -178,7 +179,7 @@ async def generate_agent_reply(
             ),
             messages,
             conversation_id=conversation_id,
-            request_kind="chat_reply",
+            request_kind=CHAT_REPLY,
             model=model,
         )
     raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
@@ -195,7 +196,7 @@ async def extract_profile(
     if provider == "mock":
         _record_usage_event(
             conversation_id=conversation_id,
-            request_kind="profile_extract",
+            request_kind=PROFILE_EXTRACT,
             provider=provider,
             model=model or "mock",
             success=True,
@@ -216,7 +217,7 @@ async def extract_profile(
             extraction_messages,
             temperature=0,
             conversation_id=conversation_id,
-            request_kind="profile_extract",
+            request_kind=PROFILE_EXTRACT,
             model=model,
         )
     elif provider == "ollama":
@@ -225,7 +226,7 @@ async def extract_profile(
             extraction_messages,
             temperature=0,
             conversation_id=conversation_id,
-            request_kind="profile_extract",
+            request_kind=PROFILE_EXTRACT,
             model=model,
         )
     else:
@@ -241,7 +242,7 @@ async def extract_profile(
                 repair_messages,
                 temperature=0,
                 conversation_id=conversation_id,
-                request_kind="profile_extract_repair",
+                request_kind=PROFILE_EXTRACT_REPAIR,
                 model=model,
             )
         else:
@@ -250,7 +251,7 @@ async def extract_profile(
                 repair_messages,
                 temperature=0,
                 conversation_id=conversation_id,
-                request_kind="profile_extract_repair",
+                request_kind=PROFILE_EXTRACT_REPAIR,
                 model=model,
             )
         raw_profile = _parse_json_object(content)
