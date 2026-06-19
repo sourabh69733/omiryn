@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from fastapi import HTTPException, Request
@@ -11,6 +12,8 @@ from fastapi import HTTPException, Request
 class CurrentUser:
     id: str
     email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
 
 
 def auth_required() -> bool:
@@ -68,4 +71,23 @@ async def _verify_supabase_token(token: str) -> CurrentUser:
     if not user_id:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
 
-    return CurrentUser(id=user_id, email=payload.get("email"))
+    metadata = payload.get("user_metadata") or {}
+    return CurrentUser(
+        id=user_id,
+        email=payload.get("email"),
+        display_name=_metadata_display_name(metadata),
+        avatar_url=_metadata_avatar_url(metadata),
+    )
+
+
+def _metadata_display_name(metadata: dict[str, Any]) -> str | None:
+    for key in ("full_name", "name", "display_name"):
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _metadata_avatar_url(metadata: dict[str, Any]) -> str | None:
+    value = metadata.get("avatar_url") or metadata.get("picture")
+    return value.strip() if isinstance(value, str) and value.strip() else None

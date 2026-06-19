@@ -278,7 +278,7 @@ def auth_config() -> dict[str, object]:
 async def auth_me(user: CurrentUser | None = Depends(current_user)) -> dict[str, str | None]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
-    return {"id": user.id, "email": user.email}
+    return _auth_user_payload(user)
 
 
 @app.get("/api/me/dating-basics")
@@ -301,7 +301,13 @@ async def put_dating_basics(
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
-    profile = save_user_profile(user.id, payload.gender, payload.interested_in)
+    existing_profile = get_user_profile(user.id)
+    profile = save_user_profile(
+        user.id,
+        payload.gender,
+        payload.interested_in,
+        (existing_profile or {}).get("display_name") or user.display_name,
+    )
     return {"complete": True, "profile": profile}
 
 
@@ -311,11 +317,11 @@ async def get_me_profile(
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
-    profile = get_user_profile(user.id)
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
     sources = list_user_context_sources(user.id)
     facts = list_profile_facts(user.id)
     response = {
-        "user": {"id": user.id, "email": user.email},
+        "user": _auth_user_payload(user),
         "profile": profile,
         "learned_facts": facts,
         "learned_fact_groups": _group_profile_facts(facts),
@@ -1127,6 +1133,24 @@ def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[
         category = str(fact.get("category") or "other")
         groups.setdefault(category, []).append(fact)
     return groups
+
+
+def _profile_with_auth_defaults(
+    profile: dict[str, object] | None,
+    user: CurrentUser,
+) -> dict[str, object] | None:
+    if not profile or profile.get("display_name") or not user.display_name:
+        return profile
+    return {**profile, "display_name": user.display_name}
+
+
+def _auth_user_payload(user: CurrentUser) -> dict[str, str | None]:
+    payload = {"id": user.id, "email": user.email}
+    if user.display_name:
+        payload["display_name"] = user.display_name
+    if user.avatar_url:
+        payload["avatar_url"] = user.avatar_url
+    return payload
 
 
 def _profile_debug_data_enabled() -> bool:

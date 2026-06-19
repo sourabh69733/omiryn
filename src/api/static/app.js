@@ -256,14 +256,15 @@ function renderAuthState() {
   }
 
   const email = user.email || "Signed in";
+  const displayName = googleDisplayName(user) || email;
   if (authUser) {
     authUser.hidden = false;
   }
   if (authEmail) {
-    authEmail.textContent = email;
+    authEmail.textContent = displayName;
   }
   if (authAvatar) {
-    authAvatar.textContent = email.slice(0, 1).toUpperCase();
+    authAvatar.textContent = displayName.slice(0, 1).toUpperCase();
   }
   if (loginGoogle) {
     loginGoogle.hidden = true;
@@ -281,6 +282,11 @@ function renderAuthState() {
   if (window.location.pathname === "/usage") {
     loadUsageDashboard();
   }
+}
+
+function googleDisplayName(user) {
+  const metadata = user?.user_metadata || {};
+  return metadata.full_name || metadata.name || metadata.display_name || "";
 }
 
 function renderSignedOutAuth(label) {
