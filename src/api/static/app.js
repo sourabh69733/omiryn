@@ -1146,7 +1146,7 @@ function renderConversationHistory(conversations) {
 
   historyList.innerHTML = "";
   visibleConversations.forEach((conversation) => {
-    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`;
+    const title = `Conversation ${conversation.id.slice(0, 8)}`;
     const item = document.createElement("div");
     item.className = "history-item";
     item.classList.toggle("active", conversation.id === conversationId);
