@@ -23,8 +23,12 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
+
+# Vercel/serverless should not keep an application-side SQLAlchemy pool.
+DB_DISABLE_POOL="false"
 
 metadata = MetaData()
 
@@ -138,10 +142,20 @@ def engine() -> Engine:
         if db_path.parent != Path("."):
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    return create_engine(
-        url,
-        connect_args={"check_same_thread": False} if url.startswith("sqlite") else {},
-    )
+    connect_args: dict[str, Any] = {}
+    engine_args: dict[str, Any] = {"pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+    else:
+        connect_args["prepare_threshold"] = None
+        if _disable_application_pool():
+            engine_args["poolclass"] = NullPool
+
+    return create_engine(url, connect_args=connect_args, **engine_args)
+
+
+def _disable_application_pool() -> bool:
+    return DB_DISABLE_POOL == "true"
 
 
 ENGINE = engine()

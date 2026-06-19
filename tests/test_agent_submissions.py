@@ -22,6 +22,7 @@ from storage import _normalize_database_url, reset_db, save_agent_usage_event, u
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
         os.environ["AUTH_REQUIRED"] = "false"
+        os.environ["AGENT_PROVIDER"] = "mock"
         app.dependency_overrides.clear()
         reset_db()
         self.client = TestClient(app)
