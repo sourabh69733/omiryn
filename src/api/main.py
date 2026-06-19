@@ -25,6 +25,7 @@ from agent.providers import (
     agent_runtime_status,
     extract_profile,
 )
+from admin.routes import ADMIN_STATIC_DIR, router as admin_router
 from agent.context import (
     STYLE_CONTEXT_SOURCE_TYPES,
     build_profile_extraction_context_sources,
@@ -111,6 +112,12 @@ class NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
+app.mount(
+    "/admin/static",
+    NoCacheStaticFiles(directory=ADMIN_STATIC_DIR),
+    name="admin-static",
+)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
