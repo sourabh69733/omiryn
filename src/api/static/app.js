@@ -85,6 +85,10 @@ const activeMemoryList = document.querySelector("#active-memory-list");
 const toneSuggestion = document.querySelector("#tone-suggestion");
 const applyDetectedTone = document.querySelector("#apply-detected-tone");
 const contextPrompt = document.querySelector("#context-prompt");
+const openContextMemory = document.querySelector("#open-context-memory");
+const contextMemoryDialog = document.querySelector("#context-memory-dialog");
+const closeContextMemory = document.querySelector("#close-context-memory");
+const cancelContextMemory = document.querySelector("#cancel-context-memory");
 const copyContextPrompt = document.querySelector("#copy-context-prompt");
 const contextSourceType = document.querySelector("#context-source-type");
 const contextTitle = document.querySelector("#context-title");
@@ -96,6 +100,10 @@ const whatsappSender = document.querySelector("#whatsapp-sender");
 const whatsappStyleName = document.querySelector("#whatsapp-style-name");
 const whatsappFiles = document.querySelector("#whatsapp-files");
 const whatsappContent = document.querySelector("#whatsapp-content");
+const openWhatsappStyle = document.querySelector("#open-whatsapp-style");
+const whatsappStyleDialog = document.querySelector("#whatsapp-style-dialog");
+const closeWhatsappStyle = document.querySelector("#close-whatsapp-style");
+const cancelWhatsappStyle = document.querySelector("#cancel-whatsapp-style");
 const saveWhatsappImport = document.querySelector("#save-whatsapp-import");
 const whatsappStatus = document.querySelector("#whatsapp-status");
 const whatsappImportLog = document.querySelector("#whatsapp-import-log");
@@ -667,6 +675,33 @@ function closeFactEvidenceDialog() {
     lastEvidenceTrigger.focus();
   }
   lastEvidenceTrigger = null;
+}
+
+function openContextMemoryDialog() {
+  if (!contextMemoryDialog) return;
+  contextMemoryDialog.hidden = false;
+  loadContextImportPrompt();
+  contextTitle?.focus();
+}
+
+function closeContextMemoryDialog() {
+  if (contextMemoryDialog) {
+    contextMemoryDialog.hidden = true;
+  }
+  openContextMemory?.focus();
+}
+
+function openWhatsappStyleDialog() {
+  if (!whatsappStyleDialog) return;
+  whatsappStyleDialog.hidden = false;
+  whatsappSender?.focus();
+}
+
+function closeWhatsappStyleDialog() {
+  if (whatsappStyleDialog) {
+    whatsappStyleDialog.hidden = true;
+  }
+  openWhatsappStyle?.focus();
 }
 
 function profileFactCategoryOrder(category) {
@@ -1346,6 +1381,7 @@ async function saveConversationContextSource() {
     contextContent.value = "";
     setContextStatus("Context saved. Future replies can use it.");
     await loadContextSources();
+    closeContextMemoryDialog();
   } catch (error) {
     setContextStatus(error.message);
   } finally {
@@ -1396,6 +1432,7 @@ async function saveWhatsappStyleImport() {
       whatsappContent.value = "";
     }
     await loadContextSources();
+    closeWhatsappStyleDialog();
     setWhatsappStatus(
       `${imports.length} text style${imports.length === 1 ? "" : "s"} imported.`,
       "success"
@@ -1490,7 +1527,7 @@ function renderContextSources(sources) {
   if (!contextSourceList) return;
 
   if (!sources.length) {
-    contextSourceList.innerHTML = "";
+    contextSourceList.innerHTML = '<div class="context-source-empty">No saved memory yet.</div>';
     setContextStatus("No imported context yet.");
     return;
   }
@@ -2381,6 +2418,12 @@ agentContextButton?.addEventListener("click", (event) => {
   toggleContextPicker();
 });
 applyDetectedTone?.addEventListener("click", applyDetectedToneSelection);
+openContextMemory?.addEventListener("click", openContextMemoryDialog);
+closeContextMemory?.addEventListener("click", closeContextMemoryDialog);
+cancelContextMemory?.addEventListener("click", closeContextMemoryDialog);
+openWhatsappStyle?.addEventListener("click", openWhatsappStyleDialog);
+closeWhatsappStyle?.addEventListener("click", closeWhatsappStyleDialog);
+cancelWhatsappStyle?.addEventListener("click", closeWhatsappStyleDialog);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
 saveContextSource?.addEventListener("click", saveConversationContextSource);
 saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
@@ -2404,6 +2447,16 @@ deleteSessionDialog?.addEventListener("click", (event) => {
     closeDeleteSessionDialog();
   }
 });
+contextMemoryDialog?.addEventListener("click", (event) => {
+  if (event.target === contextMemoryDialog) {
+    closeContextMemoryDialog();
+  }
+});
+whatsappStyleDialog?.addEventListener("click", (event) => {
+  if (event.target === whatsappStyleDialog) {
+    closeWhatsappStyleDialog();
+  }
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (factEvidenceDialog && !factEvidenceDialog.hidden) {
@@ -2411,6 +2464,12 @@ document.addEventListener("keydown", (event) => {
   }
   if (deleteSessionDialog && !deleteSessionDialog.hidden) {
     closeDeleteSessionDialog();
+  }
+  if (contextMemoryDialog && !contextMemoryDialog.hidden) {
+    closeContextMemoryDialog();
+  }
+  if (whatsappStyleDialog && !whatsappStyleDialog.hidden) {
+    closeWhatsappStyleDialog();
   }
 });
 loginGoogle?.addEventListener("click", signInWithGoogle);

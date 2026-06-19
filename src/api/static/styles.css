@@ -801,10 +801,141 @@ p {
   text-align: center;
 }
 
+.context-intro {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+  border: 1px solid #cfe1dc;
+  border-radius: 8px;
+  background: #f4fbf9;
+  padding: 13px;
+}
+
+.context-visual {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--primary);
+  font-weight: 900;
+}
+
+.context-intro h2 {
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.context-intro p:not(.eyebrow) {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.context-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 13px;
+}
+
+.context-action-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.context-action-button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-action-button:hover,
+.context-action-button:focus-visible {
+  border-color: #b8d8cf;
+  background: #f4fbf9;
+}
+
+.context-action-button strong,
+.context-action-button small {
+  display: block;
+  grid-column: 2;
+}
+
+.context-action-button strong {
+  font-size: 13px;
+}
+
+.context-action-button small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.context-card-muted {
+  background: var(--soft);
+}
+
+.context-card-heading {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.context-card-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cfe1dc;
+  border-radius: 8px;
+  color: var(--primary);
+  background: #eef8f3;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.context-card-heading h3 {
+  font-size: 15px;
+}
+
+.context-card-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.context-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
 .context-field {
   display: grid;
   gap: 7px;
-  margin-top: 14px;
+  margin-top: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -837,12 +968,6 @@ p {
   cursor: pointer;
 }
 
-.context-divider {
-  height: 1px;
-  margin: 18px 0;
-  background: var(--line);
-}
-
 .quiet-note[data-state="working"] {
   color: var(--primary);
 }
@@ -860,7 +985,7 @@ p {
 .whatsapp-import-log {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .whatsapp-import-item {
@@ -889,14 +1014,14 @@ p {
 .context-source-list {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .context-source-item {
-  border: 1px solid var(--line);
+  border: 1px solid #d7e5e1;
   border-radius: 8px;
   background: #ffffff;
-  padding: 10px;
+  padding: 11px;
 }
 
 .context-source-item strong,
@@ -912,6 +1037,45 @@ p {
   margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.context-source-empty {
+  border: 1px dashed #cfded9;
+  border-radius: 8px;
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 12px;
+}
+
+.context-modal {
+  display: grid;
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(23, 32, 38, 0.28);
+}
+
+.context-modal-body {
+  display: grid;
+  gap: 12px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.context-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.context-modal-actions button {
+  min-width: 132px;
 }
 
 .chat-card {

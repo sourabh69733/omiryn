@@ -109,90 +109,42 @@
               </div>
 
               <section class="side-panel" data-side-panel="context" hidden>
-                <p class="eyebrow">Import Context</p>
-                <h2>External memory</h2>
-                <p class="quiet-note">
-                  Ask another LLM to summarize you, then paste the result here.
-                </p>
+                
+                <div class="context-intro">
+                  <span class="context-visual" aria-hidden="true">M</span>
+                  <div>
+                    <p class="eyebrow">Context Library</p>
+                    <h2>Saved context</h2>
+                    <p>Keep memory and style sources organized. Add more only when you need it.</p>
+                  </div>
+                </div>
 
-                <label class="context-field">
-                  Prompt to copy
-                  <textarea id="context-prompt" rows="7" readonly>I am using Omiryn to build a private personal profile about myself.
-
-Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
-Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
-
-Return sections:
-1. Basic background and life context, only if known
-2. Personality traits and temperament
-3. Core values, priorities, and beliefs
-4. Interests, hobbies, routines, and lifestyle patterns
-5. Communication style and thinking style
-6. Goals, ambitions, and current focus areas
-7. Strengths, recurring challenges, and stress patterns
-8. Preferences, dislikes, boundaries, and sensitivities
-9. Important unknowns Omiryn should ask me
-
-Rules:
-- Do not invent facts.
-- Mark uncertain points as uncertain.
-- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
-- Avoid exposing names, phone numbers, addresses, or private third-party details.
-- Keep it under 1000 words.</textarea>
-                </label>
-                <button class="secondary-button primary-wide" id="copy-context-prompt" type="button">
-                  Copy prompt
-                </button>
-
-                <label class="context-field">
-                  Source type
-                  <select id="context-source-type">
-                    <option value="llm_profile">ChatGPT / Claude / Gemini summary</option>
-                    <option value="chat_export">Short chat summary</option>
-                    <option value="manual_notes">Manual notes</option>
-                  </select>
-                </label>
-                <label class="context-field">
-                  Title
-                  <input id="context-title" type="text" value="Imported context" />
-                </label>
-                <label class="context-field">
-                  Paste result
-                  <textarea id="context-content" rows="7" placeholder="Paste the summary or chat context here..."></textarea>
-                </label>
-                <button class="primary-wide" id="save-context-source" type="button">
-                  Save context
-                </button>
+                <div class="context-card context-card-muted">
+                  <div class="context-card-heading">
+                    <span class="context-card-icon" aria-hidden="true">✓</span>
+                    <div>
+                      <h3>Saved memory</h3>
+                      <p>These sources can be attached to replies from the chat controls.</p>
+                    </div>
+                  </div>
+                  <div class="context-source-list" id="context-source-list"></div>
+                </div>
+                
+                <div class="context-action-grid">
+                  <button class="context-action-button" id="open-context-memory" type="button">
+                    <span class="context-card-icon" aria-hidden="true">+</span>
+                    <strong>Add memory</strong>
+                    <small>Paste a profile summary, chat export, or manual notes.</small>
+                  </button>
+                  <button class="context-action-button" id="open-whatsapp-style" type="button">
+                    <span class="context-card-icon" aria-hidden="true">Aa</span>
+                    <strong>Import text style</strong>
+                    <small>Learn tone from a WhatsApp export.</small>
+                  </button>
+                </div>
                 <p class="quiet-note" id="context-status">No imported context yet.</p>
-                <div class="context-source-list" id="context-source-list"></div>
-
-                <div class="context-divider"></div>
-                <p class="eyebrow">WhatsApp Style</p>
-                <h2>Learn a text style</h2>
-                <p class="quiet-note">
-                  Import a normal 1:1 WhatsApp text export. Omiryn stores a compact style summary and will not pretend to be that person.
-                </p>
-                <label class="context-field">
-                  Sender to learn
-                  <input id="whatsapp-sender" type="text" placeholder="Exact name from export, e.g. Sanjay" />
-                </label>
-                <label class="context-field">
-                  Style name
-                  <input id="whatsapp-style-name" type="text" placeholder="Sanjay-style, Nikhil-style..." />
-                </label>
-                <label class="context-field">
-                  WhatsApp .txt files
-                  <input id="whatsapp-files" type="file" accept=".txt,text/plain" multiple />
-                </label>
-                <label class="context-field">
-                  Or paste export
-                  <textarea id="whatsapp-content" rows="5" placeholder="Paste WhatsApp exported text here..."></textarea>
-                </label>
-                <button class="secondary-button primary-wide" id="save-whatsapp-import" type="button">
-                  Import text style
-                </button>
                 <p class="quiet-note" id="whatsapp-status">
-                  V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context.
+                  Text style imports will appear here after upload.
                 </p>
                 <div class="whatsapp-import-log" id="whatsapp-import-log"></div>
               </section>
@@ -685,6 +637,126 @@ Rules:
         </div>
         <div class="evidence-summary" id="fact-evidence-summary"></div>
         <div class="evidence-list" id="fact-evidence-list"></div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="context-memory-dialog" hidden>
+      <section
+        class="context-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="context-memory-title"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Add Memory</p>
+            <h2 id="context-memory-title">Import external context</h2>
+            <p>Use this for a compact profile summary, exported chat notes, or manual memory.</p>
+          </div>
+          <button class="evidence-close" id="close-context-memory" type="button" aria-label="Close memory import">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="context-modal-body">
+          <label class="context-field">
+            Prompt to copy
+            <textarea id="context-prompt" rows="5" readonly>I am using Omiryn to build a private personal profile about myself.
+
+Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
+Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
+
+Return sections:
+1. Basic background and life context, only if known
+2. Personality traits and temperament
+3. Core values, priorities, and beliefs
+4. Interests, hobbies, routines, and lifestyle patterns
+5. Communication style and thinking style
+6. Goals, ambitions, and current focus areas
+7. Strengths, recurring challenges, and stress patterns
+8. Preferences, dislikes, boundaries, and sensitivities
+9. Important unknowns Omiryn should ask me
+
+Rules:
+- Do not invent facts.
+- Mark uncertain points as uncertain.
+- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
+- Avoid exposing names, phone numbers, addresses, or private third-party details.
+- Keep it under 1000 words.</textarea>
+          </label>
+          <button class="secondary-button primary-wide" id="copy-context-prompt" type="button">
+            Copy prompt
+          </button>
+
+          <div class="context-form-grid">
+            <label class="context-field">
+              Source type
+              <select id="context-source-type">
+                <option value="llm_profile">ChatGPT / Claude / Gemini summary</option>
+                <option value="chat_export">Short chat summary</option>
+                <option value="manual_notes">Manual notes</option>
+              </select>
+            </label>
+            <label class="context-field">
+              Title
+              <input id="context-title" type="text" value="Imported context" />
+            </label>
+          </div>
+          <label class="context-field">
+            Paste result
+            <textarea id="context-content" rows="6" placeholder="Paste the summary or chat context here..."></textarea>
+          </label>
+          <div class="context-modal-actions">
+            <button class="secondary-button" id="cancel-context-memory" type="button">Cancel</button>
+            <button id="save-context-source" type="button">Save memory</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="whatsapp-style-dialog" hidden>
+      <section
+        class="context-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="whatsapp-style-title"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Text Style</p>
+            <h2 id="whatsapp-style-title">Import WhatsApp style</h2>
+            <p>Import a normal 1:1 WhatsApp export. Omiryn stores a compact style summary.</p>
+          </div>
+          <button class="evidence-close" id="close-whatsapp-style" type="button" aria-label="Close text style import">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="context-modal-body">
+          <label class="context-field">
+            Sender to learn
+            <input id="whatsapp-sender" type="text" placeholder="Exact name from export, e.g. Sanjay" />
+          </label>
+          <label class="context-field">
+            Style name
+            <input id="whatsapp-style-name" type="text" placeholder="Sanjay-style, Nikhil-style..." />
+          </label>
+          <label class="context-field">
+            WhatsApp .txt files
+            <input id="whatsapp-files" type="file" accept=".txt,text/plain" multiple />
+          </label>
+          <label class="context-field">
+            Or paste export
+            <textarea id="whatsapp-content" rows="6" placeholder="Paste WhatsApp exported text here..."></textarea>
+          </label>
+          <p class="quiet-note">
+            V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context.
+          </p>
+          <div class="context-modal-actions">
+            <button class="secondary-button" id="cancel-whatsapp-style" type="button">Cancel</button>
+            <button class="secondary-button" id="save-whatsapp-import" type="button">
+              Import text style
+            </button>
+          </div>
+        </div>
       </section>
     </div>
 
