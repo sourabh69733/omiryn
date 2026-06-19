@@ -1092,7 +1092,7 @@ function updateSidebarMeta() {
 
   if (sidebarConversationId) {
     sidebarConversationId.textContent = conversationId
-      ? `Session ${conversationId.slice(0, 8)}`
+      ? `Conversation ${conversationId.slice(0, 8)}`
       : "No conversation started.";
   }
 }
@@ -1146,6 +1146,7 @@ function renderConversationHistory(conversations) {
 
   historyList.innerHTML = "";
   visibleConversations.forEach((conversation) => {
+    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`;
     const item = document.createElement("div");
     item.className = "history-item";
     item.classList.toggle("active", conversation.id === conversationId);
@@ -1156,11 +1157,11 @@ function renderConversationHistory(conversations) {
       : "No timestamp";
     item.innerHTML = `
       <div class="history-item-copy">
-        <strong>Session ${escapeHtml(conversation.id.slice(0, 8))}</strong>
+        <strong>${escapeHtml(title)}</strong>
         <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
         <small>${escapeHtml(updatedAt)}</small>
       </div>
-      <button class="history-delete" type="button" aria-label="Delete session ${escapeHtml(conversation.id.slice(0, 8))}" title="Delete session">
+      <button class="history-delete" type="button" aria-label="Delete conversation ${escapeHtml(title)}" title="Delete conversation">
         <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
           <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
           <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
@@ -1182,19 +1183,19 @@ function renderConversationHistory(conversations) {
     item.querySelector(".history-delete")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openDeleteSessionDialog(conversation.id, event.currentTarget);
+      openDeleteSessionDialog(conversation.id, event.currentTarget, title);
     });
     historyList.appendChild(item);
   });
 }
 
-function openDeleteSessionDialog(id, trigger) {
+function openDeleteSessionDialog(id, trigger, title) {
   if (!id) return;
 
   pendingDeleteConversationId = id;
   lastDeleteTrigger = trigger || null;
   if (deleteSessionId) {
-    deleteSessionId.textContent = `Session ${id.slice(0, 8)}`;
+    deleteSessionId.textContent = title || `Conversation ${id.slice(0, 8)}`;
   }
   if (deleteSessionDialog) {
     deleteSessionDialog.hidden = false;

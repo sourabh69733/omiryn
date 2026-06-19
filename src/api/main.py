@@ -1,6 +1,7 @@
-from pathlib import Path
 import logging
 import os
+import re
+from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
@@ -201,6 +202,7 @@ class AgentConversationSettings(BaseModel):
 
 class AgentConversationSummary(BaseModel):
     id: str
+    title: str
     status: Literal["active", "extracted"]
     agent_provider: str | None = None
     agent_model: str | None = None
@@ -212,6 +214,18 @@ class AgentConversationSummary(BaseModel):
     context_source_count: int = 0
     created_at: str | None = None
     updated_at: str | None = None
+
+
+def _conversation_title(messages: list[dict[str, object]]) -> str:
+    for message in messages:
+        if message.get("role") != "user" or message.get("quality") == "low_information":
+            continue
+        content = str(message.get("content") or "").strip()
+        if not content:
+            continue
+        title = re.sub(r"\s+", " ", content)
+        return title[:54].rstrip() + ("..." if len(title) > 54 else "")
+    return "New conversation"
 
 
 class UserMessage(BaseModel):
@@ -595,6 +609,7 @@ async def list_agent_conversations(
         summaries.append(
             AgentConversationSummary(
                 id=conversation["id"],
+                title=_conversation_title(messages),
                 status=conversation["status"],
                 agent_provider=conversation["agent_provider"],
                 agent_model=conversation["agent_model"],

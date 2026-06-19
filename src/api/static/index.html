@@ -151,22 +151,22 @@
 
               <section class="side-panel active" data-side-panel="history">
                 <p class="eyebrow">Chat History</p>
-                <h2>Current session</h2>
+                <h2>Conversations</h2>
                 <div class="history-list" id="history-list">
                   <div class="history-item active" role="button" tabindex="0">
-                    <strong>Relationship profile</strong>
+                    <strong>Current chat</strong>
                     <span id="sidebar-message-count">0 messages</span>
                   </div>
                 </div>
                 <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button">
-                  New chat session
+                  New conversation
                 </button>
-                <button class="primary-wide" id="extract-profile" type="button" disabled>
+                <!-- <button class="primary-wide" id="extract-profile" type="button" disabled>
                   Extract review draft
                 </button>
                 <p class="quiet-note">
                   Creates a draft you can edit and approve before matching.
-                </p>
+                </p> -->
                 <p class="quiet-note" id="sidebar-conversation-id">No conversation started.</p>
               </section>
 
@@ -594,12 +594,12 @@
           </svg>
         </div>
         <div class="confirm-copy">
-          <p class="eyebrow">Delete Session</p>
+          <p class="eyebrow">Delete Conversation</p>
           <h2 id="delete-session-title">Remove this chat history?</h2>
           <p id="delete-session-copy">
-            This will remove the chat, imported context, and usage log for this session.
+            This will remove the chat, imported context, and usage log for this conversation.
           </p>
-          <p class="confirm-session" id="delete-session-id">Session</p>
+          <p class="confirm-session" id="delete-session-id">Conversation</p>
         </div>
         <div class="confirm-actions">
           <button class="secondary-button" id="cancel-delete-session" type="button">Cancel</button>

@@ -412,7 +412,9 @@ p {
   color: var(--ink);
   background: var(--soft);
   padding: 12px;
+  cursor: pointer;
   text-align: left;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .history-item.active {
@@ -421,8 +423,16 @@ p {
 }
 
 .history-item:hover {
+  border-color: #b8d6ce;
   color: var(--ink);
   background: #ffffff;
+  box-shadow: 0 10px 24px rgba(16, 24, 32, 0.08);
+  transform: translateY(-1px);
+}
+
+.history-item:focus-visible {
+  outline: 3px solid rgba(31, 95, 91, 0.2);
+  outline-offset: 2px;
 }
 
 .history-item-copy {
@@ -437,6 +447,7 @@ p {
 
 .history-item-copy strong {
   font-size: 14px;
+  line-height: 1.25;
 }
 
 .history-item-copy span {
@@ -461,7 +472,16 @@ p {
   border-radius: 8px;
   color: #9b3f31;
   background: #fff2ef;
+  cursor: pointer;
   padding: 0;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.history-delete:hover {
+  border-color: #d99588;
+  color: #7f3125;
+  background: #ffe4de;
+  transform: scale(1.04);
 }
 
 .history-delete svg {
