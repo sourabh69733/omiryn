@@ -23,12 +23,19 @@ if load_dotenv:
 from agent.providers import (
     AgentProviderError,
     agent_runtime_status,
-    assess_user_message_quality,
-    extract_deep_profile_facts,
     extract_profile,
-    generate_agent_reply,
 )
-from agent.profile_facts import extract_profile_facts_from_message
+from agent.context import (
+    STYLE_CONTEXT_SOURCE_TYPES,
+    build_profile_extraction_context_sources,
+    build_reply_context_sources,
+    selected_style_source_exists,
+)
+from agent.memory import (
+    capture_deep_profile_facts_from_conversation,
+    should_run_deep_profile_fact_extraction,
+)
+from agent.orchestrator import run_agent_turn
 from auth import CurrentUser, current_user
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
@@ -47,7 +54,6 @@ from storage import (
     save_context_source,
     save_conversation,
     save_draft,
-    upsert_profile_fact,
     save_user_profile,
     summarize_agent_usage,
 )
@@ -66,31 +72,6 @@ ContextSourceType = Literal[
 WhatsappStyleKind = Literal["user_style", "friend_style"]
 Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
 InterestedIn = Literal["men", "women", "everyone"]
-STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
-MEMORY_RETRIEVAL_LIMIT = 2
-DEEP_FACT_EXTRACTION_INTERVAL = int(os.getenv("PROFILE_FACT_DEEP_EXTRACT_INTERVAL", "5"))
-MEMORY_TRIGGER_TERMS = {
-    "context",
-    "memory",
-    "remember",
-    "saved",
-    "imported",
-    "upload",
-    "uploaded",
-    "whatsapp",
-    "chatgpt",
-    "claude",
-    "gemini",
-    "summary",
-    "profile",
-    "about me",
-    "know about me",
-    "what do you know",
-    "last topic",
-    "last message",
-    "past chat",
-    "conversation",
-}
 LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
 
 Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
@@ -685,41 +666,26 @@ async def send_agent_message(
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
 
-    user_message = {"role": "user", "content": payload.message}
-    quality = assess_user_message_quality(conversation.messages + [user_message])
-    if not quality["valid"]:
-        user_message["quality"] = "low_information"
-    conversation.messages.append(user_message)
-    _capture_profile_facts_from_user_message(
-        conversation.id,
-        user,
-        payload.message,
-        len(conversation.messages) - 1,
-        bool(quality["valid"]),
-    )
     try:
-        reply = await generate_agent_reply(
-            conversation.messages,
+        turn = await run_agent_turn(
             conversation_id=conversation.id,
+            messages=conversation.messages,
+            user_text=payload.message,
+            user_id=_user_id(user),
+            user_profile=get_user_profile(user.id) if user else None,
             model=conversation.agent_model,
             agent_mode=conversation.agent_mode,
             agent_tone=conversation.agent_tone,
-            context_sources=_smart_reply_context_sources(
-                conversation.id,
-                conversation.agent_style_source_id,
-                payload.message,
-                _user_id(user),
-            ),
-            user_profile=get_user_profile(user.id) if user else None,
+            style_source_id=conversation.agent_style_source_id,
         )
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
-    conversation.messages.append({"role": "assistant", "content": reply})
+    conversation.messages = turn.messages
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
-    if _should_run_deep_profile_fact_extraction(user, conversation.messages, bool(quality["valid"])):
+    if should_run_deep_profile_fact_extraction(_user_id(user), conversation.messages, turn.quality_valid):
         background_tasks.add_task(
-            _capture_deep_profile_facts_from_conversation,
+            capture_deep_profile_facts_from_conversation,
             conversation.id,
             user.id,
             conversation.messages,
@@ -1030,11 +996,7 @@ def _profile_extraction_context_sources(
     conversation_id: str,
     user_id: str | None = None,
 ) -> list[dict[str, object]]:
-    return [
-        source
-        for source in list_context_sources(conversation_id, user_id)
-        if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
-    ]
+    return build_profile_extraction_context_sources(conversation_id, user_id)
 
 
 def _smart_reply_context_sources(
@@ -1043,108 +1005,7 @@ def _smart_reply_context_sources(
     user_text: str,
     user_id: str | None = None,
 ) -> list[dict[str, object]]:
-    sources = list_context_sources(conversation_id, user_id)
-    selected_styles = _selected_style_sources(sources, style_source_id)
-    retrieved_sources = _relevant_memory_sources(sources, user_text)
-
-    if selected_styles:
-        selected_style_ids = {source.get("id") for source in selected_styles}
-        return selected_styles + [
-            source for source in retrieved_sources if source.get("id") not in selected_style_ids
-        ]
-
-    return retrieved_sources
-
-
-def _selected_style_sources(
-    sources: list[dict[str, object]],
-    style_source_id: str | None,
-) -> list[dict[str, object]]:
-    style_sources = [
-        source for source in sources if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
-    ]
-    if not style_source_id:
-        return style_sources[:MEMORY_RETRIEVAL_LIMIT]
-    selected = [source for source in style_sources if source.get("id") == style_source_id]
-    return selected or style_sources[:MEMORY_RETRIEVAL_LIMIT]
-
-
-def _relevant_memory_sources(
-    sources: list[dict[str, object]],
-    user_text: str,
-) -> list[dict[str, object]]:
-    if not _should_retrieve_memory(user_text):
-        return []
-
-    scored_sources = [
-        (score, source)
-        for source in sources
-        if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
-        for score in [_memory_source_score(source, user_text)]
-        if score > 0
-    ]
-    scored_sources.sort(key=lambda item: item[0], reverse=True)
-    return [source for _, source in scored_sources[:MEMORY_RETRIEVAL_LIMIT]]
-
-
-def _should_retrieve_memory(user_text: str) -> bool:
-    normalized = _normalized_memory_text(user_text)
-    return any(term in normalized for term in MEMORY_TRIGGER_TERMS)
-
-
-def _memory_source_score(source: dict[str, object], user_text: str) -> int:
-    query_terms = _memory_terms(user_text)
-    if not query_terms:
-        return 0
-    source_text = _normalized_memory_text(
-        " ".join(
-            [
-                str(source.get("title") or ""),
-                str(source.get("source_type") or ""),
-                str(source.get("content") or ""),
-            ]
-        )
-    )
-    score = sum(source_text.count(term) for term in query_terms)
-    source_type = source.get("source_type")
-    if source_type == "llm_profile" and any(term in query_terms for term in {"profile", "about", "me"}):
-        score += 2
-    if source_type == "chat_export" and any(term in query_terms for term in {"chat", "conversation", "topic"}):
-        score += 2
-    return score
-
-
-def _memory_terms(text: str) -> set[str]:
-    normalized = _normalized_memory_text(text)
-    stop_words = {
-        "the",
-        "and",
-        "for",
-        "you",
-        "your",
-        "about",
-        "with",
-        "from",
-        "what",
-        "that",
-        "this",
-        "tell",
-        "me",
-        "my",
-        "can",
-        "please",
-    }
-    return {
-        term
-        for term in normalized.split()
-        if len(term) >= 3 and term not in stop_words
-    }
-
-
-def _normalized_memory_text(text: str) -> str:
-    return " ".join(
-        "".join(character.lower() if character.isalnum() else " " for character in text).split()
-    )
+    return build_reply_context_sources(conversation_id, style_source_id, user_text, user_id)
 
 
 def _validate_style_source(
@@ -1152,14 +1013,8 @@ def _validate_style_source(
     style_source_id: str | None,
     user_id: str | None = None,
 ) -> None:
-    if not style_source_id:
+    if selected_style_source_exists(conversation_id, style_source_id, user_id):
         return
-    for source in list_context_sources(conversation_id, user_id):
-        if (
-            source.get("id") == style_source_id
-            and source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
-        ):
-            return
     raise HTTPException(status_code=400, detail="Selected reply style was not found.")
 
 
@@ -1257,60 +1112,6 @@ def _context_source_summary(
     if attached is not None:
         summary["attached"] = attached
     return summary
-
-
-def _capture_profile_facts_from_user_message(
-    conversation_id: str,
-    user: CurrentUser | None,
-    message: str,
-    message_index: int,
-    quality_valid: bool,
-) -> None:
-    if not user or not quality_valid:
-        return
-
-    facts = extract_profile_facts_from_message(
-        user.id,
-        conversation_id,
-        message,
-        message_index,
-    )
-    for fact in facts:
-        upsert_profile_fact(fact)
-
-
-def _should_run_deep_profile_fact_extraction(
-    user: CurrentUser | None,
-    messages: list[dict[str, object]],
-    quality_valid: bool,
-) -> bool:
-    if not user or not quality_valid or DEEP_FACT_EXTRACTION_INTERVAL <= 0:
-        return False
-    valid_user_messages = sum(
-        1
-        for message in messages
-        if message.get("role") == "user" and message.get("quality") != "low_information"
-    )
-    return valid_user_messages > 0 and valid_user_messages % DEEP_FACT_EXTRACTION_INTERVAL == 0
-
-
-async def _capture_deep_profile_facts_from_conversation(
-    conversation_id: str,
-    user_id: str,
-    messages: list[dict[str, object]],
-    model: str | None,
-) -> None:
-    try:
-        facts = await extract_deep_profile_facts(
-            messages,  # type: ignore[arg-type]
-            user_id,
-            conversation_id=conversation_id,
-            model=model,
-        )
-        for fact in facts:
-            upsert_profile_fact(fact)
-    except Exception:
-        logger.exception("agent.deep_facts.capture_failed conversation_id=%s", conversation_id)
 
 
 def _group_profile_facts(facts: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
