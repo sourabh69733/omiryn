@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omiryn Admin</title>
+    <link rel="stylesheet" href="/admin/static/styles.css?v=20260619-admin-v1" />
+  </head>
+  <body>
+    <div class="admin-shell">
+      <header class="admin-header">
+        <a class="brand" href="/admin" aria-label="Omiryn admin home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>
+            <strong>Omiryn Admin</strong>
+            <small>Users, activity, and API usage</small>
+          </span>
+        </a>
+        <nav class="admin-nav" aria-label="Admin sections">
+          <a href="/admin" data-route="dashboard">Dashboard</a>
+          <a href="/admin/users" data-route="users">Users</a>
+          <a href="/admin/activity" data-route="activity">Activity</a>
+          <a href="/admin/usage" data-route="usage">Usage</a>
+        </nav>
+        <button id="refresh-admin" type="button">Refresh</button>
+      </header>
+
+      <main>
+        <section class="admin-title">
+          <div>
+            <p class="eyebrow">Internal Admin</p>
+            <h1 id="page-title">Dashboard</h1>
+            <p id="page-subtitle">Live view of users, onboarding activity, and provider usage.</p>
+          </div>
+          <p class="admin-status" id="admin-status">Loading admin data...</p>
+        </section>
+
+        <section class="metric-grid" id="metric-grid">
+          <article class="metric-card">
+            <span>Users</span>
+            <strong id="metric-users">0</strong>
+            <small id="metric-users-detail">0 anonymous sessions</small>
+          </article>
+          <article class="metric-card">
+            <span>Conversations</span>
+            <strong id="metric-conversations">0</strong>
+            <small id="metric-conversations-detail">0 active</small>
+          </article>
+          <article class="metric-card">
+            <span>Drafts</span>
+            <strong id="metric-drafts">0</strong>
+            <small id="metric-drafts-detail">0 approved</small>
+          </article>
+          <article class="metric-card">
+            <span>Learned Facts</span>
+            <strong id="metric-facts">0</strong>
+            <small id="metric-facts-detail">0 context sources</small>
+          </article>
+          <article class="metric-card">
+            <span>API Requests</span>
+            <strong id="metric-requests">0</strong>
+            <small id="metric-requests-detail">0 failures</small>
+          </article>
+          <article class="metric-card">
+            <span>Tokens</span>
+            <strong id="metric-tokens">0</strong>
+            <small id="metric-tokens-detail">0 input / 0 output</small>
+          </article>
+          <article class="metric-card">
+            <span>Cost</span>
+            <strong id="metric-cost">$0.000000</strong>
+            <small>Estimated provider spend</small>
+          </article>
+        </section>
+
+        <section class="admin-section" data-section="dashboard users">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Users</p>
+              <h2>User activity</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Profile</th>
+                  <th>Conversations</th>
+                  <th>Messages</th>
+                  <th>Drafts</th>
+                  <th>Facts</th>
+                  <th>Tokens</th>
+                  <th>Last activity</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users">
+                <tr><td colspan="8">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-grid" data-section="dashboard activity">
+          <article class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Conversations</p>
+                <h2>Recent sessions</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Conversation</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Messages</th>
+                    <th>Tokens</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-conversations">
+                  <tr><td colspan="6">Loading conversations...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Drafts</p>
+                <h2>Recent profiles</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Draft</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Warnings</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-drafts">
+                  <tr><td colspan="5">Loading drafts...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="admin-grid" data-section="dashboard usage">
+          <article class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Providers</p>
+                <h2>Model mix</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Provider / Model</th>
+                    <th>Calls</th>
+                    <th>Tokens</th>
+                    <th>Failures</th>
+                    <th>Cost</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-provider-mix">
+                  <tr><td colspan="5">Loading provider usage...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">API Ledger</p>
+                <h2>Recent calls</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kind</th>
+                    <th>User</th>
+                    <th>Model</th>
+                    <th>Tokens</th>
+                    <th>Latency</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-usage-events">
+                  <tr><td colspan="6">Loading usage...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+    <script src="/admin/static/app.js?v=20260619-admin-v1"></script>
+  </body>
+</html>

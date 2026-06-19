@@ -792,6 +792,98 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(summary["average_completion_tokens_per_message"], 20)
         self.assertIn(PROFILE_SIGNAL_BACKFILL, {event["request_kind"] for event in events})
 
+    def test_admin_overview_aggregates_users_activity_and_usage(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        self.client.put(
+            "/api/me/profile",
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+            },
+        )
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "manual_notes",
+                "title": "Admin visible note",
+                "content": "The user prefers kind communication and calm plans.",
+            },
+        )
+        self.client.post("/api/agent-submissions/profile", json=sample_submission())
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "kindness",
+                "value": {"kind": "kindness"},
+                "label": "Values kindness",
+                "confidence": 0.8,
+            }
+        )
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": conversation_id,
+                "request_kind": "chat_reply",
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "success": True,
+                "prompt_tokens": 90,
+                "completion_tokens": 30,
+                "total_tokens": 120,
+                "latency_ms": 80,
+                "estimated_cost_usd": 0.0001,
+                "raw_usage": {},
+            }
+        )
+        app.dependency_overrides.clear()
+
+        response = self.client.get("/api/admin/overview")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["summary"]["user_count"], 1)
+        self.assertEqual(data["summary"]["conversation_count"], 1)
+        self.assertEqual(data["summary"]["draft_count"], 1)
+        self.assertEqual(data["summary"]["learned_fact_count"], 1)
+        self.assertEqual(data["summary"]["context_source_count"], 1)
+        self.assertEqual(data["summary"]["usage"]["request_count"], 1)
+        self.assertEqual(data["summary"]["usage"]["total_tokens"], 120)
+        self.assertEqual(data["users"][0]["user_id"], "user-a")
+        self.assertEqual(data["users"][0]["display_name"], "Aarav")
+        self.assertEqual(data["users"][0]["usage"]["total_tokens"], 120)
+        self.assertEqual(data["recent_conversations"][0]["id"], conversation_id)
+        self.assertEqual(data["recent_usage_events"][0]["provider"], "groq")
+
+    def test_admin_pages_serve_separate_admin_shell(self) -> None:
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Omiryn Admin", response.text)
+        self.assertIn("/admin/static/app.js", response.text)
+
+    def test_admin_api_rejects_non_admin_when_admins_are_configured(self) -> None:
+        async def non_admin_user() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        app.dependency_overrides[current_user] = non_admin_user
+        with patch.dict(
+            "os.environ",
+            {
+                "AUTH_REQUIRED": "true",
+                "ADMIN_EMAILS": "admin@example.com",
+                "ADMIN_USER_IDS": "",
+            },
+        ):
+            response = self.client.get("/api/admin/overview")
+
+        self.assertEqual(response.status_code, 403)
+
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")
 
