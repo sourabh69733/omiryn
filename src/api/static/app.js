@@ -215,7 +215,7 @@ async function initializeAuth() {
       throw new Error("Auth config unavailable.");
     }
     const config = await response.json();
-    authRequired = Boolean(config.auth_required);
+    authRequired = Boolean(config.auth_required || (config.supabase_url && config.supabase_anon_key));
     profileDebugDataEnabled = Boolean(config.profile_debug_data_enabled);
     if (!config.supabase_url || !config.supabase_anon_key) {
       renderSignedOutAuth("Auth not configured");
@@ -310,7 +310,7 @@ function renderSignedOutAuth(label) {
 function renderAuthGate(message) {
   const signedIn = Boolean(authSession?.user);
   const shouldAuthGate = authRequired && !signedIn;
-  const shouldBasicsGate = signedIn && datingBasicsComplete === false;
+  const shouldBasicsGate = !shouldAuthGate && signedIn && datingBasicsComplete === false;
   const shouldHideApp = shouldAuthGate || shouldBasicsGate;
   if (appShell) {
     appShell.hidden = shouldHideApp;
@@ -329,11 +329,27 @@ function renderAuthGate(message) {
   }
 }
 
+async function resetToSignIn(message = "Sign in to continue.") {
+  datingBasicsComplete = null;
+  try {
+    await supabaseClient?.auth.signOut();
+  } catch {
+    // A stale local session should not keep the user trapped behind onboarding.
+  }
+  authSession = null;
+  renderSignedOutAuth("Continue with Google");
+  renderAuthGate(message);
+}
+
 async function loadDatingBasicsStatus() {
   if (!authSession?.user) return;
 
   try {
     const response = await apiFetch("/api/me/dating-basics");
+    if (response.status === 401) {
+      await resetToSignIn("Sign in to continue.");
+      return;
+    }
     if (!response.ok) {
       throw new Error("Could not load dating basics.");
     }
@@ -397,6 +413,10 @@ async function saveDatingBasicsProfile(event) {
       })
     });
     const data = await response.json();
+    if (response.status === 401) {
+      await resetToSignIn(data.detail || "Sign in to continue.");
+      return;
+    }
     if (!response.ok) {
       throw new Error(data.detail || "Could not save dating basics.");
     }

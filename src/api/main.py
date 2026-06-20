@@ -266,10 +266,13 @@ def agent_status() -> dict[str, object]:
 
 @app.get("/api/auth/config")
 def auth_config() -> dict[str, object]:
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
     return {
-        "supabase_url": os.getenv("SUPABASE_URL", ""),
-        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", ""),
-        "auth_required": os.getenv("AUTH_REQUIRED", "false").lower() == "true",
+        "supabase_url": supabase_url,
+        "supabase_anon_key": supabase_anon_key,
+        "auth_required": os.getenv("AUTH_REQUIRED", "").lower() == "true"
+        or bool(supabase_url and supabase_anon_key),
         "profile_debug_data_enabled": _profile_debug_data_enabled(),
     }
 
