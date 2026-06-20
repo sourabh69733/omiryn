@@ -23,6 +23,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import Engine
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import NullPool
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
@@ -167,8 +168,24 @@ def init_db() -> None:
 
 
 def reset_db() -> None:
+    if not _reset_db_allowed(database_url()):
+        raise RuntimeError(
+            "Refusing to reset a non-test database. "
+            "Use a DATABASE_URL with a test database name/path, or set "
+            "OMIRYN_ALLOW_RESET_DB=true for an intentional manual reset."
+        )
     metadata.drop_all(ENGINE)
     metadata.create_all(ENGINE)
+
+
+def _reset_db_allowed(url: str) -> bool:
+    if os.getenv("OMIRYN_ALLOW_RESET_DB", "").lower() == "true":
+        return True
+    parsed = make_url(url)
+    if parsed.drivername.startswith("sqlite"):
+        database = parsed.database or ""
+        return "test" in Path(database).name.lower()
+    return "test" in (parsed.database or "").lower()
 
 
 def save_draft(draft: dict[str, Any], user_id: str | None = None) -> None:

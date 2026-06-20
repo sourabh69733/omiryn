@@ -16,7 +16,13 @@ from agent.providers import (
 from agent.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
 from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
-from storage import _normalize_database_url, reset_db, save_agent_usage_event, upsert_profile_fact
+from storage import (
+    _normalize_database_url,
+    _reset_db_allowed,
+    reset_db,
+    save_agent_usage_event,
+    upsert_profile_fact,
+)
 
 
 class AgentSubmissionApiTest(unittest.TestCase):
@@ -55,6 +61,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
             _normalize_database_url("postgresql+psycopg://user:pass@localhost:5432/omiryn"),
             "postgresql+psycopg://user:pass@localhost:5432/omiryn",
         )
+
+    def test_reset_db_guard_only_allows_test_databases_by_default(self) -> None:
+        self.assertFalse(
+            _reset_db_allowed("postgresql+psycopg://omiryn:omiryn@localhost:5432/omiryn")
+        )
+        self.assertTrue(
+            _reset_db_allowed("postgresql+psycopg://omiryn:omiryn@localhost:5432/omiryn_test")
+        )
+        self.assertTrue(_reset_db_allowed("sqlite:///./data/omiryn_test.db"))
+        self.assertFalse(_reset_db_allowed("sqlite:///./data/omiryn.db"))
 
     def test_user_can_edit_then_approve_draft(self) -> None:
         draft_id = self._create_draft()
@@ -965,6 +981,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["user"]["user_id"], "user-a")
         self.assertEqual(data["user"]["display_name"], "Aarav")
         self.assertEqual(data["user"]["display_name_source"], "draft")
+        self.assertEqual(data["profile"]["display_name"], "Aarav")
+        self.assertEqual(data["profile"]["source"], "draft")
         self.assertEqual([conversation["id"] for conversation in data["conversations"]], [conversation_a])
         self.assertEqual([draft["id"] for draft in data["drafts"]], [draft_a["draft_id"]])
         self.assertEqual([fact["label"] for fact in data["facts"]], ["Values kindness"])
