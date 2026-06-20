@@ -11,6 +11,7 @@ from agent.providers import (
     _context_sources_text,
     _groq_rate_limit_headers,
     _mock_reply,
+    _prompt_debug,
     _provider_messages,
     _system_prompt_with_context,
 )
@@ -727,6 +728,21 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 {"role": "user", "content": "I want something serious."},
             ],
         )
+
+    def test_prompt_debug_counts_system_and_provider_message_chars(self) -> None:
+        debug = _prompt_debug(
+            "system text",
+            [
+                {"role": "assistant", "content": "hello"},
+                {"role": "user", "content": "world"},
+            ],
+        )
+
+        self.assertEqual(debug["system_chars"], 11)
+        self.assertEqual(debug["message_chars"], 10)
+        self.assertEqual(debug["total_chars"], 21)
+        self.assertEqual(debug["rough_tokens"], 5)
+        self.assertEqual(debug["provider_message_count"], 2)
 
     def test_provider_messages_compact_old_history(self) -> None:
         messages = [

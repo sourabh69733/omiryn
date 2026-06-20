@@ -884,7 +884,12 @@ async function restoreOrStartConversation() {
   const linkedTarget = linkedConversationTargetFromUrl();
   const savedConversationId = linkedTarget?.conversationId || storedConversationId();
   if (!savedConversationId) {
-    await startConversation();
+    const latestConversation = await latestRestorableConversation();
+    if (latestConversation) {
+      hydrateConversation(latestConversation);
+    } else {
+      await startConversation();
+    }
     return;
   }
 
@@ -901,6 +906,24 @@ async function restoreOrStartConversation() {
     forgetStoredConversation();
     prepareEmptyConversation();
     await loadConversationHistory();
+  }
+}
+
+async function latestRestorableConversation() {
+  try {
+    const conversations = await fetchConversationSummaries();
+    if (!conversations.length) return null;
+    const preferred = conversations.find(
+      (conversation) =>
+        conversation.user_message_count > 0 ||
+        conversation.context_source_count > 0 ||
+        conversation.status === "active"
+    ) || conversations[0];
+    const response = await apiFetch(`/api/agent/conversations/${preferred.id}`);
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
   }
 }
 
@@ -1143,15 +1166,20 @@ async function loadConversationHistory() {
   if (!historyList) return;
 
   try {
-    const response = await apiFetch("/api/agent/conversations");
-    if (!response.ok) {
-      throw new Error("Could not load chat history.");
-    }
-    const data = await response.json();
-    renderConversationHistory(data.conversations || []);
+    const conversations = await fetchConversationSummaries();
+    renderConversationHistory(conversations);
   } catch (error) {
     historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
   }
+}
+
+async function fetchConversationSummaries() {
+  const response = await apiFetch("/api/agent/conversations");
+  if (!response.ok) {
+    throw new Error("Could not load chat history.");
+  }
+  const data = await response.json();
+  return data.conversations || [];
 }
 
 function renderConversationHistory(conversations) {
@@ -2339,7 +2367,7 @@ function renderTokensByMinute(events) {
 
 function renderUsageEvents(events) {
   if (!events.length) {
-    usageEvents.innerHTML = '<tr><td class="table-empty" colspan="6">No agent calls logged yet.</td></tr>';
+    usageEvents.innerHTML = '<tr><td class="table-empty" colspan="7">No agent calls logged yet.</td></tr>';
     return;
   }
 
@@ -2350,11 +2378,19 @@ function renderUsageEvents(events) {
       const statusText = event.success ? "Success" : "Failed";
       const cost = event.estimated_cost_usd ? formatUsd(event.estimated_cost_usd) : "-";
       const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+      const promptDebug = event.raw_usage?.prompt_debug || {};
+      const promptSize = promptDebug.total_chars
+        ? `${formatNumber(promptDebug.rough_tokens || Math.round(promptDebug.total_chars / 4))} rough`
+        : "-";
+      const promptSizeDetail = promptDebug.total_chars
+        ? `${formatNumber(promptDebug.total_chars)} chars`
+        : "";
       return `
         <tr>
           <td>${escapeHtml(usageRequestKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small></td>
           <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
           <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
+          <td class="mono">${escapeHtml(promptSize)}<small>${escapeHtml(promptSizeDetail)}</small></td>
           <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
           <td class="mono">${cost}</td>
           <td><span class="status-pill ${statusClass}">${statusText}</span></td>
@@ -2530,20 +2566,24 @@ document.addEventListener("click", (event) => {
   }
 });
 
-initializeAuth();
+bootApp();
 
-const draftId = currentDraftIdFromPath();
-if (draftId) {
-  showScreen("review");
-  loadDraft(draftId);
-} else if (window.location.pathname === "/matches") {
-  showScreen("matches");
-  loadMatches();
-} else if (window.location.pathname === "/profile") {
-  showScreen("profile");
-} else if (window.location.pathname === "/usage") {
-  showScreen("usage");
-} else {
-  showScreen("interview");
-  restoreOrStartConversation();
+async function bootApp() {
+  await initializeAuth();
+
+  const draftId = currentDraftIdFromPath();
+  if (draftId) {
+    showScreen("review");
+    loadDraft(draftId);
+  } else if (window.location.pathname === "/matches") {
+    showScreen("matches");
+    loadMatches();
+  } else if (window.location.pathname === "/profile") {
+    showScreen("profile");
+  } else if (window.location.pathname === "/usage") {
+    showScreen("usage");
+  } else {
+    showScreen("interview");
+    restoreOrStartConversation();
+  }
 }

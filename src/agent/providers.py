@@ -745,11 +745,14 @@ async def _groq_chat(
     if not api_key:
         raise AgentProviderError("GROQ_API_KEY is required when AGENT_PROVIDER=groq.")
 
+    provider_messages = _provider_messages(messages)
     payload = {
         "model": model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
-        "messages": [{"role": "system", "content": system_prompt}] + _provider_messages(messages),
+        "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
         "temperature": temperature,
     }
+    prompt_debug = _prompt_debug(system_prompt, provider_messages)
+    _emit_prompt_debug("groq", payload["model"], request_kind, prompt_debug)
     headers = {"Authorization": f"Bearer {api_key}"}
 
     async with httpx.AsyncClient(timeout=45) as client:
@@ -774,6 +777,7 @@ async def _groq_chat(
             raw_usage = {
                 **usage,
                 "rate_limit": _groq_rate_limit_headers(response),
+                "prompt_debug": prompt_debug,
             }
             _record_usage_event(
                 conversation_id=conversation_id,
@@ -792,7 +796,7 @@ async def _groq_chat(
                 return _compact_chat_reply(content, messages)
             return content
         except httpx.HTTPStatusError as error:
-            raw_usage = {}
+            raw_usage = {"prompt_debug": prompt_debug}
             if error.response is not None:
                 raw_usage["rate_limit"] = _groq_rate_limit_headers(error.response)
                 try:
@@ -818,6 +822,7 @@ async def _groq_chat(
                 model=payload["model"],
                 success=False,
                 latency_ms=_elapsed_ms(started_at),
+                raw_usage={"prompt_debug": prompt_debug},
                 error=str(error),
             )
             raise
@@ -849,12 +854,15 @@ async def _ollama_chat(
     model: str | None = None,
 ) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    provider_messages = _provider_messages(messages)
     payload = {
         "model": model or os.getenv("OLLAMA_MODEL", "llama3.1"),
-        "messages": [{"role": "system", "content": system_prompt}] + _provider_messages(messages),
+        "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
         "stream": False,
         "options": {"temperature": temperature},
     }
+    prompt_debug = _prompt_debug(system_prompt, provider_messages)
+    _emit_prompt_debug("ollama", payload["model"], request_kind, prompt_debug)
 
     async with httpx.AsyncClient(timeout=90) as client:
         started_at = perf_counter()
@@ -872,7 +880,7 @@ async def _ollama_chat(
                 model=payload["model"],
                 success=True,
                 latency_ms=latency_ms,
-                raw_usage=data,
+                raw_usage={**data, "prompt_debug": prompt_debug},
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=_sum_optional_ints(prompt_tokens, completion_tokens),
@@ -889,6 +897,7 @@ async def _ollama_chat(
                 model=payload["model"],
                 success=False,
                 latency_ms=_elapsed_ms(started_at),
+                raw_usage={"prompt_debug": prompt_debug},
                 error=str(error),
             )
             raise
@@ -939,6 +948,40 @@ def _record_usage_event(
         save_agent_usage_event(event)
     except Exception:
         logger.exception("agent.usage.persist_failed")
+
+
+def _prompt_debug(
+    system_prompt: str,
+    provider_messages: list[dict[str, str]],
+) -> dict[str, Any]:
+    message_chars = sum(len(str(message.get("content") or "")) for message in provider_messages)
+    total_chars = len(system_prompt) + message_chars
+    return {
+        "system_chars": len(system_prompt),
+        "message_chars": message_chars,
+        "total_chars": total_chars,
+        "rough_tokens": round(total_chars / 4),
+        "provider_message_count": len(provider_messages),
+    }
+
+
+def _emit_prompt_debug(
+    provider: str,
+    model: str | None,
+    request_kind: str,
+    prompt_debug: dict[str, Any],
+) -> None:
+    message = (
+        "agent.prompt_size "
+        f"provider={provider} model={model or 'unknown'} kind={request_kind} "
+        f"chars={prompt_debug['total_chars']} rough_tokens={prompt_debug['rough_tokens']} "
+        f"system_chars={prompt_debug['system_chars']} "
+        f"message_chars={prompt_debug['message_chars']} "
+        f"messages={prompt_debug['provider_message_count']}"
+    )
+    logger.info(message)
+    if os.getenv("AGENT_PROMPT_DEBUG", "true").lower() == "true":
+        print(message, flush=True)
 
 
 def _estimated_cost_usd(
