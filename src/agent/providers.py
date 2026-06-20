@@ -131,6 +131,13 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
         "long_term",
         "marriage",
         "yes",
+        "yep",
+        "yeah",
+        "yup",
+        "ok",
+        "okay",
+        "hmm",
+        "hm",
         "no",
         "haan",
         "ha",
@@ -147,13 +154,11 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
         return _quality_result("I did not catch that. Could you answer in a few words?")
     if normalized in allowed_short_answers:
         return {"valid": True}
-    if normalized in {"ok", "okay"} and _previous_prompt_allows_short_confirmation(messages):
-        return {"valid": True}
     if normalized in vague_answers:
         return _quality_result("That is a little too vague. Could you say what you mean in one sentence?")
     if normalized in junk_answers:
         return _quality_result("That does not look like a real answer. Could you answer the question directly?")
-    if len(normalized) < 4:
+    if len(normalized) < 2:
         return _quality_result("I did not get enough information. Could you answer with a little more detail?")
     if _looks_like_gibberish(normalized):
         return _quality_result("That looks unclear. Could you rephrase it in normal words?")
@@ -534,10 +539,24 @@ def _system_prompt_with_context(
 def _agent_persona_prompt(user_profile: dict[str, Any] | None) -> str:
     gender = (user_profile or {}).get("gender") or "unknown"
     interested_in = (user_profile or {}).get("interested_in") or "unknown"
+    display_name = (user_profile or {}).get("display_name") or "unknown"
+    email = (user_profile or {}).get("email") or "unknown"
+    location = (user_profile or {}).get("location") or "India"
+    country = (user_profile or {}).get("country") or "India"
+    timezone = (user_profile or {}).get("timezone") or "Asia/Kolkata"
+    current_date = (user_profile or {}).get("current_date") or "unknown"
+    current_time = (user_profile or {}).get("current_time") or "unknown"
+    current_weekday = (user_profile or {}).get("current_weekday") or "unknown"
     persona = _agent_persona_for_interest(str(interested_in))
     return (
-        f"User basics: gender={gender}, interested_in={interested_in}.\n"
+        f"User identity: display_name={display_name}, email={email}.\n"
+        f"User basics: gender={gender}, interested_in={interested_in}, "
+        f"location={location}, country={country}.\n"
+        f"Current context: date={current_date}, time={current_time}, "
+        f"weekday={current_weekday}, timezone={timezone}.\n"
         f"Agent persona: name={persona['name']}, presentation={persona['presentation']}.\n"
+        "Use identity/location/time only when naturally helpful. Do not mention the user's email "
+        "unless they ask about account details. If location is only a default, treat it as uncertain. "
         "Speak from this persona in a casual WhatsApp-like way. Use small replies, not big paragraphs. "
         "Do not keep saying your name. Do not turn every reply into a dating interview. "
         "Do not repeat the same supportive line again and again."

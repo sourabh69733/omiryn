@@ -884,8 +884,7 @@ async function restoreOrStartConversation() {
   const linkedTarget = linkedConversationTargetFromUrl();
   const savedConversationId = linkedTarget?.conversationId || storedConversationId();
   if (!savedConversationId) {
-    prepareEmptyConversation();
-    await loadConversationHistory();
+    await startConversation();
     return;
   }
 

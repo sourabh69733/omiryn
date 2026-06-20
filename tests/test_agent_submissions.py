@@ -5,13 +5,14 @@ from unittest.mock import patch
 import httpx
 from fastapi.testclient import TestClient
 
-from api.main import _smart_reply_context_sources, app, current_user
+from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
 from agent.providers import (
     _compact_chat_reply,
     _context_sources_text,
     _groq_rate_limit_headers,
     _mock_reply,
     _provider_messages,
+    _system_prompt_with_context,
 )
 from agent.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
@@ -212,6 +213,63 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertIn("Annie", response.json()["messages"][0]["content"])
+
+    def test_agent_initial_message_uses_display_name_when_available(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com", display_name="Sourabh")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        self.client.put(
+            "/api/me/dating-basics",
+            json={"gender": "man", "interested_in": "women"},
+        )
+
+        response = self.client.post("/api/agent/conversations")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("Hey Sourabh, I'm Annie", response.json()["messages"][0]["content"])
+
+    def test_agent_prompt_includes_user_identity_location_and_time_context(self) -> None:
+        prompt = _system_prompt_with_context(
+            "System",
+            context_sources=None,
+            user_profile={
+                "display_name": "Sourabh",
+                "email": "sourabh@example.com",
+                "gender": "man",
+                "interested_in": "women",
+                "location": "India",
+                "country": "India",
+                "timezone": "Asia/Kolkata",
+                "current_date": "2026-06-20",
+                "current_time": "10:30",
+                "current_weekday": "Saturday",
+            },
+        )
+
+        self.assertIn("display_name=Sourabh", prompt)
+        self.assertIn("email=sourabh@example.com", prompt)
+        self.assertIn("location=India", prompt)
+        self.assertIn("date=2026-06-20", prompt)
+        self.assertIn("timezone=Asia/Kolkata", prompt)
+
+    def test_agent_user_context_uses_detected_city_before_country_default(self) -> None:
+        user = CurrentUser(id="user-a", email="a@example.com", display_name="Sourabh")
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "location",
+                "key": "city",
+                "value": {"city": "Bengaluru"},
+                "label": "Is connected to Bengaluru",
+                "confidence": 0.7,
+            }
+        )
+
+        context = _agent_user_context(user)
+
+        self.assertEqual(context["location"], "Bengaluru")
+        self.assertEqual(context["country"], "India")
 
     def test_dating_basics_are_scoped_to_authenticated_user(self) -> None:
         async def user_a() -> CurrentUser:
@@ -640,6 +698,17 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(second_response.status_code, 200)
         self.assertNotEqual(first_response.json()["messages"][-2].get("quality"), "low_information")
         self.assertNotEqual(second_response.json()["messages"][-2].get("quality"), "low_information")
+
+    def test_short_acknowledgements_are_not_marked_low_information(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        for text in ("yep", "ok", "okay"):
+            response = self.client.post(
+                f"/api/agent/conversations/{conversation_id}/messages",
+                json={"message": text},
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotEqual(response.json()["messages"][-2].get("quality"), "low_information")
 
     def test_provider_messages_strip_internal_metadata(self) -> None:
         messages = _provider_messages(

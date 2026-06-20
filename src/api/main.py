@@ -1,8 +1,10 @@
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -73,6 +75,8 @@ ContextSourceType = Literal[
 WhatsappStyleKind = Literal["user_style", "friend_style"]
 Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
 InterestedIn = Literal["men", "women", "everyone"]
+DEFAULT_AGENT_COUNTRY = os.getenv("AGENT_DEFAULT_COUNTRY", "India")
+DEFAULT_AGENT_TIMEZONE = os.getenv("AGENT_DEFAULT_TIMEZONE", "Asia/Kolkata")
 LLM_CONTEXT_IMPORT_PROMPT = """I am using Omiryn to build a private personal profile about myself.
 
 Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
@@ -580,7 +584,7 @@ async def create_agent_conversation(
         payload.agent_model if payload else None,
         runtime,
     )
-    user_profile = get_user_profile(user.id) if user else None
+    user_profile = _agent_user_context(user)
     persona = _agent_persona_for_profile(user_profile)
     conversation = AgentConversation(
         id=conversation_id,
@@ -592,7 +596,7 @@ async def create_agent_conversation(
         messages=[
             {
                 "role": "assistant",
-                "content": _initial_agent_message(persona),
+                "content": _initial_agent_message(persona, user_profile),
             }
         ],
     )
@@ -688,7 +692,7 @@ async def send_agent_message(
             messages=conversation.messages,
             user_text=payload.message,
             user_id=_user_id(user),
-            user_profile=get_user_profile(user.id) if user else None,
+            user_profile=_agent_user_context(user),
             model=conversation.agent_model,
             agent_mode=conversation.agent_mode,
             agent_tone=conversation.agent_tone,
@@ -1147,6 +1151,52 @@ def _profile_with_auth_defaults(
     return {**profile, "display_name": user.display_name}
 
 
+def _agent_user_context(user: CurrentUser | None) -> dict[str, object] | None:
+    if not user:
+        return {
+            "country": DEFAULT_AGENT_COUNTRY,
+            "location": DEFAULT_AGENT_COUNTRY,
+            **_current_agent_time_context(),
+        }
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user) or {}
+    city = str(profile.get("city") or _detected_user_city(user.id) or "").strip()
+    display_name = str(profile.get("display_name") or user.display_name or "").strip()
+    return {
+        **profile,
+        "user_id": user.id,
+        "email": user.email,
+        "display_name": display_name or None,
+        "country": profile.get("country") or DEFAULT_AGENT_COUNTRY,
+        "location": city or profile.get("location") or DEFAULT_AGENT_COUNTRY,
+        **_current_agent_time_context(),
+    }
+
+
+def _detected_user_city(user_id: str) -> str | None:
+    for fact in list_profile_facts(user_id):
+        if fact.get("category") != "location" or fact.get("key") != "city":
+            continue
+        value = fact.get("value") or {}
+        if isinstance(value, dict) and value.get("city"):
+            return str(value["city"])
+    return None
+
+
+def _current_agent_time_context() -> dict[str, str]:
+    timezone_name = DEFAULT_AGENT_TIMEZONE
+    try:
+        current = datetime.now(ZoneInfo(timezone_name))
+    except ZoneInfoNotFoundError:
+        timezone_name = "UTC"
+        current = datetime.now(ZoneInfo("UTC"))
+    return {
+        "timezone": timezone_name,
+        "current_date": current.strftime("%Y-%m-%d"),
+        "current_time": current.strftime("%H:%M"),
+        "current_weekday": current.strftime("%A"),
+    }
+
+
 def _auth_user_payload(user: CurrentUser) -> dict[str, str | None]:
     payload = {"id": user.id, "email": user.email}
     if user.display_name:
@@ -1225,13 +1275,18 @@ def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, s
     return {"name": "Mira", "presentation": "companion"}
 
 
-def _initial_agent_message(persona: dict[str, str]) -> str:
+def _initial_agent_message(
+    persona: dict[str, str],
+    user_profile: dict[str, object] | None = None,
+) -> str:
     name = persona["name"]
+    display_name = str((user_profile or {}).get("display_name") or "").strip()
+    greeting = f"Hey {display_name}, I'm {name}." if display_name else f"Hey, I'm {name}."
     if name == "Annie":
-        return "Hey, I'm Annie. We can just talk normally first, no interview vibes."
+        return f"{greeting} We can just talk normally first, no interview vibes."
     if name == "Arjun":
-        return "Hey, I'm Arjun. Let's just talk normally first, no interview vibes."
-    return "Hey, I'm Mira. We can just talk normally first, no interview vibes."
+        return f"{greeting} Let's just talk normally first, no interview vibes."
+    return f"{greeting} We can just talk normally first, no interview vibes."
 
 
 def _configured_usage_limits() -> dict[str, int | None]:
