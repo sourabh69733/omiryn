@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from admin.auth import require_admin_user
-from admin.service import admin_overview
+from admin.service import admin_overview, admin_user_detail
 from auth import CurrentUser
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
@@ -38,6 +38,18 @@ async def admin_users_endpoint(
 ) -> dict[str, object]:
     overview = admin_overview(limit=limit)
     return {"users": overview["users"]}
+
+
+@router.get("/api/admin/users/{user_id}")
+async def admin_user_detail_endpoint(
+    user_id: str,
+    limit: int = 100,
+    _: CurrentUser = Depends(require_admin_user),
+) -> dict[str, object]:
+    detail = admin_user_detail(user_id, limit=limit)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+    return detail
 
 
 @router.get("/api/admin/conversations")

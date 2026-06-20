@@ -44,6 +44,17 @@ button:hover {
   background: var(--primary-dark);
 }
 
+.secondary-button {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.secondary-button:hover {
+  color: #ffffff;
+  background: var(--primary);
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -239,6 +250,10 @@ td small {
 }
 
 .panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 17px 18px;
   border-bottom: 1px solid var(--line);
 }
@@ -250,6 +265,21 @@ td small {
 
 .table-wrap {
   overflow-x: auto;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.panel-actions button {
+  min-height: 34px;
+  padding: 0 11px;
 }
 
 table {
@@ -278,9 +308,114 @@ td {
   font-size: 13px;
 }
 
+tbody tr.selectable-row {
+  cursor: pointer;
+}
+
+tbody tr.selectable-row:hover,
+tbody tr.selectable-row.selected {
+  background: #eef8f3;
+}
+
 td small {
   display: block;
   margin-top: 4px;
+  font-size: 12px;
+}
+
+.user-detail-layout {
+  display: block;
+}
+
+.user-report {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.report-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 14px;
+}
+
+.report-card span,
+.report-card small {
+  display: block;
+  color: var(--muted);
+}
+
+.report-card span {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.report-card strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 18px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.report-card small {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.detail-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  background: #f8faf9;
+  padding: 13px 14px;
+}
+
+.detail-section-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.fact-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.fact-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.fact-item strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.fact-item small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
   font-size: 12px;
 }
 

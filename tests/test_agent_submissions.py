@@ -897,6 +897,72 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["limits"]["groq_rpm"], 30)
         self.assertEqual(data["limits"]["groq_tpm"], 6000)
 
+    def test_admin_user_detail_filters_user_report_data(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        async def user_b() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_a = self.client.post("/api/agent/conversations").json()["id"]
+        draft_a = self.client.post("/api/agent-submissions/profile", json=sample_submission()).json()
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "kindness",
+                "value": {"kind": "kindness"},
+                "label": "Values kindness",
+                "confidence": 0.8,
+            }
+        )
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": conversation_a,
+                "request_kind": "chat_reply",
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "success": True,
+                "prompt_tokens": 40,
+                "completion_tokens": 10,
+                "total_tokens": 50,
+                "latency_ms": 40,
+                "raw_usage": {},
+            }
+        )
+
+        app.dependency_overrides[current_user] = user_b
+        conversation_b = self.client.post("/api/agent/conversations").json()["id"]
+        save_agent_usage_event(
+            {
+                "user_id": "user-b",
+                "conversation_id": conversation_b,
+                "request_kind": "chat_reply",
+                "provider": "mock",
+                "model": "mock",
+                "success": True,
+                "total_tokens": 0,
+                "latency_ms": 0,
+                "raw_usage": {},
+            }
+        )
+        app.dependency_overrides.clear()
+
+        response = self.client.get("/api/admin/users/user-a")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["user"]["user_id"], "user-a")
+        self.assertEqual(data["user"]["display_name"], "Aarav")
+        self.assertEqual(data["user"]["display_name_source"], "draft")
+        self.assertEqual([conversation["id"] for conversation in data["conversations"]], [conversation_a])
+        self.assertEqual([draft["id"] for draft in data["drafts"]], [draft_a["draft_id"]])
+        self.assertEqual([fact["label"] for fact in data["facts"]], ["Values kindness"])
+        self.assertEqual(data["usage_events"][0]["user_id"], "user-a")
+        self.assertEqual(data["usage_events"][0]["total_tokens"], 50)
+
     def test_admin_pages_serve_separate_admin_shell(self) -> None:
         response = self.client.get("/admin")
 

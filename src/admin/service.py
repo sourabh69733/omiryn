@@ -57,6 +57,44 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
     }
 
 
+def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
+    limit = max(1, min(limit, 200))
+    snapshot = _load_admin_snapshot()
+    usage_events = [_usage_event_from_row(row) for row in snapshot["usage_rows"]]
+    users = _admin_users(snapshot, usage_events)
+    user = next((candidate for candidate in users if candidate["user_id"] == user_id), None)
+    if not user:
+        return None
+
+    conversations = [
+        _conversation_summary(row, snapshot["context_rows"], usage_events)
+        for row in snapshot["conversation_rows"]
+        if row["user_id"] == user_id
+    ]
+    drafts = [
+        _draft_summary(row)
+        for row in snapshot["draft_rows"]
+        if row["user_id"] == user_id
+    ]
+    facts = [
+        _fact_summary(row)
+        for row in snapshot["fact_rows"]
+        if row["user_id"] == user_id
+    ]
+    events = [
+        event for event in usage_events if event.get("user_id") == user_id
+    ]
+
+    return {
+        "user": user,
+        "profile": user["profile"],
+        "facts": facts[:limit],
+        "conversations": conversations[:limit],
+        "drafts": drafts[:limit],
+        "usage_events": events[:limit],
+    }
+
+
 def _load_admin_snapshot() -> dict[str, list[Any]]:
     with ENGINE.begin() as connection:
         return {
@@ -146,9 +184,11 @@ def _user_summary(
 
     return {
         "user_id": user_id,
-        "display_name": profile["display_name"] if profile else None,
+        "display_name": _display_name_for_user(profile, drafts),
+        "display_name_source": _display_name_source_for_user(profile, drafts),
         "gender": profile["gender"] if profile else None,
         "interested_in": profile["interested_in"] if profile else None,
+        "profile": _profile_summary(profile),
         "conversation_count": len(conversations),
         "active_conversation_count": sum(1 for row in conversations if row["status"] == "active"),
         "message_count": sum(len(row["messages_json"] or []) for row in conversations),
@@ -164,6 +204,45 @@ def _user_summary(
         "learned_fact_count": len(facts),
         "usage": _summarize_usage_events(events),
         "last_activity_at": _latest_isoformat(activity_dates),
+    }
+
+
+def _display_name_for_user(profile: Any | None, drafts: list[Any]) -> str | None:
+    if profile and profile["display_name"]:
+        return profile["display_name"]
+    for draft in drafts:
+        submission = draft["submission_json"] or {}
+        display_name = str(submission.get("display_name") or "").strip()
+        if display_name:
+            return display_name
+    return None
+
+
+def _display_name_source_for_user(profile: Any | None, drafts: list[Any]) -> str:
+    if profile and profile["display_name"]:
+        return "profile"
+    for draft in drafts:
+        submission = draft["submission_json"] or {}
+        if str(submission.get("display_name") or "").strip():
+            return "draft"
+    return "unknown"
+
+
+def _profile_summary(profile: Any | None) -> dict[str, Any]:
+    if not profile:
+        return {
+            "display_name": None,
+            "gender": None,
+            "interested_in": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+    return {
+        "display_name": profile["display_name"],
+        "gender": profile["gender"],
+        "interested_in": profile["interested_in"],
+        "created_at": _isoformat_utc(profile["created_at"]),
+        "updated_at": _isoformat_utc(profile["updated_at"]),
     }
 
 
@@ -189,6 +268,20 @@ def _conversation_summary(
         ),
         "usage": _summarize_usage_events(events),
         "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _fact_summary(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "category": row["category"],
+        "key": row["key"],
+        "label": row["label"],
+        "confidence": row["confidence"],
+        "status": row["status"],
+        "used_for_matching": row["used_for_matching"],
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
 

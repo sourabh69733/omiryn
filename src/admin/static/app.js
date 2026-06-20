@@ -1,10 +1,22 @@
 const state = {
   data: null,
-  route: routeName()
+  route: routeName(),
+  usersPage: 1,
+  usersPerPage: 10,
+  selectedUserId: null,
+  selectedUserDetail: null,
+  visibleFactCount: 6
 };
 
 const statusEl = document.querySelector("#admin-status");
 const refreshButton = document.querySelector("#refresh-admin");
+const metricGrid = document.querySelector("#metric-grid");
+const usersPageStatus = document.querySelector("#users-page-status");
+const usersPrev = document.querySelector("#users-prev");
+const usersNext = document.querySelector("#users-next");
+const userDetailLayout = document.querySelector("#user-detail-layout");
+const selectedUserTitle = document.querySelector("#selected-user-title");
+const userReport = document.querySelector("#user-report");
 const usageRequests = document.querySelector("#usage-requests");
 const usageRequestDetail = document.querySelector("#usage-request-detail");
 const usageTotalTokens = document.querySelector("#usage-total-tokens");
@@ -39,9 +51,7 @@ const metrics = {
 };
 
 const tables = {
-  users: document.querySelector("#admin-users"),
-  conversations: document.querySelector("#admin-conversations"),
-  drafts: document.querySelector("#admin-drafts")
+  users: document.querySelector("#admin-users")
 };
 
 function routeName() {
@@ -55,6 +65,9 @@ function configureRoute() {
   document.querySelectorAll("[data-route]").forEach((link) => {
     link.classList.toggle("active", link.dataset.route === state.route);
   });
+  if (metricGrid) {
+    metricGrid.hidden = state.route === "users";
+  }
   document.querySelectorAll("[data-section]").forEach((section) => {
     const visibleRoutes = String(section.dataset.section || "").split(" ");
     section.hidden = !visibleRoutes.includes(state.route);
@@ -96,36 +109,49 @@ async function loadAdminOverview() {
 function renderDashboard(data) {
   renderMetrics(data.summary || {});
   renderUsers(data.users || []);
-  renderConversations(data.recent_conversations || []);
-  renderDrafts(data.recent_drafts || []);
   renderUsageDashboard(data.summary?.usage || {}, data.recent_usage_events || [], data.limits || {});
 }
 
 function renderMetrics(summary) {
   const usage = summary.usage || {};
-  metrics.users.textContent = formatNumber(summary.user_count || 0);
-  metrics.usersDetail.textContent = `${formatNumber(summary.anonymous_conversation_count || 0)} anonymous sessions`;
-  metrics.conversations.textContent = formatNumber(summary.conversation_count || 0);
-  metrics.conversationsDetail.textContent = `${formatNumber(summary.active_conversation_count || 0)} active / ${formatNumber(summary.extracted_conversation_count || 0)} extracted`;
-  metrics.drafts.textContent = formatNumber(summary.draft_count || 0);
-  metrics.draftsDetail.textContent = `${formatNumber(summary.approved_draft_count || 0)} approved`;
-  metrics.facts.textContent = formatNumber(summary.learned_fact_count || 0);
-  metrics.factsDetail.textContent = `${formatNumber(summary.context_source_count || 0)} context sources`;
-  metrics.requests.textContent = formatNumber(usage.request_count || 0);
-  metrics.requestsDetail.textContent = `${formatNumber(usage.failed_request_count || 0)} failures`;
-  metrics.tokens.textContent = formatNumber(usage.total_tokens || 0);
-  metrics.tokensDetail.textContent = `${formatNumber(usage.prompt_tokens || 0)} input / ${formatNumber(usage.completion_tokens || 0)} output`;
-  metrics.cost.textContent = formatUsd(usage.estimated_cost_usd || 0);
+  setText(metrics.users, formatNumber(summary.user_count || 0));
+  setText(
+    metrics.usersDetail,
+    `${formatNumber(summary.anonymous_conversation_count || 0)} anonymous sessions`
+  );
+  setText(metrics.conversations, formatNumber(summary.conversation_count || 0));
+  setText(
+    metrics.conversationsDetail,
+    `${formatNumber(summary.active_conversation_count || 0)} active / ${formatNumber(summary.extracted_conversation_count || 0)} extracted`
+  );
+  setText(metrics.drafts, formatNumber(summary.draft_count || 0));
+  setText(metrics.draftsDetail, `${formatNumber(summary.approved_draft_count || 0)} approved`);
+  setText(metrics.facts, formatNumber(summary.learned_fact_count || 0));
+  setText(metrics.factsDetail, `${formatNumber(summary.context_source_count || 0)} context sources`);
+  setText(metrics.requests, formatNumber(usage.request_count || 0));
+  setText(metrics.requestsDetail, `${formatNumber(usage.failed_request_count || 0)} failures`);
+  setText(metrics.tokens, formatNumber(usage.total_tokens || 0));
+  setText(
+    metrics.tokensDetail,
+    `${formatNumber(usage.prompt_tokens || 0)} input / ${formatNumber(usage.completion_tokens || 0)} output`
+  );
+  setText(metrics.cost, formatUsd(usage.estimated_cost_usd || 0));
 }
 
 function renderUsers(users) {
   if (!users.length) {
-    tables.users.innerHTML = emptyRow(8, "No users have activity yet.");
+    tables.users.innerHTML = emptyRow(9, "No users have activity yet.");
+    updateUsersPagination(0);
     return;
   }
-  tables.users.innerHTML = users.map((user) => `
-    <tr>
-      <td class="mono">${escapeHtml(shortId(user.user_id))}<small>${escapeHtml(user.display_name || user.user_id)}</small></td>
+  const pageCount = Math.max(1, Math.ceil(users.length / state.usersPerPage));
+  state.usersPage = Math.min(Math.max(1, state.usersPage), pageCount);
+  const start = (state.usersPage - 1) * state.usersPerPage;
+  const pageUsers = users.slice(start, start + state.usersPerPage);
+  tables.users.innerHTML = pageUsers.map((user) => `
+    <tr class="selectable-row ${user.user_id === state.selectedUserId ? "selected" : ""}" data-user-id="${escapeHtml(user.user_id)}" tabindex="0">
+      <td>${escapeHtml(user.display_name || "-")}<small>${escapeHtml(user.display_name_source || "unknown")}</small></td>
+      <td class="mono">${escapeHtml(user.user_id)}</td>
       <td>${escapeHtml(profileLabel(user))}</td>
       <td class="mono">${formatNumber(user.conversation_count || 0)}<small>${formatNumber(user.active_conversation_count || 0)} active</small></td>
       <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
@@ -135,39 +161,149 @@ function renderUsers(users) {
       <td>${formatDate(user.last_activity_at)}</td>
     </tr>
   `).join("");
+  updateUsersPagination(users.length);
 }
 
-function renderConversations(conversations) {
-  if (!conversations.length) {
-    tables.conversations.innerHTML = emptyRow(6, "No conversations yet.");
-    return;
+function updateUsersPagination(totalUsers) {
+  const pageCount = Math.max(1, Math.ceil(totalUsers / state.usersPerPage));
+  usersPageStatus.textContent = `${formatNumber(totalUsers)} users · page ${formatNumber(state.usersPage)} of ${formatNumber(pageCount)}`;
+  usersPrev.disabled = state.usersPage <= 1;
+  usersNext.disabled = state.usersPage >= pageCount;
+}
+
+async function selectUser(userId) {
+  if (!userId) return;
+  state.selectedUserId = userId;
+  state.visibleFactCount = 6;
+  renderUsers(state.data?.users || []);
+  selectedUserTitle.textContent = "Loading user report...";
+  userReport.innerHTML = '<div class="table-empty">Loading selected user...</div>';
+
+  try {
+    const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}?limit=100`, {
+      headers: { Accept: "application/json" }
+    });
+    const detail = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(detail.detail, "Could not load selected user."));
+    }
+    state.selectedUserDetail = detail;
+    renderUserReport(detail);
+    setStatus(`Selected ${detail.user.display_name || detail.user.user_id}`);
+  } catch (error) {
+    userReport.innerHTML = `<div class="table-empty">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message);
   }
-  tables.conversations.innerHTML = conversations.map((conversation) => `
+}
+
+function renderUserReport(detail) {
+  const user = detail.user || {};
+  const profile = detail.profile || {};
+  const conversations = detail.conversations || [];
+  const facts = detail.facts || [];
+  selectedUserTitle.textContent = user.display_name || user.user_id || "User report";
+  userReport.innerHTML = `
+    <div class="report-grid">
+      ${reportCard("Name", user.display_name || "-", user.display_name_source ? `Source: ${user.display_name_source}` : "")}
+      ${reportCard("Gender", profile.gender || "-", "Profile")}
+      ${reportCard("Interested in", profile.interested_in || "-", "Profile")}
+      ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
+      ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
+      ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
+    </div>
+    ${renderFactsSection(facts)}
+    ${renderConversationSection(conversations)}
+  `;
+  document.querySelector("#show-more-facts")?.addEventListener("click", () => {
+    state.visibleFactCount += 6;
+    renderUserReport(state.selectedUserDetail);
+  });
+}
+
+function reportCard(label, value, detail = "") {
+  return `
+    <article class="report-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+    </article>
+  `;
+}
+
+function renderFactsSection(facts) {
+  const visibleFacts = facts.slice(0, state.visibleFactCount);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Profile facts</h3>
+        <span class="mono">${formatNumber(facts.length)} facts</span>
+      </div>
+      ${
+        visibleFacts.length
+          ? `<div class="fact-list">${visibleFacts.map(renderFactItem).join("")}</div>`
+          : '<div class="table-empty">No learned facts yet.</div>'
+      }
+      ${
+        facts.length > visibleFacts.length
+          ? `<div class="table-empty"><button class="secondary-button" id="show-more-facts" type="button">Show more facts</button></div>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderFactItem(fact) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(fact.label || fact.key || "Fact")}</strong>
+      <small>${escapeHtml(fact.category || "other")} · confidence ${formatNumber(Math.round((fact.confidence || 0) * 100))}% · ${escapeHtml(fact.status || "-")}</small>
+    </article>
+  `;
+}
+
+function renderConversationSection(conversations) {
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Chat conversations</h3>
+        <span class="mono">${formatNumber(conversations.length)} conversations</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Conversation</th>
+              <th>Status</th>
+              <th>Messages</th>
+              <th>Tokens</th>
+              <th>API calls</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              conversations.length
+                ? conversations.map(renderConversationReportRow).join("")
+                : '<tr><td class="table-empty" colspan="6">No conversations yet.</td></tr>'
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderConversationReportRow(conversation) {
+  return `
     <tr>
-      <td class="mono">${escapeHtml(shortId(conversation.id))}<small>${escapeHtml(conversation.agent_model || conversation.agent_provider || "-")}</small></td>
-      <td class="mono">${escapeHtml(shortId(conversation.user_id || "anonymous"))}</td>
+      <td class="mono">${escapeHtml(conversation.id)}<small>${escapeHtml(conversation.agent_model || conversation.agent_provider || "-")}</small></td>
       <td>${statusPill(conversation.status)}</td>
       <td class="mono">${formatNumber(conversation.message_count || 0)}<small>${formatNumber(conversation.user_message_count || 0)} user / ${formatNumber(conversation.context_source_count || 0)} context</small></td>
-      <td class="mono">${formatNumber(conversation.usage?.total_tokens || 0)}<small>${formatNumber(conversation.usage?.request_count || 0)} calls</small></td>
+      <td class="mono">${formatNumber(conversation.usage?.total_tokens || 0)}<small>${formatNumber(conversation.usage?.prompt_tokens || 0)} in / ${formatNumber(conversation.usage?.completion_tokens || 0)} out</small></td>
+      <td class="mono">${formatNumber(conversation.usage?.request_count || 0)}<small>${formatNumber(conversation.usage?.failed_request_count || 0)} failed</small></td>
       <td>${formatDate(conversation.updated_at)}</td>
     </tr>
-  `).join("");
-}
-
-function renderDrafts(drafts) {
-  if (!drafts.length) {
-    tables.drafts.innerHTML = emptyRow(5, "No profile drafts yet.");
-    return;
-  }
-  tables.drafts.innerHTML = drafts.map((draft) => `
-    <tr>
-      <td class="mono">${escapeHtml(shortId(draft.id))}<small>${escapeHtml(draft.display_name || draft.agent_provider || "-")}</small></td>
-      <td class="mono">${escapeHtml(shortId(draft.user_id || "anonymous"))}</td>
-      <td>${statusPill(draft.status)}</td>
-      <td class="mono">${formatNumber(draft.warning_count || 0)}</td>
-      <td>${formatDate(draft.updated_at)}</td>
-    </tr>
-  `).join("");
+  `;
 }
 
 async function loadUsageDashboard() {
@@ -489,8 +625,6 @@ function renderUsageEvents(events) {
 
 function renderError(message) {
   tables.users.innerHTML = emptyRow(8, message);
-  tables.conversations.innerHTML = emptyRow(6, message);
-  tables.drafts.innerHTML = emptyRow(5, message);
   if (providerList) {
     providerList.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
   }
@@ -532,6 +666,11 @@ function apiErrorMessage(detail, fallback) {
 
 function setStatus(message) {
   statusEl.textContent = message;
+}
+
+function setText(element, value) {
+  if (!element) return;
+  element.textContent = value;
 }
 
 function emptyRow(colspan, message) {
@@ -588,5 +727,25 @@ function escapeHtml(value) {
 }
 
 refreshButton.addEventListener("click", loadAdminOverview);
+usersPrev?.addEventListener("click", () => {
+  state.usersPage -= 1;
+  renderUsers(state.data?.users || []);
+});
+usersNext?.addEventListener("click", () => {
+  state.usersPage += 1;
+  renderUsers(state.data?.users || []);
+});
+tables.users?.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-user-id]");
+  if (!row) return;
+  selectUser(row.dataset.userId);
+});
+tables.users?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const row = event.target.closest("[data-user-id]");
+  if (!row) return;
+  event.preventDefault();
+  selectUser(row.dataset.userId);
+});
 configureRoute();
 loadAdminOverview();

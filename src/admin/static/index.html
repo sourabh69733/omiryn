@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn Admin</title>
-    <link rel="stylesheet" href="/admin/static/styles.css?v=20260619-admin-v1" />
+    <link rel="stylesheet" href="/admin/static/styles.css?v=20260620-users-v1" />
   </head>
   <body>
     <div class="admin-shell">
@@ -35,41 +35,11 @@
           <p class="admin-status" id="admin-status">Loading admin data...</p>
         </section>
 
-        <section class="metric-grid" id="metric-grid">
+        <section class="metric-grid" id="metric-grid" style="max-width: fit-content;">
           <article class="metric-card">
             <span>Users</span>
             <strong id="metric-users">0</strong>
             <small id="metric-users-detail">0 anonymous sessions</small>
-          </article>
-          <article class="metric-card">
-            <span>Conversations</span>
-            <strong id="metric-conversations">0</strong>
-            <small id="metric-conversations-detail">0 active</small>
-          </article>
-          <article class="metric-card">
-            <span>Drafts</span>
-            <strong id="metric-drafts">0</strong>
-            <small id="metric-drafts-detail">0 approved</small>
-          </article>
-          <article class="metric-card">
-            <span>Learned Facts</span>
-            <strong id="metric-facts">0</strong>
-            <small id="metric-facts-detail">0 context sources</small>
-          </article>
-          <article class="metric-card">
-            <span>API Requests</span>
-            <strong id="metric-requests">0</strong>
-            <small id="metric-requests-detail">0 failures</small>
-          </article>
-          <article class="metric-card">
-            <span>Tokens</span>
-            <strong id="metric-tokens">0</strong>
-            <small id="metric-tokens-detail">0 input / 0 output</small>
-          </article>
-          <article class="metric-card">
-            <span>Cost</span>
-            <strong id="metric-cost">$0.000000</strong>
-            <small>Estimated provider spend</small>
           </article>
         </section>
 
@@ -79,12 +49,18 @@
               <p class="eyebrow">Users</p>
               <h2>User activity</h2>
             </div>
+            <div class="panel-actions">
+              <span id="users-page-status">Page 1</span>
+              <button class="secondary-button" id="users-prev" type="button">Previous</button>
+              <button class="secondary-button" id="users-next" type="button">Next</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>User</th>
+                  <th>Name</th>
+                  <th>User ID</th>
                   <th>Profile</th>
                   <th>Conversations</th>
                   <th>Messages</th>
@@ -95,63 +71,24 @@
                 </tr>
               </thead>
               <tbody id="admin-users">
-                <tr><td colspan="8">Loading users...</td></tr>
+                <tr><td colspan="9">Loading users...</td></tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <section class="admin-grid" data-section="dashboard activity">
-          <article class="admin-section">
+        <section class="user-detail-layout" id="user-detail-layout" data-section="users" hidden>
+          <section class="admin-section">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Conversations</p>
-                <h2>Recent sessions</h2>
+                <p class="eyebrow">Selected User</p>
+                <h2 id="selected-user-title">Select a user</h2>
               </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Conversation</th>
-                    <th>User</th>
-                    <th>Status</th>
-                    <th>Messages</th>
-                    <th>Tokens</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-conversations">
-                  <tr><td colspan="6">Loading conversations...</td></tr>
-                </tbody>
-              </table>
+            <div class="user-report" id="user-report">
+              <div class="table-empty">Click a user row to view their profile, facts, and conversations.</div>
             </div>
-          </article>
-
-          <article class="admin-section">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Drafts</p>
-                <h2>Recent profiles</h2>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Draft</th>
-                    <th>User</th>
-                    <th>Status</th>
-                    <th>Warnings</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-drafts">
-                  <tr><td colspan="5">Loading drafts...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+          </section>
         </section>
 
         <section class="admin-usage-dashboard" data-section="usage">
@@ -273,6 +210,6 @@
         </section>
       </main>
     </div>
-    <script src="/admin/static/app.js?v=20260619-admin-v1"></script>
+    <script src="/admin/static/app.js?v=20260620-users-v1"></script>
   </body>
 </html>
