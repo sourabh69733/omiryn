@@ -1479,6 +1479,9 @@ async function saveWhatsappStyleImport() {
     if (whatsappFiles) {
       whatsappFiles.value = "";
     }
+    if (whatsappSender) {
+      whatsappSender.value = "";
+    }
     if (whatsappStyleName) {
       whatsappStyleName.value = "";
     }
@@ -1500,11 +1503,6 @@ async function saveWhatsappStyleImport() {
 }
 
 async function whatsappImportPayloads() {
-  const senderToLearn = whatsappSender?.value.trim() || "";
-  if (!senderToLearn) {
-    throw new Error("Enter the exact WhatsApp sender to learn, for example Sanjay.");
-  }
-
   const files = Array.from(whatsappFiles?.files || []);
   if (files.length) {
     return Promise.all(files.map(whatsappPayloadFromFile));
@@ -1742,12 +1740,17 @@ function renderWhatsappImportLog(sources) {
 
   whatsappImportLog.innerHTML = sources
     .map(
-      (source) => `
-        <div class="whatsapp-import-item">
-          <strong>${escapeHtml(source.title || "WhatsApp style")}</strong>
-          <span>Saved · ${formatNumber(source.content_length || 0)} chars summary</span>
-        </div>
-      `
+      (source) => {
+        const selectedSender = source.metadata?.selected_sender || "";
+        const inferred = source.metadata?.selected_sender_inferred ? " inferred" : "";
+        const senderText = selectedSender ? ` · learned ${selectedSender}${inferred}` : "";
+        return `
+          <div class="whatsapp-import-item">
+            <strong>${escapeHtml(source.title || "WhatsApp style")}</strong>
+            <span>Saved${escapeHtml(senderText)} · ${formatNumber(source.content_length || 0)} chars summary</span>
+          </div>
+        `;
+      }
     )
     .join("");
 }

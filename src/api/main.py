@@ -529,14 +529,6 @@ def create_whatsapp_context_source(
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
-    if payload.style_kind == "friend_style" and not (payload.user_sender or "").strip():
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Enter the exact WhatsApp sender to learn, for example Sanjay. "
-                "Omiryn needs to know which side of the chat should define the style."
-            ),
-        )
     try:
         style_summary = build_whatsapp_style_summary(
             payload.content,
@@ -1127,6 +1119,7 @@ def _context_source_summary(
         "title": source["title"],
         "content_length": len(content),
         "preview": content[:240],
+        "metadata": source.get("metadata") or {},
         "created_at": source["created_at"],
     }
     if attached is not None:
