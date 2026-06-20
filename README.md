@@ -81,8 +81,18 @@ Reset local runtime data:
 ./scripts/reset-data.sh --yes
 ```
 
-This clears conversations, imported context, drafts, and usage logs for the
-configured `DATABASE_URL`.
+This creates a timestamped backup in `./backups` before clearing conversations,
+imported context, drafts, and usage logs for the configured `DATABASE_URL`.
+Use `--skip-backup` only when you are intentionally discarding disposable data.
+
+Create a database backup without resetting:
+
+```bash
+./scripts/db-backup.sh
+```
+
+Tests default to `sqlite:///./data/omiryn_test.db`, and `reset_db()` refuses to
+drop a non-test database unless `OMIRYN_ALLOW_RESET_DB=true` is set explicitly.
 
 ## Authentication
 
