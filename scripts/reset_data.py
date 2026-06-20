@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ if load_dotenv:
     load_dotenv(PROJECT_ROOT / ".env")
 
 from storage import database_url, init_db, reset_db
+from db_backup import backup_database
 
 
 def main() -> int:
@@ -33,6 +35,11 @@ def main() -> int:
         action="store_true",
         help="Print the configured database URL before resetting.",
     )
+    parser.add_argument(
+        "--skip-backup",
+        action="store_true",
+        help="Skip the automatic backup before resetting.",
+    )
     args = parser.parse_args()
 
     if args.show_db:
@@ -43,6 +50,11 @@ def main() -> int:
         print("Run: ./scripts/reset-data.sh --yes")
         return 2
 
+    if not args.skip_backup:
+        backup_path = backup_database()
+        print(f"Backup created before reset: {backup_path}")
+
+    os.environ["OMIRYN_ALLOW_RESET_DB"] = "true"
     reset_db()
     init_db()
     print("Omiryn runtime data reset.")
