@@ -29,20 +29,87 @@
           <div>
             <p class="eyebrow">Internal Admin</p>
             <h1 id="page-title">Dashboard</h1>
-            <p id="page-subtitle">Live view of users, onboarding activity, and provider usage.</p>
+            <p id="page-subtitle">Live view of users and product health.</p>
           </div>
           <p class="admin-status" id="admin-status">Loading admin data...</p>
         </section>
 
-        <section class="metric-grid" id="metric-grid" style="max-width: fit-content;">
+        <section class="metric-grid dashboard-metrics" id="metric-grid">
           <article class="metric-card">
-            <span>Users</span>
+            <span>Total Users</span>
             <strong id="metric-users">0</strong>
-            <small id="metric-users-detail">0 anonymous sessions</small>
+            <small id="metric-users-detail">Registered user records</small>
+          </article>
+          <article class="metric-card">
+            <span>Active Users 7d</span>
+            <strong id="metric-active-users">0</strong>
+            <small>Users with recent activity</small>
+          </article>
+          <article class="metric-card">
+            <span>Onboarding Started</span>
+            <strong id="metric-onboarding-started">0</strong>
+            <small>Users with at least one chat</small>
+          </article>
+          <article class="metric-card">
+            <span>Onboarding Completed</span>
+            <strong id="metric-onboarding-completed">0</strong>
+            <small>Profile draft created</small>
+          </article>
+          <article class="metric-card">
+            <span>Approved Profiles</span>
+            <strong id="metric-approved-profiles">0</strong>
+            <small>Ready for matching</small>
+          </article>
+          <article class="metric-card">
+            <span>Missing Basics</span>
+            <strong id="metric-missing-basics">0</strong>
+            <small>Name, gender, or interest missing</small>
+          </article>
+          <article class="metric-card">
+            <span>New Users</span>
+            <strong id="metric-new-users">0</strong>
+            <small id="metric-new-users-detail">0 today</small>
+          </article>
+          <article class="metric-card">
+            <span>No Recent Activity</span>
+            <strong id="metric-inactive-users">0</strong>
+            <small>Started, inactive 14d</small>
+          </article>
+          <article class="metric-card">
+            <span>Pending Approval</span>
+            <strong id="metric-open-drafts">0</strong>
+            <small>Drafts waiting approval</small>
+          </article>
+          <article class="metric-card">
+            <span>Agent Failures Today</span>
+            <strong id="metric-agent-failures">0</strong>
+            <small>Provider or runtime failures</small>
           </article>
         </section>
 
-        <section class="admin-section" data-section="dashboard users">
+        <section class="dashboard-insights" id="dashboard-insights" data-section="dashboard">
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Funnel</p>
+                <h2>Onboarding health</h2>
+              </div>
+            </div>
+            <div class="funnel-list" id="dashboard-funnel"></div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Needs Attention</p>
+                <h2>Operational queue</h2>
+              </div>
+            </div>
+            <div class="attention-list" id="dashboard-attention"></div>
+          </section>
+        </section>
+
+        <section class="admin-section" data-section="users">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Users</p>

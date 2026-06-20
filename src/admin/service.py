@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -24,10 +24,12 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
     usage_events = [_usage_event_from_row(row) for row in snapshot["usage_rows"]]
     usage_summary = summarize_agent_usage()
     users = _admin_users(snapshot, usage_events)
+    health = _dashboard_health(users, snapshot["draft_rows"], usage_events)
 
     return {
         "summary": {
             "user_count": len(users),
+            **health,
             "anonymous_conversation_count": sum(
                 1 for row in snapshot["conversation_rows"] if row["user_id"] is None
             ),
@@ -113,6 +115,80 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
         }
 
 
+def _dashboard_health(
+    users: list[dict[str, Any]],
+    draft_rows: list[Any],
+    usage_events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    active_cutoff = now - timedelta(days=7)
+    inactive_cutoff = now - timedelta(days=14)
+
+    onboarding_started = [user for user in users if user["conversation_count"] > 0]
+    onboarding_completed = [
+        user
+        for user in users
+        if user["extracted_conversation_count"] > 0 or user["draft_count"] > 0
+    ]
+    approved_profile_users = [user for user in users if user["approved_draft_count"] > 0]
+    missing_basics_users = [
+        user
+        for user in users
+        if not user.get("display_name") or not user.get("gender") or not user.get("interested_in")
+    ]
+    active_users = [
+        user
+        for user in users
+        if _parse_iso_datetime(user.get("last_activity_at"), datetime.min.replace(tzinfo=timezone.utc))
+        >= active_cutoff
+    ]
+    inactive_users = [
+        user
+        for user in users
+        if user["conversation_count"] > 0
+        and _parse_iso_datetime(
+            user.get("last_activity_at"), datetime.min.replace(tzinfo=timezone.utc)
+        )
+        < inactive_cutoff
+    ]
+    new_today = [
+        user
+        for user in users
+        if _parse_iso_datetime(user.get("first_seen_at"), datetime.min.replace(tzinfo=timezone.utc)).date()
+        == today
+    ]
+    new_7d = [
+        user
+        for user in users
+        if _parse_iso_datetime(user.get("first_seen_at"), datetime.min.replace(tzinfo=timezone.utc))
+        >= active_cutoff
+    ]
+    open_drafts = [row for row in draft_rows if row["status"] == "draft"]
+    agent_failures_today = [
+        event
+        for event in usage_events
+        if not event["success"]
+        and _parse_iso_datetime(
+            event.get("created_at"), datetime.min.replace(tzinfo=timezone.utc)
+        ).date()
+        == today
+    ]
+
+    return {
+        "active_user_7d_count": len(active_users),
+        "onboarding_started_user_count": len(onboarding_started),
+        "onboarding_completed_user_count": len(onboarding_completed),
+        "approved_profile_user_count": len(approved_profile_users),
+        "missing_profile_basics_user_count": len(missing_basics_users),
+        "new_user_today_count": len(new_today),
+        "new_user_7d_count": len(new_7d),
+        "inactive_user_count": len(inactive_users),
+        "open_draft_count": len(open_drafts),
+        "agent_failure_today_count": len(agent_failures_today),
+    }
+
+
 def configured_usage_limits() -> dict[str, int | None]:
     return {
         "groq_rpd": _int_env("GROQ_RPD_LIMIT"),
@@ -181,6 +257,13 @@ def _user_summary(
         *[row["created_at"] for row in sources],
         *[event.get("created_at") for event in events],
     ]
+    first_seen_dates = [
+        profile["created_at"] if profile else None,
+        *[row["created_at"] for row in conversations],
+        *[row["created_at"] for row in drafts],
+        *[row["created_at"] for row in sources],
+        *[event.get("created_at") for event in events],
+    ]
 
     return {
         "user_id": user_id,
@@ -191,6 +274,9 @@ def _user_summary(
         "profile": _profile_summary(profile),
         "conversation_count": len(conversations),
         "active_conversation_count": sum(1 for row in conversations if row["status"] == "active"),
+        "extracted_conversation_count": sum(
+            1 for row in conversations if row["status"] == "extracted"
+        ),
         "message_count": sum(len(row["messages_json"] or []) for row in conversations),
         "user_message_count": sum(
             1
@@ -203,6 +289,7 @@ def _user_summary(
         "approved_draft_count": sum(1 for row in drafts if row["status"] == "approved"),
         "learned_fact_count": len(facts),
         "usage": _summarize_usage_events(events),
+        "first_seen_at": _earliest_isoformat(first_seen_dates),
         "last_activity_at": _latest_isoformat(activity_dates),
     }
 
@@ -341,6 +428,30 @@ def _latest_isoformat(values: list[Any]) -> str | None:
         if value
     ]
     return max(normalized) if normalized else None
+
+
+def _earliest_isoformat(values: list[Any]) -> str | None:
+    normalized = [
+        _isoformat_utc(value) if not isinstance(value, str) else value
+        for value in values
+        if value
+    ]
+    return min(normalized) if normalized else None
+
+
+def _parse_iso_datetime(value: Any, default: datetime) -> datetime:
+    if not value:
+        return default
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return default
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _isoformat_utc(value: Any) -> str | None:

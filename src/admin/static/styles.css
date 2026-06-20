@@ -183,6 +183,10 @@ td small {
   margin-bottom: 18px;
 }
 
+.dashboard-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
 .metric-card,
 .admin-section {
   border: 1px solid var(--line);
@@ -220,6 +224,84 @@ td small {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
+}
+
+.dashboard-insights {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.funnel-list,
+.attention-list {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.funnel-row {
+  display: grid;
+  gap: 9px;
+}
+
+.funnel-row div:first-child,
+.attention-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.funnel-row strong,
+.attention-item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.funnel-row span,
+.attention-item span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.funnel-bar {
+  height: 11px;
+  border-radius: 999px;
+  background: #e9eeee;
+  overflow: hidden;
+}
+
+.funnel-bar i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.attention-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf9;
+  padding: 13px;
+}
+
+.attention-item.warning {
+  border-color: #ecd896;
+  background: #fffaf0;
+}
+
+.attention-item.ok {
+  border-color: #bfe2d5;
+  background: #eef8f3;
+}
+
+.attention-item b {
+  font-family: var(--font-mono);
+  font-size: 20px;
 }
 
 .usage-grid {
@@ -592,6 +674,7 @@ td small {
   .admin-header,
   .admin-title,
   .admin-grid,
+  .dashboard-insights,
   .usage-panels {
     grid-template-columns: 1fr;
   }

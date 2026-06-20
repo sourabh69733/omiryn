@@ -11,6 +11,8 @@ const state = {
 const statusEl = document.querySelector("#admin-status");
 const refreshButton = document.querySelector("#refresh-admin");
 const metricGrid = document.querySelector("#metric-grid");
+const dashboardFunnel = document.querySelector("#dashboard-funnel");
+const dashboardAttention = document.querySelector("#dashboard-attention");
 const usersPageStatus = document.querySelector("#users-page-status");
 const usersPrev = document.querySelector("#users-prev");
 const usersNext = document.querySelector("#users-next");
@@ -37,17 +39,16 @@ const usageTableRowLimit = 20;
 const metrics = {
   users: document.querySelector("#metric-users"),
   usersDetail: document.querySelector("#metric-users-detail"),
-  conversations: document.querySelector("#metric-conversations"),
-  conversationsDetail: document.querySelector("#metric-conversations-detail"),
-  drafts: document.querySelector("#metric-drafts"),
-  draftsDetail: document.querySelector("#metric-drafts-detail"),
-  facts: document.querySelector("#metric-facts"),
-  factsDetail: document.querySelector("#metric-facts-detail"),
-  requests: document.querySelector("#metric-requests"),
-  requestsDetail: document.querySelector("#metric-requests-detail"),
-  tokens: document.querySelector("#metric-tokens"),
-  tokensDetail: document.querySelector("#metric-tokens-detail"),
-  cost: document.querySelector("#metric-cost")
+  activeUsers: document.querySelector("#metric-active-users"),
+  onboardingStarted: document.querySelector("#metric-onboarding-started"),
+  onboardingCompleted: document.querySelector("#metric-onboarding-completed"),
+  approvedProfiles: document.querySelector("#metric-approved-profiles"),
+  missingBasics: document.querySelector("#metric-missing-basics"),
+  newUsers: document.querySelector("#metric-new-users"),
+  newUsersDetail: document.querySelector("#metric-new-users-detail"),
+  inactiveUsers: document.querySelector("#metric-inactive-users"),
+  openDrafts: document.querySelector("#metric-open-drafts"),
+  agentFailures: document.querySelector("#metric-agent-failures")
 };
 
 const tables = {
@@ -106,34 +107,73 @@ async function loadAdminOverview() {
 
 function renderDashboard(data) {
   renderMetrics(data.summary || {});
+  renderDashboardInsights(data.summary || {});
   renderUsers(data.users || []);
   renderUsageDashboard(data.summary?.usage || {}, data.recent_usage_events || [], data.limits || {});
 }
 
 function renderMetrics(summary) {
-  const usage = summary.usage || {};
   setText(metrics.users, formatNumber(summary.user_count || 0));
-  setText(
-    metrics.usersDetail,
-    `${formatNumber(summary.anonymous_conversation_count || 0)} anonymous sessions`
-  );
-  setText(metrics.conversations, formatNumber(summary.conversation_count || 0));
-  setText(
-    metrics.conversationsDetail,
-    `${formatNumber(summary.active_conversation_count || 0)} active / ${formatNumber(summary.extracted_conversation_count || 0)} extracted`
-  );
-  setText(metrics.drafts, formatNumber(summary.draft_count || 0));
-  setText(metrics.draftsDetail, `${formatNumber(summary.approved_draft_count || 0)} approved`);
-  setText(metrics.facts, formatNumber(summary.learned_fact_count || 0));
-  setText(metrics.factsDetail, `${formatNumber(summary.context_source_count || 0)} context sources`);
-  setText(metrics.requests, formatNumber(usage.request_count || 0));
-  setText(metrics.requestsDetail, `${formatNumber(usage.failed_request_count || 0)} failures`);
-  setText(metrics.tokens, formatNumber(usage.total_tokens || 0));
-  setText(
-    metrics.tokensDetail,
-    `${formatNumber(usage.prompt_tokens || 0)} input / ${formatNumber(usage.completion_tokens || 0)} output`
-  );
-  setText(metrics.cost, formatUsd(usage.estimated_cost_usd || 0));
+  setText(metrics.usersDetail, "Registered user records");
+  setText(metrics.activeUsers, formatNumber(summary.active_user_7d_count || 0));
+  setText(metrics.onboardingStarted, formatNumber(summary.onboarding_started_user_count || 0));
+  setText(metrics.onboardingCompleted, formatNumber(summary.onboarding_completed_user_count || 0));
+  setText(metrics.approvedProfiles, formatNumber(summary.approved_profile_user_count || 0));
+  setText(metrics.missingBasics, formatNumber(summary.missing_profile_basics_user_count || 0));
+  setText(metrics.newUsers, formatNumber(summary.new_user_7d_count || 0));
+  setText(metrics.newUsersDetail, `${formatNumber(summary.new_user_today_count || 0)} today`);
+  setText(metrics.inactiveUsers, formatNumber(summary.inactive_user_count || 0));
+  setText(metrics.openDrafts, formatNumber(summary.open_draft_count || 0));
+  setText(metrics.agentFailures, formatNumber(summary.agent_failure_today_count || 0));
+}
+
+function renderDashboardInsights(summary) {
+  renderFunnel(summary);
+  renderAttention(summary);
+}
+
+function renderFunnel(summary) {
+  if (!dashboardFunnel) return;
+  const totalUsers = summary.user_count || 0;
+  const items = [
+    ["Total users", totalUsers],
+    ["Onboarding started", summary.onboarding_started_user_count || 0],
+    ["Onboarding completed", summary.onboarding_completed_user_count || 0],
+    ["Approved profiles", summary.approved_profile_user_count || 0],
+  ];
+  dashboardFunnel.innerHTML = items.map(([label, value]) => {
+    const percent = totalUsers ? Math.round((value / totalUsers) * 100) : 0;
+    return `
+      <article class="funnel-row">
+        <div>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${formatNumber(value)} · ${formatNumber(percent)}%</span>
+        </div>
+        <div class="funnel-bar" aria-hidden="true">
+          <i style="width: ${percent}%"></i>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderAttention(summary) {
+  if (!dashboardAttention) return;
+  const items = [
+    ["Pending profile approval", summary.open_draft_count || 0, "Drafts created but not approved"],
+    ["Missing profile basics", summary.missing_profile_basics_user_count || 0, "Name, gender, or interest missing"],
+    ["No recent activity", summary.inactive_user_count || 0, "Users inactive after starting"],
+    ["Agent failures today", summary.agent_failure_today_count || 0, "Provider or runtime failures"],
+  ];
+  dashboardAttention.innerHTML = items.map(([label, value, detail]) => `
+    <article class="attention-item ${value ? "warning" : "ok"}">
+      <div>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(detail)}</span>
+      </div>
+      <b>${formatNumber(value)}</b>
+    </article>
+  `).join("");
 }
 
 function renderUsers(users) {
