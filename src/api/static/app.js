@@ -43,7 +43,6 @@ const whatsappImportMaxChars = 1000000;
 const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
-  matches: document.querySelector("#matches-screen"),
   profile: document.querySelector("#profile-screen"),
   usage: document.querySelector("#usage-screen")
 };
@@ -2067,7 +2066,7 @@ async function approveCurrentDraft() {
   if (!activeDraftId) return;
   await apiFetch(`/api/drafts/${activeDraftId}/approve`, { method: "POST" });
   await loadDraft(activeDraftId);
-  window.location.href = "/matches";
+  window.location.href = "/profile";
 }
 
 async function deleteCurrentDraft() {
@@ -2505,7 +2504,7 @@ extractProfile?.addEventListener("click", extractConversationDraft);
 saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
-refreshMatches.addEventListener("click", loadMatches);
+refreshMatches?.addEventListener("click", loadMatches);
 refreshUsage.addEventListener("click", loadUsageDashboard);
 sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
@@ -2613,9 +2612,6 @@ async function bootApp() {
   if (draftId) {
     showScreen("review");
     loadDraft(draftId);
-  } else if (window.location.pathname === "/matches") {
-    showScreen("matches");
-    loadMatches();
   } else if (window.location.pathname === "/profile") {
     showScreen("profile");
   } else if (window.location.pathname === "/usage") {
