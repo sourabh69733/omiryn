@@ -5,6 +5,22 @@ const state = {
 
 const statusEl = document.querySelector("#admin-status");
 const refreshButton = document.querySelector("#refresh-admin");
+const usageRequests = document.querySelector("#usage-requests");
+const usageRequestDetail = document.querySelector("#usage-request-detail");
+const usageTotalTokens = document.querySelector("#usage-total-tokens");
+const usageTokenDetail = document.querySelector("#usage-token-detail");
+const usageAverageInputTokens = document.querySelector("#usage-average-input-tokens");
+const usageAverageOutputTokens = document.querySelector("#usage-average-output-tokens");
+const usageCost = document.querySelector("#usage-cost");
+const usageCostDetail = document.querySelector("#usage-cost-detail");
+const usageFailures = document.querySelector("#usage-failures");
+const usageRateLimits = document.querySelector("#usage-rate-limits");
+const usageRateLimitDetail = document.querySelector("#usage-rate-limit-detail");
+const providerList = document.querySelector("#provider-list");
+const rateLimitGrid = document.querySelector("#rate-limit-grid");
+const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
+const usageEvents = document.querySelector("#usage-events");
+const usageTableRowLimit = 20;
 
 const metrics = {
   users: document.querySelector("#metric-users"),
@@ -25,9 +41,7 @@ const metrics = {
 const tables = {
   users: document.querySelector("#admin-users"),
   conversations: document.querySelector("#admin-conversations"),
-  drafts: document.querySelector("#admin-drafts"),
-  providerMix: document.querySelector("#admin-provider-mix"),
-  usageEvents: document.querySelector("#admin-usage-events")
+  drafts: document.querySelector("#admin-drafts")
 };
 
 function routeName() {
@@ -69,6 +83,9 @@ async function loadAdminOverview() {
     }
     state.data = data;
     renderDashboard(data);
+    if (state.route === "usage") {
+      await loadUsageDashboard();
+    }
     setStatus(`Updated ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     setStatus(error.message);
@@ -81,8 +98,7 @@ function renderDashboard(data) {
   renderUsers(data.users || []);
   renderConversations(data.recent_conversations || []);
   renderDrafts(data.recent_drafts || []);
-  renderProviderMix(data.recent_usage_events || []);
-  renderUsageEvents(data.recent_usage_events || []);
+  renderUsageDashboard(data.summary?.usage || {}, data.recent_usage_events || [], data.limits || {});
 }
 
 function renderMetrics(summary) {
@@ -154,64 +170,333 @@ function renderDrafts(drafts) {
   `).join("");
 }
 
+async function loadUsageDashboard() {
+  if (!usageEvents) return;
+
+  usageEvents.innerHTML = '<tr><td colspan="6">Loading usage...</td></tr>';
+  providerList.innerHTML = '<div class="table-empty">Loading provider mix...</div>';
+  if (usageMinuteBuckets) {
+    usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Loading usage...</td></tr>';
+  }
+
+  try {
+    const response = await fetch("/api/admin/usage?limit=100", {
+      headers: { Accept: "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load usage."));
+    }
+    renderUsageDashboard(data.summary || {}, data.events || [], data.limits || {});
+  } catch (error) {
+    usageEvents.innerHTML = `<tr><td colspan="6">Could not load usage. ${escapeHtml(error.message)}</td></tr>`;
+    providerList.innerHTML = '<div class="table-empty">Usage unavailable.</div>';
+    if (rateLimitGrid) {
+      rateLimitGrid.innerHTML = '<div class="table-empty">Rate-limit data unavailable.</div>';
+    }
+    if (usageMinuteBuckets) {
+      usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Usage unavailable.</td></tr>';
+    }
+  }
+}
+
+function renderUsageDashboard(summary, events = [], limits = {}) {
+  renderUsageSummary(summary, events);
+  renderProviderMix(events);
+  renderGroqRateLimitHealth(events, limits);
+  renderTokensByMinute(events);
+  renderUsageEvents(events);
+}
+
+function renderGroqRateLimitHealth(events, limits = {}) {
+  if (!rateLimitGrid) return;
+
+  const groqEvents = events.filter((event) => event.provider === "groq");
+  const rateLimitedEvents = groqEvents.filter((event) => isRateLimitEvent(event));
+  const localDaily = localGroqDaily(groqEvents);
+  const todayRateLimitedEvents = localDaily.events.filter((event) => isRateLimitEvent(event));
+  if (usageRateLimits) {
+    usageRateLimits.textContent = formatNumber(todayRateLimitedEvents.length);
+  }
+  if (usageRateLimitDetail) {
+    usageRateLimitDetail.textContent = todayRateLimitedEvents.length
+      ? `${formatNumber(todayRateLimitedEvents.length)} today · ${formatNumber(rateLimitedEvents.length)} logged`
+      : "No recent throttling";
+  }
+
+  const localRate = localGroqRate(groqEvents);
+  rateLimitGrid.innerHTML = `
+    ${usageLimitMetric("RPM", localRate.rpmValue, limits.groq_rpm, "Requests consumed in last 60 seconds")}
+    ${usageLimitMetric("RPD", localDaily.requests, limits.groq_rpd, "Requests consumed today")}
+    ${usageLimitMetric("TPM", localRate.tpm, limits.groq_tpm, "Tokens consumed in last 60 seconds")}
+    ${usageLimitMetric("TPD", localDaily.tokens, limits.groq_tpd, `${formatNumber(localDaily.promptTokens)} input / ${formatNumber(localDaily.completionTokens)} output today`)}
+    ${rateLimitMetric("Total requests", formatNumber(groqEvents.length), "All logged Groq requests")}
+    ${rateLimitMetric("Total tokens", formatNumber(totalGroqTokens(groqEvents)), "All logged Groq input + output tokens")}
+    ${rateLimitMetric("429 today", formatNumber(todayRateLimitedEvents.length), `${formatNumber(rateLimitedEvents.length)} total 429 responses logged`)}
+  `;
+}
+
+function usageLimitMetric(label, used, limit, fallbackDetail) {
+  if (!limit) {
+    return rateLimitMetric(label, formatNumber(used), `${fallbackDetail} · set ${usageLimitEnvName(label)} to show remaining`);
+  }
+
+  const remaining = Math.max(0, limit - used);
+  const percent = Math.min(100, Math.round((used / limit) * 100));
+  const state = percent >= 90 ? "danger" : percent >= 75 ? "warning" : "ok";
+  return `
+    <article class="rate-limit-card ${state}">
+      <span>${label}</span>
+      <strong>${formatNumber(used)} / ${formatNumber(limit)}</strong>
+      <small>${formatNumber(remaining)} remaining · ${percent}% used</small>
+    </article>
+  `;
+}
+
+function rateLimitMetric(label, value, detail) {
+  return `
+    <article class="rate-limit-card">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${detail}</small>
+    </article>
+  `;
+}
+
+function usageLimitEnvName(label) {
+  const envNames = {
+    RPM: "GROQ_RPM_LIMIT",
+    RPD: "GROQ_RPD_LIMIT",
+    TPM: "GROQ_TPM_LIMIT",
+    TPD: "GROQ_TPD_LIMIT"
+  };
+  return envNames[label] || "GROQ_*_LIMIT";
+}
+
+function isRateLimitEvent(event) {
+  const error = `${event.error || ""} ${JSON.stringify(event.raw_usage?.error || {})}`;
+  return error.includes("429") || error.toLowerCase().includes("too many requests");
+}
+
+function localGroqRate(events) {
+  const now = Date.now();
+  const windowStart = now - 60_000;
+  const windowEvents = events.filter((event) => {
+    if (!event.created_at) return false;
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return false;
+    const timestamp = createdAt.getTime();
+    return timestamp >= windowStart && timestamp <= now + 5_000;
+  });
+  const tokens = windowEvents.reduce((total, event) => total + (event.total_tokens || 0), 0);
+  return {
+    rpm: formatNumber(windowEvents.length),
+    rpmValue: windowEvents.length,
+    tpm: tokens
+  };
+}
+
+function localGroqDaily(events) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayEvents = events.filter((event) => {
+    if (!event.created_at) return false;
+    const createdAt = new Date(event.created_at);
+    return !Number.isNaN(createdAt.getTime()) && createdAt >= startOfToday;
+  });
+
+  return {
+    events: todayEvents,
+    requests: todayEvents.length,
+    promptTokens: todayEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0),
+    completionTokens: todayEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0),
+    tokens: todayEvents.reduce((total, event) => total + (event.total_tokens || 0), 0)
+  };
+}
+
+function totalGroqTokens(events) {
+  return events.reduce((total, event) => total + (event.total_tokens || 0), 0);
+}
+
+function renderUsageSummary(summary, events = []) {
+  const averageUsage = averageChatUsage(events, summary);
+  usageRequests.textContent = formatNumber(summary.request_count || 0);
+  usageRequestDetail.textContent = `${formatNumber(summary.successful_request_count || 0)} successful`;
+  usageTotalTokens.textContent = formatNumber(summary.total_tokens || 0);
+  usageTokenDetail.textContent = `${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output`;
+  usageAverageInputTokens.textContent = formatNumber(averageUsage.prompt);
+  usageAverageOutputTokens.textContent = formatNumber(averageUsage.completion);
+  usageFailures.textContent = formatNumber(summary.failed_request_count || 0);
+
+  if (summary.estimated_cost_usd) {
+    usageCost.textContent = formatUsd(summary.estimated_cost_usd);
+    usageCostDetail.textContent = summary.estimated_cost_inr
+      ? `${formatInr(summary.estimated_cost_inr)} estimated`
+      : "USD estimate";
+  } else {
+    usageCost.textContent = "$0.000000";
+    usageCostDetail.textContent = "Set pricing env for estimates";
+  }
+}
+
+function averageChatUsage(events, summary = {}) {
+  if (summary.average_tokens_per_message || summary.average_prompt_tokens_per_message || summary.average_completion_tokens_per_message) {
+    return {
+      total: summary.average_tokens_per_message || 0,
+      prompt: summary.average_prompt_tokens_per_message || 0,
+      completion: summary.average_completion_tokens_per_message || 0
+    };
+  }
+
+  const chatEvents = events.filter((event) =>
+    event.success && event.request_kind === "chat_reply" && event.total_tokens
+  );
+  if (!chatEvents.length) {
+    return { total: 0, prompt: 0, completion: 0 };
+  }
+
+  return {
+    total: Math.round(chatEvents.reduce((total, event) => total + (event.total_tokens || 0), 0) / chatEvents.length),
+    prompt: Math.round(chatEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0) / chatEvents.length),
+    completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
+  };
+}
+
 function renderProviderMix(events) {
   if (!events.length) {
-    tables.providerMix.innerHTML = emptyRow(5, "No provider calls logged yet.");
+    providerList.innerHTML = '<div class="table-empty">No agent usage yet.</div>';
     return;
   }
-  const rows = Object.values(events.reduce((accumulator, event) => {
-    const key = `${event.provider || "unknown"}:${event.model || "unknown"}`;
+
+  const totals = events.reduce((accumulator, event) => {
+    const key = `${event.provider || "unknown"} · ${event.model || "unknown"}`;
     if (!accumulator[key]) {
       accumulator[key] = {
         provider: event.provider || "unknown",
         model: event.model || "unknown",
-        calls: 0,
-        failures: 0,
+        requests: 0,
         tokens: 0,
         cost: 0
       };
     }
-    accumulator[key].calls += 1;
-    accumulator[key].failures += event.success ? 0 : 1;
+    accumulator[key].requests += 1;
     accumulator[key].tokens += event.total_tokens || 0;
     accumulator[key].cost += event.estimated_cost_usd || 0;
     return accumulator;
-  }, {})).sort((first, second) => second.tokens - first.tokens);
+  }, {});
+  const rows = Object.values(totals).sort((first, second) => second.tokens - first.tokens);
 
-  tables.providerMix.innerHTML = rows.map((row) => `
-    <tr>
-      <td>${escapeHtml(row.provider)}<small>${escapeHtml(row.model)}</small></td>
-      <td class="mono">${formatNumber(row.calls)}</td>
-      <td class="mono">${formatNumber(row.tokens)}</td>
-      <td class="mono">${formatNumber(row.failures)}</td>
-      <td class="mono">${formatUsd(row.cost)}</td>
-    </tr>
-  `).join("");
+  providerList.innerHTML = `
+    <table class="provider-table">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Calls</th>
+          <th>Tokens</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.provider)}<small>${escapeHtml(row.model)}</small></td>
+                <td class="mono">${formatNumber(row.requests)}</td>
+                <td class="mono">${formatNumber(row.tokens)}</td>
+                <td class="mono">${row.cost ? formatUsd(row.cost) : "-"}</td>
+              </tr>
+            `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTokensByMinute(events) {
+  if (!usageMinuteBuckets) return;
+
+  const buckets = events.reduce((accumulator, event) => {
+    if (!event.created_at) return accumulator;
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return accumulator;
+
+    createdAt.setSeconds(0, 0);
+    const key = createdAt.getTime();
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        minute: createdAt,
+        calls: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+    }
+
+    accumulator[key].calls += 1;
+    accumulator[key].promptTokens += event.prompt_tokens || 0;
+    accumulator[key].completionTokens += event.completion_tokens || 0;
+    accumulator[key].totalTokens += event.total_tokens || 0;
+    return accumulator;
+  }, {});
+
+  const rows = Object.values(buckets).sort((first, second) => second.minute - first.minute);
+  if (!rows.length) {
+    usageMinuteBuckets.innerHTML = '<tr><td class="table-empty" colspan="4">No token minutes yet.</td></tr>';
+    return;
+  }
+
+  usageMinuteBuckets.innerHTML = rows
+    .slice(0, usageTableRowLimit)
+    .map((row) => `
+      <tr>
+        <td>${formatMinute(row.minute)}</td>
+        <td class="mono">${formatNumber(row.calls)}</td>
+        <td class="mono">${formatNumber(row.totalTokens)}</td>
+        <td class="mono">${formatNumber(row.promptTokens)} in / ${formatNumber(row.completionTokens)} out</td>
+      </tr>
+    `)
+    .join("");
 }
 
 function renderUsageEvents(events) {
   if (!events.length) {
-    tables.usageEvents.innerHTML = emptyRow(6, "No API usage events yet.");
+    usageEvents.innerHTML = '<tr><td class="table-empty" colspan="6">No agent calls logged yet.</td></tr>';
     return;
   }
-  tables.usageEvents.innerHTML = events.map((event) => `
-    <tr>
-      <td>${escapeHtml(usageKindLabel(event.request_kind))}<small>${formatDate(event.created_at)}</small></td>
-      <td class="mono">${escapeHtml(shortId(event.user_id || "anonymous"))}</td>
-      <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
-      <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
-      <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
-      <td>${statusPill(event.success ? "success" : "failed")}</td>
-    </tr>
-  `).join("");
+
+  usageEvents.innerHTML = events
+    .slice(0, usageTableRowLimit)
+    .map((event) => {
+      const statusClass = event.success ? "success" : "failed";
+      const statusText = event.success ? "Success" : "Failed";
+      const cost = event.estimated_cost_usd ? formatUsd(event.estimated_cost_usd) : "-";
+      const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+      return `
+        <tr>
+          <td>${escapeHtml(usageKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small></td>
+          <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
+          <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
+          <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
+          <td class="mono">${cost}</td>
+          <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function renderError(message) {
   tables.users.innerHTML = emptyRow(8, message);
   tables.conversations.innerHTML = emptyRow(6, message);
   tables.drafts.innerHTML = emptyRow(5, message);
-  tables.providerMix.innerHTML = emptyRow(5, message);
-  tables.usageEvents.innerHTML = emptyRow(6, message);
+  if (providerList) {
+    providerList.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (usageEvents) {
+    usageEvents.innerHTML = emptyRow(6, message);
+  }
 }
 
 function statusPill(value) {
@@ -259,6 +544,19 @@ function formatNumber(value) {
 
 function formatUsd(value) {
   return `$${Number(value || 0).toFixed(6)}`;
+}
+
+function formatInr(value) {
+  return `₹${Number(value || 0).toFixed(4)}`;
+}
+
+function formatMinute(value) {
+  return value.toLocaleString([], {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function formatDate(value) {

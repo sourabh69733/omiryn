@@ -67,4 +67,5 @@ async def admin_usage_endpoint(
     return {
         "summary": overview["summary"]["usage"],
         "events": overview["recent_usage_events"],
+        "limits": overview["limits"],
     }

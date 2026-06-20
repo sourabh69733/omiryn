@@ -154,57 +154,122 @@
           </article>
         </section>
 
-        <section class="admin-grid" data-section="dashboard usage">
-          <article class="admin-section">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Providers</p>
-                <h2>Model mix</h2>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Provider / Model</th>
-                    <th>Calls</th>
-                    <th>Tokens</th>
-                    <th>Failures</th>
-                    <th>Cost</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-provider-mix">
-                  <tr><td colspan="5">Loading provider usage...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+        <section class="admin-usage-dashboard" data-section="usage">
+          <div class="usage-grid" id="usage-grid">
+            <article class="metric-card">
+              <span>Requests</span>
+              <strong id="usage-requests">0</strong>
+              <small id="usage-request-detail">0 successful</small>
+            </article>
+            <article class="metric-card">
+              <span>Total tokens</span>
+              <strong id="usage-total-tokens">0</strong>
+              <small id="usage-token-detail">0 input / 0 output</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg input / msg</span>
+              <strong id="usage-average-input-tokens">0</strong>
+              <small>Prompt tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg output / msg</span>
+              <strong id="usage-average-output-tokens">0</strong>
+              <small>Reply tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Estimated cost</span>
+              <strong id="usage-cost">$0.000000</strong>
+              <small id="usage-cost-detail">Set pricing env for estimates</small>
+            </article>
+            <article class="metric-card">
+              <span>Failures</span>
+              <strong id="usage-failures">0</strong>
+              <small>Provider/network errors</small>
+            </article>
+            <article class="metric-card">
+              <span>Groq 429s</span>
+              <strong id="usage-rate-limits">0</strong>
+              <small id="usage-rate-limit-detail">No recent throttling</small>
+            </article>
+          </div>
 
-          <article class="admin-section">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">API Ledger</p>
-                <h2>Recent calls</h2>
+          <div class="usage-panels">
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Groq Limits</p>
+                  <h2>Rate-limit health</h2>
+                </div>
               </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Kind</th>
-                    <th>User</th>
-                    <th>Model</th>
-                    <th>Tokens</th>
-                    <th>Latency</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-usage-events">
-                  <tr><td colspan="6">Loading usage...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
+              <div class="rate-limit-grid" id="rate-limit-grid">
+                <div class="table-empty">Rate-limit headers will appear after new Groq calls.</div>
+              </div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Model Mix</p>
+                  <h2>Tokens by provider</h2>
+                </div>
+              </div>
+              <div class="provider-list" id="provider-list"></div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Rate</p>
+                  <h2>Tokens by minute</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="provider-table">
+                  <thead>
+                    <tr>
+                      <th>Minute</th>
+                      <th>Calls</th>
+                      <th>Tokens</th>
+                      <th>Input / Output</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-minute-buckets">
+                    <tr>
+                      <td colspan="4">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Ledger</p>
+                  <h2>Recent agent calls</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Model</th>
+                      <th>Tokens</th>
+                      <th>Latency</th>
+                      <th>Cost</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-events">
+                    <tr>
+                      <td colspan="6">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </section>
       </main>
     </div>

@@ -860,6 +860,43 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["recent_conversations"][0]["id"], conversation_id)
         self.assertEqual(data["recent_usage_events"][0]["provider"], "groq")
 
+    def test_admin_usage_dashboard_response_matches_usage_contract(self) -> None:
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": None,
+                "request_kind": "chat_reply",
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "success": True,
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "total_tokens": 120,
+                "latency_ms": 50,
+                "raw_usage": {},
+            }
+        )
+        with patch.dict(
+            "os.environ",
+            {
+                "GROQ_RPD_LIMIT": "1000",
+                "GROQ_TPD_LIMIT": "100000",
+                "GROQ_RPM_LIMIT": "30",
+                "GROQ_TPM_LIMIT": "6000",
+            },
+        ):
+            response = self.client.get("/api/admin/usage")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["summary"]["request_count"], 1)
+        self.assertEqual(data["summary"]["total_tokens"], 120)
+        self.assertEqual(data["events"][0]["provider"], "groq")
+        self.assertEqual(data["limits"]["groq_rpd"], 1000)
+        self.assertEqual(data["limits"]["groq_tpd"], 100000)
+        self.assertEqual(data["limits"]["groq_rpm"], 30)
+        self.assertEqual(data["limits"]["groq_tpm"], 6000)
+
     def test_admin_pages_serve_separate_admin_shell(self) -> None:
         response = self.client.get("/admin")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import timezone
 from typing import Any
 
@@ -45,6 +46,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             "context_source_count": len(snapshot["context_rows"]),
             "usage": usage_summary,
         },
+        "limits": configured_usage_limits(),
         "users": users[:limit],
         "recent_conversations": [
             _conversation_summary(row, snapshot["context_rows"], usage_events)
@@ -71,6 +73,28 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
                 select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
             ).mappings().all(),
         }
+
+
+def configured_usage_limits() -> dict[str, int | None]:
+    return {
+        "groq_rpd": _int_env("GROQ_RPD_LIMIT"),
+        "groq_tpd": _int_env("GROQ_TPD_LIMIT"),
+        "groq_rpm": _int_env("GROQ_RPM_LIMIT"),
+        "groq_tpm": _int_env("GROQ_TPM_LIMIT"),
+        "groq_input_tpd": _int_env("GROQ_INPUT_TPD_LIMIT"),
+        "groq_output_tpd": _int_env("GROQ_OUTPUT_TPD_LIMIT"),
+    }
+
+
+def _int_env(name: str) -> int | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, Any]]) -> list[dict[str, Any]]:
