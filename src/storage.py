@@ -793,6 +793,32 @@ def delete_context_source(source_id: str, conversation_id: str, user_id: str | N
     return result.rowcount > 0
 
 
+def delete_user_context_source(source_id: str, user_id: str) -> bool:
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(conversation_context_sources).where(
+                conversation_context_sources.c.user_id == user_id
+            )
+        ).mappings().all()
+        source_ids = [
+            row["id"]
+            for row in rows
+            if row["id"] == source_id
+            or (
+                isinstance(row["metadata_json"], dict)
+                and row["metadata_json"].get("original_source_id") == source_id
+            )
+        ]
+        if not source_ids:
+            return False
+        result = connection.execute(
+            conversation_context_sources.delete().where(
+                conversation_context_sources.c.id.in_(source_ids)
+            )
+        )
+    return result.rowcount > 0
+
+
 def _context_source_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],

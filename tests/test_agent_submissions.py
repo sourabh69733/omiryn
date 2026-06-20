@@ -1244,6 +1244,42 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(detach_response.json()["count"], 0)
         self.assertFalse(detach_response.json()["available_sources"][0]["attached"])
 
+    def test_user_context_delete_removes_reusable_source_and_attached_copies(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        first_conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        source_id = self.client.post(
+            f"/api/agent/conversations/{first_conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "Delete me",
+                "content": "The user values calm communication and ambition.",
+            },
+        ).json()["id"]
+        second_conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        self.client.put(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources/attachments",
+            json={"source_ids": [source_id]},
+        )
+
+        delete_response = self.client.delete(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources/{source_id}"
+        )
+
+        self.assertEqual(delete_response.status_code, 200)
+        first_sources = self.client.get(
+            f"/api/agent/conversations/{first_conversation_id}/context-sources"
+        ).json()
+        second_sources = self.client.get(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources"
+        ).json()
+        self.assertEqual(first_sources["count"], 0)
+        self.assertEqual(first_sources["available_sources"], [])
+        self.assertEqual(second_sources["count"], 0)
+        self.assertEqual(second_sources["available_sources"], [])
+
     def test_reply_context_ignores_imports_until_memory_is_requested(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]

@@ -44,6 +44,7 @@ from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_s
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
     delete_context_source,
+    delete_user_context_source,
     delete_conversation as storage_delete_conversation,
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
@@ -461,6 +462,23 @@ def create_conversation_context_source(
         }
     )
     return _context_source_summary(source)
+
+
+@app.delete("/api/agent/conversations/{conversation_id}/context-sources/{source_id}")
+def delete_conversation_context_source(
+    conversation_id: str,
+    source_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
+    _get_existing_conversation(conversation_id, user)
+    deleted = (
+        delete_user_context_source(source_id, user.id)
+        if user
+        else delete_context_source(source_id, conversation_id, None)
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Context source not found.")
+    return {"source_id": source_id, "status": "deleted"}
 
 
 @app.put("/api/agent/conversations/{conversation_id}/context-sources/attachments")

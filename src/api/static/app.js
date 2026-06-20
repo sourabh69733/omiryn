@@ -1587,12 +1587,47 @@ function renderContextSources(sources) {
   contextSourceList.innerHTML = sources
     .map((source) => `
       <div class="context-source-item">
-        <strong>${escapeHtml(source.title)}</strong>
-        <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars${source.attached ? " · attached here" : ""}</span>
+        <div class="context-source-copy">
+          <strong>${escapeHtml(source.title)}</strong>
+          <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars${source.attached ? " · attached here" : ""}</span>
+        </div>
+        <button
+          class="context-source-delete"
+          type="button"
+          data-source-id="${escapeHtml(source.id)}"
+          aria-label="Delete ${escapeHtml(source.title)}"
+          title="Delete memory"
+        >
+          ×
+        </button>
       </div>
     `)
     .join("");
+  contextSourceList.querySelectorAll(".context-source-delete").forEach((button) => {
+    button.addEventListener("click", () => deleteContextSource(button.dataset.sourceId));
+  });
   setContextStatus(`${sources.length} uploaded context item${sources.length === 1 ? "" : "s"}.`);
+}
+
+async function deleteContextSource(sourceId) {
+  if (!conversationId || !sourceId) return;
+  try {
+    setContextStatus("Deleting memory...", "working");
+    const response = await apiFetch(`/api/agent/conversations/${conversationId}/context-sources/${sourceId}`, {
+      method: "DELETE"
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not delete memory."));
+    }
+    pendingContextSourceIds = pendingContextSourceIds.filter((id) => id !== sourceId);
+    await loadContextSources();
+    await loadDetectedTone();
+    updateAgentStatusModel();
+    setContextStatus("Memory deleted.", "success");
+  } catch (error) {
+    setContextStatus(error.message, "error");
+  }
 }
 
 function contextSourceLabel(sourceType) {

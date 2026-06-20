@@ -1042,21 +1042,47 @@ p {
   border-radius: 8px;
   background: #ffffff;
   padding: 11px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
 }
 
-.context-source-item strong,
-.context-source-item span {
+.context-source-copy strong,
+.context-source-copy span {
   display: block;
 }
 
-.context-source-item strong {
+.context-source-copy strong {
   font-size: 13px;
 }
 
-.context-source-item span {
+.context-source-copy span {
   margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.context-source-delete {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-height: 30px;
+  border: 1px solid #efc8c0;
+  border-radius: 8px;
+  color: #9b3f31;
+  background: #fff2ef;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 0 2px;
+}
+
+.context-source-delete:hover,
+.context-source-delete:focus-visible {
+  border-color: #d99588;
+  color: #7f3125;
+  background: #ffe4de;
 }
 
 .context-source-empty {
