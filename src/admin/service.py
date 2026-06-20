@@ -250,6 +250,7 @@ def _user_summary(
     facts = [row for row in fact_rows if row["user_id"] == user_id]
     sources = [row for row in context_rows if row["user_id"] == user_id]
     events = [event for event in usage_events if event.get("user_id") == user_id]
+    profile_summary = _profile_summary(profile, drafts)
     activity_dates = [
         *[row["updated_at"] for row in conversations],
         *[row["updated_at"] for row in drafts],
@@ -267,11 +268,11 @@ def _user_summary(
 
     return {
         "user_id": user_id,
-        "display_name": _display_name_for_user(profile, drafts),
-        "display_name_source": _display_name_source_for_user(profile, drafts),
-        "gender": profile["gender"] if profile else None,
-        "interested_in": profile["interested_in"] if profile else None,
-        "profile": _profile_summary(profile),
+        "display_name": profile_summary["display_name"],
+        "display_name_source": profile_summary["source"],
+        "gender": profile_summary["gender"],
+        "interested_in": profile_summary["interested_in"],
+        "profile": profile_summary,
         "conversation_count": len(conversations),
         "active_conversation_count": sum(1 for row in conversations if row["status"] == "active"),
         "extracted_conversation_count": sum(
@@ -294,43 +295,45 @@ def _user_summary(
     }
 
 
-def _display_name_for_user(profile: Any | None, drafts: list[Any]) -> str | None:
-    if profile and profile["display_name"]:
-        return profile["display_name"]
-    for draft in drafts:
-        submission = draft["submission_json"] or {}
-        display_name = str(submission.get("display_name") or "").strip()
-        if display_name:
-            return display_name
-    return None
-
-
-def _display_name_source_for_user(profile: Any | None, drafts: list[Any]) -> str:
-    if profile and profile["display_name"]:
-        return "profile"
-    for draft in drafts:
-        submission = draft["submission_json"] or {}
-        if str(submission.get("display_name") or "").strip():
-            return "draft"
-    return "unknown"
-
-
-def _profile_summary(profile: Any | None) -> dict[str, Any]:
-    if not profile:
-        return {
-            "display_name": None,
-            "gender": None,
-            "interested_in": None,
-            "created_at": None,
-            "updated_at": None,
-        }
-    return {
-        "display_name": profile["display_name"],
-        "gender": profile["gender"],
-        "interested_in": profile["interested_in"],
-        "created_at": _isoformat_utc(profile["created_at"]),
-        "updated_at": _isoformat_utc(profile["updated_at"]),
+def _profile_summary(profile: Any | None, drafts: list[Any] | None = None) -> dict[str, Any]:
+    summary = {
+        "display_name": profile["display_name"] if profile else None,
+        "gender": profile["gender"] if profile else None,
+        "interested_in": profile["interested_in"] if profile else None,
+        "source": "profile" if profile else "unknown",
+        "created_at": _isoformat_utc(profile["created_at"]) if profile else None,
+        "updated_at": _isoformat_utc(profile["updated_at"]) if profile else None,
     }
+    if summary["display_name"] and summary["gender"] and summary["interested_in"]:
+        return summary
+
+    for draft in drafts or []:
+        submission = draft["submission_json"] or {}
+        has_draft_value = False
+        for key in ("display_name", "gender", "interested_in"):
+            value = _submission_value(submission.get(key))
+            if not summary[key] and value:
+                summary[key] = value
+                has_draft_value = True
+        if has_draft_value:
+            summary["source"] = "profile + draft" if profile else "draft"
+            summary["updated_at"] = summary["updated_at"] or _isoformat_utc(draft["updated_at"])
+            summary["created_at"] = summary["created_at"] or _isoformat_utc(draft["created_at"])
+        if summary["display_name"] and summary["gender"] and summary["interested_in"]:
+            break
+
+    return summary
+
+
+def _submission_value(value: Any) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("value")
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    if not normalized or normalized.lower() == "unknown":
+        return None
+    return normalized
 
 
 def _conversation_summary(

@@ -239,12 +239,13 @@ function renderUserReport(detail) {
   const profile = detail.profile || {};
   const conversations = detail.conversations || [];
   const facts = detail.facts || [];
-  selectedUserTitle.textContent = user.display_name || user.user_id || "User report";
+  selectedUserTitle.textContent = user.display_name || "Unnamed user";
+  const profileSource = profile.source ? titleize(profile.source) : "Profile";
   userReport.innerHTML = `
     <div class="report-grid">
       ${reportCard("Name", user.display_name || "-", user.display_name_source ? `Source: ${user.display_name_source}` : "")}
-      ${reportCard("Gender", profile.gender || "-", "Profile")}
-      ${reportCard("Interested in", profile.interested_in || "-", "Profile")}
+      ${reportCard("Gender", profile.gender || "-", profileSource)}
+      ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
       ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
       ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
       ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
