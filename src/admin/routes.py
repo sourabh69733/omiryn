@@ -17,7 +17,6 @@ router = APIRouter()
 
 @router.get("/admin")
 @router.get("/admin/users")
-@router.get("/admin/activity")
 @router.get("/admin/usage")
 async def admin_shell(_: CurrentUser = Depends(require_admin_user)) -> FileResponse:
     return FileResponse(ADMIN_STATIC_DIR / "index.html", headers=ADMIN_SHELL_HEADERS)

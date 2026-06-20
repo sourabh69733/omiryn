@@ -56,7 +56,6 @@ const tables = {
 
 function routeName() {
   if (window.location.pathname === "/admin/users") return "users";
-  if (window.location.pathname === "/admin/activity") return "activity";
   if (window.location.pathname === "/admin/usage") return "usage";
   return "dashboard";
 }
@@ -66,7 +65,7 @@ function configureRoute() {
     link.classList.toggle("active", link.dataset.route === state.route);
   });
   if (metricGrid) {
-    metricGrid.hidden = state.route === "users";
+    metricGrid.hidden = state.route !== "dashboard";
   }
   document.querySelectorAll("[data-section]").forEach((section) => {
     const visibleRoutes = String(section.dataset.section || "").split(" ");
@@ -74,9 +73,8 @@ function configureRoute() {
   });
 
   const titles = {
-    dashboard: ["Dashboard", "Live view of users, onboarding activity, and provider usage."],
+    dashboard: ["Dashboard", "Live view of users and product health."],
     users: ["Users", "Track every user profile, onboarding session, and learned signal."],
-    activity: ["Activity", "Review recent conversations and profile drafts."],
     usage: ["Usage", "Track Groq and agent API calls, tokens, failures, and cost."]
   };
   const [title, subtitle] = titles[state.route] || titles.dashboard;

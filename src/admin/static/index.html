@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn Admin</title>
-    <link rel="stylesheet" href="/admin/static/styles.css?v=20260620-users-v1" />
+    <link rel="stylesheet" href="/admin/static/styles.css?v=20260620-admin-visibility" />
   </head>
   <body>
     <div class="admin-shell">
@@ -13,13 +13,12 @@
           <span class="brand-mark" aria-hidden="true">O</span>
           <span>
             <strong>Omiryn Admin</strong>
-            <small>Users, activity, and API usage</small>
+            <small>Users and API usage</small>
           </span>
         </a>
         <nav class="admin-nav" aria-label="Admin sections">
           <a href="/admin" data-route="dashboard">Dashboard</a>
           <a href="/admin/users" data-route="users">Users</a>
-          <a href="/admin/activity" data-route="activity">Activity</a>
           <a href="/admin/usage" data-route="usage">Usage</a>
         </nav>
         <button id="refresh-admin" type="button">Refresh</button>
@@ -210,6 +209,6 @@
         </section>
       </main>
     </div>
-    <script src="/admin/static/app.js?v=20260620-users-v1"></script>
+    <script src="/admin/static/app.js?v=20260620-admin-visibility"></script>
   </body>
 </html>
