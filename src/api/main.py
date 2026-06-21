@@ -1337,10 +1337,10 @@ def _initial_agent_message(
     display_name = str((user_profile or {}).get("display_name") or "").strip()
     greeting = f"Hey {display_name}, I'm {name}." if display_name else f"Hey, I'm {name}."
     if name == "Annie":
-        return f"{greeting} We can just talk normally first, no interview vibes."
+        return f"{greeting}"
     if name == "Arjun":
         return f"{greeting} Let's just talk normally first, no interview vibes."
-    return f"{greeting} We can just talk normally first, no interview vibes."
+    return f"{greeting}"
 
 
 def _configured_usage_limits() -> dict[str, int | None]:
