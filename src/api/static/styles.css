@@ -234,7 +234,21 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
   padding: 5px 8px 5px 5px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.auth-user:hover {
+  border-color: #c2d8d1;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(16, 24, 32, 0.08);
+  transform: translateY(-1px);
+}
+
+.auth-user:focus-visible {
+  outline: 3px solid rgba(31, 95, 91, 0.2);
+  outline-offset: 2px;
 }
 
 .auth-avatar {

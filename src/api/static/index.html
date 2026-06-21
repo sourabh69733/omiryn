@@ -70,17 +70,11 @@
         </a>
 
         <div class="header-actions">
-          <nav class="progress-nav" aria-label="Matchmaking progress">
-            <a data-nav="interview" href="/">Chats</a>
-            <!-- <a data-nav="review" href="#" id="review-nav">Review</a> -->
-            <a data-nav="profile" href="/profile">Profile</a>
-          </nav>
-
           <div class="auth-control" id="auth-control">
-            <div class="auth-user" id="auth-user" hidden>
+            <button class="auth-user" id="auth-user" type="button" hidden aria-label="Open profile">
               <span class="auth-avatar" id="auth-avatar" aria-hidden="true">O</span>
               <span class="auth-email" id="auth-email">Signed in</span>
-            </div>
+            </button>
             <button class="secondary-button auth-button" id="login-google" type="button">
               Continue with Google
             </button>

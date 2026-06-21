@@ -284,6 +284,10 @@ function googleDisplayName(user) {
   return metadata.full_name || metadata.name || metadata.display_name || "";
 }
 
+function openProfilePage() {
+  window.location.href = "/profile";
+}
+
 function renderSignedOutAuth(label) {
   if (authUser) {
     authUser.hidden = true;
@@ -2678,6 +2682,7 @@ document.addEventListener("keydown", (event) => {
 loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
+authUser?.addEventListener("click", openProfilePage);
 profileGender?.addEventListener("change", updateInterestedInDefault);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
