@@ -315,11 +315,6 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             return False
 
         connection.execute(
-            conversation_context_sources.delete().where(
-                conversation_context_sources.c.conversation_id == conversation_id
-            )
-        )
-        connection.execute(
             agent_usage_events.delete().where(agent_usage_events.c.conversation_id == conversation_id)
         )
         connection.execute(

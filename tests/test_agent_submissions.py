@@ -21,6 +21,7 @@ from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_expo
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    list_context_sources,
     reset_db,
     save_agent_usage_event,
     upsert_profile_fact,
@@ -107,7 +108,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(self.client.get(f"/api/drafts/{draft_id}").status_code, 404)
 
-    def test_conversation_can_be_deleted_with_context(self) -> None:
+    def test_conversation_delete_keeps_context_memory(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         self.assertEqual(conversation_response.status_code, 201)
         conversation_id = conversation_response.json()["id"]
@@ -132,6 +133,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         conversations = self.client.get("/api/agent/conversations").json()["conversations"]
         self.assertEqual(conversations, [])
+        remaining_context = list_context_sources(conversation_id, None)
+        self.assertEqual(len(remaining_context), 1)
+        self.assertEqual(remaining_context[0]["title"], "Preference notes")
 
     def test_conversations_are_scoped_to_authenticated_user(self) -> None:
         async def user_a() -> CurrentUser:
