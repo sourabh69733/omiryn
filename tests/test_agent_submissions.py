@@ -1142,7 +1142,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
             "/api/agent/conversations",
-            json={"agent_model": "mock", "agent_mode": "coach_me", "agent_tone": "casual"},
+            json={
+                "agent_model": "mock",
+                "agent_mode": "coach_me",
+                "agent_tone": "casual",
+                "agent_name": "Amy",
+            },
         )
 
         self.assertEqual(response.status_code, 201)
@@ -1150,15 +1155,22 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(conversation["agent_model"], "mock")
         self.assertEqual(conversation["agent_mode"], "coach_me")
         self.assertEqual(conversation["agent_tone"], "casual")
+        self.assertEqual(conversation["agent_name"], "Amy")
 
         update_response = self.client.patch(
             f"/api/agent/conversations/{conversation['id']}/settings",
-            json={"agent_model": "mock", "agent_mode": "talk_like_me", "agent_tone": "direct"},
+            json={
+                "agent_model": "mock",
+                "agent_mode": "talk_like_me",
+                "agent_tone": "direct",
+                "agent_name": "Mira",
+            },
         )
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["agent_model"], "mock")
         self.assertEqual(update_response.json()["agent_mode"], "talk_like_me")
         self.assertEqual(update_response.json()["agent_tone"], "direct")
+        self.assertEqual(update_response.json()["agent_name"], "Mira")
 
         tone_response = self.client.get(f"/api/agent/conversations/{conversation['id']}/tone")
         self.assertEqual(tone_response.status_code, 200)
