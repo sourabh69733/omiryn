@@ -1217,20 +1217,13 @@ async function fetchConversationSummaries() {
 function renderConversationHistory(conversations) {
   if (!historyList) return;
 
-  const visibleConversations = conversations.filter(
-    (conversation) =>
-      conversation.id === conversationId ||
-      conversation.user_message_count > 0 ||
-      conversation.context_source_count > 0
-  );
-
-  if (!visibleConversations.length) {
+  if (!conversations.length) {
     historyList.innerHTML = '<div class="history-empty">No saved conversations yet.</div>';
     return;
   }
 
   historyList.innerHTML = "";
-  visibleConversations.forEach((conversation) => {
+  conversations.forEach((conversation) => {
     const title = conversationAgentName(conversation);
     const item = document.createElement("div");
     item.className = "history-item";
