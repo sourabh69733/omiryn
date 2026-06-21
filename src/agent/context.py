@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from storage import list_context_sources
+from storage import list_context_sources, list_user_context_sources
 
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
@@ -62,9 +62,10 @@ def build_reply_context_sources(
     user_text: str,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    sources = list_context_sources(conversation_id, user_id)
-    selected_styles = _selected_style_sources(sources, style_source_id)
-    retrieved_sources = _relevant_memory_sources(sources, user_text)
+    all_sources = list_context_sources(conversation_id, user_id)
+    attached_sources = _valid_attached_context_sources(all_sources, user_id)
+    selected_styles = _selected_style_sources(all_sources, style_source_id)
+    retrieved_sources = _relevant_memory_sources(attached_sources, user_text)
 
     if selected_styles:
         selected_style_ids = {source.get("id") for source in selected_styles}
@@ -81,7 +82,10 @@ def build_profile_extraction_context_sources(
 ) -> list[dict[str, Any]]:
     return [
         source
-        for source in list_context_sources(conversation_id, user_id)
+        for source in _valid_attached_context_sources(
+            list_context_sources(conversation_id, user_id),
+            user_id,
+        )
         if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
     ]
 
@@ -100,6 +104,27 @@ def selected_style_source_exists(
     )
 
 
+def _valid_attached_context_sources(
+    sources: list[dict[str, Any]],
+    user_id: str | None,
+) -> list[dict[str, Any]]:
+    reusable_source_ids = {
+        str(source["id"])
+        for source in list_user_context_sources(user_id)
+        if not (
+            isinstance(source.get("metadata"), dict)
+            and source["metadata"].get("original_source_id")
+        )
+    }
+    return [
+        source
+        for source in sources
+        if isinstance(source.get("metadata"), dict)
+        and source["metadata"].get("original_source_id")
+        and str(source["metadata"].get("original_source_id")) in reusable_source_ids
+    ]
+
+
 def _selected_style_sources(
     sources: list[dict[str, Any]],
     style_source_id: str | None,
@@ -108,9 +133,9 @@ def _selected_style_sources(
         source for source in sources if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
     ]
     if not style_source_id:
-        return style_sources[:MEMORY_RETRIEVAL_LIMIT]
+        return []
     selected = [source for source in style_sources if source.get("id") == style_source_id]
-    return selected or style_sources[:MEMORY_RETRIEVAL_LIMIT]
+    return selected
 
 
 def _relevant_memory_sources(

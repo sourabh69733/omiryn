@@ -419,12 +419,14 @@ async def get_conversation_context_sources(
     _get_existing_conversation(conversation_id, user)
     sources = list_context_sources(conversation_id, _user_id(user))
     user_sources = _reusable_context_sources(list_user_context_sources(_user_id(user)))
+    reusable_source_ids = {str(source["id"]) for source in user_sources}
+    attached_sources = _attached_context_sources(sources, reusable_source_ids)
     attached_ids = _attached_context_source_ids(sources)
     return {
-        "count": len(sources),
+        "count": len(attached_sources),
         "sources": [
             _context_source_summary(source, attached=True)
-            for source in sources
+            for source in attached_sources
         ],
         "available_sources": [
             _context_source_summary(source, attached=source["id"] in attached_ids)
@@ -503,8 +505,6 @@ def update_conversation_context_attachments(
     attached_sources = list_context_sources(conversation_id, user_id)
     for source_id in requested_ids:
         source = reusable_by_id[source_id]
-        if source["conversation_id"] == conversation_id:
-            continue
         if _attached_context_source_by_original_id(attached_sources, source_id):
             continue
         save_context_source(
@@ -530,12 +530,14 @@ def update_conversation_context_attachments(
 
     sources = list_context_sources(conversation_id, user_id)
     user_sources = _reusable_context_sources(list_user_context_sources(user_id))
+    reusable_source_ids = {str(source["id"]) for source in user_sources}
+    attached_sources = _attached_context_sources(sources, reusable_source_ids)
     attached_ids = _attached_context_source_ids(sources)
     return {
-        "count": len(sources),
+        "count": len(attached_sources),
         "sources": [
             _context_source_summary(source, attached=True)
-            for source in sources
+            for source in attached_sources
         ],
         "available_sources": [
             _context_source_summary(source, attached=source["id"] in attached_ids)
@@ -626,8 +628,13 @@ async def list_agent_conversations(
 ) -> dict[str, object]:
     conversations = storage_list_conversations(_user_id(user))
     summaries = []
+    reusable_source_ids = {
+        str(source["id"])
+        for source in _reusable_context_sources(list_user_context_sources(_user_id(user)))
+    }
     for conversation in conversations:
         messages = conversation["messages"]
+        context_sources = list_context_sources(conversation["id"], _user_id(user))
         summaries.append(
             AgentConversationSummary(
                 id=conversation["id"],
@@ -641,7 +648,7 @@ async def list_agent_conversations(
                 agent_style_source_id=conversation["agent_style_source_id"],
                 message_count=len(messages),
                 user_message_count=sum(1 for message in messages if message.get("role") == "user"),
-                context_source_count=len(list_context_sources(conversation["id"], _user_id(user))),
+                context_source_count=len(_attached_context_sources(context_sources, reusable_source_ids)),
                 created_at=conversation["created_at"],
                 updated_at=conversation["updated_at"],
             ).model_dump()
@@ -1258,11 +1265,26 @@ def _raw_profile_data_points(facts: list[dict[str, object]]) -> list[dict[str, o
 def _attached_context_source_ids(sources: list[dict[str, object]]) -> set[str]:
     attached_ids = set()
     for source in sources:
-        attached_ids.add(str(source.get("id")))
         metadata = source.get("metadata") or {}
         if isinstance(metadata, dict) and metadata.get("original_source_id"):
             attached_ids.add(str(metadata["original_source_id"]))
     return attached_ids
+
+
+def _attached_context_sources(
+    sources: list[dict[str, object]],
+    reusable_source_ids: set[str] | None = None,
+) -> list[dict[str, object]]:
+    return [
+        source
+        for source in sources
+        if isinstance(source.get("metadata"), dict)
+        and source["metadata"].get("original_source_id")
+        and (
+            reusable_source_ids is None
+            or str(source["metadata"].get("original_source_id")) in reusable_source_ids
+        )
+    ]
 
 
 def _attached_context_source_by_original_id(

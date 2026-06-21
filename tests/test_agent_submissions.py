@@ -1211,9 +1211,23 @@ class AgentSubmissionApiTest(unittest.TestCase):
             f"/api/agent/conversations/{conversation_id}/context-sources"
         )
         self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(list_response.json()["count"], 1)
+        self.assertEqual(list_response.json()["count"], 0)
         self.assertEqual(len(list_response.json()["available_sources"]), 1)
-        self.assertTrue(list_response.json()["available_sources"][0]["attached"])
+        self.assertFalse(list_response.json()["available_sources"][0]["attached"])
+
+        history_response = self.client.get("/api/agent/conversations")
+        self.assertEqual(history_response.json()["conversations"][0]["context_source_count"], 0)
+
+        attach_response = self.client.put(
+            f"/api/agent/conversations/{conversation_id}/context-sources/attachments",
+            json={"source_ids": [created["id"]]},
+        )
+        self.assertEqual(attach_response.status_code, 200)
+        self.assertEqual(attach_response.json()["count"], 1)
+        self.assertTrue(attach_response.json()["available_sources"][0]["attached"])
+
+        history_response = self.client.get("/api/agent/conversations")
+        self.assertEqual(history_response.json()["conversations"][0]["context_source_count"], 1)
 
     def test_user_context_can_attach_to_another_session(self) -> None:
         first_response = self.client.post("/api/agent/conversations")
@@ -1260,6 +1274,33 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(detach_response.json()["count"], 0)
         self.assertFalse(detach_response.json()["available_sources"][0]["attached"])
 
+    def test_orphan_attached_context_does_not_count_in_history(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        source_id = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/context-sources",
+            json={
+                "source_type": "llm_profile",
+                "title": "Temporary memory",
+                "content": "The user values calm communication and career growth.",
+            },
+        ).json()["id"]
+        attach_response = self.client.put(
+            f"/api/agent/conversations/{conversation_id}/context-sources/attachments",
+            json={"source_ids": [source_id]},
+        )
+        self.assertEqual(attach_response.json()["count"], 1)
+
+        delete_response = self.client.delete(
+            f"/api/agent/conversations/{conversation_id}/context-sources/{source_id}"
+        )
+        self.assertEqual(delete_response.status_code, 200)
+
+        history_response = self.client.get("/api/agent/conversations")
+        self.assertEqual(history_response.json()["conversations"][0]["context_source_count"], 0)
+        list_response = self.client.get(f"/api/agent/conversations/{conversation_id}/context-sources")
+        self.assertEqual(list_response.json()["count"], 0)
+        self.assertEqual(list_response.json()["available_sources"], [])
+
     def test_user_context_delete_removes_reusable_source_and_attached_copies(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -1296,7 +1337,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(second_sources["count"], 0)
         self.assertEqual(second_sources["available_sources"], [])
 
-    def test_reply_context_ignores_imports_until_memory_is_requested(self) -> None:
+    def test_reply_context_ignores_unattached_imports(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
         self.client.post(
@@ -1308,14 +1349,18 @@ class AgentSubmissionApiTest(unittest.TestCase):
             },
         )
 
-        sources = _smart_reply_context_sources(conversation_id, None, "haan, sounds good")
+        sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "what do you know about my career from imported memory?",
+        )
 
         self.assertEqual(sources, [])
 
     def test_reply_context_retrieves_relevant_imported_memory(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
-        self.client.post(
+        career_response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/context-sources",
             json={
                 "source_type": "llm_profile",
@@ -1330,6 +1375,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "title": "Food notes",
                 "content": "The user likes spicy street food.",
             },
+        )
+        self.client.put(
+            f"/api/agent/conversations/{conversation_id}/context-sources/attachments",
+            json={"source_ids": [career_response.json()["id"]]},
         )
 
         sources = _smart_reply_context_sources(
@@ -1365,7 +1414,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
             f"/api/agent/conversations/{conversation_id}/context-sources"
         )
         self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(list_response.json()["count"], 1)
+        self.assertEqual(list_response.json()["count"], 0)
+        self.assertEqual(len(list_response.json()["available_sources"]), 1)
+        self.assertFalse(list_response.json()["available_sources"][0]["attached"])
 
     def test_friend_style_import_can_be_selected_for_replies(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
