@@ -44,8 +44,7 @@ const whatsappImportMaxChars = 1000000;
 const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
-  profile: document.querySelector("#profile-screen"),
-  usage: document.querySelector("#usage-screen")
+  profile: document.querySelector("#profile-screen")
 };
 
 const chatLog = document.querySelector("#chat-log");
@@ -251,9 +250,6 @@ function renderAuthState() {
     datingBasicsComplete = null;
     renderSignedOutAuth("Continue with Google");
     renderAuthGate();
-    if (!authRequired && window.location.pathname === "/usage") {
-      loadUsageDashboard();
-    }
     return;
   }
 
@@ -280,9 +276,6 @@ function renderAuthState() {
   loadDatingBasicsStatus();
   if (window.location.pathname === "/profile") {
     loadProfilePage();
-  }
-  if (window.location.pathname === "/usage") {
-    loadUsageDashboard();
   }
 }
 
@@ -2614,7 +2607,7 @@ saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
 deleteDraft.addEventListener("click", deleteCurrentDraft);
 refreshMatches?.addEventListener("click", loadMatches);
-refreshUsage.addEventListener("click", loadUsageDashboard);
+refreshUsage?.addEventListener("click", loadUsageDashboard);
 sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });
@@ -2725,9 +2718,10 @@ async function bootApp() {
     loadDraft(draftId);
   } else if (window.location.pathname === "/profile") {
     showScreen("profile");
-  } else if (window.location.pathname === "/usage") {
-    showScreen("usage");
   } else {
+    if (window.location.pathname === "/usage") {
+      window.history.replaceState({}, "", "/");
+    }
     showScreen("interview");
     restoreOrStartConversation();
   }
