@@ -439,6 +439,13 @@ p {
   min-width: 0;
 }
 
+.history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .history-item-copy strong,
 .history-item-copy span,
 .history-item-copy small {
@@ -446,8 +453,36 @@ p {
 }
 
 .history-item-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   line-height: 1.25;
+}
+
+.history-agent-name {
+  cursor: text;
+}
+
+.history-name-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #b8d6ce;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  padding: 3px 6px;
+  outline: none;
+}
+
+.history-name-input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(31, 95, 91, 0.12);
 }
 
 .history-item-copy span {
@@ -1181,7 +1216,8 @@ p {
   text-transform: uppercase;
 }
 
-.model-picker select {
+.model-picker select,
+.model-picker input {
   width: 100%;
   min-height: 34px;
   border: 1px solid #2d4548;
@@ -1194,7 +1230,16 @@ p {
   padding: 0 32px 0 10px;
 }
 
-.model-picker select:focus {
+.model-picker input {
+  padding-right: 10px;
+}
+
+.agent-name-picker {
+  min-width: 120px;
+}
+
+.model-picker select:focus,
+.model-picker input:focus {
   border-color: #64d8cb;
   box-shadow: 0 0 0 3px rgba(100, 216, 203, 0.12);
 }

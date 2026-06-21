@@ -54,6 +54,7 @@ agent_conversations = Table(
     Column("agent_model", String, nullable=True),
     Column("agent_mode", String, nullable=True),
     Column("agent_tone", String, nullable=True),
+    Column("agent_name", String, nullable=True),
     Column("agent_style_source_id", String, nullable=True),
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
@@ -235,6 +236,7 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
         "agent_model": conversation.get("agent_model"),
         "agent_mode": conversation.get("agent_mode") or "know_me",
         "agent_tone": conversation.get("agent_tone") or "auto",
+        "agent_name": conversation.get("agent_name"),
         "agent_style_source_id": conversation.get("agent_style_source_id"),
         "messages_json": conversation["messages"],
     }
@@ -269,6 +271,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_model": row.get("agent_model"),
         "agent_mode": row.get("agent_mode") or "know_me",
         "agent_tone": row.get("agent_tone") or "auto",
+        "agent_name": row.get("agent_name"),
         "agent_style_source_id": row.get("agent_style_source_id"),
         "messages": row["messages_json"],
     }
@@ -291,6 +294,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_model": row.get("agent_model"),
             "agent_mode": row.get("agent_mode") or "know_me",
             "agent_tone": row.get("agent_tone") or "auto",
+            "agent_name": row.get("agent_name"),
             "agent_style_source_id": row.get("agent_style_source_id"),
             "messages": row["messages_json"],
             "created_at": _isoformat_utc(row["created_at"]),
@@ -336,6 +340,7 @@ def _ensure_runtime_columns() -> None:
             "agent_model",
             "agent_mode",
             "agent_tone",
+            "agent_name",
             "agent_style_source_id",
         ),
     }

@@ -44,7 +44,8 @@ Behavior:
 - Do not summarize the user every turn.
 - Avoid phrases like "I'm learning your pattern", "this helps build your profile", or "compatibility signals".
 - Never write a long paragraph in normal chat.
-- Do not flirt, roleplay as a partner, or pretend to be a match.
+- You may be lightly playful, warm, or flirty when the user invites that tone, but keep it respectful.
+- Do not pretend to be a real human, a real match, or the user's actual girlfriend/boyfriend.
 - You may feel like a friendly girl/boy companion based on persona, but be honest you are an AI if asked.
 
 Collect these topics over time:
@@ -172,6 +173,7 @@ async def generate_agent_reply(
     model: str | None = None,
     agent_mode: str = "know_me",
     agent_tone: str = "auto",
+    agent_name: str | None = None,
     context_sources: list[dict[str, Any]] | None = None,
     user_profile: dict[str, Any] | None = None,
 ) -> str:
@@ -198,7 +200,7 @@ async def generate_agent_reply(
             success=True,
             latency_ms=0,
         )
-        return _mock_reply(messages, user_profile)
+        return _mock_reply(messages, user_profile, agent_name)
     if provider == "groq":
         return await _groq_chat(
             _system_prompt_with_context(
@@ -207,6 +209,7 @@ async def generate_agent_reply(
                 agent_mode,
                 agent_tone,
                 user_profile,
+                agent_name,
             ),
             messages,
             conversation_id=conversation_id,
@@ -221,6 +224,7 @@ async def generate_agent_reply(
                 agent_mode,
                 agent_tone,
                 user_profile,
+                agent_name,
             ),
             messages,
             conversation_id=conversation_id,
@@ -512,9 +516,10 @@ def _system_prompt_with_context(
     agent_mode: str = "know_me",
     agent_tone: str = "auto",
     user_profile: dict[str, Any] | None = None,
+    agent_name: str | None = None,
 ) -> str:
     context_text = _context_sources_text(context_sources)
-    persona_text = _agent_persona_prompt(user_profile)
+    persona_text = _agent_persona_prompt(user_profile, agent_name)
     mode_text = _agent_mode_prompt(agent_mode)
     tone_text = _agent_tone_prompt(agent_tone)
     if not context_text:
@@ -536,7 +541,10 @@ def _system_prompt_with_context(
     )
 
 
-def _agent_persona_prompt(user_profile: dict[str, Any] | None) -> str:
+def _agent_persona_prompt(
+    user_profile: dict[str, Any] | None,
+    agent_name: str | None = None,
+) -> str:
     gender = (user_profile or {}).get("gender") or "unknown"
     interested_in = (user_profile or {}).get("interested_in") or "unknown"
     display_name = (user_profile or {}).get("display_name") or "unknown"
@@ -548,6 +556,8 @@ def _agent_persona_prompt(user_profile: dict[str, Any] | None) -> str:
     current_time = (user_profile or {}).get("current_time") or "unknown"
     current_weekday = (user_profile or {}).get("current_weekday") or "unknown"
     persona = _agent_persona_for_interest(str(interested_in))
+    if agent_name and agent_name.strip():
+        persona = {**persona, "name": agent_name.strip()}
     return (
         f"User identity: display_name={display_name}, email={email}.\n"
         f"User basics: gender={gender}, interested_in={interested_in}, "
@@ -557,7 +567,8 @@ def _agent_persona_prompt(user_profile: dict[str, Any] | None) -> str:
         f"Agent persona: name={persona['name']}, presentation={persona['presentation']}.\n"
         "Use identity/location/time only when naturally helpful. Do not mention the user's email "
         "unless they ask about account details. If location is only a default, treat it as uncertain. "
-        "Speak from this persona in a casual WhatsApp-like way. Use small replies, not big paragraphs. "
+        "Speak from this persona in a casual WhatsApp-like way, like a single ongoing personal chat. "
+        "Use small replies, not big paragraphs. "
         "Do not keep saying your name. Do not turn every reply into a dating interview. "
         "Do not repeat the same supportive line again and again."
     )
@@ -574,9 +585,11 @@ def _agent_persona_for_interest(interested_in: str) -> dict[str, str]:
 def _agent_mode_prompt(agent_mode: str) -> str:
     prompts = {
         "know_me": (
-            "Current agent mode: Companion. Talk normally first. Quietly learn the user's "
-            "personality, values, lifestyle, communication style, and relationship goals over time. "
-            "Let the conversation breathe; do not force a profile question every turn."
+            "Current agent mode: Companion. This is the user's main personal chat with you. "
+            "Talk like a warm girl/boy companion on WhatsApp: brief, natural, sometimes playful. "
+            "Quietly learn the user's personality, values, lifestyle, emotional patterns, "
+            "communication style, and relationship goals over time. Let the conversation breathe; "
+            "do not force a profile question every turn."
         ),
         "coach_me": (
             "Current agent mode: Coach me. Help the user reflect on patterns and choices. "
@@ -1030,9 +1043,12 @@ def _parse_json_object(content: str) -> dict[str, Any]:
 def _mock_reply(
     messages: list[dict[str, str]],
     user_profile: dict[str, Any] | None = None,
+    agent_name: str | None = None,
 ) -> str:
     user_messages = [message for message in messages if message["role"] == "user"]
     persona = _agent_persona_for_interest(str((user_profile or {}).get("interested_in") or ""))
+    if agent_name and agent_name.strip():
+        persona = {**persona, "name": agent_name.strip()}
     if user_messages and _is_greeting_only(user_messages[-1]["content"]):
         return f"Hey, I'm {persona['name']}. Chill, we can talk normally first."
 

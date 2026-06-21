@@ -193,6 +193,7 @@ class AgentConversation(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
     agent_tone: AgentTone = "auto"
+    agent_name: str | None = Field(default=None, max_length=40)
     agent_style_source_id: str | None = None
     messages: list[dict[str, str]] = Field(default_factory=list)
 
@@ -201,6 +202,7 @@ class AgentConversationCreate(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
     agent_tone: AgentTone = "auto"
+    agent_name: str | None = Field(default=None, max_length=40)
     agent_style_source_id: str | None = None
 
 
@@ -208,6 +210,7 @@ class AgentConversationSettings(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode | None = None
     agent_tone: AgentTone | None = None
+    agent_name: str | None = Field(default=None, max_length=40)
     agent_style_source_id: str | None = None
 
 
@@ -218,6 +221,7 @@ class AgentConversationSummary(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
     agent_tone: AgentTone = "auto"
+    agent_name: str | None = None
     agent_style_source_id: str | None = None
     message_count: int = 0
     user_message_count: int = 0
@@ -596,17 +600,19 @@ async def create_agent_conversation(
     )
     user_profile = _agent_user_context(user)
     persona = _agent_persona_for_profile(user_profile)
+    agent_name = _normalize_agent_name(payload.agent_name if payload else None, persona)
     conversation = AgentConversation(
         id=conversation_id,
         agent_provider=str(runtime["provider"]),
         agent_model=selected_model,
         agent_mode=payload.agent_mode if payload else "know_me",
         agent_tone=payload.agent_tone if payload else "auto",
+        agent_name=agent_name,
         agent_style_source_id=payload.agent_style_source_id if payload else None,
         messages=[
             {
                 "role": "assistant",
-                "content": _initial_agent_message(persona, user_profile),
+                "content": _initial_agent_message({**persona, "name": agent_name}, user_profile),
             }
         ],
     )
@@ -630,6 +636,8 @@ async def list_agent_conversations(
                 agent_model=conversation["agent_model"],
                 agent_mode=conversation["agent_mode"],
                 agent_tone=conversation["agent_tone"],
+                agent_name=conversation.get("agent_name")
+                or _agent_persona_for_profile(_agent_user_context(user))["name"],
                 agent_style_source_id=conversation["agent_style_source_id"],
                 message_count=len(messages),
                 user_message_count=sum(1 for message in messages if message.get("role") == "user"),
@@ -677,6 +685,11 @@ def update_agent_conversation_settings(
         conversation.agent_mode = payload.agent_mode
     if payload.agent_tone is not None:
         conversation.agent_tone = payload.agent_tone
+    if "agent_name" in payload.model_fields_set:
+        conversation.agent_name = _normalize_agent_name(
+            payload.agent_name,
+            _agent_persona_for_profile(_agent_user_context(user)),
+        )
     if "agent_style_source_id" in payload.model_fields_set:
         style_source_id = payload.agent_style_source_id or None
         _validate_style_source(conversation_id, style_source_id, _user_id(user))
@@ -706,6 +719,7 @@ async def send_agent_message(
             model=conversation.agent_model,
             agent_mode=conversation.agent_mode,
             agent_tone=conversation.agent_tone,
+            agent_name=conversation.agent_name,
             style_source_id=conversation.agent_style_source_id,
         )
     except (AgentProviderError, Exception) as error:
@@ -1284,6 +1298,13 @@ def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, s
     if interested_in == "men":
         return {"name": "Arjun", "presentation": "boy"}
     return {"name": "Mira", "presentation": "companion"}
+
+
+def _normalize_agent_name(name: str | None, persona: dict[str, str]) -> str:
+    cleaned = " ".join(str(name or "").strip().split())
+    if not cleaned:
+        return persona["name"]
+    return cleaned[:40]
 
 
 def _initial_agent_message(

@@ -25,6 +25,7 @@ async def run_agent_turn(
     agent_mode: str,
     agent_tone: str,
     style_source_id: str | None,
+    agent_name: str | None = None,
 ) -> AgentTurnResult:
     updated_messages = [dict(message) for message in messages]
     user_message: dict[str, Any] = {"role": "user", "content": user_text}
@@ -54,6 +55,7 @@ async def run_agent_turn(
         model=model,
         agent_mode=agent_mode,
         agent_tone=agent_tone,
+        agent_name=agent_name,
         context_sources=context.context_sources,
         user_profile=context.user_profile,
     )

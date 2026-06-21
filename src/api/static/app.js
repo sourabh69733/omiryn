@@ -5,6 +5,7 @@ let isSendingMessage = false;
 let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
+let currentAgentName = null;
 let profileFactsById = new Map();
 let lastEvidenceTrigger = null;
 let pendingMessageHighlightIndex = null;
@@ -48,12 +49,14 @@ const routes = {
 };
 
 const chatLog = document.querySelector("#chat-log");
+const chatTitle = document.querySelector("#chat-title");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
 const agentModelSelect = document.querySelector("#agent-model-select");
 const agentModeSelect = document.querySelector("#agent-mode-select");
+const agentNameInput = document.querySelector("#agent-name-input");
 const agentToneSelect = document.querySelector("#agent-tone-select");
 const agentContextButton = document.querySelector("#agent-context-button");
 const agentContextMenu = document.querySelector("#agent-context-menu");
@@ -870,6 +873,7 @@ async function startConversation() {
     body: JSON.stringify({
       agent_model: selectedAgentModel(),
       agent_mode: selectedAgentMode(),
+      agent_name: selectedAgentName(),
       agent_tone: selectedAgentTone()
     })
   });
@@ -928,6 +932,7 @@ async function latestRestorableConversation() {
 
 function prepareEmptyConversation() {
   conversationId = null;
+  currentAgentName = null;
   messages = [];
   pendingContextSourceIds = [];
   chatInput.disabled = false;
@@ -944,6 +949,7 @@ function prepareEmptyConversation() {
 
 function hydrateConversation(conversation, options = {}) {
   rememberConversation(conversation.id);
+  currentAgentName = conversation.agent_name || defaultAgentName();
   messages = conversation.messages;
   pendingMessageHighlightIndex = Number.isFinite(Number(options.highlightMessageIndex))
     ? Number(options.highlightMessageIndex)
@@ -953,6 +959,9 @@ function hydrateConversation(conversation, options = {}) {
   }
   if (conversation.agent_mode && agentModeSelect) {
     agentModeSelect.value = conversation.agent_mode;
+  }
+  if (agentNameInput) {
+    agentNameInput.value = currentAgentName;
   }
   if (conversation.agent_tone && agentToneSelect) {
     agentToneSelect.value = conversation.agent_tone;
@@ -1016,7 +1025,25 @@ function selectedAgentModel() {
 }
 
 function selectedAgentMode() {
-  return agentModeSelect ? agentModeSelect.value : "know_me";
+  return "know_me";
+}
+
+function selectedAgentName() {
+  if (agentNameInput) {
+    return agentNameInput.value.trim();
+  }
+  return currentAgentName;
+}
+
+function defaultAgentName() {
+  const interestedIn = accountInterestedIn?.value || profileInterestedIn?.value || "";
+  if (interestedIn === "women") return "Annie";
+  if (interestedIn === "men") return "Arjun";
+  return "Mira";
+}
+
+function conversationAgentName(conversation) {
+  return conversation?.agent_name || defaultAgentName();
 }
 
 function selectedAgentTone() {
@@ -1027,6 +1054,10 @@ function updateAgentStatusModel() {
   if (!agentStatus) return;
 
   const provider = agentStatus.dataset.provider || "Agent";
+  const agentName = selectedAgentName() || defaultAgentName();
+  if (chatTitle) {
+    chatTitle.textContent = agentName;
+  }
   agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${agentToneLabel(selectedAgentTone())} · ${contextSelectionLabel()} · ${selectedAgentModel() || "no model"}`;
 }
 
@@ -1040,6 +1071,7 @@ async function updateConversationModel() {
       body: JSON.stringify({
         agent_model: selectedAgentModel(),
         agent_mode: selectedAgentMode(),
+        agent_name: selectedAgentName(),
         agent_tone: selectedAgentTone()
       })
     });
@@ -1052,6 +1084,10 @@ async function updateConversationModel() {
     }
     if (conversation.agent_mode && agentModeSelect) {
       agentModeSelect.value = conversation.agent_mode;
+    }
+    currentAgentName = conversation.agent_name || defaultAgentName();
+    if (agentNameInput) {
+      agentNameInput.value = currentAgentName;
     }
     if (conversation.agent_tone && agentToneSelect) {
       agentToneSelect.value = conversation.agent_tone;
@@ -1067,7 +1103,7 @@ async function updateConversationModel() {
 
 function agentModeLabel(mode) {
   const labels = {
-    know_me: "Know me",
+    know_me: "Companion",
     coach_me: "Coach me",
     match_me: "Match me",
     talk_like_me: "Talk like me"
@@ -1198,7 +1234,7 @@ function renderConversationHistory(conversations) {
 
   historyList.innerHTML = "";
   visibleConversations.forEach((conversation) => {
-    const title = `Conversation ${conversation.id.slice(0, 8)}`;
+    const title = conversationAgentName(conversation);
     const item = document.createElement("div");
     item.className = "history-item";
     item.classList.toggle("active", conversation.id === conversationId);
@@ -1209,7 +1245,9 @@ function renderConversationHistory(conversations) {
       : "No timestamp";
     item.innerHTML = `
       <div class="history-item-copy">
-        <strong>${escapeHtml(title)}</strong>
+        <div class="history-title-row">
+          <strong class="history-agent-name" title="Double click to rename">${escapeHtml(title)}</strong>
+        </div>
         <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
         <small>${escapeHtml(updatedAt)}</small>
       </div>
@@ -1232,6 +1270,11 @@ function renderConversationHistory(conversations) {
         historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
       });
     });
+    item.querySelector(".history-agent-name")?.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      startInlineConversationRename(conversation, event.currentTarget);
+    });
     item.querySelector(".history-delete")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1241,13 +1284,79 @@ function renderConversationHistory(conversations) {
   });
 }
 
+function startInlineConversationRename(conversation, target) {
+  const currentName = conversationAgentName(conversation);
+  const input = document.createElement("input");
+  input.className = "history-name-input";
+  input.type = "text";
+  input.maxLength = 40;
+  input.value = currentName;
+  input.setAttribute("aria-label", "Companion name");
+
+  let finished = false;
+  const finish = async (shouldSave) => {
+    if (finished) return;
+    finished = true;
+    const nextName = input.value.trim();
+    if (!shouldSave || !nextName) {
+      target.textContent = currentName;
+      input.replaceWith(target);
+      return;
+    }
+    try {
+      await renameConversationFromHistory(conversation, nextName);
+    } catch (error) {
+      historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+    }
+  };
+
+  target.replaceWith(input);
+  input.focus();
+  input.select();
+  input.addEventListener("click", (event) => event.stopPropagation());
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => finish(true));
+}
+
+async function renameConversationFromHistory(conversation, agentName) {
+  const currentName = conversationAgentName(conversation);
+  if (!agentName || agentName === currentName) {
+    await loadConversationHistory();
+    return;
+  }
+
+  const response = await apiFetch(`/api/agent/conversations/${conversation.id}/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_name: agentName })
+  });
+  const updatedConversation = await response.json();
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(updatedConversation.detail, "Could not rename companion."));
+  }
+  if (conversation.id === conversationId) {
+    hydrateConversation(updatedConversation);
+  } else {
+    await loadConversationHistory();
+  }
+}
+
 function openDeleteSessionDialog(id, trigger, title) {
   if (!id) return;
 
   pendingDeleteConversationId = id;
   lastDeleteTrigger = trigger || null;
   if (deleteSessionId) {
-    deleteSessionId.textContent = title || `Conversation ${id.slice(0, 8)}`;
+    deleteSessionId.textContent = title || "this chat";
   }
   if (deleteSessionDialog) {
     deleteSessionDialog.hidden = false;
@@ -2511,6 +2620,8 @@ sideTabButtons.forEach((button) => {
 });
 agentModelSelect.addEventListener("change", updateConversationModel);
 agentModeSelect?.addEventListener("change", updateConversationModel);
+agentNameInput?.addEventListener("change", updateConversationModel);
+agentNameInput?.addEventListener("input", updateAgentStatusModel);
 agentToneSelect?.addEventListener("change", updateConversationModel);
 agentContextButton?.addEventListener("click", (event) => {
   event.stopPropagation();
