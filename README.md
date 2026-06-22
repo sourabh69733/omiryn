@@ -149,6 +149,16 @@ GROQ_TPD_LIMIT=100000
 GROQ_RPM_LIMIT=30
 GROQ_TPM_LIMIT=6000
 
+# hosted OpenAI-compatible model on DeepInfra
+AGENT_PROVIDER=deepinfra
+DEEPINFRA_API_KEY=...
+DEEPINFRA_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+
+# hosted OpenAI-compatible model on Fireworks
+AGENT_PROVIDER=fireworks
+FIREWORKS_API_KEY=...
+FIREWORKS_MODEL=accounts/fireworks/models/gpt-oss-120b
+
 # local model
 AGENT_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
