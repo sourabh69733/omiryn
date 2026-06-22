@@ -233,6 +233,13 @@ td small {
   margin-bottom: 18px;
 }
 
+.activity-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
 .funnel-list,
 .attention-list {
   display: grid;
@@ -302,6 +309,121 @@ td small {
 .attention-item b {
   font-family: var(--font-mono);
   font-size: 20px;
+}
+
+.chart-summary {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chart-body {
+  padding: 18px;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.bar-chart {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(22px, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 190px;
+}
+
+.bar-day {
+  display: grid;
+  grid-template-rows: minmax(130px, 1fr) 18px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bar-stack {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 3px;
+  min-height: 130px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bar-stack span {
+  position: relative;
+  display: block;
+  width: min(14px, 42%);
+  min-height: 2px;
+  border-radius: 5px 5px 0 0;
+}
+
+.bar-stack b {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  display: none;
+  min-width: 22px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(23, 32, 38, 0.1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 5px;
+  text-align: center;
+  z-index: 2;
+}
+
+.bar-stack span:hover b,
+.bar-stack span:focus b {
+  display: block;
+}
+
+.bar-day small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-users {
+  background: #2d7557;
+}
+
+.active-users {
+  background: #1f5f5b;
+}
+
+.conversations {
+  background: #657b8d;
+}
+
+.api-calls {
+  background: #9f7422;
 }
 
 .usage-grid {
@@ -674,9 +796,16 @@ td small {
   .admin-header,
   .admin-title,
   .admin-grid,
+  .activity-charts,
   .dashboard-insights,
   .usage-panels {
     grid-template-columns: 1fr;
+  }
+
+  .bar-chart {
+    overflow-x: auto;
+    grid-template-columns: repeat(14, 28px);
+    padding-bottom: 4px;
   }
 
   .admin-header {

@@ -25,6 +25,12 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
     usage_summary = summarize_agent_usage()
     users = _admin_users(snapshot, usage_events)
     health = _dashboard_health(users, snapshot["draft_rows"], usage_events)
+    activity = _dashboard_activity(
+        users,
+        snapshot["conversation_rows"],
+        snapshot["draft_rows"],
+        usage_events,
+    )
 
     return {
         "summary": {
@@ -48,6 +54,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             "context_source_count": len(snapshot["context_rows"]),
             "usage": usage_summary,
         },
+        "activity": activity,
         "limits": configured_usage_limits(),
         "users": users[:limit],
         "recent_conversations": [
@@ -56,6 +63,76 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         ],
         "recent_drafts": [_draft_summary(row) for row in snapshot["draft_rows"][:limit]],
         "recent_usage_events": usage_events[:limit],
+    }
+
+
+def _dashboard_activity(
+    users: list[dict[str, Any]],
+    conversation_rows: list[Any],
+    draft_rows: list[Any],
+    usage_events: list[dict[str, Any]],
+    days: int = 14,
+) -> dict[str, Any]:
+    today = datetime.now(timezone.utc).date()
+    start_date = today - timedelta(days=days - 1)
+    buckets = {
+        start_date + timedelta(days=index): {
+            "date": (start_date + timedelta(days=index)).isoformat(),
+            "label": (start_date + timedelta(days=index)).strftime("%d %b"),
+            "new_users": 0,
+            "active_users": 0,
+            "conversations": 0,
+            "api_calls": 0,
+            "_active_user_ids": set(),
+        }
+        for index in range(days)
+    }
+    active_user_ids_in_window = set()
+
+    for user in users:
+        first_seen = _parse_iso_datetime(user.get("first_seen_at"), datetime.min.replace(tzinfo=timezone.utc)).date()
+        if first_seen in buckets:
+            buckets[first_seen]["new_users"] += 1
+
+    for row in conversation_rows:
+        created_at = _date_from_value(row["created_at"])
+        if created_at in buckets:
+            buckets[created_at]["conversations"] += 1
+        updated_at = _date_from_value(row["updated_at"])
+        user_id = row["user_id"]
+        if updated_at in buckets and user_id:
+            buckets[updated_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
+    for row in draft_rows:
+        updated_at = _date_from_value(row["updated_at"])
+        user_id = row["user_id"]
+        if updated_at in buckets and user_id:
+            buckets[updated_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
+    for event in usage_events:
+        created_at = _date_from_value(event.get("created_at"))
+        if created_at in buckets:
+            buckets[created_at]["api_calls"] += 1
+            if event.get("user_id"):
+                buckets[created_at]["_active_user_ids"].add(event["user_id"])
+                active_user_ids_in_window.add(event["user_id"])
+
+    daily = []
+    for bucket in buckets.values():
+        active_user_ids = bucket.pop("_active_user_ids")
+        bucket["active_users"] = len(active_user_ids)
+        daily.append(bucket)
+
+    return {
+        "daily": daily,
+        "totals": {
+            "new_users": sum(day["new_users"] for day in daily),
+            "active_users": len(active_user_ids_in_window),
+            "conversations": sum(day["conversations"] for day in daily),
+            "api_calls": sum(day["api_calls"] for day in daily),
+        },
     }
 
 
@@ -455,6 +532,10 @@ def _parse_iso_datetime(value: Any, default: datetime) -> datetime:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _date_from_value(value: Any) -> Any:
+    return _parse_iso_datetime(value, datetime.min.replace(tzinfo=timezone.utc)).date()
 
 
 def _isoformat_utc(value: Any) -> str | None:

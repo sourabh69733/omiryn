@@ -13,6 +13,10 @@ const refreshButton = document.querySelector("#refresh-admin");
 const metricGrid = document.querySelector("#metric-grid");
 const dashboardFunnel = document.querySelector("#dashboard-funnel");
 const dashboardAttention = document.querySelector("#dashboard-attention");
+const userActivityChart = document.querySelector("#user-activity-chart");
+const engagementChart = document.querySelector("#engagement-chart");
+const userActivitySummary = document.querySelector("#user-activity-summary");
+const engagementSummary = document.querySelector("#engagement-summary");
 const usersPageStatus = document.querySelector("#users-page-status");
 const usersPrev = document.querySelector("#users-prev");
 const usersNext = document.querySelector("#users-next");
@@ -108,6 +112,7 @@ async function loadAdminOverview() {
 function renderDashboard(data) {
   renderMetrics(data.summary || {});
   renderDashboardInsights(data.summary || {});
+  renderActivityCharts(data.activity || {});
   renderUsers(data.users || []);
   renderUsageDashboard(data.summary?.usage || {}, data.recent_usage_events || [], data.limits || {});
 }
@@ -174,6 +179,60 @@ function renderAttention(summary) {
       <b>${formatNumber(value)}</b>
     </article>
   `).join("");
+}
+
+function renderActivityCharts(activity) {
+  const daily = activity.daily || [];
+  const totals = activity.totals || {};
+  if (userActivitySummary) {
+    userActivitySummary.textContent = `${formatNumber(totals.new_users || 0)} new · ${formatNumber(totals.active_users || 0)} active`;
+  }
+  if (engagementSummary) {
+    engagementSummary.textContent = `${formatNumber(totals.conversations || 0)} chats · ${formatNumber(totals.api_calls || 0)} API calls`;
+  }
+  renderBarChart(userActivityChart, daily, [
+    { key: "new_users", label: "New", className: "new-users" },
+    { key: "active_users", label: "Active", className: "active-users" }
+  ]);
+  renderBarChart(engagementChart, daily, [
+    { key: "conversations", label: "Chats", className: "conversations" },
+    { key: "api_calls", label: "API", className: "api-calls" }
+  ]);
+}
+
+function renderBarChart(target, daily, series) {
+  if (!target) return;
+  if (!daily.length) {
+    target.innerHTML = '<div class="table-empty">No activity data yet.</div>';
+    return;
+  }
+  const maxValue = Math.max(
+    1,
+    ...daily.flatMap((day) => series.map((item) => Number(day[item.key] || 0)))
+  );
+  target.innerHTML = `
+    <div class="chart-legend">
+      ${series.map((item) => `<span><i class="${escapeHtml(item.className)}"></i>${escapeHtml(item.label)}</span>`).join("")}
+    </div>
+    <div class="bar-chart" role="img" aria-label="14 day activity chart">
+      ${daily.map((day) => renderBarChartDay(day, series, maxValue)).join("")}
+    </div>
+  `;
+}
+
+function renderBarChartDay(day, series, maxValue) {
+  return `
+    <article class="bar-day" title="${escapeHtml(day.label || day.date || "")}">
+      <div class="bar-stack">
+        ${series.map((item) => {
+          const value = Number(day[item.key] || 0);
+          const height = Math.max(value ? 6 : 2, Math.round((value / maxValue) * 100));
+          return `<span class="${escapeHtml(item.className)}" style="height: ${height}%"><b>${formatNumber(value)}</b></span>`;
+        }).join("")}
+      </div>
+      <small>${escapeHtml(shortChartLabel(day.label || ""))}</small>
+    </article>
+  `;
 }
 
 function renderUsers(users) {
@@ -742,6 +801,10 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString();
+}
+
+function shortChartLabel(value) {
+  return String(value || "").split(" ")[0] || "-";
 }
 
 function shortId(value) {
