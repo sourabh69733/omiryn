@@ -28,6 +28,7 @@ STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500
 CHAT_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35"))
 CHAT_ADVICE_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_ADVICE_REPLY_WORD_LIMIT", "80"))
 STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
+OPENAI_COMPATIBLE_PROVIDERS = {"deepinfra", "fireworks"}
 
 ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private dating companion.
 Your job is to talk naturally, make the user feel less alone, and slowly understand
@@ -216,6 +217,22 @@ async def generate_agent_reply(
             request_kind=CHAT_REPLY,
             model=model,
         )
+    if provider in OPENAI_COMPATIBLE_PROVIDERS:
+        return await _openai_compatible_chat(
+            provider,
+            _system_prompt_with_context(
+                ONBOARDING_SYSTEM_PROMPT,
+                context_sources,
+                agent_mode,
+                agent_tone,
+                user_profile,
+                agent_name,
+            ),
+            messages,
+            conversation_id=conversation_id,
+            request_kind=CHAT_REPLY,
+            model=model,
+        )
     if provider == "ollama":
         return await _ollama_chat(
             _system_prompt_with_context(
@@ -269,6 +286,16 @@ async def extract_profile(
             request_kind=PROFILE_EXTRACT,
             model=model,
         )
+    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
+        content = await _openai_compatible_chat(
+            provider,
+            EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=PROFILE_EXTRACT,
+            model=model,
+        )
     elif provider == "ollama":
         content = await _ollama_chat(
             EXTRACTION_SYSTEM_PROMPT,
@@ -287,6 +314,16 @@ async def extract_profile(
         repair_messages = extraction_messages + [{"role": "assistant", "content": content}]
         if provider == "groq":
             content = await _groq_chat(
+                EXTRACTION_REPAIR_PROMPT,
+                repair_messages,
+                temperature=0,
+                conversation_id=conversation_id,
+                request_kind=PROFILE_EXTRACT_REPAIR,
+                model=model,
+            )
+        elif provider in OPENAI_COMPATIBLE_PROVIDERS:
+            content = await _openai_compatible_chat(
+                provider,
                 EXTRACTION_REPAIR_PROMPT,
                 repair_messages,
                 temperature=0,
@@ -342,6 +379,16 @@ async def extract_deep_profile_facts(
             request_kind=PROFILE_FACT_EXTRACT,
             model=model,
         )
+    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
+        content = await _openai_compatible_chat(
+            provider,
+            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+            extraction_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=PROFILE_FACT_EXTRACT,
+            model=model,
+        )
     elif provider == "ollama":
         content = await _ollama_chat(
             DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
@@ -368,7 +415,10 @@ def agent_runtime_status() -> dict[str, Any]:
         "provider": provider,
         "model": _provider_model(provider),
         "available_models": _available_models(provider),
+        "api_key_loaded": _provider_api_key_loaded(provider),
         "groq_api_key_loaded": bool(os.getenv("GROQ_API_KEY")),
+        "deepinfra_api_key_loaded": bool(_deepinfra_api_key()),
+        "fireworks_api_key_loaded": bool(os.getenv("FIREWORKS_API_KEY")),
         "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     }
 
@@ -376,6 +426,10 @@ def agent_runtime_status() -> dict[str, Any]:
 def _provider_model(provider: str) -> str | None:
     if provider == "groq":
         return os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    if provider == "deepinfra":
+        return os.getenv("DEEPINFRA_MODEL", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+    if provider == "fireworks":
+        return os.getenv("FIREWORKS_MODEL", "accounts/fireworks/models/gpt-oss-120b")
     if provider == "ollama":
         return os.getenv("OLLAMA_MODEL", "llama3.1")
     if provider == "mock":
@@ -393,11 +447,41 @@ def _available_models(provider: str) -> list[str]:
                 "llama-3.1-8b-instant",
             ],
         )
+    if provider == "deepinfra":
+        return _models_from_env(
+            "DEEPINFRA_AVAILABLE_MODELS",
+            [
+                os.getenv("DEEPINFRA_MODEL", "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+                "meta-llama/Llama-3.1-70B-Instruct-Turbo",
+                "deepseek-ai/DeepSeek-V3",
+            ],
+        )
+    if provider == "fireworks":
+        return _models_from_env(
+            "FIREWORKS_AVAILABLE_MODELS",
+            [
+                os.getenv("FIREWORKS_MODEL", "accounts/fireworks/models/gpt-oss-120b"),
+                "accounts/fireworks/models/llama-v3p3-70b-instruct",
+                "accounts/fireworks/models/deepseek-v3p1",
+            ],
+        )
     if provider == "ollama":
         return _models_from_env("OLLAMA_AVAILABLE_MODELS", [os.getenv("OLLAMA_MODEL", "llama3.1")])
     if provider == "mock":
         return ["mock"]
     return []
+
+
+def _provider_api_key_loaded(provider: str) -> bool:
+    if provider == "groq":
+        return bool(os.getenv("GROQ_API_KEY"))
+    if provider == "deepinfra":
+        return bool(_deepinfra_api_key())
+    if provider == "fireworks":
+        return bool(os.getenv("FIREWORKS_API_KEY"))
+    if provider in {"mock", "ollama"}:
+        return True
+    return False
 
 
 def _models_from_env(env_name: str, defaults: list[str]) -> list[str]:
@@ -507,7 +591,6 @@ def _conversation_summary_message(messages: list[dict[str, str]]) -> dict[str, s
     if assistant_lines:
         parts.append("Earlier assistant prompts: " + " | ".join(assistant_lines))
     return {"role": "system", "content": "\n".join(parts)}
-    return provider_messages
 
 
 def _system_prompt_with_context(
@@ -744,6 +827,156 @@ def _truncate_for_context(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 1].rstrip() + "..."
+
+
+async def _openai_compatible_chat(
+    provider: str,
+    system_prompt: str,
+    messages: list[dict[str, str]],
+    temperature: float = 0.4,
+    conversation_id: str | None = None,
+    request_kind: str = "chat_reply",
+    model: str | None = None,
+) -> str:
+    config = _openai_compatible_provider_config(provider, model)
+    provider_messages = _provider_messages(messages)
+    payload = {
+        "model": config["model"],
+        "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
+        "temperature": temperature,
+    }
+    prompt_debug = _prompt_debug(system_prompt, provider_messages)
+    _emit_prompt_debug(provider, str(config["model"]), request_kind, prompt_debug)
+    headers = {
+        "Authorization": f"Bearer {config['api_key']}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=config["timeout_seconds"]) as client:
+        logger.info(
+            "agent.%s.request model=%s messages=%s temperature=%s",
+            provider,
+            config["model"],
+            len(payload["messages"]),
+            temperature,
+        )
+        started_at = perf_counter()
+        try:
+            response = await client.post(str(config["chat_url"]), json=payload, headers=headers)
+            response.raise_for_status()
+            latency_ms = _elapsed_ms(started_at)
+            logger.info("agent.%s.response status_code=%s", provider, response.status_code)
+            data = response.json()
+            usage = data.get("usage") or {}
+            raw_usage = {
+                **usage,
+                "rate_limit": _provider_rate_limit_headers(response),
+                "prompt_debug": prompt_debug,
+            }
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider=provider,
+                model=str(config["model"]),
+                success=True,
+                latency_ms=latency_ms,
+                raw_usage=raw_usage,
+                prompt_tokens=usage.get("prompt_tokens"),
+                completion_tokens=usage.get("completion_tokens"),
+                total_tokens=usage.get("total_tokens"),
+            )
+            content = data["choices"][0]["message"]["content"]
+            if request_kind == CHAT_REPLY:
+                return _compact_chat_reply(content, messages)
+            return content
+        except httpx.HTTPStatusError as error:
+            raw_usage = {"prompt_debug": prompt_debug}
+            if error.response is not None:
+                raw_usage["rate_limit"] = _provider_rate_limit_headers(error.response)
+                try:
+                    raw_usage["error"] = error.response.json()
+                except ValueError:
+                    raw_usage["error_text"] = error.response.text[:500]
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider=provider,
+                model=str(config["model"]),
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                raw_usage=raw_usage,
+                error=str(error),
+            )
+            raise
+        except Exception as error:
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider=provider,
+                model=str(config["model"]),
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                raw_usage={"prompt_debug": prompt_debug},
+                error=str(error),
+            )
+            raise
+
+
+def _openai_compatible_provider_config(
+    provider: str,
+    model: str | None,
+) -> dict[str, str | int]:
+    if provider == "deepinfra":
+        api_key = _deepinfra_api_key()
+        if not api_key:
+            raise AgentProviderError(
+                "DEEPINFRA_API_KEY or DEEPINFRA_TOKEN is required when "
+                "AGENT_PROVIDER=deepinfra."
+            )
+        base_url = os.getenv("DEEPINFRA_BASE_URL", "https://api.deepinfra.com/v1/openai")
+        return {
+            "api_key": api_key,
+            "chat_url": f"{base_url.rstrip('/')}/chat/completions",
+            "model": model or os.getenv(
+                "DEEPINFRA_MODEL",
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            ),
+            "timeout_seconds": int(os.getenv("DEEPINFRA_TIMEOUT_SECONDS", "45")),
+        }
+
+    if provider == "fireworks":
+        api_key = os.getenv("FIREWORKS_API_KEY")
+        if not api_key:
+            raise AgentProviderError(
+                "FIREWORKS_API_KEY is required when AGENT_PROVIDER=fireworks."
+            )
+        base_url = os.getenv(
+            "FIREWORKS_BASE_URL",
+            "https://api.fireworks.ai/inference/v1",
+        )
+        return {
+            "api_key": api_key,
+            "chat_url": f"{base_url.rstrip('/')}/chat/completions",
+            "model": model or os.getenv(
+                "FIREWORKS_MODEL",
+                "accounts/fireworks/models/gpt-oss-120b",
+            ),
+            "timeout_seconds": int(os.getenv("FIREWORKS_TIMEOUT_SECONDS", "45")),
+        }
+
+    raise AgentProviderError(f"Unsupported OpenAI-compatible provider: {provider}")
+
+
+def _deepinfra_api_key() -> str:
+    return os.getenv("DEEPINFRA_API_KEY") or os.getenv("DEEPINFRA_TOKEN") or ""
+
+
+def _provider_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
+    return {
+        name: value
+        for name, value in response.headers.items()
+        if name.lower().startswith("x-ratelimit") or name.lower() == "retry-after"
+    }
 
 
 async def _groq_chat(
@@ -1002,11 +1235,10 @@ def _estimated_cost_usd(
     prompt_tokens: int | None,
     completion_tokens: int | None,
 ) -> float | None:
-    if provider != "groq" or prompt_tokens is None or completion_tokens is None:
+    if prompt_tokens is None or completion_tokens is None:
         return None
 
-    input_cost_per_1m = float(os.getenv("GROQ_INPUT_COST_PER_1M", "0") or 0)
-    output_cost_per_1m = float(os.getenv("GROQ_OUTPUT_COST_PER_1M", "0") or 0)
+    input_cost_per_1m, output_cost_per_1m = _provider_token_costs(provider)
     if input_cost_per_1m == 0 and output_cost_per_1m == 0:
         return None
 
@@ -1015,6 +1247,20 @@ def _estimated_cost_usd(
         + (completion_tokens / 1_000_000 * output_cost_per_1m),
         8,
     )
+
+
+def _provider_token_costs(provider: str) -> tuple[float, float]:
+    env_prefixes = {
+        "groq": "GROQ",
+        "deepinfra": "DEEPINFRA",
+        "fireworks": "FIREWORKS",
+    }
+    env_prefix = env_prefixes.get(provider)
+    if not env_prefix:
+        return 0.0, 0.0
+    input_cost = float(os.getenv(f"{env_prefix}_INPUT_COST_PER_1M", "0") or 0)
+    output_cost = float(os.getenv(f"{env_prefix}_OUTPUT_COST_PER_1M", "0") or 0)
+    return input_cost, output_cost
 
 
 def _elapsed_ms(started_at: float) -> int:

@@ -9,11 +9,15 @@ from api.main import _agent_user_context, _smart_reply_context_sources, app, cur
 from agent.providers import (
     _compact_chat_reply,
     _context_sources_text,
+    _estimated_cost_usd,
     _groq_rate_limit_headers,
     _mock_reply,
+    _openai_compatible_provider_config,
     _prompt_debug,
+    _provider_token_costs,
     _provider_messages,
     _system_prompt_with_context,
+    agent_runtime_status,
 )
 from agent.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
@@ -1110,8 +1114,69 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("provider", data)
         self.assertIn("model", data)
         self.assertIn("available_models", data)
+        self.assertIn("api_key_loaded", data)
         self.assertIn("groq_api_key_loaded", data)
+        self.assertIn("deepinfra_api_key_loaded", data)
+        self.assertIn("fireworks_api_key_loaded", data)
         self.assertNotIn("groq_api_key", data)
+        self.assertNotIn("deepinfra_api_key", data)
+        self.assertNotIn("fireworks_api_key", data)
+
+    def test_deepinfra_runtime_config_uses_env_key_and_models(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_PROVIDER": "deepinfra",
+                "DEEPINFRA_API_KEY": "deepinfra-test-key",
+                "DEEPINFRA_MODEL": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            },
+        ):
+            status = agent_runtime_status()
+            config = _openai_compatible_provider_config("deepinfra", None)
+
+        self.assertEqual(status["provider"], "deepinfra")
+        self.assertTrue(status["api_key_loaded"])
+        self.assertTrue(status["deepinfra_api_key_loaded"])
+        self.assertIn("meta-llama/Llama-3.3-70B-Instruct-Turbo", status["available_models"])
+        self.assertEqual(
+            config["chat_url"],
+            "https://api.deepinfra.com/v1/openai/chat/completions",
+        )
+
+    def test_fireworks_runtime_config_uses_env_key_and_models(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_PROVIDER": "fireworks",
+                "FIREWORKS_API_KEY": "fireworks-test-key",
+                "FIREWORKS_MODEL": "accounts/fireworks/models/gpt-oss-120b",
+            },
+        ):
+            status = agent_runtime_status()
+            config = _openai_compatible_provider_config("fireworks", None)
+
+        self.assertEqual(status["provider"], "fireworks")
+        self.assertTrue(status["api_key_loaded"])
+        self.assertTrue(status["fireworks_api_key_loaded"])
+        self.assertIn("accounts/fireworks/models/gpt-oss-120b", status["available_models"])
+        self.assertEqual(
+            config["chat_url"],
+            "https://api.fireworks.ai/inference/v1/chat/completions",
+        )
+
+    def test_provider_cost_estimate_uses_provider_specific_env(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "DEEPINFRA_INPUT_COST_PER_1M": "0.10",
+                "DEEPINFRA_OUTPUT_COST_PER_1M": "0.32",
+                "FIREWORKS_INPUT_COST_PER_1M": "0.15",
+                "FIREWORKS_OUTPUT_COST_PER_1M": "0.60",
+            },
+        ):
+            self.assertEqual(_provider_token_costs("deepinfra"), (0.10, 0.32))
+            self.assertEqual(_estimated_cost_usd("deepinfra", 2000, 100), 0.000232)
+            self.assertEqual(_estimated_cost_usd("fireworks", 2000, 100), 0.00036)
 
     def test_auth_config_exposes_public_supabase_settings(self) -> None:
         with patch.dict(
