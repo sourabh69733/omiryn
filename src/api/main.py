@@ -69,7 +69,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
 AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
-AgentMessageFeedbackRating = Literal["up", "down"]
+AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
 ContextSourceType = Literal[
     "llm_profile",
     "chat_export",

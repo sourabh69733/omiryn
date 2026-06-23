@@ -92,12 +92,12 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/messages/0/feedback",
-            json={"rating": "down", "reason": "bad_tone", "comment": "Too formal."},
+            json={"rating": "bad", "reason": "bad_tone", "comment": "Too formal."},
         )
         list_response = self.client.get(f"/api/agent/conversations/{conversation_id}/feedback")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["feedback"]["rating"], "down")
+        self.assertEqual(response.json()["feedback"]["rating"], "bad")
         self.assertEqual(response.json()["feedback"]["reason"], "bad_tone")
         self.assertEqual(list_response.json()["count"], 1)
 
@@ -111,7 +111,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/messages/1/feedback",
-            json={"rating": "up"},
+            json={"rating": "good"},
         )
 
         self.assertEqual(response.status_code, 400)

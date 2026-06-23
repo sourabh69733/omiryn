@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-Rating = Literal["up", "down"]
+Rating = Literal["good", "off", "bad", "harmful"]
+FEEDBACK_RATINGS = {"good", "off", "bad", "harmful"}
 
 FEEDBACK_REASONS = {
     "not_me",
@@ -17,8 +18,8 @@ FEEDBACK_REASONS = {
 
 def normalize_message_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
     rating = str(feedback["rating"]).strip().lower()
-    if rating not in {"up", "down"}:
-        raise ValueError("Feedback rating must be up or down.")
+    if rating not in FEEDBACK_RATINGS:
+        raise ValueError("Feedback rating must be good, off, bad, or harmful.")
 
     reason = str(feedback.get("reason") or "").strip().lower()
     if reason and reason not in FEEDBACK_REASONS:
