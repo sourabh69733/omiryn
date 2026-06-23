@@ -14,6 +14,8 @@ let authSession = null;
 let authRequired = false;
 let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
+let activeFeedbackMessageIndex = null;
+const messageFeedbackState = new Map();
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -45,6 +47,20 @@ const agentNamePools = {
   men: ["Arjun", "Kabir", "Aarav", "Reyansh", "Vihaan", "Ishaan", "Dev", "Rohan"],
   everyone: ["Mira", "Annie", "Arjun", "Kiara", "Kabir", "Naina", "Aarav", "Sana"]
 };
+const feedbackReactions = [
+  { rating: "good", label: "Good", icon: "good" },
+  { rating: "off", label: "A little off", icon: "off" },
+  { rating: "bad", label: "Bad", icon: "bad" },
+  { rating: "harmful", label: "Harmful", icon: "harmful" }
+];
+const feedbackReasons = [
+  { value: "not_me", label: "Not me" },
+  { value: "wrong_memory", label: "Wrong memory" },
+  { value: "bad_tone", label: "Bad tone" },
+  { value: "too_much", label: "Too much" },
+  { value: "not_helpful", label: "Not helpful" },
+  { value: "unsafe", label: "Unsafe" }
+];
 
 const routes = {
   interview: document.querySelector("#interview-screen"),
@@ -1152,12 +1168,169 @@ function renderMessages() {
     content.textContent = message.content;
     bubble.appendChild(content);
 
-    // Later: show extracted signal chips below assistant replies.
+    if (message.role === "assistant") {
+      bubble.classList.add("has-feedback");
+      bubble.appendChild(renderMessageFeedback(index));
+    }
 
     chatLog.appendChild(bubble);
   });
   chatLog.scrollTop = chatLog.scrollHeight;
   updateSidebarMeta();
+}
+
+function renderMessageFeedback(messageIndex) {
+  const state = messageFeedbackState.get(messageIndex) || {};
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-feedback";
+  wrapper.dataset.messageIndex = String(messageIndex);
+
+  const actions = document.createElement("div");
+  actions.className = "message-feedback-actions";
+  feedbackReactions.forEach((reaction) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "message-feedback-reaction";
+    button.innerHTML = feedbackReactionIcon(reaction.icon);
+    button.title = reaction.label;
+    button.setAttribute("aria-label", reaction.label);
+    if (state.rating === reaction.rating) {
+      button.classList.add("selected");
+    }
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handleFeedbackReaction(messageIndex, reaction.rating);
+    });
+    actions.appendChild(button);
+  });
+  wrapper.appendChild(actions);
+
+  if (activeFeedbackMessageIndex === messageIndex && state.status !== "saved") {
+    wrapper.appendChild(renderFeedbackPopover(messageIndex, state));
+  }
+
+  return wrapper;
+}
+
+function feedbackReactionIcon(kind) {
+  const mouth = {
+    good: '<path d="M8.2 13.2c1 .95 2.2 1.42 3.8 1.42s2.8-.47 3.8-1.42" />',
+    off: '<path d="M8.4 14h7.2" />',
+    bad: '<path d="M8.2 15.1c1-.95 2.2-1.42 3.8-1.42s2.8.47 3.8 1.42" />',
+    harmful: '<path d="M8.4 15.2h7.2" /><path d="M8.8 8.2l1.9 1.2" /><path d="M15.2 8.2l-1.9 1.2" />'
+  }[kind] || '<path d="M8.4 14h7.2" />';
+  const eyes = kind === "harmful"
+    ? ""
+    : '<circle cx="9" cy="9.5" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="9.5" r="1" fill="currentColor" stroke="none" />';
+  return `
+    <svg class="message-feedback-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      ${eyes}
+      ${mouth}
+    </svg>
+  `;
+}
+
+function renderFeedbackPopover(messageIndex, state) {
+  const popover = document.createElement("form");
+  popover.className = "message-feedback-popover";
+  popover.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitMessageFeedback(messageIndex, {
+      rating: state.rating || "off",
+      reason: popover.querySelector("[name='reason']")?.value || "other",
+      comment: popover.querySelector("[name='comment']")?.value || ""
+    });
+  });
+
+  const title = document.createElement("span");
+  title.className = "message-feedback-title";
+  title.textContent = "What felt off?";
+  popover.appendChild(title);
+
+  const reasonList = document.createElement("div");
+  reasonList.className = "message-feedback-reasons";
+  feedbackReasons.forEach((reason, index) => {
+    const label = document.createElement("label");
+    label.className = "message-feedback-reason";
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "reason";
+    input.value = reason.value;
+    if (index === 0) input.checked = true;
+    label.appendChild(input);
+    label.append(document.createTextNode(reason.label));
+    reasonList.appendChild(label);
+  });
+  popover.appendChild(reasonList);
+
+  const input = document.createElement("input");
+  input.className = "message-feedback-comment";
+  input.name = "comment";
+  input.type = "text";
+  input.placeholder = "Optional detail";
+  input.maxLength = 280;
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      activeFeedbackMessageIndex = null;
+      renderMessages();
+    }
+  });
+  popover.appendChild(input);
+
+  const submit = document.createElement("button");
+  submit.className = "message-feedback-submit";
+  submit.type = "submit";
+  submit.textContent = "Submit";
+  popover.appendChild(submit);
+
+  setTimeout(() => input.focus(), 0);
+  return popover;
+}
+
+function handleFeedbackReaction(messageIndex, rating) {
+  if (rating === "good") {
+    submitMessageFeedback(messageIndex, { rating });
+    return;
+  }
+  activeFeedbackMessageIndex = messageIndex;
+  messageFeedbackState.set(messageIndex, { rating, status: "editing" });
+  renderMessages();
+}
+
+function closeFeedbackPopover() {
+  if (activeFeedbackMessageIndex === null) return;
+  activeFeedbackMessageIndex = null;
+  renderMessages();
+}
+
+async function submitMessageFeedback(messageIndex, payload) {
+  if (!conversationId) return;
+  messageFeedbackState.set(messageIndex, { rating: payload.rating, status: "saving" });
+  activeFeedbackMessageIndex = null;
+  renderMessages();
+
+  try {
+    const response = await apiFetch(
+      `/api/agent/conversations/${conversationId}/messages/${messageIndex}/feedback`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not save feedback."));
+    }
+    messageFeedbackState.set(messageIndex, {
+      rating: data.feedback?.rating || payload.rating,
+      status: "saved"
+    });
+  } catch {
+    messageFeedbackState.set(messageIndex, { rating: payload.rating, status: "error" });
+  }
+  renderMessages();
 }
 
 function scrollToHighlightedMessage() {
@@ -2695,9 +2868,13 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     closeContextPicker();
+    closeFeedbackPopover();
   }
 });
 document.addEventListener("click", (event) => {
+  if (activeFeedbackMessageIndex !== null && !event.target.closest(".message-feedback")) {
+    closeFeedbackPopover();
+  }
   if (
     agentContextMenu &&
     agentContextButton &&
