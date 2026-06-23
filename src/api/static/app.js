@@ -59,7 +59,6 @@ const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
 const agentStatus = document.querySelector("#agent-status");
 const agentModelSelect = document.querySelector("#agent-model-select");
-const agentModeSelect = document.querySelector("#agent-mode-select");
 const agentNameInput = document.querySelector("#agent-name-input");
 const agentToneSelect = document.querySelector("#agent-tone-select");
 const agentContextButton = document.querySelector("#agent-context-button");
@@ -875,7 +874,6 @@ async function startConversation() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       agent_model: selectedAgentModel(),
-      agent_mode: selectedAgentMode(),
       agent_name: agentName,
       agent_tone: selectedAgentTone()
     })
@@ -960,9 +958,6 @@ function hydrateConversation(conversation, options = {}) {
   if (conversation.agent_model && agentModelSelect) {
     agentModelSelect.value = conversation.agent_model;
   }
-  if (conversation.agent_mode && agentModeSelect) {
-    agentModeSelect.value = conversation.agent_mode;
-  }
   if (agentNameInput) {
     agentNameInput.value = currentAgentName;
   }
@@ -1027,10 +1022,6 @@ function selectedAgentModel() {
   return agentModelSelect ? agentModelSelect.value : null;
 }
 
-function selectedAgentMode() {
-  return "know_me";
-}
-
 function selectedAgentName() {
   if (agentNameInput) {
     return agentNameInput.value.trim();
@@ -1083,7 +1074,7 @@ function updateAgentStatusModel() {
   if (chatTitle) {
     chatTitle.textContent = agentName;
   }
-  agentStatus.textContent = `${provider} · ${agentModeLabel(selectedAgentMode())} · ${agentToneLabel(selectedAgentTone())} · ${contextSelectionLabel()} · ${selectedAgentModel() || "no model"}`;
+  agentStatus.textContent = `${provider} · ${agentToneLabel(selectedAgentTone())} · ${contextSelectionLabel()} · ${selectedAgentModel() || "no model"}`;
 }
 
 async function updateConversationModel() {
@@ -1095,7 +1086,6 @@ async function updateConversationModel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         agent_model: selectedAgentModel(),
-        agent_mode: selectedAgentMode(),
         agent_name: selectedAgentName(),
         agent_tone: selectedAgentTone()
       })
@@ -1106,9 +1096,6 @@ async function updateConversationModel() {
     }
     if (conversation.agent_model && agentModelSelect) {
       agentModelSelect.value = conversation.agent_model;
-    }
-    if (conversation.agent_mode && agentModeSelect) {
-      agentModeSelect.value = conversation.agent_mode;
     }
     currentAgentName = conversation.agent_name || defaultAgentName();
     if (agentNameInput) {
@@ -1124,16 +1111,6 @@ async function updateConversationModel() {
       agentStatus.textContent = error.message;
     }
   }
-}
-
-function agentModeLabel(mode) {
-  const labels = {
-    know_me: "Companion",
-    coach_me: "Coach me",
-    match_me: "Match me",
-    talk_like_me: "Talk like me"
-  };
-  return labels[mode] || "Know me";
 }
 
 function agentToneLabel(tone) {
@@ -2637,7 +2614,6 @@ sideTabButtons.forEach((button) => {
   button.addEventListener("click", () => showSidePanel(button.dataset.sideTab));
 });
 agentModelSelect.addEventListener("change", updateConversationModel);
-agentModeSelect?.addEventListener("change", updateConversationModel);
 agentNameInput?.addEventListener("change", updateConversationModel);
 agentNameInput?.addEventListener("input", updateAgentStatusModel);
 agentToneSelect?.addEventListener("change", updateConversationModel);
