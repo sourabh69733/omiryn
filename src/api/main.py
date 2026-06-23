@@ -41,7 +41,11 @@ from agent.memory import (
 )
 from agent.orchestrator import run_agent_turn
 from auth import CurrentUser, current_user, public_auth_config
-from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
+from ingestion.whatsapp import (
+    WHATSAPP_IMPORT_MAX_CHARS,
+    build_whatsapp_structured_memory,
+    build_whatsapp_style_summary,
+)
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
     delete_context_source,
@@ -62,6 +66,7 @@ from storage import (
     save_draft,
     save_agent_message_feedback,
     save_user_profile,
+    save_whatsapp_import_bundle,
     summarize_agent_usage,
 )
 
@@ -259,7 +264,7 @@ class WhatsappChatImportCreate(BaseModel):
     user_sender: str | None = Field(default=None, max_length=120)
     style_name: str | None = Field(default=None, max_length=120)
     style_kind: WhatsappStyleKind = "user_style"
-    content: str = Field(min_length=50, max_length=WHATSAPP_IMPORT_MAX_CHARS)
+    content: str = Field(min_length=50)
 
 
 class DatingBasics(BaseModel):
@@ -563,6 +568,10 @@ def create_whatsapp_context_source(
             payload.content,
             user_sender=payload.user_sender,
         )
+        structured_memory = build_whatsapp_structured_memory(
+            payload.content,
+            user_sender=payload.user_sender,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -585,6 +594,60 @@ def create_whatsapp_context_source(
                 "style_name": payload.style_name,
             },
         }
+    )
+    save_whatsapp_import_bundle(
+        {
+            "user_id": _user_id(user),
+            "conversation_id": conversation_id,
+            "context_source_id": source["id"],
+            "style_kind": payload.style_kind,
+            "title": payload.title,
+            "selected_sender": structured_memory.metadata.get("selected_sender"),
+            "metadata": {
+                **structured_memory.metadata,
+                "style_name": payload.style_name,
+            },
+            "messages": [
+                {
+                    "message_index": index,
+                    "sender": message.sender,
+                    "timestamp_text": message.timestamp_text,
+                    "content": message.content,
+                }
+                for index, message in enumerate(structured_memory.messages)
+            ],
+            "chunks": [
+                {
+                    "chunk_index": chunk.chunk_index,
+                    "start_message_index": chunk.start_message_index,
+                    "end_message_index": chunk.end_message_index,
+                    "content": chunk.content,
+                    "terms": chunk.terms,
+                    "embedding": None,
+                    "metadata": chunk.metadata,
+                }
+                for chunk in structured_memory.chunks
+            ],
+            "people": [
+                {
+                    "sender": person.sender,
+                    "message_count": person.message_count,
+                    "role": person.role,
+                    "metadata": person.metadata,
+                }
+                for person in structured_memory.people
+            ],
+            "style_profiles": [
+                {
+                    "sender": profile.sender,
+                    "summary": profile.summary,
+                    "sample_messages": profile.sample_messages,
+                    "metadata": profile.metadata,
+                }
+                for profile in structured_memory.style_profiles
+            ],
+        },
+        _user_id(user),
     )
     return _context_source_summary(source)
 

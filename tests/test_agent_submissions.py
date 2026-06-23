@@ -21,11 +21,21 @@ from agent.providers import (
 )
 from agent.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
-from ingestion.whatsapp import build_whatsapp_style_summary, parse_whatsapp_export
+from ingestion.whatsapp import (
+    build_whatsapp_structured_memory,
+    build_whatsapp_style_summary,
+    parse_whatsapp_export,
+    prepare_whatsapp_export_text,
+)
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
     list_context_sources,
+    list_whatsapp_chunks,
+    list_whatsapp_imports,
+    list_whatsapp_messages,
+    list_whatsapp_people,
+    list_whatsapp_style_profiles,
     reset_db,
     save_agent_message_feedback,
     save_agent_usage_event,
@@ -1552,6 +1562,102 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(len(list_response.json()["available_sources"]), 1)
         self.assertFalse(list_response.json()["available_sources"][0]["attached"])
 
+    def test_whatsapp_import_stores_structured_phase_one_memory(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        source_id = create_response.json()["id"]
+        imports = list_whatsapp_imports(conversation_id)
+        self.assertEqual(len(imports), 1)
+        self.assertEqual(imports[0]["context_source_id"], source_id)
+        self.assertEqual(imports[0]["selected_sender"], "Aarav")
+        self.assertEqual(imports[0]["metadata"]["parsed_message_count"], 6)
+        self.assertFalse(imports[0]["metadata"]["embedding_ready"])
+
+        messages = list_whatsapp_messages(imports[0]["id"])
+        self.assertEqual(len(messages), 6)
+        self.assertEqual(messages[0]["sender"], "Aarav")
+        self.assertEqual(messages[0]["timestamp_text"], "12/06/2026 10:00 AM")
+        self.assertIn("running late", messages[0]["content"])
+        self.assertIn("second line", messages[2]["content"])
+
+        chunks = list_whatsapp_chunks(imports[0]["id"])
+        self.assertGreaterEqual(len(chunks), 1)
+        self.assertEqual(chunks[0]["chunk_index"], 1)
+        self.assertIsNone(chunks[0]["embedding"])
+        self.assertIn("Aarav:", chunks[0]["content"])
+        self.assertIn("Riya:", chunks[0]["content"])
+
+        people = list_whatsapp_people(imports[0]["id"])
+        self.assertEqual({person["sender"] for person in people}, {"Aarav", "Riya"})
+        self.assertEqual(
+            next(person for person in people if person["sender"] == "Aarav")["role"],
+            "selected_user",
+        )
+
+        style_profiles = list_whatsapp_style_profiles(imports[0]["id"])
+        self.assertEqual({profile["sender"] for profile in style_profiles}, {"Aarav", "Riya"})
+        aarav_style = next(profile for profile in style_profiles if profile["sender"] == "Aarav")
+        self.assertIn("average_words", aarav_style["summary"])
+        self.assertIn("topic_terms", aarav_style["summary"])
+        self.assertTrue(aarav_style["sample_messages"])
+
+    def test_large_whatsapp_import_uses_latest_complete_messages(self) -> None:
+        old_message = "01/01/2026, 10:00 AM - Aarav: old context that should be dropped\n"
+        latest_export = "\n".join(
+            f"12/06/2026, 10:{minute:02d} AM - Aarav: latest message {minute}"
+            if minute % 2 == 0
+            else f"12/06/2026, 10:{minute:02d} AM - Riya: latest reply {minute}"
+            for minute in range(6)
+        )
+        export_text = old_message * 10 + latest_export
+
+        with patch("ingestion.whatsapp.WHATSAPP_IMPORT_MAX_CHARS", len(latest_export) + 5):
+            prepared_text, metadata = prepare_whatsapp_export_text(export_text)
+            messages = parse_whatsapp_export(prepared_text)
+            structured = build_whatsapp_structured_memory(export_text, "Aarav")
+            summary = build_whatsapp_style_summary(export_text, "Aarav")
+
+        self.assertTrue(metadata["truncated"])
+        self.assertEqual(metadata["truncation_strategy"], "latest_complete_messages")
+        self.assertTrue(prepared_text.startswith("12/06/2026"))
+        self.assertGreaterEqual(len(messages), 6)
+        self.assertTrue(structured.metadata["truncated"])
+        self.assertEqual(structured.metadata["original_char_count"], len(export_text))
+        self.assertIn("Large export note", summary.content)
+        self.assertTrue(summary.metadata["truncated"])
+
+    def test_whatsapp_structured_memory_is_removed_with_source(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        source_id = create_response.json()["id"]
+        self.assertEqual(len(list_whatsapp_imports(conversation_id)), 1)
+
+        delete_response = self.client.delete(
+            f"/api/agent/conversations/{conversation_id}/context-sources/{source_id}"
+        )
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(list_whatsapp_imports(conversation_id), [])
+
     def test_friend_style_import_can_be_selected_for_replies(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
@@ -1611,6 +1717,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(len(messages), 6)
         self.assertEqual(messages[0].sender, "Aarav")
+        self.assertEqual(messages[0].timestamp_text, "12/06/2026 10:00 AM")
         self.assertIn("second line", messages[2].content)
 
         summary = build_whatsapp_style_summary(sample_whatsapp_export(), "Aarav")
@@ -1620,6 +1727,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Recent chat context", summary.content)
         self.assertIn("Last parsed sender: Riya", summary.content)
         self.assertIn("Recent topic terms:", summary.content)
+
+        structured = build_whatsapp_structured_memory(sample_whatsapp_export(), "Aarav")
+        self.assertEqual(len(structured.messages), 6)
+        self.assertGreaterEqual(len(structured.chunks), 1)
+        self.assertEqual(structured.people[0].sender, "Aarav")
+        self.assertEqual(structured.people[0].role, "selected_user")
+        self.assertEqual({profile.sender for profile in structured.style_profiles}, {"Aarav", "Riya"})
+        self.assertFalse(structured.metadata["embedding_ready"])
+
+    def test_whatsapp_parser_supports_bracketed_seconds_export(self) -> None:
+        messages = parse_whatsapp_export(sample_bracketed_whatsapp_export())
+
+        self.assertEqual(len(messages), 5)
+        self.assertEqual(messages[0].sender, "Sourabh sahu")
+        self.assertEqual(messages[0].timestamp_text, "22/05/26 4:44:11 PM")
+        self.assertEqual(messages[2].sender, "abhishek")
+        self.assertIn("6-7 bje around", messages[2].content)
+        self.assertIn("wahi per", messages[4].content)
+
+        structured = build_whatsapp_structured_memory(sample_bracketed_whatsapp_export(), "Sourabh sahu")
+        self.assertEqual(len(structured.messages), 5)
+        self.assertEqual({person.sender for person in structured.people}, {"Sourabh sahu", "abhishek"})
 
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")
@@ -1690,6 +1819,15 @@ second line of same message
 12/06/2026, 10:03 AM - Riya: what plan?
 12/06/2026, 10:04 AM - Aarav: coffee first, then walk?
 12/06/2026, 10:05 AM - Riya: okay"""
+
+
+def sample_bracketed_whatsapp_export() -> str:
+    return """[22/05/26, 4:44:11 PM] Sourabh sahu: thik h
+[22/05/26, 4:44:18 PM] Sourabh sahu: kab chalega?
+[22/05/26, 4:53:43 PM] abhishek: vhi 6-7 bje around
+[22/05/26, 4:55:19 PM] Sourabh sahu: hmm
+[22/05/26, 4:55:54 PM] Sourabh sahu: mai tujhe wahi aaya tha na tu wahi per
+wahi per rukna"""
 
 
 if __name__ == "__main__":

@@ -1841,10 +1841,6 @@ async function whatsappImportPayloads() {
 }
 
 async function whatsappPayloadFromFile(file) {
-  if (file.size > whatsappImportMaxChars * 4) {
-    throw new Error(`${file.name} is too large for v1.`);
-  }
-
   const content = (await file.text()).trim();
   validateWhatsappImportSize(content, file.name);
   const fileLabel = file.name.replace(/\.[^.]+$/, "");
@@ -1864,11 +1860,6 @@ function normalizedWhatsappStyleName(fallbackLabel) {
 function validateWhatsappImportSize(content, label) {
   if (content.length < 50) {
     throw new Error(`${label} does not look like a WhatsApp text export.`);
-  }
-  if (content.length > whatsappImportMaxChars) {
-    throw new Error(
-      `${label} is too large for v1. Limit is ${formatNumber(whatsappImportMaxChars)} characters.`
-    );
   }
 }
 
@@ -2098,10 +2089,13 @@ function renderWhatsappImportLog(sources) {
         const selectedSender = source.metadata?.selected_sender || "";
         const inferred = source.metadata?.selected_sender_inferred ? " inferred" : "";
         const senderText = selectedSender ? ` · learned ${selectedSender}${inferred}` : "";
+        const truncatedText = source.metadata?.truncated
+          ? ` · latest ${formatNumber(source.metadata.imported_char_count || source.content_length || 0)} of ${formatNumber(source.metadata.original_char_count || 0)} chars imported`
+          : "";
         return `
           <div class="whatsapp-import-item">
             <strong>${escapeHtml(source.title || "WhatsApp style")}</strong>
-            <span>Saved${escapeHtml(senderText)} · ${formatNumber(source.content_length || 0)} chars summary</span>
+            <span>Saved${escapeHtml(senderText)}${escapeHtml(truncatedText)} · ${formatNumber(source.content_length || 0)} chars summary</span>
           </div>
         `;
       }
