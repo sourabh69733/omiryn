@@ -1207,6 +1207,8 @@ function renderMessageFeedback(messageIndex) {
 
   if (activeFeedbackMessageIndex === messageIndex && state.status !== "saved") {
     wrapper.appendChild(renderFeedbackPopover(messageIndex, state));
+  } else if (state.status === "saved" && (state.reason || state.comment)) {
+    wrapper.appendChild(renderSavedFeedbackPopover(state));
   }
 
   return wrapper;
@@ -1288,6 +1290,25 @@ function renderFeedbackPopover(messageIndex, state) {
   return popover;
 }
 
+function renderSavedFeedbackPopover(state) {
+  const popover = document.createElement("div");
+  popover.className = "message-feedback-popover message-feedback-popover-readonly";
+  const reason = feedbackReasons.find((item) => item.value === state.reason)?.label;
+  if (reason) {
+    const reasonText = document.createElement("span");
+    reasonText.className = "message-feedback-title";
+    reasonText.textContent = reason;
+    popover.appendChild(reasonText);
+  }
+  if (state.comment) {
+    const comment = document.createElement("span");
+    comment.className = "message-feedback-saved-comment";
+    comment.textContent = state.comment;
+    popover.appendChild(comment);
+  }
+  return popover;
+}
+
 function handleFeedbackReaction(messageIndex, rating) {
   if (rating === "good") {
     submitMessageFeedback(messageIndex, { rating });
@@ -1325,6 +1346,8 @@ async function submitMessageFeedback(messageIndex, payload) {
     }
     messageFeedbackState.set(messageIndex, {
       rating: data.feedback?.rating || payload.rating,
+      reason: data.feedback?.reason || payload.reason || null,
+      comment: data.feedback?.comment || payload.comment || null,
       status: "saved"
     });
   } catch {

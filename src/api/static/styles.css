@@ -1642,10 +1642,29 @@ p {
   transform: translateX(-50%);
 }
 
+.message-feedback-popover-readonly {
+  display: none;
+  min-width: 150px;
+  max-width: 240px;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.message.agent:hover .message-feedback-popover-readonly,
+.message.agent:focus-within .message-feedback-popover-readonly {
+  display: grid;
+}
+
 .message-feedback-title {
   color: #dfecea;
   font-size: 11px;
   font-weight: 900;
+}
+
+.message-feedback-saved-comment {
+  color: #9fbab5;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .message-feedback-reasons {
