@@ -5,7 +5,9 @@ const state = {
   usersPerPage: 10,
   selectedUserId: null,
   selectedUserDetail: null,
-  visibleFactCount: 6
+  visibleFactCount: 6,
+  feedbackPage: 1,
+  feedbackPerPage: 5
 };
 
 const statusEl = document.querySelector("#admin-status");
@@ -253,7 +255,7 @@ function renderUsers(users) {
       <td class="mono">${formatNumber(user.conversation_count || 0)}<small>${formatNumber(user.active_conversation_count || 0)} active</small></td>
       <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
       <td class="mono">${formatNumber(user.draft_count || 0)}<small>${formatNumber(user.approved_draft_count || 0)} approved</small></td>
-      <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context</small></td>
+      <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb</small></td>
       <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${formatUsd(user.usage?.estimated_cost_usd || 0)}</small></td>
       <td>${formatDate(user.last_activity_at)}</td>
     </tr>
@@ -272,6 +274,8 @@ async function selectUser(userId) {
   if (!userId) return;
   state.selectedUserId = userId;
   state.visibleFactCount = 6;
+  state.feedbackPage = 1;
+  state.feedbackPerPage = 5;
   renderUsers(state.data?.users || []);
   selectedUserTitle.textContent = "Loading user report...";
   userReport.innerHTML = '<div class="table-empty">Loading selected user...</div>';
@@ -298,6 +302,8 @@ function renderUserReport(detail) {
   const profile = detail.profile || {};
   const conversations = detail.conversations || [];
   const facts = detail.facts || [];
+  const feedback = detail.feedback || [];
+  const feedbackSummary = detail.feedback_summary || user.feedback_summary || {};
   selectedUserTitle.textContent = user.display_name || "Unnamed user";
   const profileSource = profile.source ? titleize(profile.source) : "Profile";
   userReport.innerHTML = `
@@ -307,13 +313,29 @@ function renderUserReport(detail) {
       ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
       ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
       ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
+      ${reportCard("Feedback", formatNumber(feedbackSummary.total || feedback.length || 0), feedbackSummaryDetail(feedbackSummary))}
       ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
     </div>
     ${renderFactsSection(facts)}
+    ${renderFeedbackSection(feedback, feedbackSummary)}
     ${renderConversationSection(conversations)}
   `;
   document.querySelector("#show-more-facts")?.addEventListener("click", () => {
     state.visibleFactCount += 6;
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#feedback-prev")?.addEventListener("click", () => {
+    state.feedbackPage = Math.max(1, state.feedbackPage - 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#feedback-next")?.addEventListener("click", () => {
+    const pageCount = Math.max(1, Math.ceil(feedback.length / state.feedbackPerPage));
+    state.feedbackPage = Math.min(pageCount, state.feedbackPage + 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#show-more-feedback")?.addEventListener("click", () => {
+    state.feedbackPerPage += 5;
+    state.feedbackPage = 1;
     renderUserReport(state.selectedUserDetail);
   });
 }
@@ -357,6 +379,90 @@ function renderFactItem(fact) {
       <small>${escapeHtml(fact.category || "other")} · confidence ${formatNumber(Math.round((fact.confidence || 0) * 100))}% · ${escapeHtml(fact.status || "-")}</small>
     </article>
   `;
+}
+
+function renderFeedbackSection(feedback, summary = {}) {
+  const pageCount = Math.max(1, Math.ceil(feedback.length / state.feedbackPerPage));
+  state.feedbackPage = Math.min(Math.max(1, state.feedbackPage), pageCount);
+  const start = (state.feedbackPage - 1) * state.feedbackPerPage;
+  const visibleFeedback = feedback.slice(start, start + state.feedbackPerPage);
+  const showingStart = feedback.length ? start + 1 : 0;
+  const showingEnd = Math.min(start + state.feedbackPerPage, feedback.length);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Message feedback</h3>
+        <span class="mono">${escapeHtml(feedbackSummaryDetail(summary))}</span>
+      </div>
+      ${
+        visibleFeedback.length
+          ? `<div class="feedback-list">${visibleFeedback.map(renderFeedbackItem).join("")}</div>`
+          : '<div class="table-empty">No message feedback yet.</div>'
+      }
+      ${
+        feedback.length > state.feedbackPerPage
+          ? `
+            <div class="detail-pagination">
+              <span class="mono">Showing ${formatNumber(showingStart)}-${formatNumber(showingEnd)} of ${formatNumber(feedback.length)}</span>
+              <div>
+                <button class="secondary-button" id="feedback-prev" type="button" ${state.feedbackPage <= 1 ? "disabled" : ""}>Previous</button>
+                <button class="secondary-button" id="feedback-next" type="button" ${state.feedbackPage >= pageCount ? "disabled" : ""}>Next</button>
+                <button class="secondary-button" id="show-more-feedback" type="button">Show more feedback</button>
+              </div>
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderFeedbackItem(item) {
+  const reason = item.reason ? feedbackReasonLabel(item.reason) : "No reason";
+  const comment = (item.comment || "").trim();
+  const preview = (item.message_preview || "").trim();
+  return `
+    <article class="feedback-item">
+      <div class="feedback-item-head">
+        ${feedbackRatingPill(item.rating)}
+        <span class="mono">${formatDate(item.created_at)}</span>
+      </div>
+      <strong>${escapeHtml(reason)}</strong>
+      ${comment ? `<p>${escapeHtml(comment)}</p>` : ""}
+      ${preview ? `<blockquote>${escapeHtml(preview)}</blockquote>` : ""}
+      <small class="mono">${escapeHtml(item.conversation_id || "-")} · message ${formatNumber((item.message_index ?? 0) + 1)}</small>
+    </article>
+  `;
+}
+
+function feedbackRatingPill(rating) {
+  const labels = {
+    good: "Good",
+    off: "Off",
+    bad: "Bad",
+    harmful: "Harmful"
+  };
+  const value = rating || "unknown";
+  return `<span class="status-pill rating-${escapeHtml(value)}">${escapeHtml(labels[value] || titleize(value))}</span>`;
+}
+
+function feedbackSummaryDetail(summary = {}) {
+  const total = summary.total || 0;
+  if (!total) return "0 feedback";
+  return `${formatNumber(summary.good || 0)} good / ${formatNumber((summary.off || 0) + (summary.bad || 0) + (summary.harmful || 0))} issues`;
+}
+
+function feedbackReasonLabel(reason) {
+  const labels = {
+    not_me: "Not me",
+    wrong_memory: "Wrong memory",
+    bad_tone: "Bad tone",
+    too_much: "Too much",
+    not_helpful: "Not helpful",
+    unsafe: "Unsafe",
+    other: "Other"
+  };
+  return labels[reason] || titleize(String(reason || "feedback").replaceAll("_", " "));
 }
 
 function renderConversationSection(conversations) {
@@ -722,7 +828,7 @@ function renderUsageEvents(events) {
 }
 
 function renderError(message) {
-  tables.users.innerHTML = emptyRow(8, message);
+  tables.users.innerHTML = emptyRow(9, message);
   if (providerList) {
     providerList.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
   }

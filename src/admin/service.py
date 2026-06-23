@@ -9,6 +9,7 @@ from sqlalchemy import select
 from storage import (
     ENGINE,
     agent_conversations,
+    agent_message_feedback,
     agent_usage_events,
     conversation_context_sources,
     draft_profiles,
@@ -30,6 +31,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         snapshot["conversation_rows"],
         snapshot["draft_rows"],
         usage_events,
+        snapshot["feedback_rows"],
     )
 
     return {
@@ -52,6 +54,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             ),
             "learned_fact_count": len(snapshot["fact_rows"]),
             "context_source_count": len(snapshot["context_rows"]),
+            "feedback_count": len(snapshot["feedback_rows"]),
             "usage": usage_summary,
         },
         "activity": activity,
@@ -71,6 +74,7 @@ def _dashboard_activity(
     conversation_rows: list[Any],
     draft_rows: list[Any],
     usage_events: list[dict[str, Any]],
+    feedback_rows: list[Any],
     days: int = 14,
 ) -> dict[str, Any]:
     today = datetime.now(timezone.utc).date()
@@ -109,6 +113,13 @@ def _dashboard_activity(
         user_id = row["user_id"]
         if updated_at in buckets and user_id:
             buckets[updated_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
+    for row in feedback_rows:
+        created_at = _date_from_value(row["created_at"])
+        user_id = row["user_id"]
+        if created_at in buckets and user_id:
+            buckets[created_at]["_active_user_ids"].add(user_id)
             active_user_ids_in_window.add(user_id)
 
     for event in usage_events:
@@ -163,6 +174,11 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
     events = [
         event for event in usage_events if event.get("user_id") == user_id
     ]
+    feedback = [
+        _feedback_detail(row, snapshot["conversation_rows"])
+        for row in snapshot["feedback_rows"]
+        if row["user_id"] == user_id
+    ]
 
     return {
         "user": user,
@@ -171,6 +187,8 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         "conversations": conversations[:limit],
         "drafts": drafts[:limit],
         "usage_events": events[:limit],
+        "feedback": feedback[:limit],
+        "feedback_summary": _summarize_feedback(feedback),
     }
 
 
@@ -186,6 +204,9 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
             ).mappings().all(),
             "fact_rows": connection.execute(select(profile_facts)).mappings().all(),
             "context_rows": connection.execute(select(conversation_context_sources)).mappings().all(),
+            "feedback_rows": connection.execute(
+                select(agent_message_feedback).order_by(agent_message_feedback.c.created_at.desc())
+            ).mappings().all(),
             "usage_rows": connection.execute(
                 select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
             ).mappings().all(),
@@ -291,7 +312,14 @@ def _int_env(name: str) -> int | None:
 def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     user_ids = {
         row["user_id"]
-        for key in ("profile_rows", "conversation_rows", "draft_rows", "fact_rows", "context_rows")
+        for key in (
+            "profile_rows",
+            "conversation_rows",
+            "draft_rows",
+            "fact_rows",
+            "context_rows",
+            "feedback_rows",
+        )
         for row in snapshot[key]
         if row["user_id"]
     }
@@ -305,6 +333,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             snapshot["draft_rows"],
             snapshot["fact_rows"],
             snapshot["context_rows"],
+            snapshot["feedback_rows"],
             usage_events,
         )
         for user_id in user_ids
@@ -319,6 +348,7 @@ def _user_summary(
     draft_rows: list[Any],
     fact_rows: list[Any],
     context_rows: list[Any],
+    feedback_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
     profile = next((row for row in profile_rows if row["user_id"] == user_id), None)
@@ -326,13 +356,16 @@ def _user_summary(
     drafts = [row for row in draft_rows if row["user_id"] == user_id]
     facts = [row for row in fact_rows if row["user_id"] == user_id]
     sources = [row for row in context_rows if row["user_id"] == user_id]
+    feedback = [row for row in feedback_rows if row["user_id"] == user_id]
     events = [event for event in usage_events if event.get("user_id") == user_id]
+    feedback_summary = _summarize_feedback(feedback)
     profile_summary = _profile_summary(profile, drafts)
     activity_dates = [
         *[row["updated_at"] for row in conversations],
         *[row["updated_at"] for row in drafts],
         *[row["updated_at"] for row in facts],
         *[row["created_at"] for row in sources],
+        *[row["created_at"] for row in feedback],
         *[event.get("created_at") for event in events],
     ]
     first_seen_dates = [
@@ -340,6 +373,7 @@ def _user_summary(
         *[row["created_at"] for row in conversations],
         *[row["created_at"] for row in drafts],
         *[row["created_at"] for row in sources],
+        *[row["created_at"] for row in feedback],
         *[event.get("created_at") for event in events],
     ]
 
@@ -366,6 +400,11 @@ def _user_summary(
         "draft_count": len(drafts),
         "approved_draft_count": sum(1 for row in drafts if row["status"] == "approved"),
         "learned_fact_count": len(facts),
+        "feedback_count": len(feedback),
+        "negative_feedback_count": (
+            feedback_summary["off"] + feedback_summary["bad"] + feedback_summary["harmful"]
+        ),
+        "feedback_summary": feedback_summary,
         "usage": _summarize_usage_events(events),
         "first_seen_at": _earliest_isoformat(first_seen_dates),
         "last_activity_at": _latest_isoformat(activity_dates),
@@ -465,6 +504,46 @@ def _draft_summary(row: Any) -> dict[str, Any]:
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
+
+
+def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
+    conversation = next(
+        (candidate for candidate in conversation_rows if candidate["id"] == row["conversation_id"]),
+        None,
+    )
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "message_index": row["message_index"],
+        "rating": row["rating"],
+        "reason": row["reason"],
+        "comment": row["comment"],
+        "message_preview": _feedback_message_preview(conversation, row["message_index"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _feedback_message_preview(conversation: Any | None, message_index: int) -> str | None:
+    if not conversation:
+        return None
+    messages = conversation["messages_json"] or []
+    if message_index < 0 or message_index >= len(messages):
+        return None
+    message = messages[message_index]
+    content = str(message.get("content") or "").strip()
+    if not content:
+        return None
+    return content[:180] + ("..." if len(content) > 180 else "")
+
+
+def _summarize_feedback(feedback: list[Any]) -> dict[str, int]:
+    ratings = {"good": 0, "off": 0, "bad": 0, "harmful": 0}
+    for item in feedback:
+        rating = item.get("rating") if isinstance(item, dict) else item["rating"]
+        if rating in ratings:
+            ratings[rating] += 1
+    return {"total": len(feedback), **ratings}
 
 
 def _usage_event_from_row(row: Any) -> dict[str, Any]:
