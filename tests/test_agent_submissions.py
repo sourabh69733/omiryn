@@ -1612,6 +1612,94 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("topic_terms", aarav_style["summary"])
         self.assertTrue(aarav_style["sample_messages"])
 
+    def test_reply_context_retrieves_structured_whatsapp_memory_when_relevant(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+
+        casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay")
+        self.assertEqual(casual_sources, [])
+
+        whatsapp_sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "what do you know from my whatsapp messages about coffee plan?",
+        )
+
+        self.assertGreaterEqual(len(whatsapp_sources), 1)
+        structured_source = next(
+            source
+            for source in whatsapp_sources
+            if source["source_type"] == "whatsapp_structured_context"
+        )
+        self.assertIn("Structured WhatsApp context", structured_source["content"])
+        self.assertIn("People:", structured_source["content"])
+        self.assertIn("Sender style profiles:", structured_source["content"])
+        self.assertIn("coffee first", structured_source["content"])
+
+    def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Sanjay-style",
+                "user_sender": "Aarav",
+                "style_name": "Sanjay-style",
+                "style_kind": "friend_style",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        style_source_id = create_response.json()["id"]
+
+        sources = _smart_reply_context_sources(
+            conversation_id,
+            style_source_id,
+            "haan okay",
+        )
+
+        self.assertEqual(sources[0]["source_type"], "friend_style")
+        self.assertTrue(
+            any(source["source_type"] == "whatsapp_structured_context" for source in sources)
+        )
+
+    def test_attached_whatsapp_source_packs_structured_memory_in_new_chat(self) -> None:
+        first_conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{first_conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        source_id = create_response.json()["id"]
+
+        second_conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        attach_response = self.client.put(
+            f"/api/agent/conversations/{second_conversation_id}/context-sources/attachments",
+            json={"source_ids": [source_id]},
+        )
+        self.assertEqual(attach_response.status_code, 200)
+
+        sources = _smart_reply_context_sources(
+            second_conversation_id,
+            None,
+            "what topics were in my uploaded whatsapp chat?",
+        )
+
+        self.assertTrue(
+            any(source["source_type"] == "whatsapp_structured_context" for source in sources)
+        )
+
     def test_large_whatsapp_import_uses_latest_complete_messages(self) -> None:
         old_message = "01/01/2026, 10:00 AM - Aarav: old context that should be dropped\n"
         latest_export = "\n".join(
