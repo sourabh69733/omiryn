@@ -12,6 +12,7 @@ let pendingMessageHighlightIndex = null;
 let supabaseClient = null;
 let authSession = null;
 let authRequired = false;
+let authProvider = "none";
 let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
 let activeFeedbackMessageIndex = null;
@@ -236,9 +237,24 @@ async function initializeAuth() {
       throw new Error("Auth config unavailable.");
     }
     const config = await response.json();
-    authRequired = Boolean(config.auth_required || (config.supabase_url && config.supabase_anon_key));
+    authProvider = config.auth_provider || (config.supabase_url ? "supabase" : "none");
+    const supabaseConfig = config.providers?.supabase || {
+      url: config.supabase_url,
+      anon_key: config.supabase_anon_key
+    };
+    authRequired = Boolean(config.auth_gate_required ?? config.auth_required);
     profileDebugDataEnabled = Boolean(config.profile_debug_data_enabled);
-    if (!config.supabase_url || !config.supabase_anon_key) {
+    if (authProvider === "none") {
+      renderSignedOutAuth("Auth not configured");
+      renderAuthGate();
+      return;
+    }
+    if (authProvider !== "supabase") {
+      renderSignedOutAuth(`${authProvider} auth is not supported in this client yet`);
+      renderAuthGate();
+      return;
+    }
+    if (!supabaseConfig.url || !supabaseConfig.anon_key) {
       renderSignedOutAuth("Auth not configured");
       renderAuthGate();
       return;
@@ -248,8 +264,8 @@ async function initializeAuth() {
     }
 
     supabaseClient = window.supabase.createClient(
-      config.supabase_url,
-      config.supabase_anon_key
+      supabaseConfig.url,
+      supabaseConfig.anon_key
     );
     const { data } = await supabaseClient.auth.getSession();
     authSession = data.session || null;

@@ -40,7 +40,7 @@ from agent.memory import (
     should_run_deep_profile_fact_extraction,
 )
 from agent.orchestrator import run_agent_turn
-from auth import CurrentUser, current_user
+from auth import CurrentUser, current_user, public_auth_config
 from ingestion.whatsapp import WHATSAPP_IMPORT_MAX_CHARS, build_whatsapp_style_summary
 from matching import AgePreference, Dealbreaker, MatchProfile, score_match
 from storage import (
@@ -285,13 +285,8 @@ def agent_status() -> dict[str, object]:
 
 @app.get("/api/auth/config")
 def auth_config() -> dict[str, object]:
-    supabase_url = os.getenv("SUPABASE_URL", "")
-    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
     return {
-        "supabase_url": supabase_url,
-        "supabase_anon_key": supabase_anon_key,
-        "auth_required": os.getenv("AUTH_REQUIRED", "").lower() == "true"
-        or bool(supabase_url and supabase_anon_key),
+        **public_auth_config(),
         "profile_debug_data_enabled": _profile_debug_data_enabled(),
     }
 

@@ -27,6 +27,7 @@ from storage import (
     _reset_db_allowed,
     list_context_sources,
     reset_db,
+    save_agent_message_feedback,
     save_agent_usage_event,
     upsert_profile_fact,
 )
@@ -950,6 +951,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "raw_usage": {},
             }
         )
+        save_agent_message_feedback(
+            {
+                "user_id": "user-a",
+                "conversation_id": conversation_id,
+                "message_index": 0,
+                "rating": "bad",
+                "reason": "bad_tone",
+                "comment": "Felt too sharp.",
+            }
+        )
         app.dependency_overrides.clear()
 
         response = self.client.get("/api/admin/overview")
@@ -961,6 +972,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["summary"]["draft_count"], 1)
         self.assertEqual(data["summary"]["learned_fact_count"], 1)
         self.assertEqual(data["summary"]["context_source_count"], 1)
+        self.assertEqual(data["summary"]["feedback_count"], 1)
         self.assertEqual(data["summary"]["active_user_7d_count"], 1)
         self.assertEqual(data["summary"]["onboarding_started_user_count"], 1)
         self.assertEqual(data["summary"]["onboarding_completed_user_count"], 1)
@@ -979,6 +991,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["users"][0]["user_id"], "user-a")
         self.assertEqual(data["users"][0]["display_name"], "Aarav")
         self.assertEqual(data["users"][0]["usage"]["total_tokens"], 120)
+        self.assertEqual(data["users"][0]["feedback_count"], 1)
+        self.assertEqual(data["users"][0]["negative_feedback_count"], 1)
         self.assertEqual(data["recent_conversations"][0]["id"], conversation_id)
         self.assertEqual(data["recent_usage_events"][0]["provider"], "groq")
 
@@ -1054,6 +1068,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "raw_usage": {},
             }
         )
+        save_agent_message_feedback(
+            {
+                "user_id": "user-a",
+                "conversation_id": conversation_a,
+                "message_index": 0,
+                "rating": "off",
+                "reason": "wrong_memory",
+                "comment": "This assumed something I never said.",
+            }
+        )
 
         app.dependency_overrides[current_user] = user_b
         conversation_b = self.client.post("/api/agent/conversations").json()["id"]
@@ -1068,6 +1092,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "total_tokens": 0,
                 "latency_ms": 0,
                 "raw_usage": {},
+            }
+        )
+        save_agent_message_feedback(
+            {
+                "user_id": "user-b",
+                "conversation_id": conversation_b,
+                "message_index": 0,
+                "rating": "good",
             }
         )
         app.dependency_overrides.clear()
@@ -1086,6 +1118,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual([fact["label"] for fact in data["facts"]], ["Values kindness"])
         self.assertEqual(data["usage_events"][0]["user_id"], "user-a")
         self.assertEqual(data["usage_events"][0]["total_tokens"], 50)
+        self.assertEqual(data["feedback_summary"]["total"], 1)
+        self.assertEqual(data["feedback_summary"]["off"], 1)
+        self.assertEqual(data["feedback"][0]["user_id"], "user-a")
+        self.assertEqual(data["feedback"][0]["conversation_id"], conversation_a)
+        self.assertEqual(data["feedback"][0]["rating"], "off")
+        self.assertEqual(data["feedback"][0]["reason"], "wrong_memory")
+        self.assertEqual(data["feedback"][0]["comment"], "This assumed something I never said.")
 
     def test_admin_pages_serve_separate_admin_shell(self) -> None:
         response = self.client.get("/admin")
@@ -1183,10 +1222,11 @@ class AgentSubmissionApiTest(unittest.TestCase):
             self.assertEqual(_estimated_cost_usd("deepinfra", 2000, 100), 0.000232)
             self.assertEqual(_estimated_cost_usd("fireworks", 2000, 100), 0.00036)
 
-    def test_auth_config_exposes_public_supabase_settings(self) -> None:
+    def test_auth_config_exposes_provider_settings(self) -> None:
         with patch.dict(
             "os.environ",
             {
+                "AUTH_PROVIDER": "supabase",
                 "SUPABASE_URL": "https://example.supabase.co",
                 "SUPABASE_ANON_KEY": "anon-public-key",
                 "AUTH_REQUIRED": "true",
@@ -1199,12 +1239,36 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(
             response.json(),
             {
+                "auth_provider": "supabase",
                 "supabase_url": "https://example.supabase.co",
                 "supabase_anon_key": "anon-public-key",
                 "auth_required": True,
+                "auth_gate_required": True,
+                "providers": {
+                    "supabase": {
+                        "url": "https://example.supabase.co",
+                        "anon_key": "anon-public-key",
+                    }
+                },
                 "profile_debug_data_enabled": True,
             },
         )
+
+    def test_auth_config_gates_browser_when_provider_is_configured(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AUTH_PROVIDER": "supabase",
+                "SUPABASE_URL": "https://example.supabase.co",
+                "SUPABASE_ANON_KEY": "anon-public-key",
+                "AUTH_REQUIRED": "false",
+            },
+        ):
+            response = self.client.get("/api/auth/config")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["auth_required"])
+        self.assertTrue(response.json()["auth_gate_required"])
 
     def test_auth_required_blocks_anonymous_user_data_routes(self) -> None:
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
