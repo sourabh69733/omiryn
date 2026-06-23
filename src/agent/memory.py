@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 
+from agent.data_points import normalize_data_point
 from agent.profile_facts import extract_profile_facts_from_message
 from agent.providers import extract_deep_profile_facts
 from storage import upsert_profile_fact
@@ -28,7 +29,7 @@ def capture_profile_facts_from_user_message(
         message_index,
     )
     for fact in facts:
-        upsert_profile_fact(fact)
+        upsert_profile_fact(normalize_data_point(fact))
 
 
 def should_run_deep_profile_fact_extraction(
@@ -60,6 +61,6 @@ async def capture_deep_profile_facts_from_conversation(
             model=model,
         )
         for fact in facts:
-            upsert_profile_fact(fact)
+            upsert_profile_fact(normalize_data_point(fact))
     except Exception:
         logger.exception("agent.deep_facts.capture_failed conversation_id=%s", conversation_id)

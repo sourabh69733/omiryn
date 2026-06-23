@@ -34,6 +34,7 @@ from agent.context import (
     build_reply_context_sources,
     selected_style_source_exists,
 )
+from agent.feedback import normalize_message_feedback
 from agent.memory import (
     capture_deep_profile_facts_from_conversation,
     should_run_deep_profile_fact_extraction,
@@ -55,9 +56,11 @@ from storage import (
     list_profile_facts,
     list_user_context_sources,
     list_agent_usage_events,
+    list_agent_message_feedback,
     save_context_source,
     save_conversation,
     save_draft,
+    save_agent_message_feedback,
     save_user_profile,
     summarize_agent_usage,
 )
@@ -66,6 +69,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
 AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
+AgentMessageFeedbackRating = Literal["up", "down"]
 ContextSourceType = Literal[
     "llm_profile",
     "chat_export",
@@ -232,6 +236,12 @@ class AgentConversationSummary(BaseModel):
 
 class UserMessage(BaseModel):
     message: str = Field(min_length=1)
+
+
+class AgentMessageFeedbackCreate(BaseModel):
+    rating: AgentMessageFeedbackRating
+    reason: str | None = Field(default=None, max_length=80)
+    comment: str | None = Field(default=None, max_length=1000)
 
 
 class ContextSourceCreate(BaseModel):
@@ -743,6 +753,47 @@ async def send_agent_message(
             conversation.agent_model,
         )
     return conversation
+
+
+@app.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/feedback")
+async def create_agent_message_feedback(
+    conversation_id: str,
+    message_index: int,
+    payload: AgentMessageFeedbackCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    conversation = _get_existing_conversation(conversation_id, user)
+    if message_index < 0 or message_index >= len(conversation.messages):
+        raise HTTPException(status_code=404, detail="Conversation message not found.")
+    if conversation.messages[message_index].get("role") != "assistant":
+        raise HTTPException(status_code=400, detail="Feedback can only be added to agent messages.")
+
+    feedback = normalize_message_feedback(
+        {
+            "conversation_id": conversation_id,
+            "user_id": _user_id(user),
+            "message_index": message_index,
+            "rating": payload.rating,
+            "reason": payload.reason,
+            "comment": payload.comment,
+            "metadata": {
+                "agent_provider": conversation.agent_provider,
+                "agent_model": conversation.agent_model,
+                "agent_name": conversation.agent_name,
+            },
+        }
+    )
+    return {"feedback": save_agent_message_feedback(feedback)}
+
+
+@app.get("/api/agent/conversations/{conversation_id}/feedback")
+async def get_agent_message_feedback(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    _get_existing_conversation(conversation_id, user)
+    feedback = list_agent_message_feedback(conversation_id, _user_id(user))
+    return {"count": len(feedback), "feedback": feedback}
 
 
 @app.post("/api/agent/conversations/{conversation_id}/extract")

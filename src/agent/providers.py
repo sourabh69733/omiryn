@@ -10,6 +10,22 @@ from typing import Any
 import httpx
 
 from agent.extraction import normalize_extracted_profile
+from agent.behavior import (
+    agent_persona_for_interest,
+    behavior_prompt,
+    tone_prompt,
+)
+from agent.prompt_builder import (
+    build_companion_system_prompt,
+    context_sources_text,
+    truncate_for_context,
+)
+from agent.prompt_sections import (
+    COMPANION_SYSTEM_PROMPT,
+    DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+    EXTRACTION_REPAIR_PROMPT,
+    EXTRACTION_SYSTEM_PROMPT,
+)
 from agent.usage import (
     CHAT_REPLY,
     INPUT_GUARDRAIL,
@@ -29,84 +45,7 @@ CHAT_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35"))
 CHAT_ADVICE_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_ADVICE_REPLY_WORD_LIMIT", "80"))
 STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
 OPENAI_COMPATIBLE_PROVIDERS = {"deepinfra", "fireworks"}
-
-ONBOARDING_SYSTEM_PROMPT = """You are Omiryn's private dating companion.
-Your job is to talk naturally, make the user feel less alone, and slowly understand
-them well enough to help them find a real-world match.
-
-Behavior:
-- Read the conversation before replying. Do not follow a fixed questionnaire.
-- Default to one short WhatsApp-like reply. Use 1 sentence unless the user asks for detail.
-- Match the user's message length. If they say "yes", "hmm", or one line, answer briefly.
-- Do not ask a question every turn. Sometimes react, joke lightly, reassure, or share a small opinion.
-- Ask at most one soft question when it feels natural.
-- Learn the user's personality, choices, and partner preferences gradually through normal conversation.
-- Avoid repeating the same question pattern or validation phrases.
-- Do not summarize the user every turn.
-- Avoid phrases like "I'm learning your pattern", "this helps build your profile", or "compatibility signals".
-- Never write a long paragraph in normal chat.
-- You may be lightly playful, warm, or flirty when the user invites that tone, but keep it respectful.
-- Do not pretend to be a real human, a real match, or the user's actual girlfriend/boyfriend.
-- You may feel like a friendly girl/boy companion based on persona, but be honest you are an AI if asked.
-
-Collect these topics over time:
-relationship intent, values, lifestyle, communication style, conflict style,
-family expectations, children preference, location constraints, attraction preferences,
-and hard dealbreakers."""
-
-EXTRACTION_REPAIR_PROMPT = """Your previous response was not valid JSON for Omiryn.
-Return only one JSON object. No markdown, no commentary, no extra text."""
-
-EXTRACTION_SYSTEM_PROMPT = """Extract a structured dating profile from this conversation.
-Return only valid JSON. Do not include markdown.
-Use this shape:
-{
-  "display_name": null,
-  "age": null,
-  "city": {"value": "unknown", "source": "unknown", "confidence": 0.5},
-  "relationship_intent": {"value": "unknown", "source": "unknown", "confidence": 0.5},
-  "values": {"values": [], "source": "unknown", "confidence": 0.5},
-  "lifestyle": {"values": [], "source": "unknown", "confidence": 0.5},
-  "communication_style": {"value": "unknown", "source": "unknown", "confidence": 0.5},
-  "family_expectations": {"value": "unknown", "source": "unknown", "confidence": 0.5},
-  "children_preference": {"value": "unknown", "source": "unknown", "confidence": 0.5},
-  "dealbreakers": {"values": [], "source": "unknown", "confidence": 0.5},
-  "soft_preferences": {"values": [], "source": "unknown", "confidence": 0.5},
-  "summary": ""
-}
-For every source use one of: user_stated, inferred, unknown.
-Rules:
-- If the user did not clearly state a field, use source=inferred only when there is strong evidence.
-- Otherwise use value="unknown", source="unknown", confidence <= 0.5.
-- Do not invent age, city, religion, family preference, children preference, or dealbreakers.
-- Keep values and lifestyle as short snake_case strings.
-- Keep summary under 40 words."""
-
-DEEP_FACT_EXTRACTION_SYSTEM_PROMPT = """Extract private Omiryn matching memory facts from the conversation.
-Return only valid JSON. Do not include markdown.
-Use this shape:
-{
-  "facts": [
-    {
-      "category": "values",
-      "key": "mutual_respect",
-      "label": "Values mutual respect",
-      "value": {"kind": "mutual_respect", "detail": "Short detail"},
-      "confidence": 0.72,
-      "evidence": "Short user quote or paraphrase"
-    }
-  ]
-}
-Rules:
-- Extract only facts about the user, not the assistant or other people.
-- Prefer many small facts over broad summaries.
-- Useful categories: dating_intent, values, lifestyle, communication, conflict_style,
-  attachment_style, emotional_patterns, family_context, partner_preferences,
-  dealbreakers, attraction_patterns, goals, constraints, personality.
-- Do not invent. If weakly inferred, confidence must be <= 0.45.
-- Do not diagnose medical or mental health conditions.
-- Keep labels under 12 words and evidence under 30 words.
-- Return at most 25 facts."""
+ONBOARDING_SYSTEM_PROMPT = COMPANION_SYSTEM_PROMPT
 
 
 class AgentProviderError(RuntimeError):
@@ -601,26 +540,12 @@ def _system_prompt_with_context(
     user_profile: dict[str, Any] | None = None,
     agent_name: str | None = None,
 ) -> str:
-    context_text = _context_sources_text(context_sources)
-    persona_text = _agent_persona_prompt(user_profile, agent_name)
-    mode_text = _agent_mode_prompt(agent_mode)
-    tone_text = _agent_tone_prompt(agent_tone)
-    if not context_text:
-        return f"{system_prompt}\n\n{persona_text}\n\n{mode_text}\n\n{tone_text}"
-    return (
-        f"{system_prompt}\n\n{persona_text}\n\n{mode_text}\n\n{tone_text}\n\n"
-        "Additional user-provided context is available below. Use it only to ask better "
-        "questions, understand the user, and lightly adapt tone when speaking-style context "
-        "is present. If WhatsApp context is present, you may discuss broad recent topics from "
-        "the processed summary, but be clear you do not have live WhatsApp access or a full "
-        "raw transcript. If a friend-style text profile is present, use it only as a writing-style "
-        "reference for rhythm, warmth, brevity, and phrasing. Reply directly in that style without "
-        "reintroducing yourself as Omiryn unless the user asks who you are. Never claim to be that "
-        "friend, never roleplay as that person, and never imply they wrote or approved your reply. "
-        "If the selected friend-style context is missing, ambiguous, or clearly for the wrong sender, "
-        "ask which sender/style the user wants to use. Mention imported context only when it is useful "
-        "or the user asks. Do not quote private source text back unless the user explicitly asks.\n"
-        f"{context_text}"
+    return build_companion_system_prompt(
+        context_sources=context_sources,
+        user_profile=user_profile,
+        agent_tone=agent_tone,
+        agent_name=agent_name,
+        base_prompt=system_prompt,
     )
 
 
@@ -628,81 +553,20 @@ def _agent_persona_prompt(
     user_profile: dict[str, Any] | None,
     agent_name: str | None = None,
 ) -> str:
-    gender = (user_profile or {}).get("gender") or "unknown"
-    interested_in = (user_profile or {}).get("interested_in") or "unknown"
-    display_name = (user_profile or {}).get("display_name") or "unknown"
-    email = (user_profile or {}).get("email") or "unknown"
-    location = (user_profile or {}).get("location") or "India"
-    country = (user_profile or {}).get("country") or "India"
-    timezone = (user_profile or {}).get("timezone") or "Asia/Kolkata"
-    current_date = (user_profile or {}).get("current_date") or "unknown"
-    current_time = (user_profile or {}).get("current_time") or "unknown"
-    current_weekday = (user_profile or {}).get("current_weekday") or "unknown"
-    persona = _agent_persona_for_interest(str(interested_in))
-    if agent_name and agent_name.strip():
-        persona = {**persona, "name": agent_name.strip()}
-    return (
-        f"User identity: display_name={display_name}, email={email}.\n"
-        f"User basics: gender={gender}, interested_in={interested_in}, "
-        f"location={location}, country={country}.\n"
-        f"Current context: date={current_date}, time={current_time}, "
-        f"weekday={current_weekday}, timezone={timezone}.\n"
-        f"Agent persona: name={persona['name']}, presentation={persona['presentation']}.\n"
-        "Use identity/location/time only when naturally helpful. Do not mention the user's email "
-        "unless they ask about account details. If location is only a default, treat it as uncertain. "
-        "Speak from this persona in a casual WhatsApp-like way, like a single ongoing personal chat. "
-        "Use small replies, not big paragraphs. "
-        "Do not keep saying your name. Do not turn every reply into a dating interview. "
-        "Do not repeat the same supportive line again and again."
-    )
+    from agent.behavior import build_companion_behavior
+
+    behavior = build_companion_behavior(user_profile, agent_name=agent_name)
+    return behavior_prompt(behavior, user_profile)
 
 
 def _agent_persona_for_interest(interested_in: str) -> dict[str, str]:
-    if interested_in == "women":
-        return {"name": "Annie", "presentation": "girl/woman companion"}
-    if interested_in == "men":
-        return {"name": "Arjun", "presentation": "boy/man companion"}
-    return {"name": "Mira", "presentation": "warm neutral companion"}
+    return agent_persona_for_interest(interested_in)
 
 
-def _agent_mode_prompt(agent_mode: str) -> str:
-    prompts = {
-        "know_me": (
-            "Current agent mode: Companion. This is the user's main personal chat with you. "
-            "Talk like a warm girl/boy companion on WhatsApp: brief, natural, sometimes playful. "
-            "Quietly learn the user's personality, values, lifestyle, emotional patterns, "
-            "communication style, and relationship goals over time. Let the conversation breathe; "
-            "do not force a profile question every turn."
-        ),
-        "coach_me": (
-            "Current agent mode: Coach me. Help the user reflect on patterns and choices. "
-            "Be practical, kind, and direct. Avoid therapy claims or diagnosis."
-        ),
-        "match_me": (
-            "Current agent mode: Match me. Focus on what partner traits, relationship dynamics, "
-            "and compatibility signals may fit the user. Explain uncertainty clearly."
-        ),
-        "talk_like_me": (
-            "Current agent mode: Talk like me. Prioritize mirroring the user's pacing, wording, "
-            "and conversational energy from imported speaking-style context while staying respectful."
-        ),
-    }
-    return prompts.get(agent_mode, prompts["know_me"])
 
 
 def _agent_tone_prompt(agent_tone: str) -> str:
-    prompts = {
-        "auto": (
-            "Tone setting: Auto. Match the user's natural tone from recent messages and imported "
-            "speaking-style context. If signals conflict, stay warm, clear, brief, and natural."
-        ),
-        "casual": "Tone setting: Casual. Use relaxed, simple language without sounding sloppy.",
-        "warm": "Tone setting: Warm. Be gentle, supportive, and emotionally clear.",
-        "formal": "Tone setting: Formal. Be polished, structured, and respectful.",
-        "direct": "Tone setting: Direct. Be concise, specific, and low-fluff.",
-        "playful": "Tone setting: Playful. Be light and witty while staying respectful.",
-    }
-    return prompts.get(agent_tone, prompts["auto"])
+    return tone_prompt(agent_tone)
 
 
 def _conversation_and_context_text(
@@ -806,27 +670,11 @@ def _safe_confidence(value: Any, fallback: float) -> float:
 
 
 def _context_sources_text(context_sources: list[dict[str, Any]] | None) -> str:
-    if not context_sources:
-        return ""
-    sections = []
-    for source in context_sources[:CONTEXT_SOURCE_LIMIT]:
-        title = source.get("title") or "Untitled source"
-        source_type = source.get("source_type") or "context"
-        content_limit = (
-            STYLE_CONTEXT_CHAR_LIMIT
-            if source_type in STYLE_CONTEXT_TYPES
-            else CONTEXT_SOURCE_CHAR_LIMIT
-        )
-        content = _truncate_for_context(str(source.get("content") or ""), content_limit)
-        sections.append(f"[{source_type}] {title}\n{content}")
-    return "User-provided context sources:\n" + "\n\n".join(sections)
+    return context_sources_text(context_sources)
 
 
 def _truncate_for_context(text: str, limit: int) -> str:
-    text = " ".join(text.split())
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "..."
+    return truncate_for_context(text, limit)
 
 
 async def _openai_compatible_chat(

@@ -121,8 +121,23 @@ profile_facts = Table(
     Column("status", String, nullable=False),
     Column("visibility", String, nullable=False),
     Column("used_for_matching", Boolean, nullable=False),
+    Column("used_for_chat_context", Boolean, nullable=False, default=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+agent_message_feedback = Table(
+    "agent_message_feedback",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
+    Column("conversation_id", String, nullable=False),
+    Column("message_index", Integer, nullable=False),
+    Column("rating", String, nullable=False),
+    Column("reason", String, nullable=True),
+    Column("comment", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 def database_url() -> str:
@@ -318,6 +333,11 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_usage_events.delete().where(agent_usage_events.c.conversation_id == conversation_id)
         )
         connection.execute(
+            agent_message_feedback.delete().where(
+                agent_message_feedback.c.conversation_id == conversation_id
+            )
+        )
+        connection.execute(
             agent_conversations.delete().where(agent_conversations.c.id == conversation_id)
         )
     return True
@@ -329,6 +349,7 @@ def _ensure_runtime_columns() -> None:
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
+        "profile_facts": ("used_for_chat_context",),
         "agent_conversations": (
             "user_id",
             "agent_provider",
@@ -344,7 +365,14 @@ def _ensure_runtime_columns() -> None:
             existing_columns = {column["name"] for column in inspect(ENGINE).get_columns(table_name)}
             for column_name in column_names:
                 if column_name not in existing_columns:
-                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR"))
+                    column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
+                    default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
+                    connection.execute(
+                        text(
+                            f"ALTER TABLE {table_name} "
+                            f"ADD COLUMN {column_name} {column_type}{default}"
+                        )
+                    )
 
 
 def upsert_profile_fact(fact: dict[str, Any]) -> dict[str, Any]:
@@ -379,6 +407,7 @@ def list_profile_facts(
     user_id: str,
     statuses: set[str] | None = None,
     used_for_matching: bool | None = None,
+    used_for_chat_context: bool | None = None,
 ) -> list[dict[str, Any]]:
     statement = (
         select(profile_facts)
@@ -393,6 +422,8 @@ def list_profile_facts(
         statement = statement.where(profile_facts.c.status.in_(statuses))
     if used_for_matching is not None:
         statement = statement.where(profile_facts.c.used_for_matching == used_for_matching)
+    if used_for_chat_context is not None:
+        statement = statement.where(profile_facts.c.used_for_chat_context == used_for_chat_context)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -416,6 +447,7 @@ def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
         "status": fact.get("status") or "active",
         "visibility": fact.get("visibility") or "internal",
         "used_for_matching": bool(fact.get("used_for_matching", True)),
+        "used_for_chat_context": bool(fact.get("used_for_chat_context", False)),
     }
 
 
@@ -433,6 +465,7 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
         "status": incoming["status"] or existing["status"],
         "visibility": incoming["visibility"] or existing["visibility"],
         "used_for_matching": incoming["used_for_matching"],
+        "used_for_chat_context": incoming["used_for_chat_context"],
     }
 
 
@@ -567,8 +600,57 @@ def _profile_fact_from_row(row: Any) -> dict[str, Any]:
         "status": row["status"],
         "visibility": row["visibility"],
         "used_for_matching": row["used_for_matching"],
+        "used_for_chat_context": row["used_for_chat_context"],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def save_agent_message_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "id": feedback.get("id") or str(uuid4()),
+        "user_id": feedback.get("user_id"),
+        "conversation_id": feedback["conversation_id"],
+        "message_index": feedback["message_index"],
+        "rating": feedback["rating"],
+        "reason": feedback.get("reason"),
+        "comment": feedback.get("comment"),
+        "metadata_json": feedback.get("metadata") or {},
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_message_feedback.insert().values(**payload))
+        row = connection.execute(
+            select(agent_message_feedback).where(agent_message_feedback.c.id == payload["id"])
+        ).mappings().first()
+    return _agent_message_feedback_from_row(row)
+
+
+def list_agent_message_feedback(
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(agent_message_feedback).order_by(agent_message_feedback.c.created_at.desc())
+    if conversation_id:
+        statement = statement.where(agent_message_feedback.c.conversation_id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_message_feedback.c.user_id == user_id)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_message_feedback_from_row(row) for row in rows]
+
+
+def _agent_message_feedback_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "message_index": row["message_index"],
+        "rating": row["rating"],
+        "reason": row["reason"],
+        "comment": row["comment"],
+        "metadata": row["metadata_json"],
+        "created_at": _isoformat_utc(row["created_at"]),
     }
 
 
