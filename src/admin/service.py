@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from storage import (
     ENGINE,
+    _unprotect_messages,
     agent_conversations,
     agent_message_feedback,
     agent_usage_events,
@@ -389,11 +390,11 @@ def _user_summary(
         "extracted_conversation_count": sum(
             1 for row in conversations if row["status"] == "extracted"
         ),
-        "message_count": sum(len(row["messages_json"] or []) for row in conversations),
+        "message_count": sum(len(_conversation_messages(row)) for row in conversations),
         "user_message_count": sum(
             1
             for row in conversations
-            for message in (row["messages_json"] or [])
+            for message in _conversation_messages(row)
             if message.get("role") == "user"
         ),
         "context_source_count": len(sources),
@@ -457,7 +458,7 @@ def _conversation_summary(
     context_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    messages = row["messages_json"] or []
+    messages = _conversation_messages(row)
     conversation_id = row["id"]
     events = [event for event in usage_events if event.get("conversation_id") == conversation_id]
     return {
@@ -527,7 +528,7 @@ def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
 def _feedback_message_preview(conversation: Any | None, message_index: int) -> str | None:
     if not conversation:
         return None
-    messages = conversation["messages_json"] or []
+    messages = _conversation_messages(conversation)
     if message_index < 0 or message_index >= len(messages):
         return None
     message = messages[message_index]
@@ -535,6 +536,10 @@ def _feedback_message_preview(conversation: Any | None, message_index: int) -> s
     if not content:
         return None
     return content[:180] + ("..." if len(content) > 180 else "")
+
+
+def _conversation_messages(row: Any) -> list[dict[str, Any]]:
+    return _unprotect_messages(row["user_id"], row["messages_json"] or [])
 
 
 def _summarize_feedback(feedback: list[Any]) -> dict[str, int]:

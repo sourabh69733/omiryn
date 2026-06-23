@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 from datetime import timezone
-from uuid import uuid4
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
@@ -25,6 +26,14 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import NullPool
+
+from security.encryption import (
+    decrypt_json,
+    decrypt_text,
+    is_encrypted_blob,
+    maybe_encrypt_json,
+    maybe_encrypt_text,
+)
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
 
@@ -243,9 +252,10 @@ def get_draft(draft_id: str, user_id: str | None = None) -> dict[str, Any] | Non
 
 
 def save_conversation(conversation: dict[str, Any], user_id: str | None = None) -> None:
+    conversation_user_id = user_id or conversation.get("user_id")
     payload = {
         "id": conversation["id"],
-        "user_id": user_id,
+        "user_id": conversation_user_id,
         "status": conversation["status"],
         "agent_provider": conversation.get("agent_provider"),
         "agent_model": conversation.get("agent_model"),
@@ -253,7 +263,7 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
         "agent_tone": conversation.get("agent_tone") or "auto",
         "agent_name": conversation.get("agent_name"),
         "agent_style_source_id": conversation.get("agent_style_source_id"),
-        "messages_json": conversation["messages"],
+        "messages_json": _protect_messages(conversation_user_id, conversation["messages"]),
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
@@ -288,7 +298,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_tone": row.get("agent_tone") or "auto",
         "agent_name": row.get("agent_name"),
         "agent_style_source_id": row.get("agent_style_source_id"),
-        "messages": row["messages_json"],
+        "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
 
 
@@ -311,7 +321,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_tone": row.get("agent_tone") or "auto",
             "agent_name": row.get("agent_name"),
             "agent_style_source_id": row.get("agent_style_source_id"),
-            "messages": row["messages_json"],
+            "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),
             "updated_at": _isoformat_utc(row["updated_at"]),
         }
@@ -829,13 +839,14 @@ def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:
 
 
 def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
+    source_user_id = source.get("user_id") or _conversation_user_id(source["conversation_id"])
     payload = {
         "id": source.get("id") or str(uuid4()),
-        "user_id": source.get("user_id") or _conversation_user_id(source["conversation_id"]),
+        "user_id": source_user_id,
         "conversation_id": source["conversation_id"],
         "source_type": source["source_type"],
         "title": source["title"],
-        "content": source["content"],
+        "content": _protect_text(source_user_id, source["content"]),
         "metadata_json": source.get("metadata") or {},
     }
     with ENGINE.begin() as connection:
@@ -908,10 +919,38 @@ def _context_source_from_row(row: Any) -> dict[str, Any]:
         "conversation_id": row["conversation_id"],
         "source_type": row["source_type"],
         "title": row["title"],
-        "content": row["content"],
+        "content": _unprotect_text(row["user_id"], row["content"]),
         "metadata": row["metadata_json"],
         "created_at": _isoformat_utc(row["created_at"]),
     }
+
+
+def _protect_messages(user_id: str | None, messages: list[dict[str, Any]]) -> Any:
+    return maybe_encrypt_json(user_id, messages)
+
+
+def _unprotect_messages(user_id: str | None, value: Any) -> list[dict[str, Any]]:
+    return decrypt_json(user_id, value)
+
+
+def _protect_text(user_id: str | None, value: str) -> str:
+    protected = maybe_encrypt_text(user_id, value)
+    if is_encrypted_blob(protected):
+        return json.dumps(protected, separators=(",", ":"))
+    return str(protected)
+
+
+def _unprotect_text(user_id: str | None, value: Any) -> str:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith("{"):
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                parsed = None
+            if is_encrypted_blob(parsed):
+                return decrypt_text(user_id, parsed)
+    return decrypt_text(user_id, value)
 
 
 def _owned_update_values(payload: dict[str, Any], owner_key: str) -> dict[str, Any]:
