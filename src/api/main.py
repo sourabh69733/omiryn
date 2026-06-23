@@ -623,7 +623,7 @@ def create_whatsapp_context_source(
                     "end_message_index": chunk.end_message_index,
                     "content": chunk.content,
                     "terms": chunk.terms,
-                    "embedding": None,
+                    "embedding": chunk.embedding,
                     "metadata": chunk.metadata,
                 }
                 for chunk in structured_memory.chunks

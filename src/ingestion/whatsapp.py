@@ -4,6 +4,8 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+from text_vectors import LOCAL_TEXT_EMBEDDING_KIND, build_text_embedding
+
 WHATSAPP_IMPORT_MAX_CHARS = 1_000_000
 WHATSAPP_STYLE_MAX_MESSAGES = 800
 WHATSAPP_STYLE_SAMPLE_LIMIT = 10
@@ -56,6 +58,7 @@ class WhatsappMemoryChunk:
     end_message_index: int
     content: str
     terms: list[str]
+    embedding: dict[str, object] | None
     metadata: dict[str, object]
 
 
@@ -207,7 +210,8 @@ def build_whatsapp_structured_memory(
             "chunk_count": len(chunks),
             **import_metadata,
             "raw_chat_stored": True,
-            "embedding_ready": False,
+            "embedding_ready": True,
+            "embedding_kind": LOCAL_TEXT_EMBEDDING_KIND,
         },
     )
 
@@ -305,6 +309,7 @@ def _conversation_chunks(messages: list[WhatsappMessage]) -> list[WhatsappMemory
                 end_message_index=start + len(chunk_messages) - 1,
                 content="\n".join(lines),
                 terms=terms,
+                embedding=build_text_embedding("\n".join(lines), terms),
                 metadata={
                     "message_count": len(chunk_messages),
                     "start_timestamp": chunk_messages[0].timestamp_text,

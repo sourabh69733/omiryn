@@ -1582,7 +1582,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(imports[0]["context_source_id"], source_id)
         self.assertEqual(imports[0]["selected_sender"], "Aarav")
         self.assertEqual(imports[0]["metadata"]["parsed_message_count"], 6)
-        self.assertFalse(imports[0]["metadata"]["embedding_ready"])
+        self.assertTrue(imports[0]["metadata"]["embedding_ready"])
+        self.assertEqual(imports[0]["metadata"]["embedding_kind"], "local_hash_v1")
 
         messages = list_whatsapp_messages(imports[0]["id"])
         self.assertEqual(len(messages), 6)
@@ -1594,7 +1595,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         chunks = list_whatsapp_chunks(imports[0]["id"])
         self.assertGreaterEqual(len(chunks), 1)
         self.assertEqual(chunks[0]["chunk_index"], 1)
-        self.assertIsNone(chunks[0]["embedding"])
+        self.assertEqual(chunks[0]["embedding"]["kind"], "local_hash_v1")
         self.assertIn("Aarav:", chunks[0]["content"])
         self.assertIn("Riya:", chunks[0]["content"])
 
@@ -1643,6 +1644,34 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("People:", structured_source["content"])
         self.assertIn("Sender style profiles:", structured_source["content"])
         self.assertIn("coffee first", structured_source["content"])
+
+    def test_reply_context_semantically_ranks_whatsapp_chunks(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Sourabh",
+                "content": sample_multi_chunk_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+
+        whatsapp_sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "where did abhishek ask me to wait?",
+        )
+
+        structured_source = next(
+            source
+            for source in whatsapp_sources
+            if source["source_type"] == "whatsapp_structured_context"
+        )
+        relevant_chunks = structured_source["content"].split("Relevant message chunks:", 1)[1]
+        first_chunk = relevant_chunks.split("Chunk ", 2)[1]
+        self.assertIn("wahi per rukna", first_chunk)
+        self.assertNotIn("movie playlist filler 01", first_chunk)
 
     def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
@@ -1822,7 +1851,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(structured.people[0].sender, "Aarav")
         self.assertEqual(structured.people[0].role, "selected_user")
         self.assertEqual({profile.sender for profile in structured.style_profiles}, {"Aarav", "Riya"})
-        self.assertFalse(structured.metadata["embedding_ready"])
+        self.assertTrue(structured.metadata["embedding_ready"])
+        self.assertEqual(structured.chunks[0].embedding["kind"], "local_hash_v1")
 
     def test_whatsapp_parser_supports_bracketed_seconds_export(self) -> None:
         messages = parse_whatsapp_export(sample_bracketed_whatsapp_export())
@@ -1916,6 +1946,25 @@ def sample_bracketed_whatsapp_export() -> str:
 [22/05/26, 4:55:19 PM] Sourabh sahu: hmm
 [22/05/26, 4:55:54 PM] Sourabh sahu: mai tujhe wahi aaya tha na tu wahi per
 wahi per rukna"""
+
+
+def sample_multi_chunk_whatsapp_export() -> str:
+    lines = [
+        f"12/06/2026, 9:{minute:02d} AM - Sourabh: movie playlist filler {minute:02d}"
+        if minute % 2
+        else f"12/06/2026, 9:{minute:02d} AM - Abhishek: song scene filler {minute:02d}"
+        for minute in range(1, 25)
+    ]
+    lines.extend(
+        [
+            "12/06/2026, 10:25 AM - Sourabh: mai aa gaya hu",
+            "12/06/2026, 10:26 AM - Abhishek: voice call kar le pehle",
+            "12/06/2026, 10:27 AM - Sourabh: location kidhar hai?",
+            "12/06/2026, 10:28 AM - Abhishek: wahi per rukna gate ke paas",
+            "12/06/2026, 10:29 AM - Sourabh: thik h wahi wait kar raha hu",
+        ]
+    )
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

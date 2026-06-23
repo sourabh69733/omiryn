@@ -11,6 +11,7 @@ from storage import (
     list_whatsapp_people,
     list_whatsapp_style_profiles,
 )
+from text_vectors import build_text_embedding, cosine_similarity
 
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
@@ -40,6 +41,8 @@ MEMORY_TRIGGER_TERMS = {
     "gemini",
     "summary",
     "profile",
+    "convo",
+    "msg",
     "about me",
     "know about me",
     "what do you know",
@@ -48,6 +51,23 @@ MEMORY_TRIGGER_TERMS = {
     "past chat",
     "conversation",
 }
+MEMORY_TRIGGER_PHRASES = {
+    "kaise baat",
+    "kaise text",
+    "kaise bol",
+    "kis style",
+    "kya baat",
+    "kya baate",
+    "hum kya",
+    "last convo",
+    "pichli baat",
+    "pehle kya",
+    "previous chat",
+    "uploaded chat",
+    "where did",
+    "whatsapp chat",
+}
+RECENCY_QUERY_TERMS = {"last", "latest", "recent", "previous", "pichli", "pehle", "before"}
 
 
 @dataclass(frozen=True)
@@ -317,12 +337,24 @@ def _rank_whatsapp_chunks(
     user_text: str,
 ) -> list[dict[str, Any]]:
     query_terms = _memory_terms(user_text)
+    query_embedding = build_text_embedding(user_text, query_terms)
     if not query_terms:
-        return chunks[:WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT]
+        return chunks[-WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT:]
+
+    max_index = max((int(chunk.get("chunk_index") or 0) for chunk in chunks), default=1)
+    wants_recent = bool(query_terms & RECENCY_QUERY_TERMS)
     scored_chunks = [
         (score, chunk)
         for chunk in chunks
-        for score in [_whatsapp_chunk_score(chunk, query_terms)]
+        for score in [
+            _whatsapp_chunk_score(
+                chunk,
+                query_terms,
+                query_embedding,
+                max_index,
+                wants_recent,
+            )
+        ]
     ]
     scored_chunks.sort(
         key=lambda item: (
@@ -331,11 +363,17 @@ def _rank_whatsapp_chunks(
         ),
         reverse=True,
     )
-    positive_chunks = [chunk for score, chunk in scored_chunks if score > 0]
+    positive_chunks = [chunk for score, chunk in scored_chunks if score > 0.05]
     return positive_chunks or chunks[-WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT:]
 
 
-def _whatsapp_chunk_score(chunk: dict[str, Any], query_terms: set[str]) -> int:
+def _whatsapp_chunk_score(
+    chunk: dict[str, Any],
+    query_terms: set[str],
+    query_embedding: dict[str, Any],
+    max_index: int,
+    wants_recent: bool,
+) -> float:
     chunk_text = _normalized_memory_text(
         " ".join(
             [
@@ -344,7 +382,11 @@ def _whatsapp_chunk_score(chunk: dict[str, Any], query_terms: set[str]) -> int:
             ]
         )
     )
-    return sum(chunk_text.count(term) for term in query_terms)
+    lexical_score = sum(1 for term in query_terms if term in chunk_text)
+    semantic_score = cosine_similarity(query_embedding, chunk.get("embedding"))
+    recency_score = (int(chunk.get("chunk_index") or 0) / max(1, max_index)) if max_index else 0
+    recency_weight = 1.25 if wants_recent else 0.15
+    return (semantic_score * 6) + lexical_score + (recency_score * recency_weight)
 
 
 def _relevant_memory_sources(
@@ -367,7 +409,9 @@ def _relevant_memory_sources(
 
 def _should_retrieve_memory(user_text: str) -> bool:
     normalized = _normalized_memory_text(user_text)
-    return any(term in normalized for term in MEMORY_TRIGGER_TERMS)
+    return any(term in normalized for term in MEMORY_TRIGGER_TERMS) or any(
+        phrase in normalized for phrase in MEMORY_TRIGGER_PHRASES
+    )
 
 
 def _memory_source_score(source: dict[str, Any], user_text: str) -> int:
@@ -415,6 +459,16 @@ def _memory_terms(text: str) -> set[str]:
         "my",
         "can",
         "please",
+        "hai",
+        "tha",
+        "thi",
+        "kya",
+        "kis",
+        "kar",
+        "karta",
+        "karte",
+        "raha",
+        "rahe",
     }
     return {term for term in normalized.split() if len(term) >= 3 and term not in stop_words}
 
