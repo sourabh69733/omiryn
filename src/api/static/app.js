@@ -1152,6 +1152,7 @@ function titleCase(value) {
 
 function renderMessages() {
   chatLog.innerHTML = "";
+  chatLog.classList.toggle("feedback-open", activeFeedbackMessageIndex !== null);
   messages.forEach((message, index) => {
     const bubble = document.createElement("div");
     bubble.className = `message ${message.role === "assistant" ? "agent" : "user"}`;
@@ -1184,6 +1185,9 @@ function renderMessageFeedback(messageIndex) {
   const wrapper = document.createElement("div");
   wrapper.className = "message-feedback";
   wrapper.dataset.messageIndex = String(messageIndex);
+  if (activeFeedbackMessageIndex === messageIndex) {
+    wrapper.classList.add("active");
+  }
 
   const actions = document.createElement("div");
   actions.className = "message-feedback-actions";

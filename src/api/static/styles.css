@@ -1525,6 +1525,17 @@ p {
   transform: translateY(0);
 }
 
+.chat-log.feedback-open .message.agent:hover .message-feedback:not(.active) .message-feedback-actions,
+.chat-log.feedback-open .message.agent:focus-within .message-feedback:not(.active) .message-feedback-actions {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+}
+
+.chat-log.feedback-open .message-feedback:not(.active) {
+  display: none;
+}
+
 .message-feedback-reaction {
   display: grid;
   place-items: center;
