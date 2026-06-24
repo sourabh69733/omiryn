@@ -3,11 +3,13 @@ region              = "asia-south1"
 service_name        = "omiryn"
 artifact_repository = "omiryn"
 
-sql_instance_name = "omiryn-postgres"
-sql_database_name = "omiryn"
-sql_user_name     = "omiryn_app"
-sql_tier          = "db-f1-micro"
-sql_disk_size_gb  = 10
+sql_instance_name     = "omiryn-postgres"
+sql_database_name     = "omiryn"
+sql_user_name         = "omiryn_app"
+sql_edition           = "ENTERPRISE"
+sql_tier              = "db-f1-micro"
+sql_disk_size_gb      = 10
+sql_public_ip_enabled = true
 
 # Prefer setting this interactively:
 # terraform apply -var='sql_user_password=...'

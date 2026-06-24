@@ -52,6 +52,12 @@ variable "sql_database_version" {
   default     = "POSTGRES_16"
 }
 
+variable "sql_edition" {
+  description = "Cloud SQL edition. Use ENTERPRISE for small shared-core tiers like db-f1-micro."
+  type        = string
+  default     = "ENTERPRISE"
+}
+
 variable "sql_tier" {
   description = "Cloud SQL machine tier."
   type        = string
@@ -62,6 +68,12 @@ variable "sql_disk_size_gb" {
   description = "Cloud SQL disk size in GB."
   type        = number
   default     = 10
+}
+
+variable "sql_public_ip_enabled" {
+  description = "Enable public IPv4 on Cloud SQL. Keep true for the simple Cloud Run connector setup unless private connectivity is configured."
+  type        = bool
+  default     = true
 }
 
 variable "secret_names" {
@@ -93,10 +105,10 @@ variable "runtime_env" {
   description = "Non-secret Cloud Run environment variables."
   type        = map(string)
   default = {
-    AUTH_PROVIDER               = "supabase"
-    AUTH_REQUIRED               = "true"
-    DB_DISABLE_POOL             = "true"
-    AGENT_PROVIDER              = "mock"
-    PROFILE_DEBUG_DATA_ENABLED  = "false"
+    AUTH_PROVIDER              = "supabase"
+    AUTH_REQUIRED              = "true"
+    DB_DISABLE_POOL            = "true"
+    AGENT_PROVIDER             = "mock"
+    PROFILE_DEBUG_DATA_ENABLED = "false"
   }
 }

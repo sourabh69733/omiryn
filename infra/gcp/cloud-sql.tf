@@ -7,6 +7,7 @@ resource "google_sql_database_instance" "postgres" {
 
   settings {
     tier              = var.sql_tier
+    edition           = var.sql_edition
     availability_type = "ZONAL"
     disk_size         = var.sql_disk_size_gb
     disk_type         = "PD_SSD"
@@ -19,7 +20,7 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     ip_configuration {
-      ipv4_enabled = false
+      ipv4_enabled = var.sql_public_ip_enabled
     }
   }
 

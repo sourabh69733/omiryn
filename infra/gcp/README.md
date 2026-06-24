@@ -28,6 +28,20 @@ terraform plan
 terraform apply
 ```
 
+For the lowest-cost dev instance, keep:
+
+```hcl
+sql_edition           = "ENTERPRISE"
+sql_tier              = "db-f1-micro"
+sql_public_ip_enabled = true
+```
+
+`ENTERPRISE_PLUS` needs a larger performance-optimized tier, so it will reject
+`db-f1-micro`.
+
+The simple setup keeps public IPv4 enabled because Cloud SQL requires at least
+one connectivity path. Cloud Run can still use the Cloud SQL connector/socket.
+
 If you want Terraform to create the Cloud SQL user too:
 
 ```bash
