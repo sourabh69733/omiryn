@@ -1,0 +1,18 @@
+project_id          = "your-gcp-project-id"
+region              = "asia-south1"
+service_name        = "omiryn"
+artifact_repository = "omiryn"
+
+sql_instance_name = "omiryn-postgres"
+sql_database_name = "omiryn"
+sql_user_name     = "omiryn_app"
+sql_tier          = "db-f1-micro"
+sql_disk_size_gb  = 10
+
+# Prefer setting this interactively:
+# terraform apply -var='sql_user_password=...'
+sql_user_password = ""
+
+# Keep false until an image has been pushed.
+create_cloud_run_service = false
+container_image          = ""
