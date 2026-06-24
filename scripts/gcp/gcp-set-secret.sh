@@ -16,6 +16,8 @@ require_var GCP_PROJECT_ID
 SECRET_NAME="$1"
 ENV_VAR_NAME="$2"
 
+require_secret_name "$SECRET_NAME" "Secret Manager secret id"
+
 if [ -z "${!ENV_VAR_NAME:-}" ]; then
   echo "Environment variable $ENV_VAR_NAME is empty." >&2
   exit 1

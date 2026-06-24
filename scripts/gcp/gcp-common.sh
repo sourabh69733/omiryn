@@ -31,6 +31,17 @@ require_artifact_repository_name() {
   fi
 }
 
+require_secret_name() {
+  local secret_name="$1"
+  local label="${2:-secret name}"
+  if [[ ! "$secret_name" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    echo "Invalid $label: $secret_name" >&2
+    echo "Use only the Secret Manager secret id, for example: omiryn-supabase-url" >&2
+    echo "Do not use a URL, token, API key, or full resource path here." >&2
+    exit 1
+  fi
+}
+
 optional_secret_arg() {
   local env_name="$1"
   local secret_name="$2"
