@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=scripts/gcp-common.sh
 source "$SCRIPT_DIR/gcp-common.sh"
 
@@ -12,12 +12,27 @@ require_var GCP_SERVICE
 require_var GCP_ARTIFACT_REPOSITORY
 require_var DATABASE_URL_SECRET
 require_var ENCRYPTION_MASTER_KEY_SECRET
+require_artifact_repository_name
 
 IMAGE_TAG="${IMAGE_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
 IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/${GCP_SERVICE}:${IMAGE_TAG}"
 
 gcloud config set project "$GCP_PROJECT_ID"
 
+gcloud services enable \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  run.googleapis.com
+
+if ! gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY" \
+  --location "$GCP_REGION" >/dev/null 2>&1; then
+  gcloud artifacts repositories create "$GCP_ARTIFACT_REPOSITORY" \
+    --repository-format docker \
+    --location "$GCP_REGION" \
+    --description "Omiryn application images"
+fi
+
+echo "Building image: $IMAGE_URI"
 gcloud builds submit "$PROJECT_ROOT" --tag "$IMAGE_URI"
 
 secret_args=(

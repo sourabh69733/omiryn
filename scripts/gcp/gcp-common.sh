@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-GCP_ENV_FILE="${GCP_ENV_FILE:-.gcp.env}"
+GCP_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$GCP_COMMON_DIR/../.." && pwd)}"
+GCP_ENV_FILE="${GCP_ENV_FILE:-$PROJECT_ROOT/.gcp.env}"
 
 if [ -f "$GCP_ENV_FILE" ]; then
   set -a
@@ -15,6 +17,16 @@ require_var() {
   if [ -z "${!name:-}" ]; then
     echo "Missing required environment variable: $name" >&2
     echo "Create .gcp.env from scripts/gcp-env.example or export $name." >&2
+    exit 1
+  fi
+}
+
+require_artifact_repository_name() {
+  if [[ ! "${GCP_ARTIFACT_REPOSITORY:-}" =~ ^[a-z]([a-z0-9-]*[a-z0-9])?$ ]]; then
+    echo "Invalid GCP_ARTIFACT_REPOSITORY: ${GCP_ARTIFACT_REPOSITORY:-<empty>}" >&2
+    echo "Loaded env file: $GCP_ENV_FILE" >&2
+    echo "Use only the Artifact Registry repository id, for example: omiryn" >&2
+    echo "Do not use the full registry URL like asia-south1-docker.pkg.dev/PROJECT/REPO." >&2
     exit 1
   fi
 }
