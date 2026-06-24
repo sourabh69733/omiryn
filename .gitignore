@@ -1,10 +1,16 @@
 .env
+.gcp.env
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
 .coverage
 htmlcov/
 dist/
