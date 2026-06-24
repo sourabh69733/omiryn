@@ -79,6 +79,11 @@ docker build -t omiryn:local .
 docker run --rm --env-file .env -p 8080:8080 -e PORT=8080 omiryn:local
 ```
 
+The helper scripts are safer than raw `docker run` for local debugging because
+they strip shell-style quotes from env values, rewrite local Postgres hosts from
+`localhost` to `host.docker.internal`, and mount `./data` into `/app/data` for
+SQLite.
+
 Override common settings:
 
 ```bash
