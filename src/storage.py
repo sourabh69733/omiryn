@@ -514,6 +514,24 @@ def list_profile_facts(
     return _dedupe_profile_fact_dicts([_profile_fact_from_row(row) for row in rows])
 
 
+def delete_profile_facts_by_source(
+    source_kind: str,
+    source_ids: list[str],
+    user_id: str | None = None,
+) -> int:
+    if not source_ids:
+        return 0
+    statement = profile_facts.delete().where(
+        profile_facts.c.source_kind == source_kind,
+        profile_facts.c.source_id.in_(source_ids),
+    )
+    if user_id is not None:
+        statement = statement.where(profile_facts.c.user_id == user_id)
+    with ENGINE.begin() as connection:
+        result = connection.execute(statement)
+    return int(result.rowcount or 0)
+
+
 def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": fact.get("id") or str(uuid4()),
@@ -1162,6 +1180,14 @@ def _delete_whatsapp_imports_for_context_sources(
 ) -> None:
     if not source_ids:
         return
+    facts_statement = profile_facts.delete().where(
+        profile_facts.c.source_kind == "whatsapp_import",
+        profile_facts.c.source_id.in_(source_ids),
+    )
+    if user_id is not None:
+        facts_statement = facts_statement.where(profile_facts.c.user_id == user_id)
+    connection.execute(facts_statement)
+
     statement = select(whatsapp_imports.c.id).where(
         whatsapp_imports.c.context_source_id.in_(source_ids)
     )

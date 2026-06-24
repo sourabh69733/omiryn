@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent.data_points import rank_data_points_for_context
 from storage import (
     list_context_sources,
+    list_profile_facts,
     list_user_context_sources,
     list_whatsapp_chunks,
     list_whatsapp_imports,
@@ -15,7 +17,9 @@ from text_vectors import build_text_embedding, cosine_similarity
 
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
+DATA_POINT_CONTEXT_LIMIT = 4
 WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT = 2
+DATA_POINT_SOURCE_TYPE = "data_points"
 WHATSAPP_STRUCTURED_SOURCE_TYPE = "whatsapp_structured_context"
 MEMORY_TRIGGER_TERMS = {
     "chat",
@@ -105,6 +109,7 @@ def build_reply_context_sources(
     attached_sources = _valid_attached_context_sources(all_sources, user_id)
     selected_styles = _selected_style_sources(all_sources, style_source_id)
     retrieved_sources = _relevant_memory_sources(attached_sources, user_text)
+    data_point_sources = _data_point_context_sources(user_id, user_text)
     structured_whatsapp_sources = _structured_whatsapp_context_sources(
         all_sources,
         attached_sources,
@@ -115,11 +120,11 @@ def build_reply_context_sources(
 
     if selected_styles:
         selected_style_ids = {_source_identity(source) for source in selected_styles}
-        return selected_styles + structured_whatsapp_sources + [
+        return selected_styles + data_point_sources + structured_whatsapp_sources + [
             source for source in retrieved_sources if _source_identity(source) not in selected_style_ids
         ]
 
-    return structured_whatsapp_sources + retrieved_sources
+    return data_point_sources + structured_whatsapp_sources + retrieved_sources
 
 
 def build_profile_extraction_context_sources(
@@ -195,6 +200,51 @@ def _source_identity(source: dict[str, Any]) -> str:
     if isinstance(metadata, dict) and metadata.get("original_source_id"):
         return str(metadata["original_source_id"])
     return str(source.get("id") or "")
+
+
+def _data_point_context_sources(user_id: str | None, user_text: str) -> list[dict[str, Any]]:
+    if not user_id or not _should_retrieve_memory(user_text):
+        return []
+    ranked_points = rank_data_points_for_context(
+        list_profile_facts(user_id, used_for_chat_context=True),
+        user_text,
+        limit=DATA_POINT_CONTEXT_LIMIT,
+    )
+    if not ranked_points:
+        return []
+    lines = [
+        "User data points relevant to this message.",
+        "Use these as compact stored memory. Do not mention internal labels unless useful.",
+    ]
+    for point in ranked_points:
+        value = point.get("value") or {}
+        lines.append(
+            "- "
+            f"{point.get('label')}; "
+            f"category={point.get('category')}; "
+            f"value={_data_point_value_preview(value)}"
+        )
+    return [
+        {
+            "source_type": DATA_POINT_SOURCE_TYPE,
+            "title": "Relevant data points",
+            "content": "\n".join(lines),
+            "metadata": {
+                "point_count": len(ranked_points),
+                "point_ids": [point.get("id") for point in ranked_points],
+            },
+        }
+    ]
+
+
+def _data_point_value_preview(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("topics", "recent_terms", "traits"):
+            items = value.get(key)
+            if isinstance(items, list) and items:
+                return ", ".join(str(item) for item in items[:8])
+        return ", ".join(f"{key}={item}" for key, item in list(value.items())[:4])
+    return str(value)
 
 
 def _structured_whatsapp_context_sources(

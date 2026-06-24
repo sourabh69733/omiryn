@@ -34,12 +34,14 @@ from agent.context import (
     build_reply_context_sources,
     selected_style_source_exists,
 )
+from agent.data_points import normalize_data_point
 from agent.feedback import normalize_message_feedback
 from agent.memory import (
     capture_deep_profile_facts_from_conversation,
     should_run_deep_profile_fact_extraction,
 )
 from agent.orchestrator import run_agent_turn
+from agent.whatsapp_data_points import extract_whatsapp_data_points
 from auth import CurrentUser, current_user, public_auth_config
 from ingestion.whatsapp import (
     WHATSAPP_IMPORT_MAX_CHARS,
@@ -68,6 +70,7 @@ from storage import (
     save_user_profile,
     save_whatsapp_import_bundle,
     summarize_agent_usage,
+    upsert_profile_fact,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -595,7 +598,7 @@ def create_whatsapp_context_source(
             },
         }
     )
-    save_whatsapp_import_bundle(
+    whatsapp_import = save_whatsapp_import_bundle(
         {
             "user_id": _user_id(user),
             "conversation_id": conversation_id,
@@ -649,6 +652,15 @@ def create_whatsapp_context_source(
         },
         _user_id(user),
     )
+    if user:
+        for point in extract_whatsapp_data_points(
+            structured_memory,
+            user_id=user.id,
+            source_id=source["id"],
+            import_id=str(whatsapp_import["id"]),
+            title=payload.title,
+        ):
+            upsert_profile_fact(normalize_data_point(point))
     return _context_source_summary(source)
 
 

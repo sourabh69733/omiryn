@@ -26,7 +26,9 @@ and hard dealbreakers."""
 
 CONTEXT_USAGE_RULES = """Additional user-provided context is available below. Use it only to ask better
 questions, understand the user, and lightly adapt tone when speaking-style context
-is present. If structured WhatsApp context is present, use its people, sender style
+is present. If compact data points are present, treat them as stored memory summaries
+for topics, recent events, and tone traits; prefer them over re-reading old chat when
+they answer the user's question. If structured WhatsApp context is present, use its people, sender style
 profiles, and relevant message chunks to answer questions about the uploaded chat,
 topics, messages, and tone. Do not say you have no access when relevant uploaded
 WhatsApp context is included; say you are answering from the stored parsed import.

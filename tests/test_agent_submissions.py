@@ -31,6 +31,7 @@ from storage import (
     _normalize_database_url,
     _reset_db_allowed,
     list_context_sources,
+    list_profile_facts,
     list_whatsapp_chunks,
     list_whatsapp_imports,
     list_whatsapp_messages,
@@ -1673,6 +1674,44 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("wahi per rukna", first_chunk)
         self.assertNotIn("movie playlist filler 01", first_chunk)
 
+    def test_whatsapp_import_creates_chat_data_points_for_authenticated_user(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        source_id = create_response.json()["id"]
+
+        facts = list_profile_facts("user-a")
+        categories = {fact["category"] for fact in facts}
+        self.assertIn("whatsapp_topics", categories)
+        self.assertIn("whatsapp_recent_events", categories)
+        self.assertIn("whatsapp_tone_traits", categories)
+        self.assertTrue(all(fact["source_kind"] == "whatsapp_import" for fact in facts))
+        self.assertTrue(all(fact["source_id"] == source_id for fact in facts))
+        self.assertTrue(all(fact["used_for_chat_context"] for fact in facts))
+        self.assertTrue(all(not fact["used_for_matching"] for fact in facts))
+
+        sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "what topics were in my uploaded whatsapp chat?",
+            "user-a",
+        )
+        data_point_source = next(
+            source for source in sources if source["source_type"] == "data_points"
+        )
+        self.assertIn("WhatsApp topics include", data_point_source["content"])
+
     def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
         create_response = self.client.post(
@@ -1755,6 +1794,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertTrue(summary.metadata["truncated"])
 
     def test_whatsapp_structured_memory_is_removed_with_source(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
         create_response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/whatsapp-import",
@@ -1767,6 +1810,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(create_response.status_code, 201)
         source_id = create_response.json()["id"]
         self.assertEqual(len(list_whatsapp_imports(conversation_id)), 1)
+        self.assertTrue(list_profile_facts("user-a"))
 
         delete_response = self.client.delete(
             f"/api/agent/conversations/{conversation_id}/context-sources/{source_id}"
@@ -1774,6 +1818,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(list_whatsapp_imports(conversation_id), [])
+        self.assertEqual(list_profile_facts("user-a"), [])
 
     def test_friend_style_import_can_be_selected_for_replies(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
