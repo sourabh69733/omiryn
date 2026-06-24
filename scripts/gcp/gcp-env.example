@@ -1,0 +1,40 @@
+# Copy to .gcp.env and edit. Do not commit .gcp.env.
+
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_REGION=asia-south1
+GCP_SERVICE=omiryn
+GCP_ARTIFACT_REPOSITORY=omiryn
+
+# Optional. Set from Terraform output cloud_run_service_account.
+GCP_RUNTIME_SERVICE_ACCOUNT=
+
+# Cloud SQL
+GCP_SQL_INSTANCE=omiryn-postgres
+GCP_SQL_DATABASE=omiryn
+GCP_SQL_USER=omiryn_app
+GCP_SQL_TIER=db-f1-micro
+GCP_SQL_VERSION=POSTGRES_16
+
+# Set this only while creating the Cloud SQL user.
+DB_PASSWORD=
+
+# Optional. If set, Cloud Run will be deployed with Cloud SQL attached.
+# Format: project:region:instance
+GCP_CLOUDSQL_CONNECTION_NAME=
+
+# Runtime env
+AUTH_PROVIDER=supabase
+AUTH_REQUIRED=true
+DB_DISABLE_POOL=true
+AGENT_PROVIDER=mock
+PROFILE_DEBUG_DATA_ENABLED=false
+
+# Secret Manager names. These secrets must exist before deploy.
+DATABASE_URL_SECRET=omiryn-database-url
+ENCRYPTION_MASTER_KEY_SECRET=omiryn-encryption-master-key
+SUPABASE_URL_SECRET=omiryn-supabase-url
+SUPABASE_ANON_KEY_SECRET=omiryn-supabase-anon-key
+
+# Optional AI provider secret names. Add more in scripts/gcp-deploy.sh if needed.
+GROQ_API_KEY_SECRET=
+OPENAI_API_KEY_SECRET=
