@@ -86,3 +86,28 @@ Then run:
 terraform plan
 terraform apply
 ```
+
+## Optional: Custom Domain With HTTPS Load Balancer
+
+After the Cloud Run service exists, set:
+
+```hcl
+create_https_load_balancer = true
+load_balancer_domain_names = ["app.example.com"]
+```
+
+Then run:
+
+```bash
+terraform plan
+terraform apply
+```
+
+Point your domain DNS to the `load_balancer_ip` output:
+
+```text
+A app.example.com -> LOAD_BALANCER_IP
+```
+
+The Google-managed certificate becomes active after DNS points to the load
+balancer. It may take a while to provision.

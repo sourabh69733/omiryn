@@ -18,3 +18,9 @@ sql_user_password = ""
 # Keep false until an image has been pushed.
 create_cloud_run_service = false
 container_image          = ""
+
+# Optional custom domain through Global HTTPS Load Balancer + Cloud CDN.
+create_https_load_balancer  = false
+load_balancer_domain_names  = []
+load_balancer_enable_cdn    = true
+load_balancer_http_redirect = true

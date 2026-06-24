@@ -117,3 +117,35 @@ variable "runtime_env" {
     PROFILE_DEBUG_DATA_ENABLED = "false"
   }
 }
+
+variable "create_https_load_balancer" {
+  description = "Create a global external HTTPS load balancer in front of Cloud Run."
+  type        = bool
+  default     = false
+}
+
+variable "load_balancer_domain_names" {
+  description = "Custom domains for the managed SSL certificate, for example [\"app.example.com\"]."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for domain in var.load_balancer_domain_names :
+      can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$", domain))
+    ])
+    error_message = "load_balancer_domain_names must contain domain names only, without https:// or paths."
+  }
+}
+
+variable "load_balancer_enable_cdn" {
+  description = "Enable Cloud CDN on the Cloud Run backend service."
+  type        = bool
+  default     = true
+}
+
+variable "load_balancer_http_redirect" {
+  description = "Create port 80 HTTP redirect to HTTPS."
+  type        = bool
+  default     = true
+}
