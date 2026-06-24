@@ -30,6 +30,11 @@ terraform plan
 terraform apply
 ```
 
+For the lowest-cost dev database, keep `sql_edition = "ENTERPRISE"` with
+`sql_tier = "db-f1-micro"`. Enterprise Plus does not support that tiny tier.
+The simple setup also keeps `sql_public_ip_enabled = true`; Cloud Run still
+connects through the Cloud SQL connector/socket.
+
 If Terraform is creating the database user:
 
 ```bash
