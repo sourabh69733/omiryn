@@ -152,7 +152,20 @@ SUPABASE_ANON_KEY='...' \
 ./scripts/gcp-logs.sh
 ```
 
-## 8. Encrypt Existing Data
+## 8. Optional Custom Domain
+
+Use the Terraform HTTPS load balancer when you want a custom domain:
+
+```hcl
+create_https_load_balancer = true
+load_balancer_domain_names = ["app.example.com"]
+```
+
+Apply Terraform, then create an `A` record at your DNS provider using the
+`load_balancer_ip` output. The managed certificate becomes active after DNS
+points to that IP.
+
+## 9. Encrypt Existing Data
 
 Dry run first:
 
