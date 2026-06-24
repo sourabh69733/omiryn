@@ -19,6 +19,11 @@ variable "artifact_repository" {
   description = "Artifact Registry repository for Docker images."
   type        = string
   default     = "omiryn"
+
+  validation {
+    condition     = can(regex("^[a-z]([a-z0-9-]*[a-z0-9])?$", var.artifact_repository))
+    error_message = "artifact_repository must be a repository id like omiryn, not a full registry URL."
+  }
 }
 
 variable "sql_instance_name" {

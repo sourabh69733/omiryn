@@ -1,11 +1,11 @@
 locals {
   cloud_run_secret_env = {
-    DATABASE_URL           = var.secret_names.database_url
-    ENCRYPTION_MASTER_KEY  = var.secret_names.encryption_master_key
-    SUPABASE_URL           = var.secret_names.supabase_url
-    SUPABASE_ANON_KEY      = var.secret_names.supabase_anon_key
-    GROQ_API_KEY           = var.secret_names.groq_api_key
-    OPENAI_API_KEY         = var.secret_names.openai_api_key
+    DATABASE_URL          = var.secret_names.database_url
+    ENCRYPTION_MASTER_KEY = var.secret_names.encryption_master_key
+    SUPABASE_URL          = var.secret_names.supabase_url
+    SUPABASE_ANON_KEY     = var.secret_names.supabase_anon_key
+    GROQ_API_KEY          = var.secret_names.groq_api_key
+    OPENAI_API_KEY        = var.secret_names.openai_api_key
   }
 }
 
