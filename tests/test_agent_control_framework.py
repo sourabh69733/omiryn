@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
+from agent.style_adapter import style_adaptation_guide
 from api.main import app
 from storage import reset_db
 
@@ -144,6 +145,29 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("[data_points] Relevant data points", context_text)
         self.assertIn("[whatsapp_structured_context] Structured WhatsApp context", context_text)
         self.assertLess(len(context_text), 5900)
+
+    def test_style_adapter_turns_metrics_into_reply_guidance(self) -> None:
+        guide = style_adaptation_guide(
+            {
+                "sender": "Abhishek",
+                "summary": {
+                    "average_words": 3.2,
+                    "short_message_share": "80%",
+                    "question_share": "12%",
+                    "exclamation_share": "0%",
+                    "emoji_like_share": "0%",
+                    "lowercase_opening_share": "70%",
+                    "frequent_terms": ["haan", "thik", "wahi"],
+                },
+                "metadata": {"role": "participant"},
+            },
+            selected=True,
+        )
+
+        self.assertIn("Style adaptation guide for Abhishek (selected)", guide)
+        self.assertIn("Prefer 3-8 words", guide)
+        self.assertIn("Lowercase openings are acceptable", guide)
+        self.assertIn("Do not claim to be this sender", guide)
 
     def test_feedback_api_stores_agent_message_feedback(self) -> None:
         conversation = self.client.post("/api/agent/conversations").json()

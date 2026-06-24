@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent.data_points import rank_data_points_for_context
+from agent.style_adapter import style_adaptation_guide
 from storage import (
     list_context_sources,
     list_profile_facts,
@@ -362,8 +363,18 @@ def _structured_whatsapp_context_text(
             ]
         )
     if style_profiles:
-        sections.extend(["", "Sender style profiles:"])
-        for profile in style_profiles[:4]:
+        selected_profiles = _ordered_style_profiles(style_profiles, selected_sender)
+        sections.extend(["", "Style adaptation guides:"])
+        for profile in selected_profiles[:2]:
+            sections.append(
+                style_adaptation_guide(
+                    profile,
+                    selected=str(profile.get("sender") or "").casefold()
+                    == selected_sender.casefold(),
+                )
+            )
+        sections.extend(["", "Sender style profile metrics:"])
+        for profile in selected_profiles[:4]:
             summary = profile.get("summary") or {}
             terms = ", ".join(summary.get("topic_terms") or summary.get("frequent_terms") or [])
             samples = "; ".join(str(sample) for sample in (profile.get("sample_messages") or [])[:3])
@@ -380,6 +391,22 @@ def _structured_whatsapp_context_text(
         for chunk in chunks:
             sections.append(str(chunk.get("content") or ""))
     return "\n".join(sections)
+
+
+def _ordered_style_profiles(
+    style_profiles: list[dict[str, Any]],
+    selected_sender: str,
+) -> list[dict[str, Any]]:
+    if not selected_sender:
+        return style_profiles
+    selected_casefold = selected_sender.casefold()
+    return sorted(
+        style_profiles,
+        key=lambda profile: (
+            str(profile.get("sender") or "").casefold() != selected_casefold,
+            str(profile.get("sender") or ""),
+        ),
+    )
 
 
 def _rank_whatsapp_chunks(

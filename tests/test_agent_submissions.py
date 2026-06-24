@@ -1643,7 +1643,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertIn("Structured WhatsApp context", structured_source["content"])
         self.assertIn("People:", structured_source["content"])
-        self.assertIn("Sender style profiles:", structured_source["content"])
+        self.assertIn("Style adaptation guides:", structured_source["content"])
+        self.assertIn("Sender style profile metrics:", structured_source["content"])
         self.assertIn("coffee first", structured_source["content"])
 
     def test_reply_context_semantically_ranks_whatsapp_chunks(self) -> None:
@@ -1734,9 +1735,11 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(sources[0]["source_type"], "friend_style")
-        self.assertTrue(
-            any(source["source_type"] == "whatsapp_structured_context" for source in sources)
+        structured_source = next(
+            source for source in sources if source["source_type"] == "whatsapp_structured_context"
         )
+        self.assertIn("Style adaptation guide for Aarav (selected)", structured_source["content"])
+        self.assertIn("Do not claim to be this sender", structured_source["content"])
 
     def test_attached_whatsapp_source_packs_structured_memory_in_new_chat(self) -> None:
         first_conversation_id = self.client.post("/api/agent/conversations").json()["id"]
