@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -665,7 +665,15 @@ def create_whatsapp_context_source(
 
 
 @app.get("/")
-def root() -> FileResponse:
+def root(request: Request) -> FileResponse:
+    host = request.headers.get("host", "").split(":", 1)[0].lower()
+    if host.startswith("app."):
+        return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
+    return FileResponse(STATIC_DIR / "landing.html", headers=APP_SHELL_HEADERS)
+
+
+@app.get("/app")
+def app_shell() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
