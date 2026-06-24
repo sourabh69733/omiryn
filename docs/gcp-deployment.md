@@ -123,6 +123,15 @@ Use the printed socket-style `DATABASE_URL` as your Cloud Run database URL.
 
 ## 5. Create Secret Values
 
+Sync every configured secret from `.gcp.env`:
+
+```bash
+./scripts/gcp-sync-secrets.sh
+```
+
+Required values are `DATABASE_URL`, `ENCRYPTION_MASTER_KEY`, `SUPABASE_URL`,
+and `SUPABASE_ANON_KEY`. Optional provider keys are skipped when empty.
+
 Examples:
 
 ```bash

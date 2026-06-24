@@ -53,6 +53,12 @@ terraform apply -var='sql_user_password=your-db-password'
 From the project root:
 
 ```bash
+./scripts/gcp-sync-secrets.sh
+```
+
+Or update one secret manually:
+
+```bash
 DATABASE_URL='postgresql+psycopg://...' \
   ./scripts/gcp-set-secret.sh omiryn-database-url DATABASE_URL
 
