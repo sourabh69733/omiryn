@@ -1,5 +1,6 @@
 locals {
-  create_https_lb = var.create_https_load_balancer && length(var.load_balancer_domain_names) > 0
+  create_https_lb            = var.create_https_load_balancer && length(var.load_balancer_domain_names) > 0
+  lb_certificate_name_suffix = substr(sha1(join(",", sort(var.load_balancer_domain_names))), 0, 8)
 }
 
 resource "google_compute_global_address" "app_lb" {
@@ -13,10 +14,14 @@ resource "google_compute_global_address" "app_lb" {
 resource "google_compute_managed_ssl_certificate" "app_lb" {
   count = local.create_https_lb ? 1 : 0
 
-  name = "${var.service_name}-managed-cert"
+  name = "${var.service_name}-managed-cert-${local.lb_certificate_name_suffix}"
 
   managed {
     domains = var.load_balancer_domain_names
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 
   depends_on = [google_project_service.required]
