@@ -4,7 +4,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from agent.data_points import normalize_data_point, rank_data_points_for_context
-from agent.prompt_builder import build_companion_system_prompt
+from agent.context_budget import budget_context_sources
+from agent.prompt_builder import build_companion_system_prompt, context_sources_text
 from api.main import app
 from storage import reset_db
 
@@ -85,6 +86,64 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertEqual(len(ranked), 1)
         self.assertEqual(ranked[0]["key"], "calm_communication")
+
+    def test_context_budget_prefers_compact_memory_and_style(self) -> None:
+        budgeted = budget_context_sources(
+            [
+                {
+                    "source_type": "manual_notes",
+                    "title": "Long notes",
+                    "content": "manual " * 600,
+                },
+                {
+                    "source_type": "whatsapp_structured_context",
+                    "title": "Raw chunks",
+                    "content": "chunk " * 700,
+                },
+                {
+                    "source_type": "data_points",
+                    "title": "Relevant data points",
+                    "content": "topic coffee plan tone casual",
+                },
+                {
+                    "source_type": "friend_style",
+                    "title": "Abhishek style",
+                    "content": "short casual hinglish " * 30,
+                },
+            ],
+            total_budget=1300,
+            source_limit=3,
+        )
+
+        source_types = [item.source["source_type"] for item in budgeted]
+        self.assertIn("data_points", source_types)
+        self.assertIn("friend_style", source_types)
+        self.assertNotIn("manual_notes", source_types)
+
+    def test_context_text_uses_total_budget(self) -> None:
+        context_text = context_sources_text(
+            [
+                {
+                    "source_type": "data_points",
+                    "title": "Relevant data points",
+                    "content": "points " * 500,
+                },
+                {
+                    "source_type": "whatsapp_structured_context",
+                    "title": "Structured WhatsApp context",
+                    "content": "chunks " * 900,
+                },
+                {
+                    "source_type": "manual_notes",
+                    "title": "Manual",
+                    "content": "manual " * 900,
+                },
+            ]
+        )
+
+        self.assertIn("[data_points] Relevant data points", context_text)
+        self.assertIn("[whatsapp_structured_context] Structured WhatsApp context", context_text)
+        self.assertLess(len(context_text), 5900)
 
     def test_feedback_api_stores_agent_message_feedback(self) -> None:
         conversation = self.client.post("/api/agent/conversations").json()

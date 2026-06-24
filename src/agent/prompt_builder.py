@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from agent.behavior import (
@@ -9,12 +8,11 @@ from agent.behavior import (
     build_companion_behavior,
     tone_prompt,
 )
+from agent.context_budget import (
+    budget_context_sources,
+    truncate_for_context,
+)
 from agent.prompt_sections import COMPANION_SYSTEM_PROMPT, CONTEXT_USAGE_RULES
-
-CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
-CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
-STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
-STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
 
 
 def build_companion_system_prompt(
@@ -56,21 +54,9 @@ def context_sources_text(context_sources: list[dict[str, Any]] | None) -> str:
     if not context_sources:
         return ""
     sections = []
-    for source in context_sources[:CONTEXT_SOURCE_LIMIT]:
+    for budgeted_source in budget_context_sources(context_sources):
+        source = budgeted_source.source
         title = source.get("title") or "Untitled source"
         source_type = source.get("source_type") or "context"
-        content_limit = (
-            STYLE_CONTEXT_CHAR_LIMIT
-            if source_type in STYLE_CONTEXT_TYPES
-            else CONTEXT_SOURCE_CHAR_LIMIT
-        )
-        content = truncate_for_context(str(source.get("content") or ""), content_limit)
-        sections.append(f"[{source_type}] {title}\n{content}")
+        sections.append(f"[{source_type}] {title}\n{budgeted_source.content}")
     return "User-provided context sources:\n" + "\n\n".join(sections)
-
-
-def truncate_for_context(text: str, limit: int) -> str:
-    text = " ".join(text.split())
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "..."
