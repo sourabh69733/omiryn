@@ -677,6 +677,28 @@ td small {
   font-size: 11px;
 }
 
+.feedback-item details {
+  margin-top: 10px;
+}
+
+.feedback-item summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.snapshot-source-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.snapshot-source-list blockquote {
+  max-height: 120px;
+  overflow: auto;
+}
+
 .detail-pagination {
   display: flex;
   align-items: center;

@@ -303,6 +303,8 @@ function renderUserReport(detail) {
   const conversations = detail.conversations || [];
   const facts = detail.facts || [];
   const feedback = detail.feedback || [];
+  const contextSnapshots = detail.context_snapshots || [];
+  const contextSnapshotSummary = detail.context_snapshot_summary || {};
   const feedbackSummary = detail.feedback_summary || user.feedback_summary || {};
   selectedUserTitle.textContent = user.display_name || "Unnamed user";
   const profileSource = profile.source ? titleize(profile.source) : "Profile";
@@ -313,11 +315,13 @@ function renderUserReport(detail) {
       ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
       ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
       ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
+      ${reportCard("Context debug", formatNumber(contextSnapshotSummary.total || contextSnapshots.length || 0), `${formatNumber(contextSnapshotSummary.total_context_tokens || 0)} rough tokens`)}
       ${reportCard("Feedback", formatNumber(feedbackSummary.total || feedback.length || 0), feedbackSummaryDetail(feedbackSummary))}
       ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
     </div>
     ${renderFactsSection(facts)}
     ${renderFeedbackSection(feedback, feedbackSummary)}
+    ${renderContextSnapshotSection(contextSnapshots, contextSnapshotSummary)}
     ${renderConversationSection(conversations)}
   `;
   document.querySelector("#show-more-facts")?.addEventListener("click", () => {
@@ -377,6 +381,73 @@ function renderFactItem(fact) {
     <article class="fact-item">
       <strong>${escapeHtml(fact.label || fact.key || "Fact")}</strong>
       <small>${escapeHtml(fact.category || "other")} · confidence ${formatNumber(Math.round((fact.confidence || 0) * 100))}% · ${escapeHtml(fact.status || "-")}</small>
+    </article>
+  `;
+}
+
+function renderContextSnapshotSection(snapshots, summary = {}) {
+  const visibleSnapshots = snapshots.slice(0, 6);
+  const detail = [
+    `${formatNumber(summary.total_context_tokens || 0)} rough tokens`,
+    `${formatNumber(summary.style_guide_count || 0)} style guides`,
+    `${formatNumber(summary.data_point_count || 0)} data-point uses`,
+    `${formatNumber(summary.structured_whatsapp_count || 0)} WhatsApp context`
+  ].join(" · ");
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Context debug</h3>
+        <span class="mono">${escapeHtml(detail)}</span>
+      </div>
+      ${
+        visibleSnapshots.length
+          ? `<div class="feedback-list">${visibleSnapshots.map(renderContextSnapshotItem).join("")}</div>`
+          : '<div class="table-empty">No context snapshots yet.</div>'
+      }
+    </section>
+  `;
+}
+
+function renderContextSnapshotItem(snapshot) {
+  const summary = snapshot.summary || {};
+  const context = snapshot.context || {};
+  const sources = context.sources || [];
+  const flags = [
+    summary.used_data_points ? "data_points" : "",
+    summary.used_structured_whatsapp ? "structured_whatsapp" : "",
+    summary.used_style_context ? "style_context" : "",
+    summary.used_style_guide ? "style_guide" : "",
+    summary.used_whatsapp_chunks ? "whatsapp_chunks" : ""
+  ].filter(Boolean);
+  return `
+    <article class="feedback-item">
+      <div class="feedback-item-head">
+        <span class="status-pill">${formatNumber(summary.included_source_count || sources.length || 0)} sources</span>
+        <span class="mono">${formatDate(snapshot.created_at)}</span>
+      </div>
+      <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
+      <p>${formatNumber(summary.context_chars || 0)} chars · ${formatNumber(summary.rough_context_tokens || 0)} rough tokens · ${formatNumber(summary.source_count || 0)} candidates</p>
+      ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
+      <details>
+        <summary>Sources sent</summary>
+        <div class="snapshot-source-list">
+          ${
+            sources.length
+              ? sources.map(renderContextSnapshotSource).join("")
+              : '<div class="table-empty">No sources included.</div>'
+          }
+        </div>
+      </details>
+    </article>
+  `;
+}
+
+function renderContextSnapshotSource(source) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(source.title || "Untitled source")}</strong>
+      <small>${escapeHtml(source.source_type || "context")} · ${formatNumber(source.included_chars || 0)} chars · ${formatNumber(source.rough_tokens || 0)} rough tokens${source.truncated ? " · truncated" : ""}</small>
+      ${source.preview ? `<blockquote>${escapeHtml(source.preview)}</blockquote>` : ""}
     </article>
   `;
 }
@@ -498,13 +569,14 @@ function renderConversationSection(conversations) {
 }
 
 function renderConversationReportRow(conversation) {
+  const latestSnapshot = conversation.latest_context_snapshot?.summary || {};
   return `
     <tr>
       <td class="mono">${escapeHtml(conversation.id)}<small>${escapeHtml(conversation.agent_model || conversation.agent_provider || "-")}</small></td>
       <td>${statusPill(conversation.status)}</td>
       <td class="mono">${formatNumber(conversation.message_count || 0)}<small>${formatNumber(conversation.user_message_count || 0)} user / ${formatNumber(conversation.context_source_count || 0)} context</small></td>
       <td class="mono">${formatNumber(conversation.usage?.total_tokens || 0)}<small>${formatNumber(conversation.usage?.prompt_tokens || 0)} in / ${formatNumber(conversation.usage?.completion_tokens || 0)} out</small></td>
-      <td class="mono">${formatNumber(conversation.usage?.request_count || 0)}<small>${formatNumber(conversation.usage?.failed_request_count || 0)} failed</small></td>
+      <td class="mono">${formatNumber(conversation.usage?.request_count || 0)}<small>${formatNumber(conversation.context_snapshot_count || 0)} ctx · ${formatNumber(latestSnapshot.rough_context_tokens || 0)} ctx tokens</small></td>
       <td>${formatDate(conversation.updated_at)}</td>
     </tr>
   `;

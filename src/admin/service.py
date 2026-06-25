@@ -6,10 +6,12 @@ from typing import Any
 
 from sqlalchemy import select
 
+from security.encryption import decrypt_json
 from storage import (
     ENGINE,
     _unprotect_messages,
     agent_conversations,
+    agent_context_snapshots,
     agent_message_feedback,
     agent_usage_events,
     conversation_context_sources,
@@ -33,6 +35,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         snapshot["draft_rows"],
         usage_events,
         snapshot["feedback_rows"],
+        snapshot["context_snapshot_rows"],
     )
 
     return {
@@ -55,6 +58,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             ),
             "learned_fact_count": len(snapshot["fact_rows"]),
             "context_source_count": len(snapshot["context_rows"]),
+            "context_snapshot_count": len(snapshot["context_snapshot_rows"]),
             "feedback_count": len(snapshot["feedback_rows"]),
             "usage": usage_summary,
         },
@@ -63,6 +67,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         "users": users[:limit],
         "recent_conversations": [
             _conversation_summary(row, snapshot["context_rows"], usage_events)
+            | _conversation_context_snapshot_summary(row, snapshot["context_snapshot_rows"])
             for row in snapshot["conversation_rows"][:limit]
         ],
         "recent_drafts": [_draft_summary(row) for row in snapshot["draft_rows"][:limit]],
@@ -76,6 +81,7 @@ def _dashboard_activity(
     draft_rows: list[Any],
     usage_events: list[dict[str, Any]],
     feedback_rows: list[Any],
+    context_snapshot_rows: list[Any],
     days: int = 14,
 ) -> dict[str, Any]:
     today = datetime.now(timezone.utc).date()
@@ -123,6 +129,13 @@ def _dashboard_activity(
             buckets[created_at]["_active_user_ids"].add(user_id)
             active_user_ids_in_window.add(user_id)
 
+    for row in context_snapshot_rows:
+        created_at = _date_from_value(row["created_at"])
+        user_id = row["user_id"]
+        if created_at in buckets and user_id:
+            buckets[created_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
     for event in usage_events:
         created_at = _date_from_value(event.get("created_at"))
         if created_at in buckets:
@@ -159,6 +172,7 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
 
     conversations = [
         _conversation_summary(row, snapshot["context_rows"], usage_events)
+        | _conversation_context_snapshot_summary(row, snapshot["context_snapshot_rows"])
         for row in snapshot["conversation_rows"]
         if row["user_id"] == user_id
     ]
@@ -180,6 +194,11 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         for row in snapshot["feedback_rows"]
         if row["user_id"] == user_id
     ]
+    context_snapshots = [
+        _context_snapshot_detail(row)
+        for row in snapshot["context_snapshot_rows"]
+        if row["user_id"] == user_id
+    ]
 
     return {
         "user": user,
@@ -190,6 +209,8 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         "usage_events": events[:limit],
         "feedback": feedback[:limit],
         "feedback_summary": _summarize_feedback(feedback),
+        "context_snapshots": context_snapshots[:limit],
+        "context_snapshot_summary": _summarize_context_snapshots(context_snapshots),
     }
 
 
@@ -207,6 +228,9 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
             "context_rows": connection.execute(select(conversation_context_sources)).mappings().all(),
             "feedback_rows": connection.execute(
                 select(agent_message_feedback).order_by(agent_message_feedback.c.created_at.desc())
+            ).mappings().all(),
+            "context_snapshot_rows": connection.execute(
+                select(agent_context_snapshots).order_by(agent_context_snapshots.c.created_at.desc())
             ).mappings().all(),
             "usage_rows": connection.execute(
                 select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
@@ -320,6 +344,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             "fact_rows",
             "context_rows",
             "feedback_rows",
+            "context_snapshot_rows",
         )
         for row in snapshot[key]
         if row["user_id"]
@@ -335,6 +360,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             snapshot["fact_rows"],
             snapshot["context_rows"],
             snapshot["feedback_rows"],
+            snapshot["context_snapshot_rows"],
             usage_events,
         )
         for user_id in user_ids
@@ -350,6 +376,7 @@ def _user_summary(
     fact_rows: list[Any],
     context_rows: list[Any],
     feedback_rows: list[Any],
+    context_snapshot_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
     profile = next((row for row in profile_rows if row["user_id"] == user_id), None)
@@ -358,6 +385,7 @@ def _user_summary(
     facts = [row for row in fact_rows if row["user_id"] == user_id]
     sources = [row for row in context_rows if row["user_id"] == user_id]
     feedback = [row for row in feedback_rows if row["user_id"] == user_id]
+    context_snapshots = [row for row in context_snapshot_rows if row["user_id"] == user_id]
     events = [event for event in usage_events if event.get("user_id") == user_id]
     feedback_summary = _summarize_feedback(feedback)
     profile_summary = _profile_summary(profile, drafts)
@@ -367,6 +395,7 @@ def _user_summary(
         *[row["updated_at"] for row in facts],
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
+        *[row["created_at"] for row in context_snapshots],
         *[event.get("created_at") for event in events],
     ]
     first_seen_dates = [
@@ -375,6 +404,7 @@ def _user_summary(
         *[row["created_at"] for row in drafts],
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
+        *[row["created_at"] for row in context_snapshots],
         *[event.get("created_at") for event in events],
     ]
 
@@ -402,6 +432,7 @@ def _user_summary(
         "approved_draft_count": sum(1 for row in drafts if row["status"] == "approved"),
         "learned_fact_count": len(facts),
         "feedback_count": len(feedback),
+        "context_snapshot_count": len(context_snapshots),
         "negative_feedback_count": (
             feedback_summary["off"] + feedback_summary["bad"] + feedback_summary["harmful"]
         ),
@@ -476,6 +507,62 @@ def _conversation_summary(
         "usage": _summarize_usage_events(events),
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _conversation_context_snapshot_summary(
+    row: Any,
+    context_snapshot_rows: list[Any],
+) -> dict[str, Any]:
+    conversation_id = row["id"]
+    snapshots = [
+        snapshot for snapshot in context_snapshot_rows if snapshot["conversation_id"] == conversation_id
+    ]
+    latest = snapshots[0] if snapshots else None
+    return {
+        "context_snapshot_count": len(snapshots),
+        "latest_context_snapshot": _context_snapshot_detail(latest) if latest else None,
+    }
+
+
+def _context_snapshot_detail(row: Any | None) -> dict[str, Any] | None:
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "message_index": row["message_index"],
+        "summary": decrypt_json(row["user_id"], row["summary_json"]),
+        "context": decrypt_json(row["user_id"], row["context_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _summarize_context_snapshots(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
+    total_context_chars = sum(
+        int((snapshot.get("summary") or {}).get("context_chars") or 0)
+        for snapshot in snapshots
+    )
+    total_context_tokens = sum(
+        int((snapshot.get("summary") or {}).get("rough_context_tokens") or 0)
+        for snapshot in snapshots
+    )
+    return {
+        "total": len(snapshots),
+        "total_context_chars": total_context_chars,
+        "total_context_tokens": total_context_tokens,
+        "style_guide_count": sum(
+            1 for snapshot in snapshots if (snapshot.get("summary") or {}).get("used_style_guide")
+        ),
+        "data_point_count": sum(
+            1 for snapshot in snapshots if (snapshot.get("summary") or {}).get("used_data_points")
+        ),
+        "structured_whatsapp_count": sum(
+            1
+            for snapshot in snapshots
+            if (snapshot.get("summary") or {}).get("used_structured_whatsapp")
+        ),
     }
 
 
