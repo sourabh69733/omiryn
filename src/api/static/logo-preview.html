@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omiryn Logo Preview</title>
+    <style>
+      :root {
+        --ink: #fff8e8;
+        --muted: #a9b3b3;
+        --bg: #101416;
+        --panel: #171d1f;
+        --line: rgba(255, 255, 255, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background: linear-gradient(180deg, #0b0f10, var(--bg));
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 40px;
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      p {
+        margin-top: 8px;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        margin-top: 32px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 22px;
+      }
+
+      .logo-row {
+        display: grid;
+        min-height: 96px;
+        place-items: center start;
+      }
+
+      .card img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .light {
+        margin-top: 16px;
+        background: #fffaf1;
+      }
+
+      .light h2,
+      .light small {
+        color: #101416;
+      }
+
+      h2 {
+        margin: 16px 0 4px;
+        font-size: 16px;
+      }
+
+      small {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Omiryn Logo Preview</h1>
+    <p>Compare marks at header size on dark and light backgrounds.</p>
+
+    <section class="grid">
+      <article class="card">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo.svg" alt="Omiryn main logo" />
+        </div>
+        <h2>Main</h2>
+        <small>Monogram + wordmark, current landing choice.</small>
+      </article>
+
+      <article class="card">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo-wordmark.svg" alt="Omiryn wordmark" />
+        </div>
+        <h2>Wordmark</h2>
+        <small>Cleanest, no icon.</small>
+      </article>
+
+      <article class="card">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo-signet.svg" alt="Omiryn signet logo" />
+        </div>
+        <h2>Signet</h2>
+        <small>Simpler O mark.</small>
+      </article>
+
+      <article class="card">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo-glyph.svg" alt="Omiryn glyph" />
+        </div>
+        <h2>Glyph</h2>
+        <small>App icon / favicon candidate.</small>
+      </article>
+    </section>
+
+    <section class="grid light">
+      <article class="card light">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo.svg" alt="Omiryn main logo on light" />
+        </div>
+        <h2>Main on light</h2>
+        <small>For comparison only.</small>
+      </article>
+      <article class="card light">
+        <div class="logo-row">
+          <img src="/static/assets/omiryn-logo-glyph.svg" alt="Omiryn glyph on light" />
+        </div>
+        <h2>Glyph on light</h2>
+        <small>For comparison only.</small>
+      </article>
+    </section>
+  </body>
+</html>
