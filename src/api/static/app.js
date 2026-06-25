@@ -320,6 +320,11 @@ function googleDisplayName(user) {
   return metadata.full_name || metadata.name || metadata.display_name || "";
 }
 
+function appReturnUrl() {
+  const path = window.location.pathname === "/" ? "/app" : window.location.pathname;
+  return `${window.location.origin}${path}${window.location.search}${window.location.hash}`;
+}
+
 function openProfilePage() {
   window.location.href = "/profile";
 }
@@ -835,7 +840,7 @@ async function signInWithGoogle() {
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin
+      redirectTo: appReturnUrl()
     }
   });
   if (error) {
@@ -2936,7 +2941,7 @@ async function bootApp() {
     showScreen("profile");
   } else {
     if (window.location.pathname === "/usage") {
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, "", "/app");
     }
     showScreen("interview");
     restoreOrStartConversation();
