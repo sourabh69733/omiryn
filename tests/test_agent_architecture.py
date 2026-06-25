@@ -11,6 +11,7 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
             patch("agent.orchestrator.capture_profile_facts_from_user_message") as capture_facts,
             patch("agent.orchestrator.build_reply_context") as build_context,
             patch("agent.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.orchestrator.save_agent_context_snapshot") as save_snapshot,
         ):
             build_context.return_value = AgentContext(
                 user_profile={"user_id": "user-a", "interested_in": "women"},
@@ -51,12 +52,18 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         _, kwargs = model_call.call_args
         self.assertEqual(kwargs["context_sources"][0]["title"], "Profile memory")
         self.assertEqual(kwargs["user_profile"]["interested_in"], "women")
+        save_snapshot.assert_called_once()
+        snapshot = save_snapshot.call_args.args[0]
+        self.assertEqual(snapshot["conversation_id"], "conversation-1")
+        self.assertEqual(snapshot["message_index"], 2)
+        self.assertEqual(snapshot["summary"]["included_source_count"], 1)
 
     async def test_orchestrator_marks_low_information_messages(self) -> None:
         with (
             patch("agent.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.orchestrator.build_reply_context") as build_context,
             patch("agent.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.orchestrator.save_agent_context_snapshot"),
         ):
             build_context.return_value = AgentContext()
             model_call.return_value = "That does not look like a real answer."

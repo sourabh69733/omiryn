@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context import build_reply_context
+from agent.context_snapshot import build_context_snapshot
 from agent.memory import capture_profile_facts_from_user_message
 from agent.providers import assess_user_message_quality, generate_agent_reply
+from storage import save_agent_context_snapshot
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,16 @@ async def run_agent_turn(
         user_profile=user_profile,
         style_source_id=style_source_id,
     )
+    context_snapshot = build_context_snapshot(
+        context.context_sources,
+        conversation_id=conversation_id,
+        user_id=user_id,
+        user_message_index=len(updated_messages) - 1,
+        assistant_message_index=len(updated_messages),
+        model=model,
+        agent_tone=agent_tone,
+        style_source_id=style_source_id,
+    )
     reply = await generate_agent_reply(
         updated_messages,
         conversation_id=conversation_id,
@@ -60,4 +72,5 @@ async def run_agent_turn(
         user_profile=context.user_profile,
     )
     updated_messages.append({"role": "assistant", "content": reply})
+    save_agent_context_snapshot(context_snapshot)
     return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)

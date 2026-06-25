@@ -5,7 +5,7 @@ from unittest.mock import patch
 import httpx
 from fastapi.testclient import TestClient
 
-from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
+from api.main import STATIC_DIR, _agent_user_context, _smart_reply_context_sources, app, current_user
 from agent.providers import (
     _compact_chat_reply,
     _context_sources_text,
@@ -30,6 +30,7 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    list_agent_context_snapshots,
     list_context_sources,
     list_profile_facts,
     list_whatsapp_chunks,
@@ -1007,6 +1008,42 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["recent_conversations"][0]["id"], conversation_id)
         self.assertEqual(data["recent_usage_events"][0]["provider"], "groq")
 
+    def test_agent_reply_context_snapshot_is_visible_in_admin_detail(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        import_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(import_response.status_code, 201)
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "what topics were in my uploaded whatsapp chat?"},
+        )
+        self.assertEqual(message_response.status_code, 200)
+
+        snapshots = list_agent_context_snapshots(conversation_id, "user-a")
+        self.assertEqual(len(snapshots), 1)
+        self.assertEqual(snapshots[0]["message_index"], 2)
+        self.assertGreaterEqual(snapshots[0]["summary"]["included_source_count"], 1)
+        self.assertTrue(snapshots[0]["summary"]["used_structured_whatsapp"])
+
+        app.dependency_overrides.clear()
+        admin_response = self.client.get("/api/admin/users/user-a")
+
+        self.assertEqual(admin_response.status_code, 200)
+        detail = admin_response.json()
+        self.assertEqual(detail["context_snapshot_summary"]["total"], 1)
+        self.assertEqual(detail["context_snapshots"][0]["conversation_id"], conversation_id)
+        self.assertTrue(detail["conversations"][0]["latest_context_snapshot"])
+
     def test_admin_usage_dashboard_response_matches_usage_contract(self) -> None:
         save_agent_usage_event(
             {
@@ -1144,6 +1181,50 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Omiryn Admin", response.text)
         self.assertIn("/admin/static/app.js", response.text)
 
+    def test_app_shell_links_brand_to_app_route(self) -> None:
+        response = self.client.get("/app")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('href="/app"', response.text)
+        self.assertIn("/static/app.js", response.text)
+
+    def test_app_auth_redirect_returns_to_app_route(self) -> None:
+        script = (STATIC_DIR / "app.js").read_text()
+
+        self.assertIn("function appReturnUrl()", script)
+        self.assertIn("redirectTo: appReturnUrl()", script)
+        self.assertNotIn("redirectTo: window.location.origin", script)
+
+    def test_admin_dev_bypass_serves_shell_when_auth_required(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AUTH_REQUIRED": "true",
+                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
+                "ADMIN_EMAILS": "",
+                "ADMIN_USER_IDS": "",
+            },
+        ):
+            response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Omiryn Admin", response.text)
+
+    def test_admin_dev_bypass_overrides_configured_admin_allowlist(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AUTH_REQUIRED": "true",
+                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
+                "ADMIN_EMAILS": "admin@example.com",
+                "ADMIN_USER_IDS": "admin-user",
+            },
+        ):
+            response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Omiryn Admin", response.text)
+
     def test_admin_api_rejects_non_admin_when_admins_are_configured(self) -> None:
         async def non_admin_user() -> CurrentUser:
             return CurrentUser(id="user-b", email="b@example.com")
@@ -1153,6 +1234,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "os.environ",
             {
                 "AUTH_REQUIRED": "true",
+                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "false",
                 "ADMIN_EMAILS": "admin@example.com",
                 "ADMIN_USER_IDS": "",
             },
