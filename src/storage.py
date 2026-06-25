@@ -90,6 +90,18 @@ agent_usage_events = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+agent_context_snapshots = Table(
+    "agent_context_snapshots",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
+    Column("conversation_id", String, nullable=False),
+    Column("message_index", Integer, nullable=False),
+    Column("summary_json", JSON, nullable=False),
+    Column("context_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 conversation_context_sources = Table(
     "conversation_context_sources",
     metadata,
@@ -419,6 +431,11 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
         connection.execute(
             agent_message_feedback.delete().where(
                 agent_message_feedback.c.conversation_id == conversation_id
+            )
+        )
+        connection.execute(
+            agent_context_snapshots.delete().where(
+                agent_context_snapshots.c.conversation_id == conversation_id
             )
         )
         connection.execute(
@@ -776,6 +793,53 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
     }
     with ENGINE.begin() as connection:
         connection.execute(agent_usage_events.insert().values(**payload))
+
+
+def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    user_id = snapshot.get("user_id") or _conversation_user_id(snapshot.get("conversation_id"))
+    payload = {
+        "id": snapshot.get("id") or str(uuid4()),
+        "user_id": user_id,
+        "conversation_id": snapshot["conversation_id"],
+        "message_index": snapshot["message_index"],
+        "summary_json": maybe_encrypt_json(user_id, snapshot.get("summary") or {}),
+        "context_json": maybe_encrypt_json(user_id, snapshot.get("context") or {}),
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_context_snapshots.insert().values(**payload))
+        row = connection.execute(
+            select(agent_context_snapshots).where(agent_context_snapshots.c.id == payload["id"])
+        ).mappings().first()
+    return _agent_context_snapshot_from_row(row)
+
+
+def list_agent_context_snapshots(
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(agent_context_snapshots).order_by(
+        agent_context_snapshots.c.created_at.desc()
+    )
+    if conversation_id:
+        statement = statement.where(agent_context_snapshots.c.conversation_id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_context_snapshots.c.user_id == user_id)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_context_snapshot_from_row(row) for row in rows]
+
+
+def _agent_context_snapshot_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "message_index": row["message_index"],
+        "summary": decrypt_json(row["user_id"], row["summary_json"]),
+        "context": decrypt_json(row["user_id"], row["context_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
 
 
 def get_user_profile(user_id: str) -> dict[str, Any] | None:
