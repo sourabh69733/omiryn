@@ -30,6 +30,7 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    list_data_point_feedback,
     list_agent_context_snapshots,
     list_context_sources,
     list_profile_facts,
@@ -448,6 +449,77 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["facts"][0]["category"], "communication")
         self.assertEqual(len(data["groups"]["communication"]), 1)
         self.assertNotIn("values", data["groups"])
+
+    def test_data_point_feedback_is_saved_and_returned_with_raw_points(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "whatsapp_topics",
+                "key": "location",
+                "value": {"topics": ["location", "voice call"]},
+                "label": "Talked about location and a voice call",
+                "confidence": 0.74,
+                "source_kind": "whatsapp_import",
+                "source_id": "source-a",
+                "used_for_matching": False,
+                "used_for_chat_context": True,
+            }
+        )
+
+        response = self.client.post(
+            f"/api/me/profile-facts/{fact['id']}/feedback",
+            json={"rating": "disagree", "reason": "wrong", "comment": "This is too broad."},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["feedback"]["rating"], "disagree")
+        stored_feedback = list_data_point_feedback(user_id="user-a")
+        self.assertEqual(len(stored_feedback), 1)
+        self.assertEqual(stored_feedback[0]["profile_fact_id"], fact["id"])
+
+        update_response = self.client.post(
+            f"/api/me/profile-facts/{fact['id']}/feedback",
+            json={"rating": "agree"},
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(len(list_data_point_feedback(user_id="user-a")), 1)
+        self.assertEqual(update_response.json()["feedback"]["rating"], "agree")
+
+        with patch.dict("os.environ", {"PROFILE_DEBUG_DATA_ENABLED": "true"}):
+            profile_response = self.client.get("/api/me/profile")
+
+        raw_point = profile_response.json()["raw_internal_data_points"][0]
+        self.assertEqual(raw_point["id"], fact["id"])
+        self.assertEqual(raw_point["feedback"]["rating"], "agree")
+        self.assertEqual(profile_response.json()["data_point_feedback_summary"]["agree"], 1)
+
+    def test_data_point_feedback_is_scoped_to_current_user(self) -> None:
+        async def user_b() -> CurrentUser:
+            return CurrentUser(id="user-b", email="b@example.com")
+
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "kindness",
+                "value": {"kind": "important"},
+                "label": "Values kindness",
+                "confidence": 0.8,
+            }
+        )
+
+        app.dependency_overrides[current_user] = user_b
+        response = self.client.post(
+            f"/api/me/profile-facts/{fact['id']}/feedback",
+            json={"rating": "agree"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(list_data_point_feedback(), [])
 
     def test_profile_fact_upsert_merges_evidence_and_confidence(self) -> None:
         upsert_profile_fact(
