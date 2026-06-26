@@ -212,14 +212,53 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         save_response = self.client.put(
             "/api/me/dating-basics",
-            json={"gender": "man", "interested_in": "women"},
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+                "phone": "+919999999999",
+            },
         )
         self.assertEqual(save_response.status_code, 200)
         self.assertTrue(save_response.json()["complete"])
 
         loaded_response = self.client.get("/api/me/dating-basics")
+        self.assertEqual(loaded_response.json()["profile"]["display_name"], "Aarav")
         self.assertEqual(loaded_response.json()["profile"]["gender"], "man")
         self.assertEqual(loaded_response.json()["profile"]["interested_in"], "women")
+        self.assertEqual(loaded_response.json()["profile"]["city"], "Bengaluru")
+        self.assertEqual(loaded_response.json()["profile"]["phone"], "+919999999999")
+
+    def test_profile_photo_upload_updates_user_profile(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        save_response = self.client.put(
+            "/api/me/dating-basics",
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+            },
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        response = self.client.put(
+            "/api/me/profile-photo",
+            content=b"fake-image-bytes",
+            headers={"content-type": "image/png"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["profile_photo_url"].startswith("/uploads/profile_photos/"))
+        loaded_response = self.client.get("/api/me/dating-basics")
+        self.assertEqual(
+            loaded_response.json()["profile"]["profile_photo_url"],
+            response.json()["profile_photo_url"],
+        )
 
     def test_agent_initial_persona_uses_interested_gender(self) -> None:
         async def signed_in_user() -> CurrentUser:
@@ -228,7 +267,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         self.client.put(
             "/api/me/dating-basics",
-            json={"gender": "man", "interested_in": "women"},
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+            },
         )
 
         response = self.client.post("/api/agent/conversations")
@@ -243,7 +287,11 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         self.client.put(
             "/api/me/dating-basics",
-            json={"gender": "man", "interested_in": "women"},
+            json={
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+            },
         )
 
         response = self.client.post("/api/agent/conversations")
@@ -303,7 +351,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = user_a
         self.client.put(
             "/api/me/dating-basics",
-            json={"gender": "woman", "interested_in": "men"},
+            json={
+                "display_name": "Anaya",
+                "gender": "woman",
+                "interested_in": "men",
+                "city": "Mumbai",
+            },
         )
 
         app.dependency_overrides[current_user] = user_b
@@ -508,7 +561,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         self.client.put(
             "/api/me/dating-basics",
-            json={"gender": "man", "interested_in": "women"},
+            json={
+                "display_name": "Aarav",
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+            },
         )
 
         draft_id = self._create_draft()
