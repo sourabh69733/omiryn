@@ -224,6 +224,20 @@ profile_facts = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+data_point_feedback = Table(
+    "data_point_feedback",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("profile_fact_id", String, nullable=False),
+    Column("rating", String, nullable=False),
+    Column("reason", String, nullable=True),
+    Column("comment", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 agent_message_feedback = Table(
     "agent_message_feedback",
     metadata,
@@ -548,6 +562,12 @@ def delete_profile_facts_by_source(
 ) -> int:
     if not source_ids:
         return 0
+    select_statement = select(profile_facts.c.id).where(
+        profile_facts.c.source_kind == source_kind,
+        profile_facts.c.source_id.in_(source_ids),
+    )
+    if user_id is not None:
+        select_statement = select_statement.where(profile_facts.c.user_id == user_id)
     statement = profile_facts.delete().where(
         profile_facts.c.source_kind == source_kind,
         profile_facts.c.source_id.in_(source_ids),
@@ -555,8 +575,80 @@ def delete_profile_facts_by_source(
     if user_id is not None:
         statement = statement.where(profile_facts.c.user_id == user_id)
     with ENGINE.begin() as connection:
+        fact_ids = [row[0] for row in connection.execute(select_statement).all()]
+        if fact_ids:
+            connection.execute(
+                data_point_feedback.delete().where(
+                    data_point_feedback.c.profile_fact_id.in_(fact_ids)
+                )
+            )
         result = connection.execute(statement)
     return int(result.rowcount or 0)
+
+
+def get_profile_fact(fact_id: str, user_id: str | None = None) -> dict[str, Any] | None:
+    statement = select(profile_facts).where(profile_facts.c.id == fact_id)
+    if user_id is not None:
+        statement = statement.where(profile_facts.c.user_id == user_id)
+
+    with ENGINE.begin() as connection:
+        row = connection.execute(statement).mappings().first()
+    return _profile_fact_from_row(row) if row else None
+
+
+def save_data_point_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "id": feedback.get("id") or str(uuid4()),
+        "user_id": feedback["user_id"],
+        "profile_fact_id": feedback["profile_fact_id"],
+        "rating": feedback["rating"],
+        "reason": feedback.get("reason"),
+        "comment": feedback.get("comment"),
+        "metadata_json": feedback.get("metadata") or {},
+    }
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(data_point_feedback).where(
+                data_point_feedback.c.user_id == payload["user_id"],
+                data_point_feedback.c.profile_fact_id == payload["profile_fact_id"],
+            )
+        ).mappings().first()
+        if existing:
+            feedback_id = existing["id"]
+            connection.execute(
+                data_point_feedback.update()
+                .where(data_point_feedback.c.id == feedback_id)
+                .values(
+                    rating=payload["rating"],
+                    reason=payload["reason"],
+                    comment=payload["comment"],
+                    metadata_json=payload["metadata_json"],
+                    updated_at=func.now(),
+                )
+            )
+        else:
+            feedback_id = payload["id"]
+            connection.execute(data_point_feedback.insert().values(**payload))
+
+        row = connection.execute(
+            select(data_point_feedback).where(data_point_feedback.c.id == feedback_id)
+        ).mappings().first()
+    return _data_point_feedback_from_row(row)
+
+
+def list_data_point_feedback(
+    user_id: str | None = None,
+    profile_fact_id: str | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(data_point_feedback).order_by(data_point_feedback.c.updated_at.desc())
+    if user_id is not None:
+        statement = statement.where(data_point_feedback.c.user_id == user_id)
+    if profile_fact_id is not None:
+        statement = statement.where(data_point_feedback.c.profile_fact_id == profile_fact_id)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_data_point_feedback_from_row(row) for row in rows]
 
 
 def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
@@ -730,6 +822,20 @@ def _profile_fact_from_row(row: Any) -> dict[str, Any]:
         "visibility": row["visibility"],
         "used_for_matching": row["used_for_matching"],
         "used_for_chat_context": row["used_for_chat_context"],
+        "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _data_point_feedback_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "profile_fact_id": row["profile_fact_id"],
+        "rating": row["rating"],
+        "reason": row["reason"],
+        "comment": row["comment"],
+        "metadata": row["metadata_json"],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
@@ -1263,6 +1369,18 @@ def _delete_whatsapp_imports_for_context_sources(
 ) -> None:
     if not source_ids:
         return
+    facts_select = select(profile_facts.c.id).where(
+        profile_facts.c.source_kind == "whatsapp_import",
+        profile_facts.c.source_id.in_(source_ids),
+    )
+    if user_id is not None:
+        facts_select = facts_select.where(profile_facts.c.user_id == user_id)
+    fact_ids = [row[0] for row in connection.execute(facts_select).all()]
+    if fact_ids:
+        connection.execute(
+            data_point_feedback.delete().where(data_point_feedback.c.profile_fact_id.in_(fact_ids))
+        )
+
     facts_statement = profile_facts.delete().where(
         profile_facts.c.source_kind == "whatsapp_import",
         profile_facts.c.source_id.in_(source_ids),

@@ -2371,6 +2371,7 @@ p {
 
 .profile-fact-card {
   display: grid;
+  position: relative;
   gap: 12px;
   min-height: 112px;
   padding: 14px;
@@ -2493,6 +2494,7 @@ p {
 
 .raw-data-item {
   display: grid;
+  position: relative;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
@@ -2544,6 +2546,155 @@ p {
   font-size: 11px;
   font-weight: 800;
   padding: 6px 8px;
+}
+
+.data-point-feedback-card {
+  display: grid;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 5;
+  gap: 8px;
+  border: 1px solid #cfe2dc;
+  border-left: 4px solid #60c8b8;
+  border-radius: 8px;
+  background: #f1faf7;
+  box-shadow: 0 16px 36px rgba(38, 53, 59, 0.16);
+  opacity: 0;
+  padding: 10px;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.profile-fact-card:hover .data-point-feedback-card,
+.profile-fact-card:focus-within .data-point-feedback-card,
+.raw-data-item:hover .data-point-feedback-card,
+.raw-data-item:focus-within .data-point-feedback-card,
+.data-point-feedback-card:has(.data-point-feedback-form) {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.data-point-feedback-card:not(.has-feedback) {
+  background: #f8fcfa;
+}
+
+.data-point-feedback-card.has-feedback {
+  border-color: #b9d9d1;
+  background: #eef8f4;
+}
+
+.data-point-feedback-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.data-point-feedback-label {
+  color: #1f6656;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.data-point-feedback-actions,
+.data-point-feedback-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.data-point-feedback-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.data-point-feedback-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid #c6d9d4;
+  border-radius: 999px;
+  color: #43565d;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 11px;
+}
+
+.data-point-feedback-button:hover,
+.data-point-feedback-button:focus-visible {
+  border-color: #9fcfc3;
+  color: #116450;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(104, 200, 184, 0.16);
+}
+
+.data-point-feedback-button.agree.selected {
+  border-color: #45ad94;
+  color: #074b3d;
+  background: #c9f2e7;
+  box-shadow: 0 0 0 3px rgba(69, 173, 148, 0.18);
+}
+
+.data-point-feedback-button.disagree.selected {
+  border-color: #e59175;
+  color: #773716;
+  background: #ffe3d7;
+  box-shadow: 0 0 0 3px rgba(229, 145, 117, 0.18);
+}
+
+.data-point-feedback-note {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-point-feedback-note.muted {
+  opacity: 0.72;
+}
+
+.data-point-feedback-form {
+  border-top: 1px solid #d9ebe6;
+  padding-top: 8px;
+}
+
+.data-point-feedback-form select,
+.data-point-feedback-form input {
+  min-height: 32px;
+  border: 1px solid #d8e3e0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.data-point-feedback-form input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.data-point-feedback-form button {
+  min-height: 32px;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 7px 12px;
 }
 
 .provider-list {
@@ -2794,6 +2945,28 @@ p {
 
   .raw-data-item-meta {
     justify-content: flex-start;
+  }
+
+  .data-point-feedback-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .data-point-feedback-card {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .data-point-feedback-actions,
+  .data-point-feedback-button {
+    width: 100%;
+  }
+
+  .data-point-feedback-button {
+    justify-content: center;
   }
 
   .screen-copy h1 {

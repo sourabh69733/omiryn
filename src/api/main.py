@@ -34,6 +34,7 @@ from agent.context import (
     build_reply_context_sources,
     selected_style_source_exists,
 )
+from agent.data_point_feedback import normalize_data_point_feedback
 from agent.data_points import normalize_data_point
 from agent.feedback import normalize_message_feedback
 from agent.memory import (
@@ -54,17 +55,20 @@ from storage import (
     delete_user_context_source,
     delete_conversation as storage_delete_conversation,
     get_conversation as storage_get_conversation,
+    get_profile_fact,
     get_draft as storage_get_draft,
     get_user_profile,
     init_db,
     list_context_sources,
     list_conversations as storage_list_conversations,
     list_profile_facts,
+    list_data_point_feedback,
     list_user_context_sources,
     list_agent_usage_events,
     list_agent_message_feedback,
     save_context_source,
     save_conversation,
+    save_data_point_feedback,
     save_draft,
     save_agent_message_feedback,
     save_user_profile,
@@ -86,6 +90,7 @@ PROFILE_PHOTO_CONTENT_TYPES = {
 AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
 AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
+DataPointFeedbackRating = Literal["agree", "disagree"]
 ContextSourceType = Literal[
     "llm_profile",
     "chat_export",
@@ -266,6 +271,12 @@ class AgentMessageFeedbackCreate(BaseModel):
     comment: str | None = Field(default=None, max_length=1000)
 
 
+class DataPointFeedbackCreate(BaseModel):
+    rating: DataPointFeedbackRating
+    reason: str | None = Field(default=None, max_length=80)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
 class ContextSourceCreate(BaseModel):
     source_type: ContextSourceType = "llm_profile"
     title: str = Field(default="Imported context", min_length=1, max_length=120)
@@ -375,11 +386,15 @@ async def get_me_profile(
     profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
     sources = list_user_context_sources(user.id)
     facts = list_profile_facts(user.id)
+    data_point_feedback = list_data_point_feedback(user_id=user.id)
+    data_point_feedback_by_fact = _latest_data_point_feedback_by_fact(data_point_feedback)
+    facts_with_feedback = _profile_facts_with_feedback(facts, data_point_feedback_by_fact)
     response = {
         "user": _auth_user_payload(user),
         "profile": profile,
-        "learned_facts": facts,
-        "learned_fact_groups": _group_profile_facts(facts),
+        "learned_facts": facts_with_feedback,
+        "learned_fact_groups": _group_profile_facts(facts_with_feedback),
+        "data_point_feedback_summary": _summarize_data_point_feedback(data_point_feedback),
         "style_sources": [
             _context_source_summary(source)
             for source in sources
@@ -392,7 +407,10 @@ async def get_me_profile(
         ],
     }
     if _profile_debug_data_enabled():
-        response["raw_internal_data_points"] = _raw_profile_data_points(facts)
+        response["raw_internal_data_points"] = _raw_profile_data_points(
+            facts_with_feedback,
+            data_point_feedback_by_fact,
+        )
     return response
 
 
@@ -470,6 +488,36 @@ async def get_me_profile_facts(
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     facts = list_profile_facts(user.id)
     return {"facts": facts, "groups": _group_profile_facts(facts)}
+
+
+@app.post("/api/me/profile-facts/{fact_id}/feedback")
+async def create_data_point_feedback(
+    fact_id: str,
+    payload: DataPointFeedbackCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    fact = get_profile_fact(fact_id, user.id)
+    if not fact:
+        raise HTTPException(status_code=404, detail="Data point not found.")
+
+    feedback = normalize_data_point_feedback(
+        {
+            "user_id": user.id,
+            "profile_fact_id": fact_id,
+            "rating": payload.rating,
+            "reason": payload.reason,
+            "comment": payload.comment,
+            "metadata": {
+                "category": fact.get("category"),
+                "key": fact.get("key"),
+                "source_kind": fact.get("source_kind"),
+                "source_id": fact.get("source_id"),
+            },
+        }
+    )
+    return {"feedback": save_data_point_feedback(feedback)}
 
 
 @app.get("/api/agent/usage")
@@ -1468,7 +1516,46 @@ def _profile_debug_data_enabled() -> bool:
     return os.getenv("PROFILE_DEBUG_DATA_ENABLED", "false").lower() == "true"
 
 
-def _raw_profile_data_points(facts: list[dict[str, object]]) -> list[dict[str, object]]:
+def _latest_data_point_feedback_by_fact(
+    feedback_items: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    latest: dict[str, dict[str, object]] = {}
+    for item in feedback_items:
+        fact_id = str(item.get("profile_fact_id") or "")
+        if fact_id and fact_id not in latest:
+            latest[fact_id] = item
+    return latest
+
+
+def _summarize_data_point_feedback(feedback_items: list[dict[str, object]]) -> dict[str, int]:
+    summary = {"total": len(feedback_items), "agree": 0, "disagree": 0}
+    for item in feedback_items:
+        rating = str(item.get("rating") or "")
+        if rating in summary:
+            summary[rating] += 1
+    return summary
+
+
+def _profile_facts_with_feedback(
+    facts: list[dict[str, object]],
+    feedback_by_fact: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    return [
+        {
+            **fact,
+            "feedback": _data_point_feedback_summary_for_fact(
+                feedback_by_fact.get(str(fact.get("id") or ""))
+            ),
+        }
+        for fact in facts
+    ]
+
+
+def _raw_profile_data_points(
+    facts: list[dict[str, object]],
+    feedback_by_fact: dict[str, dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
+    feedback_by_fact = feedback_by_fact or {}
     return [
         {
             "id": fact.get("id"),
@@ -1483,9 +1570,25 @@ def _raw_profile_data_points(facts: list[dict[str, object]]) -> list[dict[str, o
             "evidence_count": len(fact.get("evidence") or []),
             "visibility": fact.get("visibility"),
             "updated_at": fact.get("updated_at"),
+            "feedback": _data_point_feedback_summary_for_fact(
+                feedback_by_fact.get(str(fact.get("id") or ""))
+            ),
         }
         for fact in facts
     ]
+
+
+def _data_point_feedback_summary_for_fact(
+    feedback: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if not feedback:
+        return None
+    return {
+        "rating": feedback.get("rating"),
+        "reason": feedback.get("reason"),
+        "comment": feedback.get("comment"),
+        "updated_at": feedback.get("updated_at"),
+    }
 
 
 def _attached_context_source_ids(sources: list[dict[str, object]]) -> set[str]:

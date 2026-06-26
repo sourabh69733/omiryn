@@ -7,6 +7,10 @@ let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
 let currentAgentName = null;
 let profileFactsById = new Map();
+let profileFactList = [];
+let profileFactGroupsData = {};
+let rawProfileDataPoints = [];
+let activeDataPointFeedbackId = null;
 let lastEvidenceTrigger = null;
 let pendingMessageHighlightIndex = null;
 let supabaseClient = null;
@@ -61,6 +65,13 @@ const feedbackReasons = [
   { value: "too_much", label: "Too much" },
   { value: "not_helpful", label: "Not helpful" },
   { value: "unsafe", label: "Unsafe" }
+];
+const dataPointFeedbackReasons = [
+  { value: "wrong", label: "Wrong" },
+  { value: "not_me", label: "Not me" },
+  { value: "too_specific", label: "Too specific" },
+  { value: "private", label: "Too private" },
+  { value: "not_useful", label: "Not useful" }
 ];
 
 const routes = {
@@ -643,6 +654,8 @@ function renderProfileSources(container, sources, emptyText) {
 function renderProfileFacts(groups, facts) {
   if (!profileFactGroups) return;
   const factList = Array.isArray(facts) ? facts : [];
+  profileFactList = factList;
+  profileFactGroupsData = groups || {};
   profileFactsById = new Map(factList.map((fact) => [String(fact.id), fact]));
   if (profileFactTotal) {
     profileFactTotal.textContent = `${formatNumber(factList.length)} ${factList.length === 1 ? "fact" : "facts"}`;
@@ -699,6 +712,7 @@ function renderProfileFactCard(fact) {
         </button>
         <span class="fact-tag fact-tag-status">${escapeHtml(profileFactStatusLabel(fact.status))}</span>
       </div>
+      ${renderDataPointFeedback(fact)}
     </article>
   `;
 }
@@ -706,6 +720,7 @@ function renderProfileFactCard(fact) {
 function renderRawProfileDataPoints(points) {
   if (!rawProfileDataPanel || !rawProfileDataList) return;
   const pointList = profileDebugDataEnabled && Array.isArray(points) ? points : [];
+  rawProfileDataPoints = pointList;
   rawProfileDataPanel.hidden = !profileDebugDataEnabled;
   if (!profileDebugDataEnabled) {
     return;
@@ -725,7 +740,12 @@ function renderRawProfileDataPoints(points) {
   }
 
   rawProfileDataList.innerHTML = pointList
-    .map((point) => `
+    .map((point) => renderRawProfileDataPoint(point))
+    .join("");
+}
+
+function renderRawProfileDataPoint(point) {
+  return `
       <article class="raw-data-item">
         <div class="raw-data-item-main">
           <span>${escapeHtml(profileFactCategoryLabel(point.category))}</span>
@@ -738,9 +758,79 @@ function renderRawProfileDataPoints(points) {
           <span>${formatNumber(point.evidence_count || 0)} ev</span>
           <span>${point.used_for_matching ? "matching" : "ignored"}</span>
         </div>
+        ${renderDataPointFeedback(point)}
       </article>
-    `)
-    .join("");
+    `;
+}
+
+function renderDataPointFeedback(point) {
+  const feedback = point.feedback || {};
+  const rating = feedback.rating || "";
+  const isOpen = activeDataPointFeedbackId === String(point.id);
+  const savedLabel = rating === "agree" ? "Agreed" : rating === "disagree" ? "Disagreed" : "";
+  const note = feedback.comment || dataPointFeedbackReasonLabel(feedback.reason);
+  const feedbackNote = rating === "disagree" && note
+    ? `<small class="data-point-feedback-note">${escapeHtml(note)}</small>`
+    : savedLabel
+      ? `<small class="data-point-feedback-note">${escapeHtml(savedLabel)}</small>`
+      : '<small class="data-point-feedback-note muted">Hover to review</small>';
+  return `
+    <div class="data-point-feedback-card ${rating ? "has-feedback" : ""}" data-point-id="${escapeHtml(point.id || "")}">
+      <div class="data-point-feedback-head">
+        <span class="data-point-feedback-label">Is this right?</span>
+        <div class="data-point-feedback-actions" aria-label="Data point feedback">
+          <button
+            class="data-point-feedback-button agree ${rating === "agree" ? "selected" : ""}"
+            type="button"
+            data-point-feedback="agree"
+            data-point-id="${escapeHtml(point.id || "")}"
+          >
+            Agree
+          </button>
+          <button
+            class="data-point-feedback-button disagree ${rating === "disagree" ? "selected" : ""}"
+            type="button"
+            data-point-feedback="disagree"
+            data-point-id="${escapeHtml(point.id || "")}"
+          >
+            Disagree
+          </button>
+        </div>
+      </div>
+      ${feedbackNote}
+      ${isOpen ? renderDataPointFeedbackForm(point) : ""}
+    </div>
+  `;
+}
+
+function dataPointFeedbackReasonLabel(reasonValue) {
+  const reason = dataPointFeedbackReasons.find((item) => item.value === reasonValue);
+  return reason?.label || "";
+}
+
+function renderDataPointFeedbackForm(point) {
+  const feedback = point.feedback || {};
+  return `
+    <form class="data-point-feedback-form" data-point-feedback-form="${escapeHtml(point.id || "")}">
+      <select name="reason" aria-label="Why is this data point wrong?">
+        ${dataPointFeedbackReasons
+          .map((reason) => `
+            <option value="${escapeHtml(reason.value)}" ${feedback.reason === reason.value ? "selected" : ""}>
+              ${escapeHtml(reason.label)}
+            </option>
+          `)
+          .join("")}
+      </select>
+      <input
+        name="comment"
+        maxlength="1000"
+        placeholder="Optional note"
+        autocomplete="off"
+        value="${escapeHtml(feedback.comment || "")}"
+      />
+      <button type="submit">Save</button>
+    </form>
+  `;
 }
 
 function rawDataValue(value) {
@@ -750,6 +840,83 @@ function rawDataValue(value) {
     return JSON.stringify(value);
   } catch (_error) {
     return String(value);
+  }
+}
+
+function handleRawDataPointFeedbackClick(event) {
+  const button = event.target.closest("[data-point-feedback]");
+  if (!button) return;
+  const pointId = button.dataset.pointId;
+  const rating = button.dataset.pointFeedback;
+  if (!pointId || !rating) return;
+  if (rating === "disagree") {
+    activeDataPointFeedbackId = String(pointId);
+    renderDataPointFeedbackSurfaces();
+    return;
+  }
+  submitDataPointFeedback(pointId, { rating });
+}
+
+function handleRawDataPointFeedbackSubmit(event) {
+  const form = event.target.closest("[data-point-feedback-form]");
+  if (!form) return;
+  event.preventDefault();
+  const pointId = form.dataset.pointFeedbackForm;
+  if (!pointId) return;
+  const formData = new FormData(form);
+  submitDataPointFeedback(pointId, {
+    rating: "disagree",
+    reason: String(formData.get("reason") || ""),
+    comment: String(formData.get("comment") || "").trim()
+  });
+}
+
+async function submitDataPointFeedback(pointId, payload) {
+  if (!pointId) return;
+  try {
+    const response = await apiFetch(`/api/me/profile-facts/${encodeURIComponent(pointId)}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not save data point feedback."));
+    }
+    activeDataPointFeedbackId = null;
+    updateDataPointFeedbackState(pointId, data.feedback || null);
+    renderDataPointFeedbackSurfaces();
+    if (profileStatus) {
+      profileStatus.textContent = "Data point feedback saved.";
+    }
+  } catch (error) {
+    if (profileStatus) {
+      profileStatus.textContent = error.message;
+    }
+  }
+}
+
+function updateDataPointFeedbackState(pointId, feedback) {
+  const updatePoint = (point) =>
+    String(point.id) === String(pointId)
+      ? { ...point, feedback }
+      : point;
+  profileFactList = profileFactList.map(updatePoint);
+  profileFactGroupsData = Object.fromEntries(
+    Object.entries(profileFactGroupsData || {}).map(([category, facts]) => [
+      category,
+      Array.isArray(facts) ? facts.map(updatePoint) : facts
+    ])
+  );
+  rawProfileDataPoints = rawProfileDataPoints.map(updatePoint);
+}
+
+function renderDataPointFeedbackSurfaces() {
+  if (profileFactGroups && profileFactList.length) {
+    renderProfileFacts(profileFactGroupsData, profileFactList);
+  }
+  if (rawProfileDataPanel && !rawProfileDataPanel.hidden) {
+    renderRawProfileDataPoints(rawProfileDataPoints);
   }
 }
 
@@ -2929,11 +3096,18 @@ confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
 cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
 closeFactEvidence?.addEventListener("click", closeFactEvidenceDialog);
 profileFactGroups?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-point-feedback]")) {
+    handleRawDataPointFeedbackClick(event);
+    return;
+  }
   const trigger = event.target.closest(".fact-evidence-trigger");
   if (!trigger) return;
   const fact = profileFactsById.get(String(trigger.dataset.factId));
   openFactEvidenceDialog(fact, trigger);
 });
+profileFactGroups?.addEventListener("submit", handleRawDataPointFeedbackSubmit);
+rawProfileDataList?.addEventListener("click", handleRawDataPointFeedbackClick);
+rawProfileDataList?.addEventListener("submit", handleRawDataPointFeedbackSubmit);
 factEvidenceDialog?.addEventListener("click", (event) => {
   if (event.target === factEvidenceDialog) {
     closeFactEvidenceDialog();
