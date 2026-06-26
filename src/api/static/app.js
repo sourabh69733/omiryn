@@ -766,39 +766,32 @@ function renderRawProfileDataPoint(point) {
 function renderDataPointFeedback(point) {
   const feedback = point.feedback || {};
   const rating = feedback.rating || "";
-  const isOpen = activeDataPointFeedbackId === String(point.id);
-  const savedLabel = rating === "agree" ? "Agreed" : rating === "disagree" ? "Disagreed" : "";
-  const note = feedback.comment || dataPointFeedbackReasonLabel(feedback.reason);
-  const feedbackNote = rating === "disagree" && note
-    ? `<small class="data-point-feedback-note">${escapeHtml(note)}</small>`
-    : savedLabel
-      ? `<small class="data-point-feedback-note">${escapeHtml(savedLabel)}</small>`
-      : '<small class="data-point-feedback-note muted">Hover to review</small>';
   return `
     <div class="data-point-feedback-card ${rating ? "has-feedback" : ""}" data-point-id="${escapeHtml(point.id || "")}">
       <div class="data-point-feedback-head">
-        <span class="data-point-feedback-label">Is this right?</span>
         <div class="data-point-feedback-actions" aria-label="Data point feedback">
           <button
             class="data-point-feedback-button agree ${rating === "agree" ? "selected" : ""}"
             type="button"
             data-point-feedback="agree"
             data-point-id="${escapeHtml(point.id || "")}"
+            aria-label="Mark data point correct"
+            title="Correct"
           >
-            Agree
+            <span aria-hidden="true">✓</span>
           </button>
           <button
             class="data-point-feedback-button disagree ${rating === "disagree" ? "selected" : ""}"
             type="button"
             data-point-feedback="disagree"
             data-point-id="${escapeHtml(point.id || "")}"
+            aria-label="Mark data point wrong"
+            title="Wrong"
           >
-            Disagree
+            <span aria-hidden="true">×</span>
           </button>
         </div>
       </div>
-      ${feedbackNote}
-      ${isOpen ? renderDataPointFeedbackForm(point) : ""}
     </div>
   `;
 }
@@ -833,6 +826,54 @@ function renderDataPointFeedbackForm(point) {
   `;
 }
 
+function openDataPointFeedbackDialog(pointId) {
+  const point = findDataPointById(pointId);
+  if (!point) return;
+  activeDataPointFeedbackId = String(pointId);
+  closeDataPointFeedbackDialog(false);
+  const dialog = document.createElement("div");
+  dialog.className = "data-point-feedback-dialog-backdrop";
+  dialog.innerHTML = `
+    <section class="data-point-feedback-dialog" role="dialog" aria-modal="true" aria-label="Data point feedback">
+      <div class="data-point-feedback-dialog-head">
+        <strong>Why is this wrong?</strong>
+        <button class="data-point-feedback-close" type="button" data-close-data-point-feedback aria-label="Close">×</button>
+      </div>
+      <p>${escapeHtml(point.label || point.key || "This data point")}</p>
+      ${renderDataPointFeedbackForm(point)}
+    </section>
+  `;
+  document.body.appendChild(dialog);
+  dialog.querySelector("[data-close-data-point-feedback]")?.addEventListener("click", () => {
+    closeDataPointFeedbackDialog();
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      closeDataPointFeedbackDialog();
+    }
+  });
+  dialog
+    .querySelector("[data-point-feedback-form]")
+    ?.addEventListener("submit", handleRawDataPointFeedbackSubmit);
+  dialog.querySelector("input, select, button")?.focus();
+}
+
+function closeDataPointFeedbackDialog(clearActive = true) {
+  document.querySelector(".data-point-feedback-dialog-backdrop")?.remove();
+  if (clearActive) {
+    activeDataPointFeedbackId = null;
+  }
+}
+
+function findDataPointById(pointId) {
+  const id = String(pointId);
+  return (
+    profileFactList.find((point) => String(point.id) === id) ||
+    rawProfileDataPoints.find((point) => String(point.id) === id) ||
+    null
+  );
+}
+
 function rawDataValue(value) {
   if (value === null || value === undefined) return "{}";
   if (typeof value === "string") return value;
@@ -850,10 +891,10 @@ function handleRawDataPointFeedbackClick(event) {
   const rating = button.dataset.pointFeedback;
   if (!pointId || !rating) return;
   if (rating === "disagree") {
-    activeDataPointFeedbackId = String(pointId);
-    renderDataPointFeedbackSurfaces();
+    openDataPointFeedbackDialog(pointId);
     return;
   }
+  closeDataPointFeedbackDialog();
   submitDataPointFeedback(pointId, { rating });
 }
 
@@ -884,6 +925,7 @@ async function submitDataPointFeedback(pointId, payload) {
       throw new Error(apiErrorMessage(data.detail, "Could not save data point feedback."));
     }
     activeDataPointFeedbackId = null;
+    closeDataPointFeedbackDialog(false);
     updateDataPointFeedbackState(pointId, data.feedback || null);
     renderDataPointFeedbackSurfaces();
     if (profileStatus) {
@@ -3142,6 +3184,7 @@ document.addEventListener("keydown", (event) => {
   if (whatsappStyleDialog && !whatsappStyleDialog.hidden) {
     closeWhatsappStyleDialog();
   }
+  closeDataPointFeedbackDialog();
 });
 loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
@@ -3165,6 +3208,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeContextPicker();
     closeFeedbackPopover();
+    closeDataPointFeedbackDialog();
   }
 });
 document.addEventListener("click", (event) => {

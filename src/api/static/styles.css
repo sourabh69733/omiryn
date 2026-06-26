@@ -2551,20 +2551,19 @@ p {
 .data-point-feedback-card {
   display: grid;
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  left: 10px;
+  right: 12px;
+  bottom: 12px;
   z-index: 5;
   gap: 8px;
   border: 1px solid #cfe2dc;
-  border-left: 4px solid #60c8b8;
-  border-radius: 8px;
-  background: #f1faf7;
-  box-shadow: 0 16px 36px rgba(38, 53, 59, 0.16);
+  border-radius: 999px;
+  background: rgba(248, 252, 250, 0.96);
+  box-shadow: 0 10px 24px rgba(38, 53, 59, 0.14);
+  max-width: min(520px, calc(100% - 24px));
   opacity: 0;
-  padding: 10px;
+  padding: 5px;
   pointer-events: none;
-  transform: translateY(6px);
+  transform: translateY(4px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
@@ -2574,38 +2573,29 @@ p {
 .profile-fact-card:focus-within .data-point-feedback-card,
 .raw-data-item:hover .data-point-feedback-card,
 .raw-data-item:focus-within .data-point-feedback-card,
-.data-point-feedback-card:has(.data-point-feedback-form) {
+.data-point-feedback-card.has-feedback {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
 .data-point-feedback-card:not(.has-feedback) {
-  background: #f8fcfa;
+  background: rgba(248, 252, 250, 0.96);
 }
 
 .data-point-feedback-card.has-feedback {
   border-color: #b9d9d1;
-  background: #eef8f4;
+  background: rgba(238, 248, 244, 0.98);
 }
 
 .data-point-feedback-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
-.data-point-feedback-label {
-  color: #1f6656;
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.data-point-feedback-actions,
-.data-point-feedback-form {
+.data-point-feedback-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2622,14 +2612,28 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 30px;
   min-height: 30px;
   border: 1px solid #c6d9d4;
   border-radius: 999px;
   color: #43565d;
   background: #ffffff;
-  font-size: 11px;
+  font-size: 19px;
   font-weight: 900;
-  padding: 6px 11px;
+  line-height: 1;
+  padding: 0;
+}
+
+.data-point-feedback-button span {
+  transform: translateY(-1px);
+}
+
+.data-point-feedback-button.disagree span {
+  transform: translateY(-2px);
+}
+
+.data-point-feedback-card.has-feedback .data-point-feedback-button:not(.selected) {
+  display: none;
 }
 
 .data-point-feedback-button:hover,
@@ -2654,47 +2658,88 @@ p {
   box-shadow: 0 0 0 3px rgba(229, 145, 117, 0.18);
 }
 
-.data-point-feedback-note {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.data-point-feedback-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 28, 32, 0.22);
+  padding: 18px;
 }
 
-.data-point-feedback-note.muted {
-  opacity: 0.72;
+.data-point-feedback-dialog {
+  display: grid;
+  width: min(460px, 100%);
+  gap: 12px;
+  border: 1px solid #cfe2dc;
+  border-radius: 8px;
+  background: #fbfdfc;
+  box-shadow: 0 22px 70px rgba(28, 42, 48, 0.28);
+  padding: 16px;
+}
+
+.data-point-feedback-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.data-point-feedback-dialog-head strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.data-point-feedback-dialog p {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.data-point-feedback-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  border: 1px solid #d8e3e0;
+  border-radius: 999px;
+  color: #52646b;
+  background: #ffffff;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
 }
 
 .data-point-feedback-form {
-  border-top: 1px solid #d9ebe6;
-  padding-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(120px, 150px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .data-point-feedback-form select,
 .data-point-feedback-form input {
-  min-height: 32px;
+  min-height: 40px;
   border: 1px solid #d8e3e0;
   border-radius: 8px;
   background: #ffffff;
   color: var(--ink);
   font: inherit;
   font-size: 12px;
-  padding: 7px 9px;
+  padding: 9px 11px;
 }
 
 .data-point-feedback-form input {
-  flex: 1 1 180px;
   min-width: 0;
 }
 
 .data-point-feedback-form button {
-  min-height: 32px;
+  min-height: 40px;
   border-radius: 999px;
-  font-size: 12px;
-  padding: 7px 12px;
+  font-size: 13px;
+  padding: 9px 14px;
 }
 
 .provider-list {
@@ -2948,25 +2993,30 @@ p {
   }
 
   .data-point-feedback-head {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 
   .data-point-feedback-card {
-    position: static;
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-    box-shadow: none;
+    right: 10px;
+    bottom: 10px;
   }
 
   .data-point-feedback-actions,
   .data-point-feedback-button {
-    width: 100%;
+    width: auto;
   }
 
   .data-point-feedback-button {
     justify-content: center;
+  }
+
+  .data-point-feedback-dialog {
+    padding: 14px;
+  }
+
+  .data-point-feedback-form {
+    grid-template-columns: 1fr;
   }
 
   .screen-copy h1 {
@@ -2997,5 +3047,13 @@ p {
 
   .draft-form {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) {
+  .data-point-feedback-card {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 }
