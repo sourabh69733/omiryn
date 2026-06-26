@@ -134,6 +134,13 @@ p {
   font-weight: 800;
 }
 
+.basics-field span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.basics-field input,
 .basics-field select {
   width: 100%;
   min-height: 44px;
@@ -143,6 +150,21 @@ p {
   background: #ffffff;
   padding: 0 12px;
   outline: none;
+}
+
+.basics-field input[type="file"],
+.profile-form input[type="file"] {
+  min-height: auto;
+  padding: 10px 12px;
+}
+
+.profile-photo-preview {
+  width: 76px;
+  height: 76px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--soft);
 }
 
 .basics-field select:focus {

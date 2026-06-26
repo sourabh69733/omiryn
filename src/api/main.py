@@ -74,7 +74,15 @@ from storage import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
+PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+PROFILE_PHOTO_CONTENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
 AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
@@ -129,6 +137,12 @@ class NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
+PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/uploads/profile_photos",
+    NoCacheStaticFiles(directory=PROFILE_UPLOAD_DIR),
+    name="profile-photos",
+)
 app.mount(
     "/admin/static",
     NoCacheStaticFiles(directory=ADMIN_STATIC_DIR),
@@ -271,14 +285,19 @@ class WhatsappChatImportCreate(BaseModel):
 
 
 class DatingBasics(BaseModel):
+    display_name: str | None = Field(default=None, max_length=120)
     gender: Gender
     interested_in: InterestedIn
+    city: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=40)
 
 
 class UserProfilePatch(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     gender: Gender
     interested_in: InterestedIn
+    city: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=40)
 
 
 @app.get("/health")
@@ -312,9 +331,9 @@ async def get_dating_basics(
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
-    profile = get_user_profile(user.id)
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
     return {
-        "complete": bool(profile and profile.get("gender") and profile.get("interested_in")),
+        "complete": _basic_profile_complete(profile),
         "profile": profile,
     }
 
@@ -327,11 +346,22 @@ async def put_dating_basics(
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     existing_profile = get_user_profile(user.id)
+    display_name = _clean_optional_text(
+        payload.display_name or (existing_profile or {}).get("display_name") or user.display_name
+    )
+    city = _clean_optional_text(payload.city or (existing_profile or {}).get("city"))
+    if not display_name:
+        raise HTTPException(status_code=422, detail="Name is required.")
+    if not city:
+        raise HTTPException(status_code=422, detail="Location is required.")
     profile = save_user_profile(
         user.id,
         payload.gender,
         payload.interested_in,
-        (existing_profile or {}).get("display_name") or user.display_name,
+        display_name,
+        city,
+        _clean_optional_text(payload.phone),
+        (existing_profile or {}).get("profile_photo_url"),
     )
     return {"complete": True, "profile": profile}
 
@@ -377,9 +407,59 @@ async def put_me_profile(
         user.id,
         payload.gender,
         payload.interested_in,
-        payload.display_name.strip() if payload.display_name else None,
+        _clean_optional_text(payload.display_name),
+        _clean_optional_text(payload.city),
+        _clean_optional_text(payload.phone),
+        (get_user_profile(user.id) or {}).get("profile_photo_url"),
     )
     return {"profile": profile}
+
+
+@app.put("/api/me/profile-photo")
+async def put_me_profile_photo(
+    request: Request,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    extension = PROFILE_PHOTO_CONTENT_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(status_code=415, detail="Upload a JPG, PNG, WebP, or GIF image.")
+
+    content = await request.body()
+    if not content:
+        raise HTTPException(status_code=400, detail="Profile photo is empty.")
+    if len(content) > PROFILE_PHOTO_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Profile photo must be 5 MB or smaller.")
+
+    filename = f"{user.id}-{uuid4().hex}{extension}"
+    photo_path = PROFILE_UPLOAD_DIR / filename
+    photo_path.write_bytes(content)
+    photo_url = f"/uploads/profile_photos/{filename}"
+
+    existing_profile = get_user_profile(user.id)
+    if existing_profile:
+        profile = save_user_profile(
+            user.id,
+            str(existing_profile.get("gender") or "prefer_not_to_say"),
+            str(existing_profile.get("interested_in") or "everyone"),
+            _clean_optional_text(existing_profile.get("display_name")),
+            _clean_optional_text(existing_profile.get("city")),
+            _clean_optional_text(existing_profile.get("phone")),
+            photo_url,
+        )
+    else:
+        profile = save_user_profile(
+            user.id,
+            "prefer_not_to_say",
+            "everyone",
+            user.display_name,
+            None,
+            None,
+            photo_url,
+        )
+    return {"profile_photo_url": photo_url, "profile": profile}
 
 
 @app.get("/api/me/profile-facts")
@@ -1310,6 +1390,23 @@ def _profile_with_auth_defaults(
     if not profile or profile.get("display_name") or not user.display_name:
         return profile
     return {**profile, "display_name": user.display_name}
+
+
+def _basic_profile_complete(profile: dict[str, object] | None) -> bool:
+    return bool(
+        profile
+        and profile.get("display_name")
+        and profile.get("gender")
+        and profile.get("interested_in")
+        and profile.get("city")
+    )
+
+
+def _clean_optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split())
+    return cleaned or None
 
 
 def _agent_user_context(user: CurrentUser | None) -> dict[str, object] | None:

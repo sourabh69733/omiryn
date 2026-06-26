@@ -26,13 +26,18 @@
       <form class="auth-panel basics-panel" id="dating-basics-form">
         <span class="brand-mark auth-mark" aria-hidden="true">O</span>
         <p class="eyebrow">Dating Basics</p>
-        <h1>Set your match direction</h1>
+        <h1>Create your profile</h1>
         <p>
-          Omiryn needs these two basics before it can keep your profile and matches clear.
+          Add the basics Omiryn needs before the agent starts understanding you.
         </p>
 
         <label class="basics-field">
-          Gender
+          Name
+          <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" required />
+        </label>
+
+        <label class="basics-field">
+          I am
           <select id="profile-gender" required>
             <option value="">Select gender</option>
             <option value="man">Man</option>
@@ -51,6 +56,22 @@
             <option value="everyone">Everyone</option>
           </select>
         </label>
+
+        <label class="basics-field">
+          Location
+          <input id="profile-city" type="text" placeholder="City" autocomplete="address-level2" required />
+        </label>
+
+        <label class="basics-field">
+          Mobile <span>Optional</span>
+          <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+        </label>
+
+        <label class="basics-field">
+          Profile photo <span>Optional</span>
+          <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+        </label>
+        <img class="profile-photo-preview" id="profile-photo-preview" alt="" hidden />
 
         <button class="auth-primary" id="save-dating-basics" type="submit">
           Continue
@@ -360,6 +381,19 @@
                     <option value="everyone">Everyone</option>
                   </select>
                 </label>
+                <label>
+                  Location
+                  <input id="account-city" type="text" placeholder="City" autocomplete="address-level2" required />
+                </label>
+                <label>
+                  Mobile
+                  <input id="account-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+                </label>
+                <label>
+                  Profile photo
+                  <input id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+                </label>
+                <img class="profile-photo-preview" id="account-photo-preview" alt="" hidden />
                 <button type="submit">Save profile</button>
                 <p class="quiet-note" id="profile-status">Profile details will appear after login.</p>
               </form>

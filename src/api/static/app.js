@@ -156,13 +156,22 @@ const authScreenLogin = document.querySelector("#auth-screen-login");
 const authScreenStatus = document.querySelector("#auth-screen-status");
 const datingBasicsScreen = document.querySelector("#dating-basics-screen");
 const datingBasicsForm = document.querySelector("#dating-basics-form");
+const basicsName = document.querySelector("#basics-name");
 const profileGender = document.querySelector("#profile-gender");
 const profileInterestedIn = document.querySelector("#profile-interested-in");
+const profileCity = document.querySelector("#profile-city");
+const profilePhone = document.querySelector("#profile-phone");
+const profilePhoto = document.querySelector("#profile-photo");
+const profilePhotoPreview = document.querySelector("#profile-photo-preview");
 const profileForm = document.querySelector("#profile-form");
 const profileName = document.querySelector("#profile-name");
 const profileEmail = document.querySelector("#profile-email");
 const accountGender = document.querySelector("#account-gender");
 const accountInterestedIn = document.querySelector("#account-interested-in");
+const accountCity = document.querySelector("#account-city");
+const accountPhone = document.querySelector("#account-phone");
+const accountPhoto = document.querySelector("#account-photo");
+const accountPhotoPreview = document.querySelector("#account-photo-preview");
 const profileStatus = document.querySelector("#profile-status");
 const profileStyleList = document.querySelector("#profile-style-list");
 const profileMemoryList = document.querySelector("#profile-memory-list");
@@ -396,12 +405,16 @@ async function loadDatingBasicsStatus() {
     const data = await response.json();
     datingBasicsComplete = Boolean(data.complete);
     if (data.profile) {
+      if (basicsName) basicsName.value = data.profile.display_name || googleDisplayName(authSession?.user) || "";
       if (profileGender) profileGender.value = data.profile.gender || "";
       if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
+      if (profileCity) profileCity.value = data.profile.city || "";
+      if (profilePhone) profilePhone.value = data.profile.phone || "";
+      renderProfilePhotoPreview(profilePhotoPreview, data.profile.profile_photo_url);
     }
     renderAuthGate();
     if (!datingBasicsComplete) {
-      profileGender?.focus();
+      basicsName?.focus();
     }
   } catch (error) {
     datingBasicsComplete = false;
@@ -430,11 +443,11 @@ function updateAccountInterestedInDefault() {
 
 async function saveDatingBasicsProfile(event) {
   event.preventDefault();
-  if (!profileGender || !profileInterestedIn || !saveDatingBasics) return;
+  if (!basicsName || !profileGender || !profileInterestedIn || !profileCity || !saveDatingBasics) return;
 
-  if (!profileGender.value || !profileInterestedIn.value) {
+  if (!basicsName.value.trim() || !profileGender.value || !profileInterestedIn.value || !profileCity.value.trim()) {
     if (datingBasicsStatus) {
-      datingBasicsStatus.textContent = "Choose both fields to continue.";
+      datingBasicsStatus.textContent = "Add your name, gender, interest, and location to continue.";
     }
     return;
   }
@@ -448,8 +461,11 @@ async function saveDatingBasicsProfile(event) {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        display_name: basicsName.value.trim(),
         gender: profileGender.value,
-        interested_in: profileInterestedIn.value
+        interested_in: profileInterestedIn.value,
+        city: profileCity.value.trim(),
+        phone: profilePhone?.value.trim() || null
       })
     });
     const data = await response.json();
@@ -460,9 +476,17 @@ async function saveDatingBasicsProfile(event) {
     if (!response.ok) {
       throw new Error(data.detail || "Could not save dating basics.");
     }
+    if (profilePhoto?.files?.[0]) {
+      const uploaded = await uploadProfilePhoto(profilePhoto.files[0]);
+      renderProfilePhotoPreview(profilePhotoPreview, uploaded.profile_photo_url);
+      profilePhoto.value = "";
+    }
     datingBasicsComplete = true;
+    if (profileName) profileName.value = basicsName.value.trim();
     if (accountGender) accountGender.value = profileGender.value;
     if (accountInterestedIn) accountInterestedIn.value = profileInterestedIn.value;
+    if (accountCity) accountCity.value = profileCity.value.trim();
+    if (accountPhone) accountPhone.value = profilePhone?.value.trim() || "";
     if (datingBasicsStatus) {
       datingBasicsStatus.textContent = "";
     }
@@ -495,6 +519,9 @@ async function loadProfilePage() {
     if (profileEmail) profileEmail.value = data.user?.email || "";
     if (accountGender) accountGender.value = profile.gender || "prefer_not_to_say";
     if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
+    if (accountCity) accountCity.value = profile.city || "";
+    if (accountPhone) accountPhone.value = profile.phone || "";
+    renderProfilePhotoPreview(accountPhotoPreview, profile.profile_photo_url);
     renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
     renderProfileSources(profileMemoryList, data.memory_sources || [], "No imported memory yet.");
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
@@ -517,22 +544,35 @@ async function saveProfilePage(event) {
     profileStatus.textContent = "Saving profile...";
   }
   try {
+    if (!profileName?.value.trim() || !accountCity?.value.trim()) {
+      throw new Error("Name and location are required.");
+    }
     const response = await apiFetch("/api/me/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         display_name: profileName?.value.trim() || null,
         gender: accountGender.value,
-        interested_in: accountInterestedIn.value
+        interested_in: accountInterestedIn.value,
+        city: accountCity?.value.trim() || null,
+        phone: accountPhone?.value.trim() || null
       })
     });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.detail || "Could not save profile.");
     }
+    if (accountPhoto?.files?.[0]) {
+      const uploaded = await uploadProfilePhoto(accountPhoto.files[0]);
+      renderProfilePhotoPreview(accountPhotoPreview, uploaded.profile_photo_url);
+      accountPhoto.value = "";
+    }
     datingBasicsComplete = true;
+    if (basicsName) basicsName.value = data.profile.display_name || "";
     if (profileGender) profileGender.value = data.profile.gender || "";
     if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
+    if (profileCity) profileCity.value = data.profile.city || "";
+    if (profilePhone) profilePhone.value = data.profile.phone || "";
     if (profileStatus) {
       profileStatus.textContent = "Profile saved.";
     }
@@ -541,6 +581,44 @@ async function saveProfilePage(event) {
       profileStatus.textContent = error.message;
     }
   }
+}
+
+async function uploadProfilePhoto(file) {
+  if (!file) return {};
+  if (!file.type || !file.type.startsWith("image/")) {
+    throw new Error("Choose an image file for your profile photo.");
+  }
+  const response = await apiFetch("/api/me/profile-photo", {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: await file.arrayBuffer()
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || "Could not upload profile photo.");
+  }
+  return data;
+}
+
+function renderProfilePhotoPreview(preview, url) {
+  if (!preview) return;
+  if (!url) {
+    preview.hidden = true;
+    preview.removeAttribute("src");
+    return;
+  }
+  preview.src = url;
+  preview.hidden = false;
+}
+
+function previewSelectedPhoto(input, preview) {
+  const file = input?.files?.[0];
+  if (!file || !preview) return;
+  if (!file.type.startsWith("image/")) {
+    renderProfilePhotoPreview(preview, "");
+    return;
+  }
+  renderProfilePhotoPreview(preview, URL.createObjectURL(file));
 }
 
 function renderProfileSources(container, sources, emptyText) {
@@ -2897,6 +2975,8 @@ logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
 profileGender?.addEventListener("change", updateInterestedInDefault);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
+profilePhoto?.addEventListener("change", () => previewSelectedPhoto(profilePhoto, profilePhotoPreview));
+accountPhoto?.addEventListener("change", () => previewSelectedPhoto(accountPhoto, accountPhotoPreview));
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
 profileForm?.addEventListener("submit", saveProfilePage);
 deleteSessionDialog?.addEventListener("click", (event) => {

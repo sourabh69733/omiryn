@@ -196,6 +196,9 @@ user_profiles = Table(
     Column("display_name", String, nullable=True),
     Column("gender", String, nullable=True),
     Column("interested_in", String, nullable=True),
+    Column("city", String, nullable=True),
+    Column("phone", String, nullable=True),
+    Column("profile_photo_url", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -446,7 +449,14 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
 
 def _ensure_runtime_columns() -> None:
     required_columns = {
-        "user_profiles": ("display_name", "gender", "interested_in"),
+        "user_profiles": (
+            "display_name",
+            "gender",
+            "interested_in",
+            "city",
+            "phone",
+            "profile_photo_url",
+        ),
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
@@ -854,6 +864,9 @@ def get_user_profile(user_id: str) -> dict[str, Any] | None:
         "display_name": row["display_name"],
         "gender": row["gender"],
         "interested_in": row["interested_in"],
+        "city": row["city"],
+        "phone": row["phone"],
+        "profile_photo_url": row["profile_photo_url"],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
@@ -864,12 +877,18 @@ def save_user_profile(
     gender: str,
     interested_in: str,
     display_name: str | None = None,
+    city: str | None = None,
+    phone: str | None = None,
+    profile_photo_url: str | None = None,
 ) -> dict[str, Any]:
     payload = {
         "user_id": user_id,
         "display_name": display_name,
         "gender": gender,
         "interested_in": interested_in,
+        "city": city,
+        "phone": phone,
+        "profile_photo_url": profile_photo_url,
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
