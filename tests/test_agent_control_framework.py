@@ -8,7 +8,10 @@ from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
 from agent.style_adapter import style_adaptation_guide
-from agent.whatsapp_data_points import extract_whatsapp_data_points
+from agent.whatsapp_data_points import (
+    extract_whatsapp_data_point_candidates,
+    extract_whatsapp_data_points,
+)
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
 from storage import reset_db
@@ -117,6 +120,28 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertFalse(any("topics include" in label.lower() for label in labels))
         self.assertTrue(any("casual plans" in label for label in labels))
         self.assertTrue(all((point["value"] or {}).get("meaning") for point in points))
+        self.assertTrue(all((point["value"] or {}).get("rule_candidate") for point in points))
+
+    def test_whatsapp_rules_can_return_reviewable_draft_candidates(self) -> None:
+        memory = build_whatsapp_structured_memory(
+            """12/06/2026, 10:00 AM - Aarav: hey I am running late but I will call you
+12/06/2026, 10:02 AM - Aarav: also I was thinking about that plan
+12/06/2026, 10:04 AM - Aarav: coffee first, then walk?
+12/06/2026, 10:05 AM - Riya: okay""",
+            "Aarav",
+        )
+
+        candidates = extract_whatsapp_data_point_candidates(
+            memory,
+            source_id="source-a",
+            title="Riya chat",
+        )
+
+        self.assertTrue(candidates)
+        self.assertTrue(all(candidate["source"] == "rules" for candidate in candidates))
+        self.assertTrue(all(candidate["meaning"] for candidate in candidates))
+        self.assertTrue(all(candidate["evidence"] for candidate in candidates))
+        self.assertTrue(all("usage" in candidate for candidate in candidates))
 
     def test_llm_data_point_validator_rejects_keyword_dump_points(self) -> None:
         points = normalize_llm_data_points(

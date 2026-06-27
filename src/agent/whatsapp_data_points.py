@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from ingestion.whatsapp import WhatsappMessage, WhatsappStructuredMemory
 
@@ -13,11 +13,6 @@ WHATSAPP_DISABLED_DATA_POINT_EXTRACTORS = {
     "personality_traits": "reserved_for_later",
     "relationship_dynamics": "reserved_for_later",
 }
-
-Extractor = Callable[
-    [WhatsappStructuredMemory, str, str, str, str],
-    list[dict[str, Any]],
-]
 
 MIN_MEANING_SCORE = 2.0
 
@@ -29,9 +24,23 @@ class DataPointCandidate:
     label: str
     meaning: str
     value: dict[str, Any]
-    evidence_messages: list[WhatsappMessage]
+    evidence: list[str]
     confidence: float
     score: float
+
+
+def extract_whatsapp_data_point_candidates(
+    memory: WhatsappStructuredMemory,
+    *,
+    source_id: str,
+    title: str,
+) -> list[dict[str, Any]]:
+    """Return rule-generated draft candidates for LLM review/debug."""
+    return [
+        _candidate_payload(candidate, source_id, title, memory)
+        for candidate in _rule_candidates(memory, source_id)
+        if _is_meaningful_candidate(candidate)
+    ]
 
 
 def extract_whatsapp_data_points(
@@ -42,60 +51,45 @@ def extract_whatsapp_data_points(
     import_id: str,
     title: str,
 ) -> list[dict[str, Any]]:
-    points: list[dict[str, Any]] = []
-    for extractor in WHATSAPP_DATA_POINT_EXTRACTORS.values():
-        points.extend(extractor(memory, user_id, source_id, import_id, title))
-    return _dedupe_points(points)
+    return _dedupe_points(
+        [
+            _point_from_candidate(candidate, user_id, source_id, import_id, title, memory)
+            for candidate in _rule_candidates(memory, source_id)
+            if _is_meaningful_candidate(candidate)
+        ]
+    )
 
 
-def _topic_points(
+def _rule_candidates(
     memory: WhatsappStructuredMemory,
-    user_id: str,
     source_id: str,
-    import_id: str,
-    title: str,
-) -> list[dict[str, Any]]:
-    return [
-        _point_from_candidate(candidate, user_id, source_id, import_id, title, memory)
-        for candidate in _meaningful_topic_candidates(memory, source_id)
-        if _is_meaningful_candidate(candidate)
-    ]
+) -> list[DataPointCandidate]:
+    candidates: list[DataPointCandidate] = []
+    candidates.extend(_meaningful_topic_candidates(memory, source_id))
+    recent_candidate = _recent_coordination_candidate(memory, source_id)
+    if recent_candidate:
+        candidates.append(recent_candidate)
+    candidates.extend(_tone_trait_candidates(memory, source_id))
+    return candidates
 
 
-def _recent_event_points(
+def _tone_trait_candidates(
     memory: WhatsappStructuredMemory,
-    user_id: str,
     source_id: str,
-    import_id: str,
-    title: str,
-) -> list[dict[str, Any]]:
-    candidate = _recent_coordination_candidate(memory, source_id)
-    if not candidate or not _is_meaningful_candidate(candidate):
-        return []
-    return [_point_from_candidate(candidate, user_id, source_id, import_id, title, memory)]
-
-
-def _tone_trait_points(
-    memory: WhatsappStructuredMemory,
-    user_id: str,
-    source_id: str,
-    import_id: str,
-    title: str,
-) -> list[dict[str, Any]]:
-    points = []
+) -> list[DataPointCandidate]:
+    candidates = []
     for profile in memory.style_profiles[:4]:
         traits = _tone_traits(profile.summary)
         if not traits:
             continue
         sender_key = _source_key(profile.sender)
-        points.append(
-            _point(
-                user_id=user_id,
+        score = _tone_meaning_score(profile.summary, profile.sample_messages)
+        candidates.append(
+            DataPointCandidate(
                 category="whatsapp_tone_traits",
                 key=f"{_source_key(source_id)}_{sender_key}_tone",
                 value={
                     "kind": "whatsapp_tone_traits",
-                    "title": title,
                     "sender": profile.sender,
                     "traits": traits,
                     "meaning": f"Useful for adapting replies toward {profile.sender}'s rhythm without impersonating them.",
@@ -104,21 +98,17 @@ def _tone_trait_points(
                     "role": profile.metadata.get("role"),
                 },
                 label=f"{profile.sender}'s WhatsApp style is {', '.join(traits[:4])}",
+                meaning=f"Useful for adapting replies toward {profile.sender}'s rhythm without impersonating them.",
                 confidence=_tone_confidence(profile.summary, profile.sample_messages),
-                source_id=source_id,
-                import_id=import_id,
-                evidence_text="Style signals from parsed WhatsApp import: "
-                + "; ".join(profile.sample_messages[:3]),
+                evidence=[
+                    f"{profile.sender}: {sample}"
+                    for sample in profile.sample_messages[:3]
+                    if sample.strip()
+                ],
+                score=score,
             )
         )
-    return points
-
-
-WHATSAPP_DATA_POINT_EXTRACTORS: dict[str, Extractor] = {
-    "topics": _topic_points,
-    "recent_events": _recent_event_points,
-    "tone_traits": _tone_trait_points,
-}
+    return candidates
 
 
 TOPIC_DOMAINS: dict[str, dict[str, Any]] = {
@@ -216,7 +206,7 @@ def _meaningful_topic_candidates(
                     "matched_terms": matched_terms[:10],
                     "message_count": len(matched_messages),
                 },
-                evidence_messages=matched_messages[-5:],
+                evidence=[_message_preview(message) for message in matched_messages[-5:]],
                 confidence=_confidence_from_score(score, base=0.55),
                 score=score,
             )
@@ -263,10 +253,39 @@ def _recent_coordination_candidate(
             "message_count": len(action_messages),
             "message_previews": [_message_preview(message) for message in action_messages[-5:]],
         },
-        evidence_messages=action_messages[-5:],
+        evidence=[_message_preview(message) for message in action_messages[-5:]],
         confidence=_confidence_from_score(score, base=0.54),
         score=score,
     )
+
+
+def _candidate_payload(
+    candidate: DataPointCandidate,
+    source_id: str,
+    title: str,
+    memory: WhatsappStructuredMemory,
+) -> dict[str, Any]:
+    return {
+        "source": "rules",
+        "source_kind": WHATSAPP_DATA_POINT_SOURCE_KIND,
+        "source_id": source_id,
+        "title": title,
+        "selected_sender": memory.metadata.get("selected_sender"),
+        "category": candidate.category,
+        "key": candidate.key,
+        "label": candidate.label,
+        "meaning": candidate.meaning,
+        "value": candidate.value,
+        "confidence": candidate.confidence,
+        "formation_score": round(candidate.score, 2),
+        "evidence": candidate.evidence[:5],
+        "usage": {
+            "chat_context": True,
+            "matching": False,
+            "style": candidate.category == "whatsapp_tone_traits",
+            "debug_only": False,
+        },
+    }
 
 
 def _point_from_candidate(
@@ -286,20 +305,21 @@ def _point_from_candidate(
             "title": title,
             "selected_sender": memory.metadata.get("selected_sender"),
             "meaning": candidate.meaning,
+            "rule_candidate": _candidate_payload(candidate, source_id, title, memory),
             "formation_score": round(candidate.score, 2),
         },
         label=candidate.label,
         confidence=candidate.confidence,
         source_id=source_id,
         import_id=import_id,
-        evidence_text=" | ".join(_message_preview(message) for message in candidate.evidence_messages),
+        evidence_text=" | ".join(candidate.evidence),
     )
 
 
 def _is_meaningful_candidate(candidate: DataPointCandidate) -> bool:
     if candidate.score < MIN_MEANING_SCORE:
         return False
-    if not candidate.evidence_messages:
+    if not candidate.evidence:
         return False
     return bool(candidate.label and candidate.meaning)
 
@@ -513,6 +533,19 @@ def _tone_confidence(summary: dict[str, Any], samples: list[str]) -> float:
     if summary.get("frequent_terms") or summary.get("topic_terms"):
         confidence += 0.04
     return max(0.5, min(0.82, confidence))
+
+
+def _tone_meaning_score(summary: dict[str, Any], samples: list[str]) -> float:
+    score = min(1.5, len([sample for sample in samples if sample.strip()]) * 0.35)
+    if _float(summary.get("average_words")):
+        score += 0.5
+    if summary.get("frequent_terms") or summary.get("topic_terms"):
+        score += 0.4
+    if _percentage(summary.get("short_message_share")) >= 60:
+        score += 0.4
+    if _percentage(summary.get("question_share")) >= 20:
+        score += 0.3
+    return score
 
 
 def _dedupe_points(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
