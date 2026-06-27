@@ -11,6 +11,7 @@ from agent.data_point_extraction import (
 )
 from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
+from agent.profile_facts import extract_profile_facts_from_message
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
 from agent.style_adapter import style_adaptation_guide
 from agent.whatsapp_data_points import (
@@ -99,6 +100,29 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(len(ranked), 1)
         self.assertEqual(ranked[0]["key"], "calm_communication")
 
+    def test_dating_intent_requires_specific_outcome(self) -> None:
+        generic_facts = extract_profile_facts_from_message(
+            "user-a",
+            "conversation-a",
+            "I am looking for someone special and want a good partner.",
+            0,
+        )
+        specific_facts = extract_profile_facts_from_message(
+            "user-a",
+            "conversation-a",
+            "I want something serious and long-term, maybe marriage.",
+            1,
+        )
+
+        self.assertNotIn(
+            ("dating_intent", "relationship_intent"),
+            {(fact["category"], fact["key"]) for fact in generic_facts},
+        )
+        self.assertIn(
+            ("dating_intent", "relationship_intent"),
+            {(fact["category"], fact["key"]) for fact in specific_facts},
+        )
+
     def test_whatsapp_data_points_require_meaningful_memory(self) -> None:
         memory = build_whatsapp_structured_memory(
             """12/06/2026, 10:00 AM - Aarav: hey I am running late but I will call you
@@ -126,6 +150,40 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertTrue(any("casual plans" in label for label in labels))
         self.assertTrue(all((point["value"] or {}).get("meaning") for point in points))
         self.assertTrue(all((point["value"] or {}).get("rule_candidate") for point in points))
+
+    def test_whatsapp_relationship_intent_skips_generic_dating_defaults(self) -> None:
+        generic_memory = build_whatsapp_structured_memory(
+            """12/06/2026, 10:00 AM - Aarav: I am looking for someone special
+12/06/2026, 10:01 AM - Riya: what kind?
+12/06/2026, 10:02 AM - Aarav: someone good for dating
+12/06/2026, 10:03 AM - Riya: okay""",
+            "Aarav",
+        )
+        specific_memory = build_whatsapp_structured_memory(
+            """12/06/2026, 10:00 AM - Aarav: I want serious commitment
+12/06/2026, 10:01 AM - Riya: like marriage?
+12/06/2026, 10:02 AM - Aarav: yes shaadi or long term only
+12/06/2026, 10:03 AM - Riya: got it""",
+            "Aarav",
+        )
+
+        generic_candidates = extract_whatsapp_data_point_candidates(
+            generic_memory,
+            source_id="source-a",
+            title="Riya chat",
+        )
+        specific_candidates = extract_whatsapp_data_point_candidates(
+            specific_memory,
+            source_id="source-b",
+            title="Riya chat",
+        )
+
+        self.assertFalse(
+            any((candidate["value"] or {}).get("topic_key") == "relationship_intent" for candidate in generic_candidates)
+        )
+        self.assertTrue(
+            any((candidate["value"] or {}).get("topic_key") == "relationship_intent" for candidate in specific_candidates)
+        )
 
     def test_whatsapp_rules_can_return_reviewable_draft_candidates(self) -> None:
         memory = build_whatsapp_structured_memory(
@@ -161,6 +219,24 @@ class AgentControlFrameworkTest(unittest.TestCase):
                         "evidence": ["location"],
                     },
                     {
+                        "category": "relationship_intent",
+                        "key": "looking_for_someone_special",
+                        "label": "Looking for someone special",
+                        "meaning": "Too obvious for a dating app.",
+                        "confidence": 0.83,
+                        "evidence": ["looking for someone special"],
+                    },
+                    {
+                        "category": "dating_intent",
+                        "key": "marriage_oriented",
+                        "label": "Marriage-oriented dating intent",
+                        "meaning": "Useful for matching toward serious relationship outcomes.",
+                        "value": {"kind": "marriage"},
+                        "confidence": 0.82,
+                        "evidence": ["shaadi or long term only"],
+                        "used_for_matching": True,
+                    },
+                    {
                         "category": "recent_events",
                         "key": "coffee_then_walk",
                         "label": "Planned coffee then a walk",
@@ -178,9 +254,9 @@ class AgentControlFrameworkTest(unittest.TestCase):
             "Riya chat",
         )
 
-        self.assertEqual(len(points), 1)
-        self.assertEqual(points[0]["key"], "coffee_then_walk")
-        self.assertEqual(points[0]["value"]["extractor"], "llm")
+        self.assertEqual(len(points), 2)
+        self.assertEqual({point["key"] for point in points}, {"coffee_then_walk", "marriage_oriented"})
+        self.assertTrue(all(point["value"]["extractor"] == "llm" for point in points))
 
     def test_data_point_review_prompt_contains_candidates_and_context(self) -> None:
         memory = build_whatsapp_structured_memory(

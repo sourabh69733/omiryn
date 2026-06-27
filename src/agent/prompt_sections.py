@@ -91,6 +91,9 @@ Rules:
 - Useful categories: dating_intent, values, lifestyle, communication, conflict_style,
   attachment_style, emotional_patterns, family_context, partner_preferences,
   dealbreakers, attraction_patterns, goals, constraints, personality.
+- For dating_intent, only extract the specific outcome or seriousness: exploring,
+  long_term, short_term, casual, marriage, commitment. Do not create generic
+  points like "looking for someone", "open to relationship", or "wants dating".
 - Do not invent. If weakly inferred, confidence must be <= 0.45.
 - Do not diagnose medical or mental health conditions.
 - Keep labels under 12 words and evidence under 30 words.
@@ -119,6 +122,9 @@ Use this shape:
 Rules:
 - Extract meaning, not keywords. Do not create points like "talked about location".
 - Only include points that would be useful in a future chat, matching, or style adaptation.
+- For relationship_intent/dating_intent, only include a specific outcome or
+  seriousness. Skip obvious dating-app defaults like looking for someone,
+  wanting a partner, or being open to dating.
 - Every point must have evidence from the supplied text.
 - Prefer fewer strong points over many weak ones. Return at most 12 points.
 - Do not invent. If uncertain, skip it.

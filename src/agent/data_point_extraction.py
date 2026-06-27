@@ -336,6 +336,12 @@ def _normalize_llm_data_point(
     confidence = _confidence(raw.get("confidence"), default=0.55)
     if not _valid_llm_point(label, meaning, evidence, confidence):
         return None
+    if category in {"dating_intent", "relationship_intent"} and _is_generic_dating_intent(
+        label,
+        meaning,
+        evidence,
+    ):
+        return None
 
     key = _snake_key(str(raw.get("key") or label or f"llm_data_point_{index + 1}"))[
         :120
@@ -597,6 +603,52 @@ def _valid_llm_point(
     if any(phrase in lowered for phrase in weak_phrases):
         return False
     return True
+
+
+SPECIFIC_DATING_INTENT_PATTERNS = [
+    r"\bmarriage\b",
+    r"\bmarry\b",
+    r"\bshaadi\b",
+    r"\blong[- ]?term\b",
+    r"\bshort[- ]?term\b",
+    r"\bserious\b",
+    r"\bcommitted\b",
+    r"\bcommitment\b",
+    r"\bcasual\b",
+    r"\bexploring\b",
+    r"\bfiguring out\b",
+    r"\bnot sure yet\b",
+    r"\bno commitment\b",
+]
+
+
+GENERIC_DATING_INTENT_PHRASES = {
+    "looking for someone",
+    "someone special",
+    "looking for dating",
+    "interested in dating",
+    "open to relationship",
+    "open to a relationship",
+    "wants a relationship",
+    "wants dating",
+    "wants a partner",
+    "looking for a partner",
+    "talks about dating",
+    "talks about relationship",
+}
+
+
+def _is_generic_dating_intent(
+    label: str,
+    meaning: str,
+    evidence: list[str],
+) -> bool:
+    text = " ".join([label, meaning, *evidence]).lower()
+    if any(re.search(pattern, text) for pattern in SPECIFIC_DATING_INTENT_PATTERNS):
+        return False
+    return any(phrase in text for phrase in GENERIC_DATING_INTENT_PHRASES) or bool(
+        re.search(r"\b(relationship|dating|partner|someone|special)\b", text)
+    )
 
 
 def _candidate_as_final_point(candidate: dict[str, Any]) -> dict[str, Any]:

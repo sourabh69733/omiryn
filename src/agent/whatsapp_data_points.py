@@ -153,18 +153,18 @@ TOPIC_DOMAINS: dict[str, dict[str, Any]] = {
         },
     },
     "relationship_intent": {
-        "label": "talks about relationship/dating intent",
-        "meaning": "Useful for dating-context replies and matching only when the signal is explicit enough.",
+        "label": "mentions specific dating intent",
+        "meaning": "Useful for matching when the chat shows a specific outcome like marriage, long-term, casual, or exploring.",
         "terms": {
-            "relationship",
-            "dating",
-            "partner",
-            "special",
-            "someone",
-            "girl",
-            "boy",
             "shaadi",
-            "love",
+            "marriage",
+            "marry",
+            "casual",
+            "commitment",
+            "committed",
+            "serious",
+            "exploring",
+            "explore",
         },
     },
     "music_entertainment": {
@@ -471,7 +471,7 @@ def _topic_label_detail(domain_key: str, matched_terms: list[str]) -> str:
     if domain_key == "casual_plan":
         return _join_terms(_prefer_terms(matched_terms, ["coffee", "walk", "plan", "movie"]))
     if domain_key == "relationship_intent":
-        return _join_terms(_prefer_terms(matched_terms, ["relationship", "dating", "partner", "special"]))
+        return _join_terms(_prefer_terms(matched_terms, ["shaadi", "marriage", "serious", "casual", "commitment", "exploring"]))
     return _join_terms(matched_terms[:4])
 
 
