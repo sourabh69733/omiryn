@@ -52,6 +52,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
         os.environ["AUTH_REQUIRED"] = "false"
         os.environ["AGENT_PROVIDER"] = "mock"
+        os.environ["DATA_POINT_EXTRACTOR"] = "rules"
         app.dependency_overrides.clear()
         reset_db()
         self.client = TestClient(app)
@@ -2002,6 +2003,35 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("recent_events", {fact["category"] for fact in facts})
         self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
         self.assertTrue(all((fact["value"] or {}).get("extractor") == "llm" for fact in facts))
+
+    def test_whatsapp_import_hybrid_reviews_rule_candidates(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        with patch.dict("os.environ", {"DATA_POINT_EXTRACTOR": "hybrid"}):
+            create_response = self.client.post(
+                f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+                json={
+                    "title": "Riya chat",
+                    "user_sender": "Aarav",
+                    "content": sample_whatsapp_export(),
+                },
+            )
+
+        self.assertEqual(create_response.status_code, 201)
+        facts = list_profile_facts("user-a")
+        debug_rows = list_data_point_extraction_debug(user_id="user-a")
+
+        self.assertTrue(facts)
+        self.assertTrue(debug_rows)
+        self.assertTrue(
+            all((fact["value"] or {}).get("extractor") == "hybrid_llm_review" for fact in facts)
+        )
+        self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
+        self.assertTrue(all(row["candidate"]["source"] == "rules" for row in debug_rows))
+        self.assertTrue(all(row["review"]["decision"] in {"approve", "rewrite", "merge", "reject"} for row in debug_rows))
 
     def test_whatsapp_source_delete_removes_data_point_debug_rows(self) -> None:
         async def user_a() -> CurrentUser:

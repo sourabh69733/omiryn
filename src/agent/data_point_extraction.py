@@ -8,8 +8,9 @@ import json
 
 from agent.data_points import normalize_data_point
 from agent.providers import extract_llm_data_point_candidates, review_llm_data_point_candidates
+from agent.whatsapp_data_points import extract_whatsapp_data_point_candidates
 from ingestion.whatsapp import WhatsappStructuredMemory
-from storage import upsert_profile_fact
+from storage import save_data_point_extraction_debug, upsert_profile_fact
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,11 @@ def data_point_extractor_mode() -> str:
 
 
 def should_run_llm_data_point_extraction() -> bool:
-    return data_point_extractor_mode() in {"llm", "hybrid"}
+    return data_point_extractor_mode() == "llm"
+
+
+def should_run_hybrid_data_point_review() -> bool:
+    return data_point_extractor_mode() == "hybrid"
 
 
 async def review_rule_data_point_candidates(
@@ -81,6 +86,59 @@ async def capture_llm_whatsapp_data_points(
             upsert_profile_fact(normalize_data_point(point))
     except Exception:
         logger.exception("agent.data_points.llm_capture_failed source_id=%s", source_id)
+
+
+async def capture_hybrid_whatsapp_data_points(
+    memory: WhatsappStructuredMemory,
+    *,
+    user_id: str,
+    source_id: str,
+    import_id: str,
+    title: str,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> None:
+    if not should_run_hybrid_data_point_review():
+        return
+    try:
+        candidates = extract_whatsapp_data_point_candidates(
+            memory,
+            source_id=source_id,
+            title=title,
+        )
+        if not candidates:
+            return
+        reviews = await review_rule_data_point_candidates(
+            memory,
+            candidates,
+            user_id=user_id,
+            source_id=source_id,
+            import_id=import_id,
+            title=title,
+            conversation_id=conversation_id,
+            model=model,
+        )
+        for review in reviews:
+            save_data_point_extraction_debug(
+                {
+                    "user_id": user_id,
+                    "source_kind": "whatsapp_import",
+                    "source_id": source_id,
+                    "import_id": import_id,
+                    "candidate_key": review["candidate_key"],
+                    "decision": review["decision"],
+                    "candidate": review["candidate"],
+                    "review": review["review"],
+                    "metadata": {
+                        "title": title,
+                        "extractor": "hybrid_llm_review",
+                    },
+                }
+            )
+            if review.get("point"):
+                upsert_profile_fact(normalize_data_point(review["point"]))
+    except Exception:
+        logger.exception("agent.data_points.hybrid_capture_failed source_id=%s", source_id)
 
 
 def normalize_llm_data_points(

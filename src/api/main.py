@@ -36,8 +36,10 @@ from agent.context import (
 )
 from agent.data_point_feedback import normalize_data_point_feedback
 from agent.data_point_extraction import (
+    capture_hybrid_whatsapp_data_points,
     capture_llm_whatsapp_data_points,
     data_point_extractor_mode,
+    should_run_hybrid_data_point_review,
     should_run_llm_data_point_extraction,
 )
 from agent.data_points import normalize_data_point
@@ -786,7 +788,8 @@ def create_whatsapp_context_source(
         },
         _user_id(user),
     )
-    if user and data_point_extractor_mode() != "llm":
+    extractor_mode = data_point_extractor_mode()
+    if user and extractor_mode == "rules":
         for point in extract_whatsapp_data_points(
             structured_memory,
             user_id=user.id,
@@ -798,6 +801,16 @@ def create_whatsapp_context_source(
     if user and should_run_llm_data_point_extraction():
         background_tasks.add_task(
             capture_llm_whatsapp_data_points,
+            structured_memory,
+            user_id=user.id,
+            source_id=source["id"],
+            import_id=str(whatsapp_import["id"]),
+            title=payload.title,
+            conversation_id=conversation_id,
+        )
+    if user and should_run_hybrid_data_point_review():
+        background_tasks.add_task(
+            capture_hybrid_whatsapp_data_points,
             structured_memory,
             user_id=user.id,
             source_id=source["id"],
