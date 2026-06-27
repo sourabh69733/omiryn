@@ -23,6 +23,7 @@ from agent.prompt_builder import (
 from agent.prompt_sections import (
     COMPANION_SYSTEM_PROMPT,
     DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+    DATA_POINT_REVIEW_SYSTEM_PROMPT,
     DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
     EXTRACTION_REPAIR_PROMPT,
     EXTRACTION_SYSTEM_PROMPT,
@@ -388,6 +389,60 @@ async def extract_llm_data_point_candidates(
     elif provider == "ollama":
         content = await _ollama_chat(
             DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    else:
+        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+
+    return _parse_json_object(content)
+
+
+async def review_llm_data_point_candidates(
+    review_text: str,
+    *,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    provider = _provider_name()
+    logger.info("agent.data_points.review provider=%s chars=%s", provider, len(review_text))
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        return _mock_llm_data_point_reviews(review_text)
+
+    messages = [{"role": "user", "content": review_text}]
+    if provider == "groq":
+        content = await _groq_chat(
+            DATA_POINT_REVIEW_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
+        content = await _openai_compatible_chat(
+            provider,
+            DATA_POINT_REVIEW_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    elif provider == "ollama":
+        content = await _ollama_chat(
+            DATA_POINT_REVIEW_SYSTEM_PROMPT,
             messages,
             temperature=0,
             conversation_id=conversation_id,
@@ -1314,6 +1369,57 @@ def _mock_llm_data_points(extraction_text: str) -> dict[str, Any]:
             }
         )
     return {"data_points": points}
+
+
+def _mock_llm_data_point_reviews(review_text: str) -> dict[str, Any]:
+    try:
+        payload = _parse_json_object(review_text)
+        candidates = payload.get("candidates") if isinstance(payload, dict) else []
+    except Exception:
+        candidates = []
+    reviews: list[dict[str, Any]] = []
+    for candidate in candidates if isinstance(candidates, list) else []:
+        if not isinstance(candidate, dict):
+            continue
+        key = str(candidate.get("key") or "")
+        label = str(candidate.get("label") or "")
+        evidence = candidate.get("evidence") if isinstance(candidate.get("evidence"), list) else []
+        if "talked about" in label.lower() or not evidence:
+            reviews.append(
+                {
+                    "candidate_key": key,
+                    "decision": "reject",
+                    "what_we_learned": "",
+                    "why_it_matters": "",
+                    "confidence": 0.0,
+                    "evidence": [],
+                    "usage": {"debug_only": True},
+                    "final_point": None,
+                    "rejection_reason": "Weak keyword-style candidate.",
+                }
+            )
+            continue
+        reviews.append(
+            {
+                "candidate_key": key,
+                "decision": "approve",
+                "what_we_learned": label,
+                "why_it_matters": str(candidate.get("meaning") or "Useful later."),
+                "confidence": candidate.get("confidence") or 0.72,
+                "evidence": evidence[:3],
+                "usage": candidate.get("usage") or {"chat_context": True},
+                "final_point": {
+                    "category": candidate.get("category") or "conversation_context",
+                    "key": key,
+                    "label": label,
+                    "meaning": candidate.get("meaning") or "Useful later.",
+                    "value": candidate.get("value") or {"kind": key},
+                    "privacy_level": "normal",
+                },
+                "rejection_reason": None,
+            }
+        )
+    return {"reviews": reviews}
 
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:

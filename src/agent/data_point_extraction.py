@@ -4,9 +4,10 @@ import logging
 import os
 import re
 from typing import Any
+import json
 
 from agent.data_points import normalize_data_point
-from agent.providers import extract_llm_data_point_candidates
+from agent.providers import extract_llm_data_point_candidates, review_llm_data_point_candidates
 from ingestion.whatsapp import WhatsappStructuredMemory
 from storage import upsert_profile_fact
 
@@ -25,6 +26,7 @@ VALID_CATEGORIES = {
     "boundaries",
     "matching_signals",
 }
+VALID_REVIEW_DECISIONS = {"approve", "rewrite", "merge", "reject"}
 
 
 def data_point_extractor_mode() -> str:
@@ -36,6 +38,25 @@ def data_point_extractor_mode() -> str:
 
 def should_run_llm_data_point_extraction() -> bool:
     return data_point_extractor_mode() in {"llm", "hybrid"}
+
+
+async def review_rule_data_point_candidates(
+    memory: WhatsappStructuredMemory,
+    candidates: list[dict[str, Any]],
+    *,
+    user_id: str,
+    source_id: str,
+    import_id: str,
+    title: str,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> list[dict[str, Any]]:
+    raw = await review_llm_data_point_candidates(
+        build_data_point_review_prompt(memory, candidates, title),
+        conversation_id=conversation_id,
+        model=model,
+    )
+    return normalize_llm_data_point_reviews(raw, candidates, user_id, source_id, import_id, title)
 
 
 async def capture_llm_whatsapp_data_points(
@@ -81,6 +102,37 @@ def normalize_llm_data_points(
         if point:
             points.append(point)
     return _dedupe_llm_points(points)
+
+
+def normalize_llm_data_point_reviews(
+    raw: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    user_id: str,
+    source_id: str,
+    import_id: str,
+    title: str,
+) -> list[dict[str, Any]]:
+    candidate_map = {str(candidate.get("key") or ""): candidate for candidate in candidates}
+    raw_reviews = raw.get("reviews")
+    if not isinstance(raw_reviews, list):
+        return []
+
+    reviews: list[dict[str, Any]] = []
+    for index, raw_review in enumerate(raw_reviews):
+        if not isinstance(raw_review, dict):
+            continue
+        review = _normalize_llm_data_point_review(
+            raw_review,
+            candidate_map,
+            user_id,
+            source_id,
+            import_id,
+            title,
+            index,
+        )
+        if review:
+            reviews.append(review)
+    return reviews
 
 
 def _normalize_llm_data_point(
@@ -141,6 +193,88 @@ def _normalize_llm_data_point(
     }
 
 
+def _normalize_llm_data_point_review(
+    raw: dict[str, Any],
+    candidate_map: dict[str, dict[str, Any]],
+    user_id: str,
+    source_id: str,
+    import_id: str,
+    title: str,
+    index: int,
+) -> dict[str, Any] | None:
+    candidate_key = str(raw.get("candidate_key") or "").strip()
+    candidate = candidate_map.get(candidate_key)
+    if not candidate:
+        return None
+
+    decision = _snake_key(str(raw.get("decision") or "reject"))
+    if decision not in VALID_REVIEW_DECISIONS:
+        decision = "reject"
+
+    evidence = _evidence_items(raw.get("evidence")) or _evidence_items(candidate.get("evidence"))
+    confidence = _confidence(raw.get("confidence"), default=_confidence(candidate.get("confidence"), default=0.55))
+    what_we_learned = _clean_text(raw.get("what_we_learned"), 240)
+    why_it_matters = _clean_text(raw.get("why_it_matters"), 320)
+    rejection_reason = _clean_text(raw.get("rejection_reason"), 240)
+    usage = _normalize_review_usage(raw.get("usage"), candidate.get("usage"))
+
+    review = {
+        "candidate_key": candidate_key,
+        "decision": decision,
+        "what_we_learned": what_we_learned,
+        "why_it_matters": why_it_matters,
+        "confidence": confidence,
+        "evidence": evidence[:5],
+        "usage": usage,
+        "rejection_reason": rejection_reason or None,
+    }
+
+    if decision == "reject":
+        if not rejection_reason:
+            return None
+        return {
+            "candidate_key": candidate_key,
+            "decision": "reject",
+            "candidate": candidate,
+            "review": review,
+            "point": None,
+        }
+
+    raw_final = raw.get("final_point")
+    if not isinstance(raw_final, dict):
+        if decision != "approve":
+            return None
+        raw_final = _candidate_as_final_point(candidate)
+    final_point = {
+        **raw_final,
+        "confidence": confidence,
+        "evidence": evidence,
+        "used_for_chat_context": usage["chat_context"],
+        "used_for_matching": usage["matching"],
+    }
+    if usage["debug_only"]:
+        final_point["used_for_chat_context"] = False
+        final_point["used_for_matching"] = False
+
+    point = _normalize_llm_data_point(final_point, user_id, source_id, import_id, title, index)
+    if not point:
+        return None
+    point["value"] = {
+        **point["value"],
+        "extractor": "hybrid_llm_review",
+        "llm_review": review,
+        "rule_candidate": candidate,
+        "used_for_style": usage["style"],
+    }
+    return {
+        "candidate_key": candidate_key,
+        "decision": decision,
+        "candidate": candidate,
+        "review": {**review, "final_point": raw_final},
+        "point": point,
+    }
+
+
 def _whatsapp_data_point_prompt(memory: WhatsappStructuredMemory, title: str) -> str:
     messages = "\n".join(
         _message_line(index, message)
@@ -160,6 +294,20 @@ def _whatsapp_data_point_prompt(memory: WhatsappStructuredMemory, title: str) ->
         f"{messages}"
     )
     return text[:LLM_CONTEXT_CHAR_LIMIT]
+
+
+def build_data_point_review_prompt(
+    memory: WhatsappStructuredMemory,
+    candidates: list[dict[str, Any]],
+    title: str,
+) -> str:
+    payload = {
+        "source_title": title,
+        "selected_sender": memory.metadata.get("selected_sender") or "unknown",
+        "source_excerpt": _whatsapp_data_point_prompt(memory, title),
+        "candidates": candidates[:LLM_MAX_POINTS],
+    }
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _sample_messages(memory: WhatsappStructuredMemory) -> list[Any]:
@@ -190,6 +338,30 @@ def _valid_llm_point(
     if any(phrase in lowered for phrase in weak_phrases):
         return False
     return True
+
+
+def _candidate_as_final_point(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "category": candidate.get("category") or "conversation_context",
+        "key": candidate.get("key"),
+        "label": candidate.get("label"),
+        "meaning": candidate.get("meaning"),
+        "value": candidate.get("value") if isinstance(candidate.get("value"), dict) else {},
+        "privacy_level": "normal",
+    }
+
+
+def _normalize_review_usage(raw_usage: Any, fallback_usage: Any = None) -> dict[str, bool]:
+    usage = raw_usage if isinstance(raw_usage, dict) else {}
+    fallback = fallback_usage if isinstance(fallback_usage, dict) else {}
+    debug_only = bool(usage.get("debug_only", fallback.get("debug_only", False)))
+    return {
+        "chat_context": bool(usage.get("chat_context", fallback.get("chat_context", True)))
+        and not debug_only,
+        "matching": bool(usage.get("matching", fallback.get("matching", False))) and not debug_only,
+        "style": bool(usage.get("style", fallback.get("style", False))) and not debug_only,
+        "debug_only": debug_only,
+    }
 
 
 def _evidence_items(value: Any) -> list[str]:

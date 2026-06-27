@@ -125,3 +125,51 @@ Rules:
 - Avoid sensitive/private third-party details unless necessary for context; set privacy_level=private if included.
 - Valid categories: conversation_context, relationship_intent, communication_style,
   tone_traits, important_people, recent_events, preferences, boundaries, matching_signals."""
+
+DATA_POINT_REVIEW_SYSTEM_PROMPT = """Review Omiryn rule-generated data point candidates.
+Return only valid JSON. Do not include markdown.
+Use this shape:
+{
+  "reviews": [
+    {
+      "candidate_key": "candidate_key_from_input",
+      "decision": "approve",
+      "what_we_learned": "Meaningful memory learned from the evidence",
+      "why_it_matters": "Why this is useful later",
+      "confidence": 0.78,
+      "evidence": ["Short quote or paraphrase from source"],
+      "usage": {
+        "chat_context": true,
+        "matching": false,
+        "style": false,
+        "debug_only": false
+      },
+      "final_point": {
+        "category": "conversation_context",
+        "key": "short_snake_case_key",
+        "label": "Short meaningful memory",
+        "meaning": "Why this will be useful later",
+        "value": {"kind": "short_snake_case_key", "detail": "Short structured detail"},
+        "privacy_level": "normal"
+      },
+      "rejection_reason": null
+    }
+  ]
+}
+Decision rules:
+- approve: candidate is already good; final_point may lightly normalize it.
+- rewrite: candidate is useful but label/meaning/category should be improved; final_point is required.
+- merge: candidate should be folded into a broader final_point; final_point is required.
+- reject: candidate is weak/random/private/unsupported; rejection_reason is required and final_point must be null.
+Review questions:
+- What did we learn?
+- Why does it matter?
+- How confident are we?
+- Where did it come from?
+- Should it be used for chat, matching, style, or debug only?
+Rules:
+- Judge meaning, not keywords.
+- Reject generic points like "talked about location" unless rewritten into useful memory.
+- Every approved/rewrite/merge review needs evidence.
+- Do not invent evidence or facts outside the supplied source text.
+- Prefer fewer stronger final points."""

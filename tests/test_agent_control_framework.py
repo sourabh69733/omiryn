@@ -1,9 +1,14 @@
+import json
 import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from agent.data_point_extraction import normalize_llm_data_points
+from agent.data_point_extraction import (
+    build_data_point_review_prompt,
+    normalize_llm_data_point_reviews,
+    normalize_llm_data_points,
+)
 from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
@@ -176,6 +181,134 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(len(points), 1)
         self.assertEqual(points[0]["key"], "coffee_then_walk")
         self.assertEqual(points[0]["value"]["extractor"], "llm")
+
+    def test_data_point_review_prompt_contains_candidates_and_context(self) -> None:
+        memory = build_whatsapp_structured_memory(
+            "12/06/2026, 10:04 AM - Aarav: coffee first, then walk?",
+            "Aarav",
+        )
+        candidates = [
+            {
+                "key": "coffee_plan",
+                "label": "Planned coffee then a walk",
+                "meaning": "Useful for recent plan context.",
+                "evidence": ["coffee first, then walk?"],
+            }
+        ]
+
+        prompt = build_data_point_review_prompt(memory, candidates, "Riya chat")
+        payload = json.loads(prompt)
+
+        self.assertEqual(payload["source_title"], "Riya chat")
+        self.assertEqual(payload["candidates"][0]["key"], "coffee_plan")
+        self.assertIn("coffee first, then walk", payload["source_excerpt"])
+
+    def test_llm_review_parser_handles_approve_rewrite_and_reject(self) -> None:
+        candidates = [
+            {
+                "key": "coffee_plan",
+                "category": "whatsapp_recent_events",
+                "label": "Recent WhatsApp context involved coffee and walk",
+                "meaning": "Useful for recent plan context.",
+                "value": {"kind": "whatsapp_recent_coordination"},
+                "confidence": 0.74,
+                "evidence": ["coffee first, then walk?"],
+                "usage": {"chat_context": True, "matching": False, "style": False},
+            },
+            {
+                "key": "location_keyword",
+                "category": "conversation_context",
+                "label": "Talked about location",
+                "meaning": "Too generic",
+                "confidence": 0.72,
+                "evidence": ["location"],
+            },
+            {
+                "key": "tone",
+                "category": "whatsapp_tone_traits",
+                "label": "Aarav's WhatsApp style is brief",
+                "meaning": "Useful for adapting reply rhythm.",
+                "confidence": 0.7,
+                "evidence": ["Aarav: okay"],
+                "usage": {"chat_context": True, "style": True},
+            },
+        ]
+        reviews = normalize_llm_data_point_reviews(
+            {
+                "reviews": [
+                    {
+                        "candidate_key": "coffee_plan",
+                        "decision": "approve",
+                        "what_we_learned": "They planned coffee then a walk.",
+                        "why_it_matters": "Useful for last-plan questions.",
+                        "confidence": 0.82,
+                        "evidence": ["coffee first, then walk?"],
+                        "usage": {"chat_context": True},
+                    },
+                    {
+                        "candidate_key": "location_keyword",
+                        "decision": "reject",
+                        "rejection_reason": "Only a keyword, not useful memory.",
+                    },
+                    {
+                        "candidate_key": "tone",
+                        "decision": "rewrite",
+                        "what_we_learned": "Aarav uses very short replies.",
+                        "why_it_matters": "Useful for style adaptation.",
+                        "confidence": 0.78,
+                        "evidence": ["Aarav: okay"],
+                        "usage": {"chat_context": True, "style": True},
+                        "final_point": {
+                            "category": "communication_style",
+                            "key": "short_whatsapp_replies",
+                            "label": "Uses short WhatsApp replies",
+                            "meaning": "Useful for adapting reply length.",
+                            "value": {"kind": "short_whatsapp_replies"},
+                        },
+                    },
+                ]
+            },
+            candidates,
+            "user-a",
+            "source-a",
+            "import-a",
+            "Riya chat",
+        )
+
+        self.assertEqual([review["decision"] for review in reviews], ["approve", "reject", "rewrite"])
+        self.assertIsNotNone(reviews[0]["point"])
+        self.assertEqual(reviews[0]["point"]["value"]["extractor"], "hybrid_llm_review")
+        self.assertIsNone(reviews[1]["point"])
+        self.assertEqual(reviews[1]["review"]["rejection_reason"], "Only a keyword, not useful memory.")
+        self.assertEqual(reviews[2]["point"]["key"], "short_whatsapp_replies")
+        self.assertTrue(reviews[2]["point"]["value"]["used_for_style"])
+
+    def test_llm_review_parser_rejects_invalid_reviews(self) -> None:
+        candidates = [
+            {
+                "key": "weak",
+                "label": "Weak candidate",
+                "meaning": "Maybe useful.",
+                "evidence": ["maybe"],
+            }
+        ]
+
+        reviews = normalize_llm_data_point_reviews(
+            {
+                "reviews": [
+                    {"candidate_key": "missing", "decision": "approve"},
+                    {"candidate_key": "weak", "decision": "reject"},
+                    {"candidate_key": "weak", "decision": "rewrite", "evidence": ["maybe"]},
+                ]
+            },
+            candidates,
+            "user-a",
+            "source-a",
+            "import-a",
+            "Riya chat",
+        )
+
+        self.assertEqual(reviews, [])
 
     def test_context_budget_prefers_compact_memory_and_style(self) -> None:
         budgeted = budget_context_sources(
