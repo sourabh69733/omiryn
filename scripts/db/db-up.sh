@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -f ".env" ]; then
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+cd "$PROJECT_ROOT"
+
+if [ -f "$PROJECT_ROOT/.env" ]; then
   set -a
-  source .env
+  source "$PROJECT_ROOT/.env"
   set +a
 fi
 

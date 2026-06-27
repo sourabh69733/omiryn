@@ -12,4 +12,4 @@ fi
 
 export PYTHONPATH="${PYTHONPATH:-$PROJECT_ROOT/src}"
 
-python "$PROJECT_ROOT/scripts/db/db_backup.py" "$@"
+python "$PROJECT_ROOT/scripts/db/reset_data.py" "$@"

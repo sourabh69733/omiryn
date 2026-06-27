@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
@@ -47,7 +47,7 @@ def main() -> int:
 
     if not args.yes:
         print("Refusing to reset data without --yes.")
-        print("Run: ./scripts/reset-data.sh --yes")
+        print("Run: ./scripts/db/reset-data.sh --yes")
         return 2
 
     if not args.skip_backup:
