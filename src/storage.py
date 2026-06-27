@@ -238,6 +238,22 @@ data_point_feedback = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+data_point_extraction_debug = Table(
+    "data_point_extraction_debug",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
+    Column("source_kind", String, nullable=False),
+    Column("source_id", String, nullable=True),
+    Column("import_id", String, nullable=True),
+    Column("candidate_key", String, nullable=True),
+    Column("decision", String, nullable=False),
+    Column("candidate_json", JSON, nullable=False),
+    Column("review_json", JSON, nullable=False),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 agent_message_feedback = Table(
     "agent_message_feedback",
     metadata,
@@ -651,6 +667,56 @@ def list_data_point_feedback(
     return [_data_point_feedback_from_row(row) for row in rows]
 
 
+def save_data_point_extraction_debug(entry: dict[str, Any]) -> dict[str, Any]:
+    user_id = entry.get("user_id")
+    payload = {
+        "id": entry.get("id") or str(uuid4()),
+        "user_id": user_id,
+        "source_kind": entry.get("source_kind") or "unknown",
+        "source_id": entry.get("source_id"),
+        "import_id": entry.get("import_id"),
+        "candidate_key": entry.get("candidate_key"),
+        "decision": str(entry.get("decision") or "unknown"),
+        "candidate_json": maybe_encrypt_json(user_id, entry.get("candidate") or {}),
+        "review_json": maybe_encrypt_json(user_id, entry.get("review") or {}),
+        "metadata_json": maybe_encrypt_json(user_id, entry.get("metadata") or {}),
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(data_point_extraction_debug.insert().values(**payload))
+        row = connection.execute(
+            select(data_point_extraction_debug).where(
+                data_point_extraction_debug.c.id == payload["id"]
+            )
+        ).mappings().first()
+    return _data_point_extraction_debug_from_row(row)
+
+
+def list_data_point_extraction_debug(
+    user_id: str | None = None,
+    source_id: str | None = None,
+    import_id: str | None = None,
+    decision: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(data_point_extraction_debug).order_by(
+        data_point_extraction_debug.c.created_at.desc()
+    )
+    if user_id is not None:
+        statement = statement.where(data_point_extraction_debug.c.user_id == user_id)
+    if source_id is not None:
+        statement = statement.where(data_point_extraction_debug.c.source_id == source_id)
+    if import_id is not None:
+        statement = statement.where(data_point_extraction_debug.c.import_id == import_id)
+    if decision is not None:
+        statement = statement.where(data_point_extraction_debug.c.decision == decision)
+    if limit is not None:
+        statement = statement.limit(limit)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_data_point_extraction_debug_from_row(row) for row in rows]
+
+
 def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": fact.get("id") or str(uuid4()),
@@ -838,6 +904,22 @@ def _data_point_feedback_from_row(row: Any) -> dict[str, Any]:
         "metadata": row["metadata_json"],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _data_point_extraction_debug_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "source_kind": row["source_kind"],
+        "source_id": row["source_id"],
+        "import_id": row["import_id"],
+        "candidate_key": row["candidate_key"],
+        "decision": row["decision"],
+        "candidate": decrypt_json(row["user_id"], row["candidate_json"]),
+        "review": decrypt_json(row["user_id"], row["review_json"]),
+        "metadata": decrypt_json(row["user_id"], row["metadata_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
     }
 
 
@@ -1389,6 +1471,13 @@ def _delete_whatsapp_imports_for_context_sources(
         facts_statement = facts_statement.where(profile_facts.c.user_id == user_id)
     connection.execute(facts_statement)
 
+    debug_statement = data_point_extraction_debug.delete().where(
+        data_point_extraction_debug.c.source_id.in_(source_ids)
+    )
+    if user_id is not None:
+        debug_statement = debug_statement.where(data_point_extraction_debug.c.user_id == user_id)
+    connection.execute(debug_statement)
+
     statement = select(whatsapp_imports.c.id).where(
         whatsapp_imports.c.context_source_id.in_(source_ids)
     )
@@ -1397,6 +1486,14 @@ def _delete_whatsapp_imports_for_context_sources(
     import_ids = [row[0] for row in connection.execute(statement).all()]
     if not import_ids:
         return
+    import_debug_statement = data_point_extraction_debug.delete().where(
+        data_point_extraction_debug.c.import_id.in_(import_ids)
+    )
+    if user_id is not None:
+        import_debug_statement = import_debug_statement.where(
+            data_point_extraction_debug.c.user_id == user_id
+        )
+    connection.execute(import_debug_statement)
     _delete_whatsapp_import_rows(connection, import_ids)
     connection.execute(whatsapp_imports.delete().where(whatsapp_imports.c.id.in_(import_ids)))
 

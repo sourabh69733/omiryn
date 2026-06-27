@@ -30,6 +30,7 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    list_data_point_extraction_debug,
     list_data_point_feedback,
     list_agent_context_snapshots,
     list_context_sources,
@@ -40,6 +41,7 @@ from storage import (
     list_whatsapp_people,
     list_whatsapp_style_profiles,
     reset_db,
+    save_data_point_extraction_debug,
     save_agent_message_feedback,
     save_agent_usage_event,
     upsert_profile_fact,
@@ -520,6 +522,56 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(list_data_point_feedback(), [])
+
+    def test_data_point_extraction_debug_stores_review_decisions(self) -> None:
+        saved = save_data_point_extraction_debug(
+            {
+                "user_id": "user-a",
+                "source_kind": "whatsapp_import",
+                "source_id": "source-a",
+                "import_id": "import-a",
+                "candidate_key": "meeting_location_coordination",
+                "decision": "rejected",
+                "candidate": {
+                    "label": "Talked about location",
+                    "evidence": ["location kidhar hai"],
+                },
+                "review": {
+                    "decision": "rejected",
+                    "reason": "Only a keyword, not useful memory.",
+                },
+                "metadata": {"reviewer": "llm", "model": "mock"},
+            }
+        )
+
+        self.assertEqual(saved["decision"], "rejected")
+        self.assertEqual(saved["candidate"]["label"], "Talked about location")
+        self.assertEqual(saved["review"]["reason"], "Only a keyword, not useful memory.")
+
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-b",
+                "source_kind": "whatsapp_import",
+                "source_id": "source-b",
+                "import_id": "import-b",
+                "candidate_key": "coffee_plan",
+                "decision": "approved",
+                "candidate": {"label": "Planned coffee"},
+                "review": {"decision": "approved"},
+            }
+        )
+
+        user_rows = list_data_point_extraction_debug(user_id="user-a")
+        rejected_rows = list_data_point_extraction_debug(
+            user_id="user-a",
+            source_id="source-a",
+            decision="rejected",
+        )
+        approved_rows = list_data_point_extraction_debug(user_id="user-a", decision="approved")
+
+        self.assertEqual(len(user_rows), 1)
+        self.assertEqual(rejected_rows[0]["id"], saved["id"])
+        self.assertEqual(approved_rows, [])
 
     def test_profile_fact_upsert_merges_evidence_and_confidence(self) -> None:
         upsert_profile_fact(
@@ -1950,6 +2002,43 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("recent_events", {fact["category"] for fact in facts})
         self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
         self.assertTrue(all((fact["value"] or {}).get("extractor") == "llm" for fact in facts))
+
+    def test_whatsapp_source_delete_removes_data_point_debug_rows(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        source_id = create_response.json()["id"]
+        import_id = list_whatsapp_imports(user_id="user-a")[0]["id"]
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-a",
+                "source_kind": "whatsapp_import",
+                "source_id": source_id,
+                "import_id": import_id,
+                "candidate_key": "coffee_plan",
+                "decision": "approved",
+                "candidate": {"label": "Planned coffee"},
+                "review": {"decision": "approved"},
+            }
+        )
+
+        self.assertEqual(len(list_data_point_extraction_debug(user_id="user-a")), 1)
+        delete_response = self.client.delete(
+            f"/api/agent/conversations/{conversation_id}/context-sources/{source_id}"
+        )
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(list_data_point_extraction_debug(user_id="user-a"), [])
 
     def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
