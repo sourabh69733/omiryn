@@ -1906,13 +1906,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         facts = list_profile_facts("user-a")
         categories = {fact["category"] for fact in facts}
-        self.assertIn("whatsapp_topics", categories)
+        self.assertIn("whatsapp_recurring_topics", categories)
         self.assertIn("whatsapp_recent_events", categories)
         self.assertIn("whatsapp_tone_traits", categories)
+        self.assertNotIn("whatsapp_topics", categories)
         self.assertTrue(all(fact["source_kind"] == "whatsapp_import" for fact in facts))
         self.assertTrue(all(fact["source_id"] == source_id for fact in facts))
         self.assertTrue(all(fact["used_for_chat_context"] for fact in facts))
         self.assertTrue(all(not fact["used_for_matching"] for fact in facts))
+        self.assertTrue(all((fact["value"] or {}).get("meaning") for fact in facts))
+        self.assertFalse(any("WhatsApp topics include" in fact["label"] for fact in facts))
 
         sources = _smart_reply_context_sources(
             conversation_id,
@@ -1923,7 +1926,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         data_point_source = next(
             source for source in sources if source["source_type"] == "data_points"
         )
-        self.assertIn("WhatsApp topics include", data_point_source["content"])
+        self.assertIn("WhatsApp chat makes casual plans", data_point_source["content"])
 
     def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]

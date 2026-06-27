@@ -7,7 +7,9 @@ from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
 from agent.style_adapter import style_adaptation_guide
+from agent.whatsapp_data_points import extract_whatsapp_data_points
 from api.main import app
+from ingestion.whatsapp import build_whatsapp_structured_memory
 from storage import reset_db
 
 
@@ -87,6 +89,33 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertEqual(len(ranked), 1)
         self.assertEqual(ranked[0]["key"], "calm_communication")
+
+    def test_whatsapp_data_points_require_meaningful_memory(self) -> None:
+        memory = build_whatsapp_structured_memory(
+            """12/06/2026, 10:00 AM - Aarav: hey I am running late but I will call you
+12/06/2026, 10:01 AM - Riya: no problem
+12/06/2026, 10:02 AM - Aarav: also I was thinking about that plan
+12/06/2026, 10:03 AM - Riya: what plan?
+12/06/2026, 10:04 AM - Aarav: coffee first, then walk?
+12/06/2026, 10:05 AM - Riya: okay""",
+            "Aarav",
+        )
+
+        points = extract_whatsapp_data_points(
+            memory,
+            user_id="user-a",
+            source_id="source-a",
+            import_id="import-a",
+            title="Riya chat",
+        )
+
+        labels = [point["label"] for point in points]
+        categories = {point["category"] for point in points}
+        self.assertIn("whatsapp_recurring_topics", categories)
+        self.assertIn("whatsapp_recent_events", categories)
+        self.assertFalse(any("topics include" in label.lower() for label in labels))
+        self.assertTrue(any("casual plans" in label for label in labels))
+        self.assertTrue(all((point["value"] or {}).get("meaning") for point in points))
 
     def test_context_budget_prefers_compact_memory_and_style(self) -> None:
         budgeted = budget_context_sources(
