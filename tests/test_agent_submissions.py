@@ -799,6 +799,48 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn(("goals", "career_growth"), fact_keys)
         self.assertIn(("values", "mutual_respect"), fact_keys)
 
+    def test_hybrid_chat_data_point_review_runs_for_deep_conversation_memory(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "mock",
+                "DATA_POINT_EXTRACTOR": "hybrid",
+                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+            },
+        ):
+            for index in range(2):
+                response = self.client.post(
+                    f"/api/agent/conversations/{conversation_id}/messages",
+                    json={
+                        "message": (
+                            f"Career growth and mutual respect matter to me in dating. "
+                            f"Useful detail {index}."
+                        )
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+
+        debug_rows = list_data_point_extraction_debug(user_id="user-a")
+        self.assertGreaterEqual(len(debug_rows), 2)
+        self.assertTrue(all(row["source_kind"] == "agent_conversation" for row in debug_rows))
+        self.assertTrue(all(row["decision"] == "approve" for row in debug_rows))
+        self.assertEqual({row["source_id"] for row in debug_rows}, {conversation_id})
+
+        facts = list_profile_facts("user-a")
+        fact_keys = {(fact["category"], fact["key"]) for fact in facts}
+        self.assertIn(("goals", "career_growth"), fact_keys)
+        self.assertIn(("values", "mutual_respect"), fact_keys)
+        reviewed_facts = [
+            fact for fact in facts if fact["source_kind"] == "agent_conversation"
+        ]
+        self.assertTrue(reviewed_facts)
+
     def test_repeated_chat_fact_merges_evidence(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -2045,7 +2087,6 @@ class AgentSubmissionApiTest(unittest.TestCase):
         facts = list_profile_facts("user-a")
         self.assertTrue(facts)
         self.assertIn("recent_events", {fact["category"] for fact in facts})
-        self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
         self.assertTrue(all((fact["value"] or {}).get("extractor") == "llm" for fact in facts))
 
     def test_whatsapp_import_hybrid_reviews_rule_candidates(self) -> None:
@@ -2073,7 +2114,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertTrue(
             all((fact["value"] or {}).get("extractor") == "hybrid_llm_review" for fact in facts)
         )
-        self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
+        self.assertIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
         self.assertTrue(all(row["candidate"]["source"] == "rules" for row in debug_rows))
         self.assertTrue(all(row["review"]["decision"] in {"approve", "rewrite", "merge", "reject"} for row in debug_rows))
 

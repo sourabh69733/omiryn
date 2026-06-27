@@ -7,7 +7,11 @@ from typing import Any
 import json
 
 from agent.data_points import normalize_data_point
-from agent.providers import extract_llm_data_point_candidates, review_llm_data_point_candidates
+from agent.providers import (
+    extract_deep_profile_facts,
+    extract_llm_data_point_candidates,
+    review_llm_data_point_candidates,
+)
 from agent.whatsapp_data_points import extract_whatsapp_data_point_candidates
 from ingestion.whatsapp import WhatsappStructuredMemory
 from storage import save_data_point_extraction_debug, upsert_profile_fact
@@ -26,6 +30,16 @@ VALID_CATEGORIES = {
     "preferences",
     "boundaries",
     "matching_signals",
+    "dating_intent",
+    "location",
+    "values",
+    "goals",
+    "communication",
+    "dealbreakers",
+    "personality",
+    "whatsapp_recurring_topics",
+    "whatsapp_recent_events",
+    "whatsapp_tone_traits",
 }
 VALID_REVIEW_DECISIONS = {"approve", "rewrite", "merge", "reject"}
 
@@ -56,12 +70,110 @@ async def review_rule_data_point_candidates(
     conversation_id: str | None = None,
     model: str | None = None,
 ) -> list[dict[str, Any]]:
-    raw = await review_llm_data_point_candidates(
-        build_data_point_review_prompt(memory, candidates, title),
+    return await review_data_point_candidates(
+        candidates,
+        source_excerpt=_whatsapp_data_point_prompt(memory, title),
+        source_title=title,
+        selected_sender=memory.metadata.get("selected_sender") or "unknown",
+        user_id=user_id,
+        source_id=source_id,
+        import_id=import_id,
+        source_kind="whatsapp_import",
         conversation_id=conversation_id,
         model=model,
     )
-    return normalize_llm_data_point_reviews(raw, candidates, user_id, source_id, import_id, title)
+
+
+async def review_data_point_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    source_excerpt: str,
+    source_title: str,
+    selected_sender: str | None,
+    user_id: str,
+    source_id: str,
+    import_id: str | None,
+    source_kind: str,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> list[dict[str, Any]]:
+    raw = await review_llm_data_point_candidates(
+        build_data_point_candidate_review_prompt(
+            candidates,
+            source_excerpt=source_excerpt,
+            source_title=source_title,
+            selected_sender=selected_sender,
+        ),
+        conversation_id=conversation_id,
+        model=model,
+    )
+    return normalize_llm_data_point_reviews(
+        raw,
+        candidates,
+        user_id,
+        source_id,
+        import_id,
+        source_title,
+        source_kind=source_kind,
+    )
+
+
+async def capture_hybrid_conversation_data_points(
+    messages: list[dict[str, object]],
+    *,
+    user_id: str,
+    conversation_id: str,
+    model: str | None = None,
+) -> None:
+    if not should_run_hybrid_data_point_review():
+        return
+    try:
+        proposed_facts = await extract_deep_profile_facts(
+            messages,  # type: ignore[arg-type]
+            user_id,
+            conversation_id=conversation_id,
+            model=model,
+        )
+        candidates = []
+        for fact in proposed_facts:
+            candidate = _profile_fact_candidate(fact, conversation_id)
+            if candidate:
+                candidates.append(candidate)
+        if not candidates:
+            return
+        reviews = await review_data_point_candidates(
+            candidates,
+            source_excerpt=_conversation_data_point_excerpt(messages),
+            source_title="In-app conversation",
+            selected_sender=None,
+            user_id=user_id,
+            source_id=conversation_id,
+            import_id=None,
+            source_kind="agent_conversation",
+            conversation_id=conversation_id,
+            model=model,
+        )
+        for review in reviews:
+            save_data_point_extraction_debug(
+                {
+                    "user_id": user_id,
+                    "source_kind": "agent_conversation",
+                    "source_id": conversation_id,
+                    "import_id": None,
+                    "candidate_key": review["candidate_key"],
+                    "decision": review["decision"],
+                    "candidate": review["candidate"],
+                    "review": review["review"],
+                    "metadata": {
+                        "title": "In-app conversation",
+                        "extractor": "hybrid_conversation_review",
+                    },
+                }
+            )
+            if review.get("point"):
+                upsert_profile_fact(normalize_data_point(review["point"]))
+    except Exception:
+        logger.exception("agent.data_points.hybrid_conversation_failed conversation_id=%s", conversation_id)
 
 
 async def capture_llm_whatsapp_data_points(
@@ -147,6 +259,7 @@ def normalize_llm_data_points(
     source_id: str,
     import_id: str,
     title: str,
+    source_kind: str = "whatsapp_import",
 ) -> list[dict[str, Any]]:
     raw_points = raw.get("data_points") or raw.get("points")
     if not isinstance(raw_points, list):
@@ -156,7 +269,15 @@ def normalize_llm_data_points(
     for index, raw_point in enumerate(raw_points[:LLM_MAX_POINTS]):
         if not isinstance(raw_point, dict):
             continue
-        point = _normalize_llm_data_point(raw_point, user_id, source_id, import_id, title, index)
+        point = _normalize_llm_data_point(
+            raw_point,
+            user_id,
+            source_id,
+            import_id,
+            title,
+            index,
+            source_kind=source_kind,
+        )
         if point:
             points.append(point)
     return _dedupe_llm_points(points)
@@ -167,8 +288,9 @@ def normalize_llm_data_point_reviews(
     candidates: list[dict[str, Any]],
     user_id: str,
     source_id: str,
-    import_id: str,
+    import_id: str | None,
     title: str,
+    source_kind: str = "whatsapp_import",
 ) -> list[dict[str, Any]]:
     candidate_map = {str(candidate.get("key") or ""): candidate for candidate in candidates}
     raw_reviews = raw.get("reviews")
@@ -187,6 +309,7 @@ def normalize_llm_data_point_reviews(
             import_id,
             title,
             index,
+            source_kind,
         )
         if review:
             reviews.append(review)
@@ -197,9 +320,11 @@ def _normalize_llm_data_point(
     raw: dict[str, Any],
     user_id: str,
     source_id: str,
-    import_id: str,
+    import_id: str | None,
     title: str,
     index: int,
+    *,
+    source_kind: str = "whatsapp_import",
 ) -> dict[str, Any] | None:
     category = _snake_key(str(raw.get("category") or "conversation_context"))
     if category not in VALID_CATEGORIES:
@@ -234,7 +359,7 @@ def _normalize_llm_data_point(
         "value": value,
         "label": label,
         "confidence": confidence,
-        "source_kind": "whatsapp_import",
+        "source_kind": source_kind,
         "source_id": source_id,
         "evidence": [
             {
@@ -256,9 +381,10 @@ def _normalize_llm_data_point_review(
     candidate_map: dict[str, dict[str, Any]],
     user_id: str,
     source_id: str,
-    import_id: str,
+    import_id: str | None,
     title: str,
     index: int,
+    source_kind: str,
 ) -> dict[str, Any] | None:
     candidate_key = str(raw.get("candidate_key") or "").strip()
     candidate = candidate_map.get(candidate_key)
@@ -314,7 +440,15 @@ def _normalize_llm_data_point_review(
         final_point["used_for_chat_context"] = False
         final_point["used_for_matching"] = False
 
-    point = _normalize_llm_data_point(final_point, user_id, source_id, import_id, title, index)
+    point = _normalize_llm_data_point(
+        final_point,
+        user_id,
+        source_id,
+        import_id,
+        title,
+        index,
+        source_kind=source_kind,
+    )
     if not point:
         return None
     point["value"] = {
@@ -359,13 +493,80 @@ def build_data_point_review_prompt(
     candidates: list[dict[str, Any]],
     title: str,
 ) -> str:
+    return build_data_point_candidate_review_prompt(
+        candidates,
+        source_excerpt=_whatsapp_data_point_prompt(memory, title),
+        source_title=title,
+        selected_sender=memory.metadata.get("selected_sender") or "unknown",
+    )
+
+
+def build_data_point_candidate_review_prompt(
+    candidates: list[dict[str, Any]],
+    *,
+    source_excerpt: str,
+    source_title: str,
+    selected_sender: str | None,
+) -> str:
     payload = {
-        "source_title": title,
-        "selected_sender": memory.metadata.get("selected_sender") or "unknown",
-        "source_excerpt": _whatsapp_data_point_prompt(memory, title),
+        "source_title": source_title,
+        "selected_sender": selected_sender or "unknown",
+        "source_excerpt": source_excerpt[:LLM_CONTEXT_CHAR_LIMIT],
         "candidates": candidates[:LLM_MAX_POINTS],
     }
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _profile_fact_candidate(
+    fact: dict[str, Any],
+    conversation_id: str,
+) -> dict[str, Any] | None:
+    label = _clean_text(fact.get("label") or fact.get("key"), 160)
+    key = _snake_key(str(fact.get("key") or label))
+    if not key or not label:
+        return None
+    evidence = [
+        item.get("text") if isinstance(item, dict) else str(item)
+        for item in (fact.get("evidence") or [])
+    ]
+    evidence = _evidence_items(evidence)
+    value = fact.get("value") if isinstance(fact.get("value"), dict) else {}
+    meaning = _clean_text(
+        value.get("meaning") or value.get("detail") or f"Useful context learned from this conversation: {label}",
+        240,
+    )
+    return {
+        "category": fact.get("category") or "conversation_context",
+        "key": key,
+        "label": label,
+        "meaning": meaning,
+        "value": value,
+        "confidence": fact.get("confidence") or 0.55,
+        "evidence": evidence[:5],
+        "usage": {
+            "chat_context": bool(fact.get("used_for_chat_context", True)),
+            "matching": bool(fact.get("used_for_matching", True)),
+            "style": False,
+            "debug_only": False,
+        },
+        "source": {
+            "kind": "agent_conversation",
+            "conversation_id": conversation_id,
+        },
+    }
+
+
+def _conversation_data_point_excerpt(messages: list[dict[str, object]]) -> str:
+    recent_messages = [
+        message
+        for message in messages[-24:]
+        if message.get("role") in {"user", "assistant"} and message.get("content")
+    ]
+    lines = [
+        f"{message.get('role', 'unknown')}: {' '.join(str(message.get('content') or '').split())}"
+        for message in recent_messages
+    ]
+    return "\n".join(lines)[:LLM_CONTEXT_CHAR_LIMIT]
 
 
 def _sample_messages(memory: WhatsappStructuredMemory) -> list[Any]:
