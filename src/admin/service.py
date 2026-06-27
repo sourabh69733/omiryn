@@ -15,6 +15,7 @@ from storage import (
     agent_message_feedback,
     agent_usage_events,
     conversation_context_sources,
+    data_point_extraction_debug,
     draft_profiles,
     profile_facts,
     summarize_agent_usage,
@@ -36,6 +37,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         usage_events,
         snapshot["feedback_rows"],
         snapshot["context_snapshot_rows"],
+        snapshot["data_point_review_rows"],
     )
 
     return {
@@ -59,6 +61,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             "learned_fact_count": len(snapshot["fact_rows"]),
             "context_source_count": len(snapshot["context_rows"]),
             "context_snapshot_count": len(snapshot["context_snapshot_rows"]),
+            "data_point_review_count": len(snapshot["data_point_review_rows"]),
             "feedback_count": len(snapshot["feedback_rows"]),
             "usage": usage_summary,
         },
@@ -82,6 +85,7 @@ def _dashboard_activity(
     usage_events: list[dict[str, Any]],
     feedback_rows: list[Any],
     context_snapshot_rows: list[Any],
+    data_point_review_rows: list[Any],
     days: int = 14,
 ) -> dict[str, Any]:
     today = datetime.now(timezone.utc).date()
@@ -130,6 +134,13 @@ def _dashboard_activity(
             active_user_ids_in_window.add(user_id)
 
     for row in context_snapshot_rows:
+        created_at = _date_from_value(row["created_at"])
+        user_id = row["user_id"]
+        if created_at in buckets and user_id:
+            buckets[created_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
+    for row in data_point_review_rows:
         created_at = _date_from_value(row["created_at"])
         user_id = row["user_id"]
         if created_at in buckets and user_id:
@@ -199,6 +210,11 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         for row in snapshot["context_snapshot_rows"]
         if row["user_id"] == user_id
     ]
+    data_point_reviews = [
+        _data_point_review_detail(row)
+        for row in snapshot["data_point_review_rows"]
+        if row["user_id"] == user_id
+    ]
 
     return {
         "user": user,
@@ -211,6 +227,8 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         "feedback_summary": _summarize_feedback(feedback),
         "context_snapshots": context_snapshots[:limit],
         "context_snapshot_summary": _summarize_context_snapshots(context_snapshots),
+        "data_point_reviews": data_point_reviews[:limit],
+        "data_point_review_summary": _summarize_data_point_reviews(data_point_reviews),
     }
 
 
@@ -231,6 +249,11 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
             ).mappings().all(),
             "context_snapshot_rows": connection.execute(
                 select(agent_context_snapshots).order_by(agent_context_snapshots.c.created_at.desc())
+            ).mappings().all(),
+            "data_point_review_rows": connection.execute(
+                select(data_point_extraction_debug).order_by(
+                    data_point_extraction_debug.c.created_at.desc()
+                )
             ).mappings().all(),
             "usage_rows": connection.execute(
                 select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
@@ -345,6 +368,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             "context_rows",
             "feedback_rows",
             "context_snapshot_rows",
+            "data_point_review_rows",
         )
         for row in snapshot[key]
         if row["user_id"]
@@ -361,6 +385,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             snapshot["context_rows"],
             snapshot["feedback_rows"],
             snapshot["context_snapshot_rows"],
+            snapshot["data_point_review_rows"],
             usage_events,
         )
         for user_id in user_ids
@@ -377,6 +402,7 @@ def _user_summary(
     context_rows: list[Any],
     feedback_rows: list[Any],
     context_snapshot_rows: list[Any],
+    data_point_review_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
     profile = next((row for row in profile_rows if row["user_id"] == user_id), None)
@@ -386,6 +412,7 @@ def _user_summary(
     sources = [row for row in context_rows if row["user_id"] == user_id]
     feedback = [row for row in feedback_rows if row["user_id"] == user_id]
     context_snapshots = [row for row in context_snapshot_rows if row["user_id"] == user_id]
+    data_point_reviews = [row for row in data_point_review_rows if row["user_id"] == user_id]
     events = [event for event in usage_events if event.get("user_id") == user_id]
     feedback_summary = _summarize_feedback(feedback)
     profile_summary = _profile_summary(profile, drafts)
@@ -396,6 +423,7 @@ def _user_summary(
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
         *[row["created_at"] for row in context_snapshots],
+        *[row["created_at"] for row in data_point_reviews],
         *[event.get("created_at") for event in events],
     ]
     first_seen_dates = [
@@ -405,6 +433,7 @@ def _user_summary(
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
         *[row["created_at"] for row in context_snapshots],
+        *[row["created_at"] for row in data_point_reviews],
         *[event.get("created_at") for event in events],
     ]
 
@@ -433,6 +462,7 @@ def _user_summary(
         "learned_fact_count": len(facts),
         "feedback_count": len(feedback),
         "context_snapshot_count": len(context_snapshots),
+        "data_point_review_count": len(data_point_reviews),
         "negative_feedback_count": (
             feedback_summary["off"] + feedback_summary["bad"] + feedback_summary["harmful"]
         ),
@@ -564,6 +594,40 @@ def _summarize_context_snapshots(snapshots: list[dict[str, Any]]) -> dict[str, A
             if (snapshot.get("summary") or {}).get("used_structured_whatsapp")
         ),
     }
+
+
+def _data_point_review_detail(row: Any) -> dict[str, Any]:
+    user_id = row["user_id"]
+    return {
+        "id": row["id"],
+        "user_id": user_id,
+        "source_kind": row["source_kind"],
+        "source_id": row["source_id"],
+        "import_id": row["import_id"],
+        "candidate_key": row["candidate_key"],
+        "decision": row["decision"],
+        "candidate": decrypt_json(user_id, row["candidate_json"]),
+        "review": decrypt_json(user_id, row["review_json"]),
+        "metadata": decrypt_json(user_id, row["metadata_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _summarize_data_point_reviews(reviews: list[dict[str, Any]]) -> dict[str, int]:
+    summary = {
+        "total": len(reviews),
+        "approve": 0,
+        "rewrite": 0,
+        "merge": 0,
+        "reject": 0,
+        "unknown": 0,
+    }
+    for review in reviews:
+        decision = str(review.get("decision") or "unknown")
+        if decision not in summary:
+            decision = "unknown"
+        summary[decision] += 1
+    return summary
 
 
 def _fact_summary(row: Any) -> dict[str, Any]:

@@ -7,7 +7,9 @@ const state = {
   selectedUserDetail: null,
   visibleFactCount: 6,
   feedbackPage: 1,
-  feedbackPerPage: 5
+  feedbackPerPage: 5,
+  dataPointReviewPage: 1,
+  dataPointReviewPerPage: 5
 };
 
 const statusEl = document.querySelector("#admin-status");
@@ -255,7 +257,7 @@ function renderUsers(users) {
       <td class="mono">${formatNumber(user.conversation_count || 0)}<small>${formatNumber(user.active_conversation_count || 0)} active</small></td>
       <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
       <td class="mono">${formatNumber(user.draft_count || 0)}<small>${formatNumber(user.approved_draft_count || 0)} approved</small></td>
-      <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb</small></td>
+      <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb / ${formatNumber(user.data_point_review_count || 0)} dp</small></td>
       <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${formatUsd(user.usage?.estimated_cost_usd || 0)}</small></td>
       <td>${formatDate(user.last_activity_at)}</td>
     </tr>
@@ -276,6 +278,8 @@ async function selectUser(userId) {
   state.visibleFactCount = 6;
   state.feedbackPage = 1;
   state.feedbackPerPage = 5;
+  state.dataPointReviewPage = 1;
+  state.dataPointReviewPerPage = 5;
   renderUsers(state.data?.users || []);
   selectedUserTitle.textContent = "Loading user report...";
   userReport.innerHTML = '<div class="table-empty">Loading selected user...</div>';
@@ -303,9 +307,11 @@ function renderUserReport(detail) {
   const conversations = detail.conversations || [];
   const facts = detail.facts || [];
   const feedback = detail.feedback || [];
+  const dataPointReviews = detail.data_point_reviews || [];
   const contextSnapshots = detail.context_snapshots || [];
   const contextSnapshotSummary = detail.context_snapshot_summary || {};
   const feedbackSummary = detail.feedback_summary || user.feedback_summary || {};
+  const dataPointReviewSummary = detail.data_point_review_summary || {};
   selectedUserTitle.textContent = user.display_name || "Unnamed user";
   const profileSource = profile.source ? titleize(profile.source) : "Profile";
   userReport.innerHTML = `
@@ -316,11 +322,13 @@ function renderUserReport(detail) {
       ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
       ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
       ${reportCard("Context debug", formatNumber(contextSnapshotSummary.total || contextSnapshots.length || 0), `${formatNumber(contextSnapshotSummary.total_context_tokens || 0)} rough tokens`)}
+      ${reportCard("DP reviews", formatNumber(dataPointReviewSummary.total || dataPointReviews.length || 0), dataPointReviewSummaryDetail(dataPointReviewSummary))}
       ${reportCard("Feedback", formatNumber(feedbackSummary.total || feedback.length || 0), feedbackSummaryDetail(feedbackSummary))}
       ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
     </div>
     ${renderFactsSection(facts)}
     ${renderFeedbackSection(feedback, feedbackSummary)}
+    ${renderDataPointReviewSection(dataPointReviews, dataPointReviewSummary)}
     ${renderContextSnapshotSection(contextSnapshots, contextSnapshotSummary)}
     ${renderConversationSection(conversations)}
   `;
@@ -340,6 +348,20 @@ function renderUserReport(detail) {
   document.querySelector("#show-more-feedback")?.addEventListener("click", () => {
     state.feedbackPerPage += 5;
     state.feedbackPage = 1;
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#data-point-review-prev")?.addEventListener("click", () => {
+    state.dataPointReviewPage = Math.max(1, state.dataPointReviewPage - 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#data-point-review-next")?.addEventListener("click", () => {
+    const pageCount = Math.max(1, Math.ceil(dataPointReviews.length / state.dataPointReviewPerPage));
+    state.dataPointReviewPage = Math.min(pageCount, state.dataPointReviewPage + 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#show-more-data-point-reviews")?.addEventListener("click", () => {
+    state.dataPointReviewPerPage += 5;
+    state.dataPointReviewPage = 1;
     renderUserReport(state.selectedUserDetail);
   });
 }
@@ -521,6 +543,104 @@ function feedbackSummaryDetail(summary = {}) {
   const total = summary.total || 0;
   if (!total) return "0 feedback";
   return `${formatNumber(summary.good || 0)} good / ${formatNumber((summary.off || 0) + (summary.bad || 0) + (summary.harmful || 0))} issues`;
+}
+
+function renderDataPointReviewSection(reviews, summary = {}) {
+  const pageCount = Math.max(1, Math.ceil(reviews.length / state.dataPointReviewPerPage));
+  state.dataPointReviewPage = Math.min(Math.max(1, state.dataPointReviewPage), pageCount);
+  const start = (state.dataPointReviewPage - 1) * state.dataPointReviewPerPage;
+  const visibleReviews = reviews.slice(start, start + state.dataPointReviewPerPage);
+  const showingStart = reviews.length ? start + 1 : 0;
+  const showingEnd = Math.min(start + state.dataPointReviewPerPage, reviews.length);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Data point review debug</h3>
+        <span class="mono">${escapeHtml(dataPointReviewSummaryDetail(summary))}</span>
+      </div>
+      ${
+        visibleReviews.length
+          ? `<div class="feedback-list data-point-review-list">${visibleReviews.map(renderDataPointReviewItem).join("")}</div>`
+          : '<div class="table-empty">No data point review rows yet.</div>'
+      }
+      ${
+        reviews.length > state.dataPointReviewPerPage
+          ? `
+            <div class="detail-pagination">
+              <span class="mono">Showing ${formatNumber(showingStart)}-${formatNumber(showingEnd)} of ${formatNumber(reviews.length)}</span>
+              <div>
+                <button class="secondary-button" id="data-point-review-prev" type="button" ${state.dataPointReviewPage <= 1 ? "disabled" : ""}>Previous</button>
+                <button class="secondary-button" id="data-point-review-next" type="button" ${state.dataPointReviewPage >= pageCount ? "disabled" : ""}>Next</button>
+                <button class="secondary-button" id="show-more-data-point-reviews" type="button">Show more reviews</button>
+              </div>
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderDataPointReviewItem(item) {
+  const candidate = item.candidate || {};
+  const review = item.review || {};
+  const metadata = item.metadata || {};
+  const evidence = Array.isArray(review.evidence) && review.evidence.length
+    ? review.evidence
+    : Array.isArray(candidate.evidence)
+      ? candidate.evidence
+      : [];
+  const confidence = review.confidence ?? candidate.confidence;
+  const learned = review.what_we_learned || candidate.label || candidate.meaning || item.candidate_key || "Data point candidate";
+  const matters = review.why_it_matters || candidate.meaning || "";
+  const rejection = review.rejection_reason || "";
+  return `
+    <article class="feedback-item data-point-review-item">
+      <div class="feedback-item-head">
+        ${dataPointDecisionPill(item.decision)}
+        <span class="mono">${formatDate(item.created_at)}</span>
+      </div>
+      <strong>${escapeHtml(learned)}</strong>
+      ${matters ? `<p>${escapeHtml(matters)}</p>` : ""}
+      ${rejection ? `<p class="review-rejection">${escapeHtml(rejection)}</p>` : ""}
+      <div class="review-meta-row">
+        <span>${escapeHtml(candidate.category || item.source_kind || "candidate")}</span>
+        <span>${formatNumber(Math.round(Number(confidence || 0) * 100))}% confidence</span>
+        <span>${escapeHtml(dataPointUsageLabel(review.usage || candidate.usage || {}))}</span>
+      </div>
+      ${
+        evidence.length
+          ? `<div class="review-evidence">${evidence.slice(0, 3).map((text) => `<blockquote>${escapeHtml(text)}</blockquote>`).join("")}</div>`
+          : ""
+      }
+      <small class="mono">${escapeHtml(metadata.title || item.source_kind || "-")} · ${escapeHtml(item.candidate_key || "-")}</small>
+      <details>
+        <summary>Debug payload</summary>
+        <pre class="debug-json">${escapeHtml(JSON.stringify({ candidate, review, metadata }, null, 2))}</pre>
+      </details>
+    </article>
+  `;
+}
+
+function dataPointDecisionPill(decision) {
+  const value = decision || "unknown";
+  return `<span class="status-pill data-point-decision-${escapeHtml(value)}">${escapeHtml(titleize(value))}</span>`;
+}
+
+function dataPointUsageLabel(usage = {}) {
+  const labels = [];
+  if (usage.chat_context) labels.push("chat");
+  if (usage.matching) labels.push("matching");
+  if (usage.style) labels.push("style");
+  if (usage.debug_only) labels.push("debug only");
+  return labels.length ? labels.join(" / ") : "no usage";
+}
+
+function dataPointReviewSummaryDetail(summary = {}) {
+  const total = summary.total || 0;
+  if (!total) return "0 reviews";
+  const kept = (summary.approve || 0) + (summary.rewrite || 0) + (summary.merge || 0);
+  return `${formatNumber(kept)} kept / ${formatNumber(summary.reject || 0)} rejected`;
 }
 
 function feedbackReasonLabel(reason) {

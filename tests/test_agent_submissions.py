@@ -1309,6 +1309,31 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "comment": "This assumed something I never said.",
             }
         )
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-a",
+                "source_kind": "whatsapp_import",
+                "source_id": "source-a",
+                "import_id": "import-a",
+                "candidate_key": "source_a_music",
+                "decision": "approve",
+                "candidate": {
+                    "key": "source_a_music",
+                    "label": "Likes music talk",
+                    "category": "whatsapp_recurring_topics",
+                    "confidence": 0.72,
+                    "evidence": ["Aarav: send me that song"],
+                },
+                "review": {
+                    "what_we_learned": "The chat has repeated music hooks.",
+                    "why_it_matters": "Useful for softer conversation openings.",
+                    "confidence": 0.72,
+                    "usage": {"chat_context": True, "matching": False, "style": False},
+                    "evidence": ["Aarav: send me that song"],
+                },
+                "metadata": {"title": "Aarav WhatsApp"},
+            }
+        )
 
         app.dependency_overrides[current_user] = user_b
         conversation_b = self.client.post("/api/agent/conversations").json()["id"]
@@ -1331,6 +1356,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "conversation_id": conversation_b,
                 "message_index": 0,
                 "rating": "good",
+            }
+        )
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-b",
+                "source_kind": "whatsapp_import",
+                "candidate_key": "source_b_reject",
+                "decision": "reject",
+                "candidate": {"key": "source_b_reject", "label": "Other user"},
+                "review": {"rejection_reason": "Not useful."},
             }
         )
         app.dependency_overrides.clear()
@@ -1356,6 +1391,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["feedback"][0]["rating"], "off")
         self.assertEqual(data["feedback"][0]["reason"], "wrong_memory")
         self.assertEqual(data["feedback"][0]["comment"], "This assumed something I never said.")
+        self.assertEqual(data["user"]["data_point_review_count"], 1)
+        self.assertEqual(data["data_point_review_summary"]["total"], 1)
+        self.assertEqual(data["data_point_review_summary"]["approve"], 1)
+        self.assertEqual(data["data_point_reviews"][0]["user_id"], "user-a")
+        self.assertEqual(data["data_point_reviews"][0]["decision"], "approve")
+        self.assertEqual(
+            data["data_point_reviews"][0]["review"]["what_we_learned"],
+            "The chat has repeated music hooks.",
+        )
 
     def test_admin_pages_serve_separate_admin_shell(self) -> None:
         response = self.client.get("/admin")

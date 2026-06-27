@@ -663,6 +663,7 @@ td small {
   color: var(--ink);
   font-size: 13px;
   line-height: 1.5;
+  white-space: normal;
 }
 
 .feedback-item blockquote {
@@ -697,6 +698,61 @@ td small {
 .snapshot-source-list blockquote {
   max-height: 120px;
   overflow: auto;
+}
+
+.data-point-review-list {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.data-point-review-item {
+  display: grid;
+  gap: 8px;
+}
+
+.review-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-meta-row span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #f8faf9;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.review-evidence {
+  display: grid;
+  gap: 6px;
+}
+
+.review-evidence blockquote {
+  max-height: 96px;
+  overflow: auto;
+}
+
+.review-rejection {
+  border-left: 3px solid #e5b8b4;
+  color: var(--danger);
+  padding-left: 10px;
+}
+
+.debug-json {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf9;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 10px 0 0;
+  padding: 10px;
+  white-space: pre-wrap;
 }
 
 .detail-pagination {
@@ -895,6 +951,20 @@ td small {
 }
 
 .status-pill.rating-harmful {
+  border-color: #e5b8b4;
+  color: var(--danger);
+  background: #fff4f1;
+}
+
+.status-pill.data-point-decision-approve,
+.status-pill.data-point-decision-rewrite,
+.status-pill.data-point-decision-merge {
+  border-color: #bfe2d5;
+  color: var(--success);
+  background: #e9f7f1;
+}
+
+.status-pill.data-point-decision-reject {
   border-color: #e5b8b4;
   color: var(--danger);
   background: #fff4f1;
