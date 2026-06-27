@@ -1928,6 +1928,29 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertIn("WhatsApp chat makes casual plans", data_point_source["content"])
 
+    def test_whatsapp_import_can_use_llm_data_point_extractor(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        with patch.dict("os.environ", {"DATA_POINT_EXTRACTOR": "llm"}):
+            create_response = self.client.post(
+                f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+                json={
+                    "title": "Riya chat",
+                    "user_sender": "Aarav",
+                    "content": sample_whatsapp_export(),
+                },
+            )
+
+        self.assertEqual(create_response.status_code, 201)
+        facts = list_profile_facts("user-a")
+        self.assertTrue(facts)
+        self.assertIn("recent_events", {fact["category"] for fact in facts})
+        self.assertNotIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
+        self.assertTrue(all((fact["value"] or {}).get("extractor") == "llm" for fact in facts))
+
     def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
         create_response = self.client.post(

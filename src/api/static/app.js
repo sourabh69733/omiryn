@@ -3053,6 +3053,7 @@ function usageRequestKindLabel(kind) {
     input_guardrail: "Input guardrail",
     profile_extract: "Profile draft extraction",
     profile_extract_repair: "Profile extraction repair",
+    data_point_extract: "Data point extraction",
     profile_signal_extract: "Profile signal extraction",
     profile_signal_backfill: "Profile signal backfill",
     profile_fact_aggregate: "Profile fact aggregation",

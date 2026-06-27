@@ -926,6 +926,7 @@ function usageKindLabel(kind) {
     input_guardrail: "Input guardrail",
     profile_extract: "Profile extraction",
     profile_extract_repair: "Extraction repair",
+    data_point_extract: "Data point extraction",
     profile_signal_extract: "Signal extraction",
     profile_signal_backfill: "Signal backfill",
     profile_fact_aggregate: "Fact aggregation",

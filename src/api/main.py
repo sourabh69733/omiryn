@@ -35,6 +35,11 @@ from agent.context import (
     selected_style_source_exists,
 )
 from agent.data_point_feedback import normalize_data_point_feedback
+from agent.data_point_extraction import (
+    capture_llm_whatsapp_data_points,
+    data_point_extractor_mode,
+    should_run_llm_data_point_extraction,
+)
 from agent.data_points import normalize_data_point
 from agent.feedback import normalize_message_feedback
 from agent.memory import (
@@ -691,6 +696,7 @@ def update_conversation_context_attachments(
 def create_whatsapp_context_source(
     conversation_id: str,
     payload: WhatsappChatImportCreate,
+    background_tasks: BackgroundTasks,
     user: CurrentUser | None = Depends(current_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
@@ -780,7 +786,7 @@ def create_whatsapp_context_source(
         },
         _user_id(user),
     )
-    if user:
+    if user and data_point_extractor_mode() != "llm":
         for point in extract_whatsapp_data_points(
             structured_memory,
             user_id=user.id,
@@ -789,6 +795,16 @@ def create_whatsapp_context_source(
             title=payload.title,
         ):
             upsert_profile_fact(normalize_data_point(point))
+    if user and should_run_llm_data_point_extraction():
+        background_tasks.add_task(
+            capture_llm_whatsapp_data_points,
+            structured_memory,
+            user_id=user.id,
+            source_id=source["id"],
+            import_id=str(whatsapp_import["id"]),
+            title=payload.title,
+            conversation_id=conversation_id,
+        )
     return _context_source_summary(source)
 
 

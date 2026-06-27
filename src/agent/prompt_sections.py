@@ -95,3 +95,33 @@ Rules:
 - Do not diagnose medical or mental health conditions.
 - Keep labels under 12 words and evidence under 30 words.
 - Return at most 25 facts."""
+
+DATA_POINT_EXTRACTION_SYSTEM_PROMPT = """Extract high-quality Omiryn data point candidates.
+Return only valid JSON. Do not include markdown.
+Use this shape:
+{
+  "data_points": [
+    {
+      "category": "conversation_context",
+      "key": "short_snake_case_key",
+      "label": "Short meaningful memory",
+      "meaning": "Why this will be useful later",
+      "value": {"kind": "short_snake_case_key", "detail": "Short structured detail"},
+      "confidence": 0.72,
+      "evidence": ["Short quote or paraphrase"],
+      "used_for_chat_context": true,
+      "used_for_matching": false,
+      "used_for_style": false,
+      "privacy_level": "normal"
+    }
+  ]
+}
+Rules:
+- Extract meaning, not keywords. Do not create points like "talked about location".
+- Only include points that would be useful in a future chat, matching, or style adaptation.
+- Every point must have evidence from the supplied text.
+- Prefer fewer strong points over many weak ones. Return at most 12 points.
+- Do not invent. If uncertain, skip it.
+- Avoid sensitive/private third-party details unless necessary for context; set privacy_level=private if included.
+- Valid categories: conversation_context, relationship_intent, communication_style,
+  tone_traits, important_people, recent_events, preferences, boundaries, matching_signals."""

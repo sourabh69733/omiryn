@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from agent.data_point_extraction import normalize_llm_data_points
 from agent.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_budget import budget_context_sources
 from agent.prompt_builder import build_companion_system_prompt, context_sources_text
@@ -116,6 +117,40 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertFalse(any("topics include" in label.lower() for label in labels))
         self.assertTrue(any("casual plans" in label for label in labels))
         self.assertTrue(all((point["value"] or {}).get("meaning") for point in points))
+
+    def test_llm_data_point_validator_rejects_keyword_dump_points(self) -> None:
+        points = normalize_llm_data_points(
+            {
+                "data_points": [
+                    {
+                        "category": "conversation_context",
+                        "key": "location",
+                        "label": "Talked about location",
+                        "meaning": "Too generic",
+                        "confidence": 0.9,
+                        "evidence": ["location"],
+                    },
+                    {
+                        "category": "recent_events",
+                        "key": "coffee_then_walk",
+                        "label": "Planned coffee then a walk",
+                        "meaning": "Useful when user asks what the concrete recent plan was.",
+                        "value": {"kind": "coffee_then_walk"},
+                        "confidence": 0.82,
+                        "evidence": ["coffee first, then walk?"],
+                        "used_for_chat_context": True,
+                    },
+                ]
+            },
+            "user-a",
+            "source-a",
+            "import-a",
+            "Riya chat",
+        )
+
+        self.assertEqual(len(points), 1)
+        self.assertEqual(points[0]["key"], "coffee_then_walk")
+        self.assertEqual(points[0]["value"]["extractor"], "llm")
 
     def test_context_budget_prefers_compact_memory_and_style(self) -> None:
         budgeted = budget_context_sources(

@@ -22,12 +22,14 @@ from agent.prompt_builder import (
 )
 from agent.prompt_sections import (
     COMPANION_SYSTEM_PROMPT,
+    DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
     DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
     EXTRACTION_REPAIR_PROMPT,
     EXTRACTION_SYSTEM_PROMPT,
 )
 from agent.usage import (
     CHAT_REPLY,
+    DATA_POINT_EXTRACT,
     INPUT_GUARDRAIL,
     PROFILE_EXTRACT,
     PROFILE_EXTRACT_REPAIR,
@@ -342,6 +344,60 @@ async def extract_deep_profile_facts(
 
     raw = _parse_json_object(content)
     return _normalize_deep_profile_facts(raw, user_id, conversation_id)
+
+
+async def extract_llm_data_point_candidates(
+    extraction_text: str,
+    *,
+    conversation_id: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    provider = _provider_name()
+    logger.info("agent.data_points.extract provider=%s chars=%s", provider, len(extraction_text))
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        return _mock_llm_data_points(extraction_text)
+
+    messages = [{"role": "user", "content": extraction_text}]
+    if provider == "groq":
+        content = await _groq_chat(
+            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
+        content = await _openai_compatible_chat(
+            provider,
+            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    elif provider == "ollama":
+        content = await _ollama_chat(
+            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+            messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=DATA_POINT_EXTRACT,
+            model=model,
+        )
+    else:
+        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+
+    return _parse_json_object(content)
 
 
 def _provider_name() -> str:
@@ -1204,6 +1260,60 @@ def _mock_deep_profile_facts(
             }
         )
     return _normalize_deep_profile_facts({"facts": raw_facts}, user_id, conversation_id)
+
+
+def _mock_llm_data_points(extraction_text: str) -> dict[str, Any]:
+    text = extraction_text.lower()
+    points: list[dict[str, Any]] = []
+    if "coffee" in text and "walk" in text:
+        points.append(
+            {
+                "category": "recent_events",
+                "key": "coffee_then_walk_plan",
+                "label": "Planned coffee then a walk",
+                "meaning": "Useful when the user asks what the latest concrete WhatsApp plan was.",
+                "value": {"kind": "coffee_then_walk_plan", "detail": "Coffee first, then walk."},
+                "confidence": 0.82,
+                "evidence": ["coffee first, then walk?"],
+                "used_for_chat_context": True,
+                "used_for_matching": False,
+                "used_for_style": False,
+                "privacy_level": "normal",
+            }
+        )
+    if "wahi per rukna" in text or "location" in text:
+        points.append(
+            {
+                "category": "conversation_context",
+                "key": "meeting_location_coordination",
+                "label": "Coordinated where to wait or meet",
+                "meaning": "Useful for answering questions about last WhatsApp location or meeting context.",
+                "value": {"kind": "meeting_location_coordination"},
+                "confidence": 0.78,
+                "evidence": ["wahi per rukna", "location kidhar hai"],
+                "used_for_chat_context": True,
+                "used_for_matching": False,
+                "used_for_style": False,
+                "privacy_level": "normal",
+            }
+        )
+    if not points:
+        points.append(
+            {
+                "category": "communication_style",
+                "key": "short_casual_whatsapp_style",
+                "label": "Uses short casual WhatsApp replies",
+                "meaning": "Useful for adapting reply length and rhythm.",
+                "value": {"kind": "short_casual_whatsapp_style"},
+                "confidence": 0.58,
+                "evidence": ["short chat messages"],
+                "used_for_chat_context": True,
+                "used_for_matching": False,
+                "used_for_style": True,
+                "privacy_level": "normal",
+            }
+        )
+    return {"data_points": points}
 
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
