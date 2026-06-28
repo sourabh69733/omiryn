@@ -173,6 +173,7 @@ const onboardingStepIndicators = Array.from(document.querySelectorAll("[data-ste
 const onboardingBackStep = document.querySelector("#onboarding-back-step");
 const onboardingNextStep = document.querySelector("#onboarding-next-step");
 const basicsName = document.querySelector("#basics-name");
+const profileDob = document.querySelector("#profile-dob");
 const profileGender = document.querySelector("#profile-gender");
 const profileInterestedIn = document.querySelector("#profile-interested-in");
 const basicsOptionButtons = Array.from(document.querySelectorAll("[data-profile-option]"));
@@ -180,9 +181,11 @@ const profileCity = document.querySelector("#profile-city");
 const profilePhone = document.querySelector("#profile-phone");
 const profilePhoto = document.querySelector("#profile-photo");
 const profilePhotoPreview = document.querySelector("#profile-photo-preview");
+const profilePhotoPreviews = Array.from(document.querySelectorAll("[data-photo-preview]"));
 const profileForm = document.querySelector("#profile-form");
 const profileName = document.querySelector("#profile-name");
 const profileEmail = document.querySelector("#profile-email");
+const accountAge = document.querySelector("#account-age");
 const accountGender = document.querySelector("#account-gender");
 const accountInterestedIn = document.querySelector("#account-interested-in");
 const accountCity = document.querySelector("#account-city");
@@ -431,7 +434,7 @@ async function loadDatingBasicsStatus() {
       if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
       if (profileCity) profileCity.value = data.profile.city || "";
       if (profilePhone) profilePhone.value = data.profile.phone || "";
-      renderProfilePhotoPreview(profilePhotoPreview, data.profile.profile_photo_url);
+      renderProfilePhotoGallery(data.profile.profile_photo_urls?.length ? data.profile.profile_photo_urls : [data.profile.profile_photo_url]);
       syncBasicsOptionButtons();
     }
     renderAuthGate();
@@ -472,6 +475,7 @@ function renderOnboardingStep(step = onboardingStep) {
   if (saveDatingBasics) {
     saveDatingBasics.hidden = onboardingStep !== 2;
   }
+  clearDatingBasicsFieldErrors();
   if (datingBasicsStatus) {
     datingBasicsStatus.textContent = "";
   }
@@ -524,14 +528,69 @@ function updateAccountInterestedInDefault() {
   accountInterestedIn.value = defaultInterestedIn(accountGender.value);
 }
 
+function formatDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function setDobBounds() {
+  if (!profileDob) return;
+  const today = new Date();
+  const maxDob = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+  const minDob = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+  profileDob.max = formatDateInputValue(maxDob);
+  profileDob.min = formatDateInputValue(minDob);
+}
+
+function ageFromDob(value) {
+  if (!value) return null;
+  const dob = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hadBirthdayThisYear =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hadBirthdayThisYear) {
+    age -= 1;
+  }
+  return age;
+}
+
+function setFieldError(field, message = "") {
+  const fieldShell = field?.closest?.(".basics-field");
+  const errorText = fieldShell?.querySelector?.(".field-error");
+  if (!fieldShell || !errorText) return;
+  fieldShell.classList.toggle("has-error", Boolean(message));
+  errorText.textContent = message;
+}
+
+function clearDatingBasicsFieldErrors() {
+  [basicsName, profileDob, profileCity, profilePhone].forEach((field) => {
+    if (field) setFieldError(field, "");
+  });
+}
+
 async function saveDatingBasicsProfile(event) {
   event.preventDefault();
-  if (!basicsName || !profileGender || !profileInterestedIn || !profileCity || !saveDatingBasics) return;
+  if (!basicsName || !profileDob || !profileGender || !profileInterestedIn || !profileCity || !saveDatingBasics) return;
 
-  if (!basicsName.value.trim() || !profileGender.value || !profileInterestedIn.value || !profileCity.value.trim()) {
-    if (datingBasicsStatus) {
-      datingBasicsStatus.textContent = "Add your name, gender, interest, and location to continue.";
-    }
+  clearDatingBasicsFieldErrors();
+  const ageValue = ageFromDob(profileDob.value);
+  const validationChecks = [
+    { valid: Boolean(basicsName.value.trim()), message: "Name required", field: basicsName },
+    {
+      valid: Number.isInteger(ageValue) && ageValue >= 18 && ageValue <= 100,
+      message: "18+ required",
+      field: profileDob
+    },
+    { valid: Boolean(profileGender.value), message: "Choose your gender to continue.", field: profileGender },
+    { valid: Boolean(profileInterestedIn.value), message: "Choose who you are interested in to continue.", field: profileInterestedIn },
+    { valid: Boolean(profileCity.value.trim()), message: "City required", field: profileCity }
+  ];
+  const failedCheck = validationChecks.find((check) => !check.valid);
+  if (failedCheck) {
+    setFieldError(failedCheck.field, failedCheck.message);
+    failedCheck.field?.focus?.();
     return;
   }
 
@@ -545,6 +604,7 @@ async function saveDatingBasicsProfile(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         display_name: basicsName.value.trim(),
+        age: ageValue,
         gender: profileGender.value,
         interested_in: profileInterestedIn.value,
         city: profileCity.value.trim(),
@@ -559,13 +619,18 @@ async function saveDatingBasicsProfile(event) {
     if (!response.ok) {
       throw new Error(data.detail || "Could not save dating basics.");
     }
-    if (profilePhoto?.files?.[0]) {
-      const uploaded = await uploadProfilePhoto(profilePhoto.files[0]);
-      renderProfilePhotoPreview(profilePhotoPreview, uploaded.profile_photo_url);
+    const photoFiles = selectedProfilePhotoFiles();
+    if (photoFiles.length) {
+      let uploaded = null;
+      for (const file of photoFiles) {
+        uploaded = await uploadProfilePhoto(file);
+      }
+      renderProfilePhotoGallery(uploaded?.profile_photo_urls || [uploaded?.profile_photo_url]);
       profilePhoto.value = "";
     }
     datingBasicsComplete = true;
     if (profileName) profileName.value = basicsName.value.trim();
+    if (accountAge) accountAge.value = String(ageValue);
     if (accountGender) accountGender.value = profileGender.value;
     if (accountInterestedIn) accountInterestedIn.value = profileInterestedIn.value;
     if (accountCity) accountCity.value = profileCity.value.trim();
@@ -577,7 +642,16 @@ async function saveDatingBasicsProfile(event) {
     renderAuthGate();
     focusChatInput();
   } catch (error) {
-    if (datingBasicsStatus) {
+    if (/location|city/i.test(error.message)) {
+      setFieldError(profileCity, "City required");
+      profileCity?.focus?.();
+    } else if (/age|birth/i.test(error.message)) {
+      setFieldError(profileDob, "18+ required");
+      profileDob?.focus?.();
+    } else if (/name/i.test(error.message)) {
+      setFieldError(basicsName, "Name required");
+      basicsName?.focus?.();
+    } else if (datingBasicsStatus) {
       datingBasicsStatus.textContent = error.message;
     }
   } finally {
@@ -601,6 +675,7 @@ async function loadProfilePage() {
     const profile = data.profile || {};
     if (profileName) profileName.value = profile.display_name || "";
     if (profileEmail) profileEmail.value = data.user?.email || "";
+    if (accountAge) accountAge.value = profile.age || "";
     if (accountGender) accountGender.value = profile.gender || "prefer_not_to_say";
     if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
     if (accountCity) accountCity.value = profile.city || "";
@@ -628,14 +703,16 @@ async function saveProfilePage(event) {
     profileStatus.textContent = "Saving profile...";
   }
   try {
-    if (!profileName?.value.trim() || !accountCity?.value.trim()) {
-      throw new Error("Name and location are required.");
+    const ageValue = Number(accountAge?.value);
+    if (!profileName?.value.trim() || !Number.isInteger(ageValue) || ageValue < 18 || ageValue > 100 || !accountCity?.value.trim()) {
+      throw new Error("Name, age, and location are required.");
     }
     const response = await apiFetch("/api/me/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         display_name: profileName?.value.trim() || null,
+        age: ageValue,
         gender: accountGender.value,
         interested_in: accountInterestedIn.value,
         city: accountCity?.value.trim() || null,
@@ -687,13 +764,33 @@ async function uploadProfilePhoto(file) {
 
 function renderProfilePhotoPreview(preview, url) {
   if (!preview) return;
+  const wrapper = preview.closest(".photo-slot, .photo-avatar-shell");
   if (!url) {
     preview.hidden = true;
     preview.removeAttribute("src");
+    wrapper?.classList.remove("has-photo");
     return;
   }
   preview.src = url;
   preview.hidden = false;
+  wrapper?.classList.add("has-photo");
+}
+
+function renderProfilePhotoGallery(urls = []) {
+  profilePhotoPreviews.forEach((preview, index) => {
+    renderProfilePhotoPreview(preview, urls[index] || "");
+  });
+}
+
+function selectedProfilePhotoFiles() {
+  return Array.from(profilePhoto?.files || [])
+    .filter((file) => file.type?.startsWith("image/"))
+    .slice(0, 4);
+}
+
+function previewSelectedPhotos() {
+  const urls = selectedProfilePhotoFiles().map((file) => URL.createObjectURL(file));
+  renderProfilePhotoGallery(urls);
 }
 
 function previewSelectedPhoto(input, preview) {
@@ -3273,10 +3370,15 @@ basicsOptionButtons.forEach((button) => {
   });
 });
 syncBasicsOptionButtons();
+setDobBounds();
 onboardingNextStep?.addEventListener("click", goToNextOnboardingStep);
 onboardingBackStep?.addEventListener("click", goToPreviousOnboardingStep);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
-profilePhoto?.addEventListener("change", () => previewSelectedPhoto(profilePhoto, profilePhotoPreview));
+profilePhoto?.addEventListener("change", previewSelectedPhotos);
+[basicsName, profileDob, profileCity, profilePhone].forEach((field) => {
+  field?.addEventListener("input", () => setFieldError(field, ""));
+  field?.addEventListener("change", () => setFieldError(field, ""));
+});
 accountPhoto?.addEventListener("change", () => previewSelectedPhoto(accountPhoto, accountPhotoPreview));
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
 profileForm?.addEventListener("submit", saveProfilePage);

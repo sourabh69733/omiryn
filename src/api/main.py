@@ -304,6 +304,7 @@ class WhatsappChatImportCreate(BaseModel):
 
 class DatingBasics(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
+    age: int | None = Field(default=None, ge=18, le=100)
     gender: Gender
     interested_in: InterestedIn
     city: str | None = Field(default=None, max_length=120)
@@ -312,6 +313,7 @@ class DatingBasics(BaseModel):
 
 class UserProfilePatch(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
+    age: int | None = Field(default=None, ge=18, le=100)
     gender: Gender
     interested_in: InterestedIn
     city: str | None = Field(default=None, max_length=120)
@@ -370,6 +372,8 @@ async def put_dating_basics(
     city = _clean_optional_text(payload.city or (existing_profile or {}).get("city"))
     if not display_name:
         raise HTTPException(status_code=422, detail="Name is required.")
+    if payload.age is None:
+        raise HTTPException(status_code=422, detail="Age is required.")
     if not city:
         raise HTTPException(status_code=422, detail="Location is required.")
     profile = save_user_profile(
@@ -377,9 +381,11 @@ async def put_dating_basics(
         payload.gender,
         payload.interested_in,
         display_name,
+        payload.age,
         city,
         _clean_optional_text(payload.phone),
         (existing_profile or {}).get("profile_photo_url"),
+        (existing_profile or {}).get("profile_photo_urls") or [],
     )
     return {"complete": True, "profile": profile}
 
@@ -428,14 +434,17 @@ async def put_me_profile(
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
+    existing_profile = get_user_profile(user.id) or {}
     profile = save_user_profile(
         user.id,
         payload.gender,
         payload.interested_in,
         _clean_optional_text(payload.display_name),
+        payload.age,
         _clean_optional_text(payload.city),
         _clean_optional_text(payload.phone),
-        (get_user_profile(user.id) or {}).get("profile_photo_url"),
+        existing_profile.get("profile_photo_url"),
+        existing_profile.get("profile_photo_urls") or [],
     )
     return {"profile": profile}
 
@@ -464,15 +473,24 @@ async def put_me_profile_photo(
     photo_url = f"/uploads/profile_photos/{filename}"
 
     existing_profile = get_user_profile(user.id)
+    existing_photo_urls = list((existing_profile or {}).get("profile_photo_urls") or [])
+    if not existing_photo_urls and (existing_profile or {}).get("profile_photo_url"):
+        existing_photo_urls = [str((existing_profile or {}).get("profile_photo_url"))]
+    if len(existing_photo_urls) >= 4:
+        raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
+    profile_photo_urls = [*existing_photo_urls, photo_url][:4]
+    primary_photo_url = str((existing_profile or {}).get("profile_photo_url") or profile_photo_urls[0])
     if existing_profile:
         profile = save_user_profile(
             user.id,
             str(existing_profile.get("gender") or "prefer_not_to_say"),
             str(existing_profile.get("interested_in") or "everyone"),
             _clean_optional_text(existing_profile.get("display_name")),
+            existing_profile.get("age"),
             _clean_optional_text(existing_profile.get("city")),
             _clean_optional_text(existing_profile.get("phone")),
-            photo_url,
+            primary_photo_url,
+            profile_photo_urls,
         )
     else:
         profile = save_user_profile(
@@ -482,9 +500,11 @@ async def put_me_profile_photo(
             user.display_name,
             None,
             None,
+            None,
             photo_url,
+            [photo_url],
         )
-    return {"profile_photo_url": photo_url, "profile": profile}
+    return {"profile_photo_url": primary_photo_url, "profile_photo_urls": profile_photo_urls, "profile": profile}
 
 
 @app.get("/api/me/profile-facts")
@@ -1473,6 +1493,7 @@ def _basic_profile_complete(profile: dict[str, object] | None) -> bool:
     return bool(
         profile
         and profile.get("display_name")
+        and profile.get("age")
         and profile.get("gender")
         and profile.get("interested_in")
         and profile.get("city")

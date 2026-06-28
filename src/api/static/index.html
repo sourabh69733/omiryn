@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn | Your Matchmaker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260628-onboarding-orbit-icons" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260628-onboarding-gallery-row" />
   </head>
   <body>
     <section class="auth-screen" id="auth-screen" hidden>
@@ -55,7 +55,6 @@
           <p class="basics-control-note">
             You are in control. You can adjust anything anytime.
           </p>
-          <p class="auth-status" id="dating-basics-status"></p>
         </aside>
 
         <div class="basics-builder">
@@ -159,10 +158,10 @@
             </fieldset>
 
             <div class="profile-core" aria-hidden="true">
-              <!-- <span class="profile-node node-top-left"></span>
+              <span class="profile-node node-top-left"></span>
               <span class="profile-node node-top-right"></span>
               <span class="profile-node node-bottom-left"></span>
-              <span class="profile-node node-bottom-right"></span> -->
+              <span class="profile-node node-bottom-right"></span>
               <span class="profile-core-letter" aria-hidden="true">O</span>
             </div>
           </div>
@@ -174,18 +173,59 @@
               <p>These details stay private and help anchor your profile before conversation takes over.</p>
             </div>
             <div class="about-you-fields">
-              <label class="basics-field compact">
-                Name
-                <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" />
+              <label class="basics-field compact photo-upload-field">
+                Profile photos
+                <span class="photo-upload-card">
+                  <span class="photo-gallery-grid" aria-hidden="true">
+                    <span class="photo-slot photo-slot-main">
+                      <img class="profile-photo-preview" data-photo-preview="0" id="profile-photo-preview" alt="" hidden />
+                      <span class="photo-avatar-placeholder">O</span>
+                      <span class="photo-camera-mark"></span>
+                      <small>Main photo</small>
+                    </span>
+                    <span class="photo-slot">
+                      <img class="profile-photo-preview" data-photo-preview="1" alt="" hidden />
+                      <span class="photo-plus-mark"></span>
+                    </span>
+                    <span class="photo-slot">
+                      <img class="profile-photo-preview" data-photo-preview="2" alt="" hidden />
+                      <span class="photo-plus-mark"></span>
+                    </span>
+                    <span class="photo-slot">
+                      <img class="profile-photo-preview" data-photo-preview="3" alt="" hidden />
+                      <span class="photo-plus-mark"></span>
+                    </span>
+                  </span>
+                  <span class="photo-upload-copy">
+                    <strong>Add your photos</strong>
+                    <small>Choose up to 4 clear photos. Your first photo becomes the main profile image.</small>
+                    <span class="photo-upload-action">Choose photos</span>
+                  </span>
+                  <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+                </span>
               </label>
-              <label class="basics-field compact">
-                City
-                <input id="profile-city" type="text" placeholder="Where are you based?" autocomplete="address-level2" />
-              </label>
-              <label class="basics-field compact">
-                Mobile <span>Optional</span>
-                <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
-              </label>
+              <div class="about-you-inputs">
+                <label class="basics-field compact">
+                  Name
+                  <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Date of birth
+                  <input id="profile-dob" type="date" autocomplete="bday" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  City
+                  <input id="profile-city" type="text" placeholder="Where are you based?" autocomplete="address-level2" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Phone (optional)
+                  <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -193,8 +233,6 @@
             <div class="builder-stepper" aria-label="Profile setup progress">
               <span class="active" data-step-indicator="1"><b>1</b><em>Basics</em><small>Set your direction</small></span>
               <span data-step-indicator="2"><b>2</b><em>About you</em><small>Share more about you</small></span>
-              <span data-step-indicator="3"><b>3</b><em>Values</em><small>Your core values</small></span>
-              <span data-step-indicator="4"><b>4</b><em>Review</em><small>Review &amp; finish</small></span>
             </div>
             <div class="builder-actions">
               <button class="secondary-button" id="onboarding-back-step" type="button" hidden>
@@ -491,6 +529,10 @@
                 <label>
                   Name
                   <input id="profile-name" type="text" placeholder="Your name" />
+                </label>
+                <label>
+                  Age
+                  <input id="account-age" type="number" min="18" max="100" inputmode="numeric" placeholder="Your age" />
                 </label>
                 <label>
                   Email

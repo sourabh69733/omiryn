@@ -194,11 +194,13 @@ user_profiles = Table(
     metadata,
     Column("user_id", String, primary_key=True),
     Column("display_name", String, nullable=True),
+    Column("age", Integer, nullable=True),
     Column("gender", String, nullable=True),
     Column("interested_in", String, nullable=True),
     Column("city", String, nullable=True),
     Column("phone", String, nullable=True),
     Column("profile_photo_url", String, nullable=True),
+    Column("profile_photo_urls", JSON, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -481,11 +483,13 @@ def _ensure_runtime_columns() -> None:
     required_columns = {
         "user_profiles": (
             "display_name",
+            "age",
             "gender",
             "interested_in",
             "city",
             "phone",
             "profile_photo_url",
+            "profile_photo_urls",
         ),
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
@@ -507,6 +511,10 @@ def _ensure_runtime_columns() -> None:
             for column_name in column_names:
                 if column_name not in existing_columns:
                     column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
+                    if column_name == "age":
+                        column_type = "INTEGER"
+                    if column_name == "profile_photo_urls":
+                        column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
                     connection.execute(
                         text(
@@ -1050,11 +1058,13 @@ def get_user_profile(user_id: str) -> dict[str, Any] | None:
     return {
         "user_id": row["user_id"],
         "display_name": row["display_name"],
+        "age": row["age"],
         "gender": row["gender"],
         "interested_in": row["interested_in"],
         "city": row["city"],
         "phone": row["phone"],
         "profile_photo_url": row["profile_photo_url"],
+        "profile_photo_urls": row["profile_photo_urls"] or [],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
@@ -1065,18 +1075,22 @@ def save_user_profile(
     gender: str,
     interested_in: str,
     display_name: str | None = None,
+    age: int | None = None,
     city: str | None = None,
     phone: str | None = None,
     profile_photo_url: str | None = None,
+    profile_photo_urls: list[str] | None = None,
 ) -> dict[str, Any]:
     payload = {
         "user_id": user_id,
         "display_name": display_name,
+        "age": age,
         "gender": gender,
         "interested_in": interested_in,
         "city": city,
         "phone": phone,
         "profile_photo_url": profile_photo_url,
+        "profile_photo_urls": profile_photo_urls or ([profile_photo_url] if profile_photo_url else []),
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
