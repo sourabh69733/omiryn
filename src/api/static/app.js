@@ -19,6 +19,7 @@ let authRequired = false;
 let authProvider = "none";
 let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
+let onboardingStep = 1;
 let activeFeedbackMessageIndex = null;
 const messageFeedbackState = new Map();
 
@@ -167,9 +168,14 @@ const authScreenLogin = document.querySelector("#auth-screen-login");
 const authScreenStatus = document.querySelector("#auth-screen-status");
 const datingBasicsScreen = document.querySelector("#dating-basics-screen");
 const datingBasicsForm = document.querySelector("#dating-basics-form");
+const onboardingStepPanels = Array.from(document.querySelectorAll("[data-onboarding-step]"));
+const onboardingStepIndicators = Array.from(document.querySelectorAll("[data-step-indicator]"));
+const onboardingBackStep = document.querySelector("#onboarding-back-step");
+const onboardingNextStep = document.querySelector("#onboarding-next-step");
 const basicsName = document.querySelector("#basics-name");
 const profileGender = document.querySelector("#profile-gender");
 const profileInterestedIn = document.querySelector("#profile-interested-in");
+const basicsOptionButtons = Array.from(document.querySelectorAll("[data-profile-option]"));
 const profileCity = document.querySelector("#profile-city");
 const profilePhone = document.querySelector("#profile-phone");
 const profilePhoto = document.querySelector("#profile-photo");
@@ -381,6 +387,9 @@ function renderAuthGate(message) {
   if (datingBasicsScreen) {
     datingBasicsScreen.hidden = !shouldBasicsGate;
   }
+  if (shouldBasicsGate) {
+    renderOnboardingStep(onboardingStep);
+  }
   if (authScreenLogin) {
     authScreenLogin.disabled = !supabaseClient;
   }
@@ -391,6 +400,7 @@ function renderAuthGate(message) {
 
 async function resetToSignIn(message = "Sign in to continue.") {
   datingBasicsComplete = null;
+  onboardingStep = 1;
   try {
     await supabaseClient?.auth.signOut();
   } catch {
@@ -422,10 +432,11 @@ async function loadDatingBasicsStatus() {
       if (profileCity) profileCity.value = data.profile.city || "";
       if (profilePhone) profilePhone.value = data.profile.phone || "";
       renderProfilePhotoPreview(profilePhotoPreview, data.profile.profile_photo_url);
+      syncBasicsOptionButtons();
     }
     renderAuthGate();
     if (!datingBasicsComplete) {
-      basicsName?.focus();
+      renderOnboardingStep(1);
     }
   } catch (error) {
     datingBasicsComplete = false;
@@ -442,9 +453,70 @@ function defaultInterestedIn(gender) {
   return "everyone";
 }
 
+function renderOnboardingStep(step = onboardingStep) {
+  onboardingStep = Math.max(1, Math.min(2, Number(step) || 1));
+  onboardingStepPanels.forEach((panel) => {
+    panel.hidden = Number(panel.dataset.onboardingStep) !== onboardingStep;
+  });
+  onboardingStepIndicators.forEach((indicator) => {
+    const indicatorStep = Number(indicator.dataset.stepIndicator);
+    indicator.classList.toggle("active", indicatorStep === onboardingStep);
+    indicator.classList.toggle("complete", indicatorStep < onboardingStep);
+  });
+  if (onboardingBackStep) {
+    onboardingBackStep.hidden = onboardingStep === 1;
+  }
+  if (onboardingNextStep) {
+    onboardingNextStep.hidden = onboardingStep !== 1;
+  }
+  if (saveDatingBasics) {
+    saveDatingBasics.hidden = onboardingStep !== 2;
+  }
+  if (datingBasicsStatus) {
+    datingBasicsStatus.textContent = "";
+  }
+}
+
+function goToNextOnboardingStep() {
+  if (!profileGender?.value || !profileInterestedIn?.value) {
+    if (datingBasicsStatus) {
+      datingBasicsStatus.textContent = "Choose your direction to continue.";
+    }
+    return;
+  }
+  renderOnboardingStep(2);
+  basicsName?.focus();
+}
+
+function goToPreviousOnboardingStep() {
+  renderOnboardingStep(1);
+}
+
+function syncBasicsOptionButtons() {
+  basicsOptionButtons.forEach((button) => {
+    const select = document.querySelector(`#${button.dataset.profileOption}`);
+    const isSelected = Boolean(select && select.value === button.dataset.value);
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+}
+
+function selectBasicsOption(targetId, value, dispatchChange = true) {
+  const select = document.querySelector(`#${targetId}`);
+  if (!select) return;
+  select.value = value;
+  if (dispatchChange) {
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    syncBasicsOptionButtons();
+  } else {
+    syncBasicsOptionButtons();
+  }
+}
+
 function updateInterestedInDefault() {
   if (!profileGender || !profileInterestedIn) return;
   profileInterestedIn.value = defaultInterestedIn(profileGender.value);
+  syncBasicsOptionButtons();
 }
 
 function updateAccountInterestedInDefault() {
@@ -501,6 +573,7 @@ async function saveDatingBasicsProfile(event) {
     if (datingBasicsStatus) {
       datingBasicsStatus.textContent = "";
     }
+    onboardingStep = 1;
     renderAuthGate();
     focusChatInput();
   } catch (error) {
@@ -584,6 +657,7 @@ async function saveProfilePage(event) {
     if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
     if (profileCity) profileCity.value = data.profile.city || "";
     if (profilePhone) profilePhone.value = data.profile.phone || "";
+    syncBasicsOptionButtons();
     if (profileStatus) {
       profileStatus.textContent = "Profile saved.";
     }
@@ -3192,6 +3266,15 @@ authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
 profileGender?.addEventListener("change", updateInterestedInDefault);
+profileInterestedIn?.addEventListener("change", syncBasicsOptionButtons);
+basicsOptionButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    selectBasicsOption(button.dataset.profileOption, button.dataset.value);
+  });
+});
+syncBasicsOptionButtons();
+onboardingNextStep?.addEventListener("click", goToNextOnboardingStep);
+onboardingBackStep?.addEventListener("click", goToPreviousOnboardingStep);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
 profilePhoto?.addEventListener("change", () => previewSelectedPhoto(profilePhoto, profilePhotoPreview));
 accountPhoto?.addEventListener("change", () => previewSelectedPhoto(accountPhoto, accountPhotoPreview));

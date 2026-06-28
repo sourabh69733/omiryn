@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omiryn – Build your match profile</title>
+  <meta name="description" content="Build your match profile on Omiryn. Talk first. Match better.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Page Layout ── */
+    .page {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ═══════════════════════════════════════
+       LEFT PANEL
+       ═══════════════════════════════════════ */
+    .left-panel {
+      width: 350px;
+      min-width: 350px;
+      padding: 36px 36px 24px;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      z-index: 2;
+    }
+
+    /* Logo */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 52px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: #1b5e54;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon svg { width: 20px; height: 20px; }
+    .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -0.3px;
+    }
+
+    /* Tagline */
+    .tagline {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: #1b5e54;
+      margin-bottom: 10px;
+    }
+
+    /* Heading */
+    .heading {
+      font-size: 34px;
+      font-weight: 700;
+      line-height: 1.12;
+      color: #1a1a1a;
+      margin-bottom: 30px;
+      letter-spacing: -0.5px;
+    }
+
+    /* Subheading */
+    .sub-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1b5e54;
+      margin-bottom: 6px;
+    }
+    .description {
+      font-size: 13.5px;
+      color: #666;
+      line-height: 1.55;
+      margin-bottom: 28px;
+    }
+
+    /* Features Box */
+    .features-box {
+      border: 1px solid #e2e2e2;
+      border-radius: 14px;
+      padding: 22px 20px;
+      margin-bottom: 18px;
+    }
+    .feature {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .feature + .feature {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .feature-icon {
+      width: 28px; height: 28px; min-width: 28px;
+      display: flex; align-items: center; justify-content: center;
+      color: #1b5e54;
+      margin-top: 1px;
+    }
+    .feature-icon svg { width: 20px; height: 20px; }
+    .feature-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 2px;
+      color: #1a1a1a;
+    }
+    .feature-desc {
+      font-size: 12px;
+      color: #888;
+      line-height: 1.45;
+    }
+
+    /* Control note */
+    .control-note {
+      font-size: 12px;
+      color: #1b5e54;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .control-note svg { width: 16px; height: 16px; min-width: 16px; }
+
+    /* ═══════════════════════════════════════
+       RIGHT PANEL
+       ═══════════════════════════════════════ */
+    .right-panel {
+      flex: 1;
+      background: linear-gradient(135deg, #f3f9f6 0%, #edf6f2 50%, #f0f8f5 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .profile-builder {
+      position: relative;
+      width: 640px;
+      height: 500px;
+    }
+
+    /* ── SVG connecting lines ── */
+    .lines-svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Center circle ── */
+    .center-wrap {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 170px; height: 170px;
+      z-index: 1;
+    }
+    .center-outer-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid #beddd2;
+    }
+    .center-inner {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 125px; height: 125px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #1f6a5f, #1a5c53);
+      display: flex;
+      align-items: center; justify-content: center;
+      box-shadow: 0 8px 32px rgba(26, 92, 83, 0.25);
+    }
+    .center-inner span {
+      color: rgba(255,255,255,0.95);
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 64px;
+      font-weight: 400;
+    }
+    /* Ring dots */
+    .ring-dot {
+      position: absolute;
+      width: 10px; height: 10px;
+      background: #3daa8e;
+      border-radius: 50%;
+      z-index: 2;
+    }
+    .rd-top    { top: -5px;    left: 50%;   transform: translateX(-50%); }
+    .rd-bottom { bottom: -5px; left: 50%;   transform: translateX(-50%); }
+    .rd-left   { left: -5px;   top: 50%;    transform: translateY(-50%); }
+    .rd-right  { right: -5px;  top: 50%;    transform: translateY(-50%); }
+
+    /* ── Decorative icons floating near circle ── */
+    .deco {
+      position: absolute;
+      color: #1b5e54;
+      z-index: 1;
+    }
+    .deco svg { width: 22px; height: 22px; opacity: 0.45; }
+    .deco-sparkle { top: 62px;  left: 310px; }
+    .deco-chat    { top: 262px; left: 188px; }
+    .deco-heart   { top: 395px; left: 308px; }
+
+    /* ═══════════════════════════════════════
+       OPTION GROUPS
+       ═══════════════════════════════════════ */
+    .opt-group {
+      position: absolute;
+      z-index: 2;
+    }
+    .opt-label {
+      font-size: 14px;
+      font-weight: 600;
+      font-style: italic;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    /* Pills */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 20px;
+      border-radius: 26px;
+      border: 1.5px solid #dcdcdc;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      color: #444;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 7px;
+      white-space: nowrap;
+    }
+    .pill:hover {
+      border-color: #1b5e54;
+      box-shadow: 0 2px 8px rgba(27, 94, 84, 0.08);
+    }
+    .pill svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .pill.sel-outline {
+      border-color: #1b5e54;
+      color: #1b5e54;
+      background: #f5fbf9;
+    }
+    .pill.sel-filled {
+      background: #1b5e54;
+      border-color: #1b5e54;
+      color: #fff;
+    }
+    .pill.sel-filled svg { color: #fff; }
+
+    /* Group: I am (top-left) */
+    .grp-iam {
+      top: 30px;
+      left: 30px;
+    }
+    .grp-iam .pills { display: flex; flex-direction: column; align-items: flex-start; }
+
+    /* Group: Interested in (top-right) */
+    .grp-interested {
+      top: 30px;
+      right: 20px;
+      text-align: right;
+    }
+    .grp-interested .pills { display: flex; flex-direction: column; align-items: flex-end; }
+
+    /* Group: Looking for (bottom-left) */
+    .grp-looking {
+      bottom: 50px;
+      left: 30px;
+    }
+    .grp-looking .pills { display: flex; flex-direction: column; align-items: flex-start; }
+
+    /* Group: Conversation style (bottom-right) */
+    .grp-convo {
+      bottom: 15px;
+      right: 20px;
+      text-align: right;
+    }
+    .grp-convo .pills { display: flex; flex-direction: column; align-items: flex-end; }
+
+    /* ═══════════════════════════════════════
+       BOTTOM BAR
+       ═══════════════════════════════════════ */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 40px;
+      border-top: 1px solid #eaeaea;
+      background: #fff;
+    }
+
+    .steps {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .step-num {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+    }
+    .step-num.active  { background: #1b5e54; color: #fff; }
+    .step-num.inactive { background: #eee; color: #aaa; }
+    .step-info {}
+    .step-title { font-size: 13px; font-weight: 600; color: #1a1a1a; line-height: 1.2; }
+    .step-desc  { font-size: 11px; color: #aaa; line-height: 1.2; }
+    .step.inactive-step .step-title { color: #999; }
+
+    .step-dash {
+      width: 50px;
+      height: 0;
+      border-top: 2px dashed #d5d5d5;
+      margin: 0 16px;
+    }
+
+    .continue-btn {
+      background: #1b5e54;
+      color: #fff;
+      border: none;
+      padding: 15px 38px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.2s, transform 0.15s;
+      font-family: inherit;
+      letter-spacing: 0.2px;
+    }
+    .continue-btn:hover {
+      background: #164e46;
+      transform: translateY(-1px);
+    }
+    .continue-btn svg { width: 18px; height: 18px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="main">
+
+      <!-- ═══ LEFT PANEL ═══ -->
+      <aside class="left-panel">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle"
+                    font-family="Georgia, serif" font-size="16" fill="white" font-weight="400">O</text>
+            </svg>
+          </div>
+          <span class="logo-text">Omiryn</span>
+        </div>
+
+        <p class="tagline">Talk first. Match better.</p>
+        <h1 class="heading">Build your<br>match profile</h1>
+
+        <p class="sub-heading">Start with the signals that matter</p>
+        <p class="description">These choices help Omiryn focus on the right people and conversations for you.</p>
+
+        <div class="features-box">
+          <!-- Smarter matches -->
+          <div class="feature">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-title">Smarter matches</div>
+              <div class="feature-desc">We use your signals to surface better connections.</div>
+            </div>
+          </div>
+          <!-- Private by design -->
+          <div class="feature">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-title">Private by design</div>
+              <div class="feature-desc">Only you can see your full profile and signals.</div>
+            </div>
+          </div>
+          <!-- Built from conversation -->
+          <div class="feature">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-title">Built from conversation</div>
+              <div class="feature-desc">The more you chat, the better Omiryn gets to know you.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          You're in control. You can adjust anything anytime.
+        </div>
+      </aside>
+
+      <!-- ═══ RIGHT PANEL ═══ -->
+      <section class="right-panel">
+        <div class="profile-builder">
+
+          <!-- ── SVG Connecting Lines ── -->
+          <svg class="lines-svg" viewBox="0 0 640 500" fill="none">
+            <!-- Lines from center to groups -->
+            <!-- Top-left: I am -->
+            <path d="M 320 165 Q 260 120 175 108" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 165 Q 240 140 155 145" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 165 Q 250 160 145 178" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+
+            <!-- Top-right: Interested in -->
+            <path d="M 320 165 Q 400 120 505 108" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 165 Q 420 140 505 145" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 165 Q 410 165 505 178" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+
+            <!-- Bottom-left: Looking for -->
+            <path d="M 320 335 Q 260 360 165 328" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 335 Q 240 365 155 365" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 335 Q 250 385 155 398" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+
+            <!-- Bottom-right: Conversation style -->
+            <path d="M 320 335 Q 400 340 505 315" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 335 Q 420 360 505 350" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 335 Q 400 380 505 385" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+            <path d="M 320 335 Q 410 400 505 420" stroke="#c5ddd5" stroke-width="1.2" fill="none"/>
+
+            <!-- Vertical & horizontal axis lines through center -->
+            <line x1="320" y1="70" x2="320" y2="165" stroke="#d5e8e0" stroke-width="1"/>
+            <line x1="320" y1="335" x2="320" y2="440" stroke="#d5e8e0" stroke-width="1"/>
+            <line x1="155" y1="250" x2="235" y2="250" stroke="#d5e8e0" stroke-width="1"/>
+            <line x1="405" y1="250" x2="490" y2="250" stroke="#d5e8e0" stroke-width="1"/>
+          </svg>
+
+          <!-- ── Center Circle ── -->
+          <div class="center-wrap">
+            <div class="center-outer-ring">
+              <div class="ring-dot rd-top"></div>
+              <div class="ring-dot rd-bottom"></div>
+              <div class="ring-dot rd-left"></div>
+              <div class="ring-dot rd-right"></div>
+            </div>
+            <div class="center-inner">
+              <span>O</span>
+            </div>
+          </div>
+
+          <!-- ── Decorative icons ── -->
+          <div class="deco deco-sparkle">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l2.09 6.26L20.18 10l-6.09 1.74L12 18l-2.09-6.26L3.82 10l6.09-1.74L12 2z"/>
+            </svg>
+          </div>
+          <div class="deco deco-chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="2" y="4" width="20" height="12" rx="3"/>
+              <path d="M8 20l4-4 4 4"/>
+            </svg>
+          </div>
+          <div class="deco deco-heart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </div>
+
+          <!-- ═══ I AM (top-left) ═══ -->
+          <div class="opt-group grp-iam">
+            <div class="opt-label">I am</div>
+            <div class="pills">
+              <div class="pill sel-outline" id="pill-man">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="14" r="5"/>
+                  <line x1="21" y1="3" x2="14" y2="10"/>
+                  <polyline points="21 10 21 3 14 3"/>
+                </svg>
+                Man
+              </div>
+              <div class="pill" id="pill-woman">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="9" r="5"/>
+                  <line x1="12" y1="14" x2="12" y2="22"/>
+                  <line x1="9" y1="18" x2="15" y2="18"/>
+                </svg>
+                Woman
+              </div>
+              <div class="pill" id="pill-nonbinary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/>
+                  <path d="M12 11v5"/>
+                  <path d="M8 21h8"/>
+                  <path d="M10 17h4"/>
+                </svg>
+                Non-binary
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ INTERESTED IN (top-right) ═══ -->
+          <div class="opt-group grp-interested">
+            <div class="opt-label">Interested in</div>
+            <div class="pills">
+              <div class="pill sel-filled" id="pill-women">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="9" r="5"/>
+                  <line x1="12" y1="14" x2="12" y2="22"/>
+                  <line x1="9" y1="18" x2="15" y2="18"/>
+                </svg>
+                Women
+              </div>
+              <div class="pill" id="pill-men">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="14" r="5"/>
+                  <line x1="21" y1="3" x2="14" y2="10"/>
+                  <polyline points="21 10 21 3 14 3"/>
+                </svg>
+                Men
+              </div>
+              <div class="pill" id="pill-everyone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M7 21v-2a4 4 0 0 1 3-3.87"/>
+                  <circle cx="12" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <circle cx="20" cy="7" r="2"/>
+                </svg>
+                Everyone
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ LOOKING FOR (bottom-left) ═══ -->
+          <div class="opt-group grp-looking">
+            <div class="opt-label">Looking for</div>
+            <div class="pills">
+              <div class="pill sel-filled" id="pill-meaningful">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Meaningful
+              </div>
+              <div class="pill" id="pill-casual">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Something casual
+              </div>
+              <div class="pill" id="pill-notsure">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Not sure yet
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ CONVERSATION STYLE (bottom-right) ═══ -->
+          <div class="opt-group grp-convo">
+            <div class="opt-label">Conversation style</div>
+            <div class="pills">
+              <div class="pill sel-filled" id="pill-balanced">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Balanced
+              </div>
+              <div class="pill" id="pill-playful">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                  <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                  <path d="M2 2l7.586 7.586"/>
+                  <circle cx="11" cy="11" r="2"/>
+                </svg>
+                Light &amp; playful
+              </div>
+              <div class="pill" id="pill-thoughtful">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Deep &amp; thoughtful
+              </div>
+              <div class="pill" id="pill-direct">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                Direct &amp; clear
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /profile-builder -->
+      </section>
+
+    </div><!-- /main -->
+
+    <!-- ═══ BOTTOM BAR ═══ -->
+    <footer class="bottom-bar">
+      <div class="steps">
+        <!-- Step 1 -->
+        <div class="step">
+          <div class="step-num active">1</div>
+          <div class="step-info">
+            <div class="step-title">Basics</div>
+            <div class="step-desc">Set your direction</div>
+          </div>
+        </div>
+        <div class="step-dash"></div>
+        <!-- Step 2 -->
+        <div class="step inactive-step">
+          <div class="step-num inactive">2</div>
+          <div class="step-info">
+            <div class="step-title">About you</div>
+            <div class="step-desc">Share more about you</div>
+          </div>
+        </div>
+        <div class="step-dash"></div>
+        <!-- Step 3 -->
+        <div class="step inactive-step">
+          <div class="step-num inactive">3</div>
+          <div class="step-info">
+            <div class="step-title">Values</div>
+            <div class="step-desc">Your core values</div>
+          </div>
+        </div>
+        <div class="step-dash"></div>
+        <!-- Step 4 -->
+        <div class="step inactive-step">
+          <div class="step-num inactive">4</div>
+          <div class="step-info">
+            <div class="step-title">Review</div>
+            <div class="step-desc">Review &amp; finish</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="continue-btn" id="btn-continue">
+        Continue
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+    </footer>
+
+  </div><!-- /page -->
+
+  <script>
+    // Toggle pill selection within each group
+    document.querySelectorAll('.opt-group').forEach(group => {
+      const pills = group.querySelectorAll('.pill');
+      pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          // Find currently selected pill in this group
+          const current = group.querySelector('.pill.sel-outline, .pill.sel-filled');
+          const wasFilledGroup = current && current.classList.contains('sel-filled');
+
+          // Deselect current
+          if (current && current !== pill) {
+            current.classList.remove('sel-outline', 'sel-filled');
+          }
+
+          // Toggle clicked pill
+          if (!pill.classList.contains('sel-outline') && !pill.classList.contains('sel-filled')) {
+            pill.classList.add(wasFilledGroup || !current ? 'sel-filled' : 'sel-outline');
+            // first group uses outline style
+            if (group.classList.contains('grp-iam')) {
+              pill.classList.remove('sel-filled');
+              pill.classList.add('sel-outline');
+            } else {
+              pill.classList.remove('sel-outline');
+              pill.classList.add('sel-filled');
+            }
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

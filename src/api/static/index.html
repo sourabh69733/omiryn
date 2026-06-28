@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn | Your Matchmaker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260614-friend-style" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260628-onboarding-orbit-icons" />
   </head>
   <body>
     <section class="auth-screen" id="auth-screen" hidden>
@@ -22,61 +22,193 @@
       </div>
     </section>
 
-    <section class="auth-screen" id="dating-basics-screen" hidden>
-      <form class="auth-panel basics-panel" id="dating-basics-form">
-        <span class="brand-mark auth-mark" aria-hidden="true">O</span>
-        <p class="eyebrow">Dating Basics</p>
-        <h1>Create your profile</h1>
-        <p>
-          Add the basics Omiryn needs before the agent starts understanding you.
-        </p>
+    <section class="auth-screen onboarding-screen" id="dating-basics-screen" hidden>
+      <form class="basics-experience" id="dating-basics-form">
+        <aside class="basics-intro">
+          <div class="basics-brand">
+            <span class="brand-mark" aria-hidden="true">O</span>
+            <strong>Omiryn</strong>
+          </div>
+          <p class="eyebrow">Talk first. Match better.</p>
+          <h1>Build your match profile</h1>
+          <p class="basics-copy">
+            Start with the signals that help Omiryn focus on the right people and conversations.
+          </p>
 
-        <label class="basics-field">
-          Name
-          <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" required />
-        </label>
+          <div class="basics-trust">
+            <div>
+              <span class="trust-icon" aria-hidden="true"></span>
+              <strong>Smarter matches</strong>
+              <small>Signals shape better conversations.</small>
+            </div>
+            <div>
+              <span class="trust-icon shield" aria-hidden="true"></span>
+              <strong>Private by design</strong>
+              <small>You can adjust your profile anytime.</small>
+            </div>
+            <div>
+              <span class="trust-icon chat" aria-hidden="true"></span>
+              <strong>Built from conversation</strong>
+              <small>Omiryn keeps learning as you chat.</small>
+            </div>
+          </div>
+          <p class="basics-control-note">
+            You are in control. You can adjust anything anytime.
+          </p>
+          <p class="auth-status" id="dating-basics-status"></p>
+        </aside>
 
-        <label class="basics-field">
-          I am
-          <select id="profile-gender" required>
+        <div class="basics-builder">
+          <select class="sr-only" id="profile-gender" aria-label="Gender">
             <option value="">Select gender</option>
-            <option value="man">Man</option>
+            <option value="man" selected>Man</option>
             <option value="woman">Woman</option>
             <option value="non_binary">Non-binary</option>
             <option value="prefer_not_to_say">Prefer not to say</option>
           </select>
-        </label>
-
-        <label class="basics-field">
-          Interested in
-          <select id="profile-interested-in" required>
+          <select class="sr-only" id="profile-interested-in" aria-label="Interested in">
             <option value="">Select preference</option>
-            <option value="women">Women</option>
+            <option value="women" selected>Women</option>
             <option value="men">Men</option>
             <option value="everyone">Everyone</option>
           </select>
-        </label>
+          <input class="sr-only" id="profile-intent" type="hidden" value="meaningful" />
+          <input class="sr-only" id="profile-conversation-style" type="hidden" value="balanced" />
 
-        <label class="basics-field">
-          Location
-          <input id="profile-city" type="text" placeholder="City" autocomplete="address-level2" required />
-        </label>
+          <div class="profile-canvas" data-onboarding-step="1">
+            <div class="canvas-rings" aria-hidden="true"></div>
+            <span class="orbit-icon orbit-spark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3.5c.8 4.3 3.2 6.7 7.5 7.5-4.3.8-6.7 3.2-7.5 7.5-.8-4.3-3.2-6.7-7.5-7.5 4.3-.8 6.7-3.2 7.5-7.5Z"></path>
+                <path d="M18.5 2.8c.35 1.9 1.4 2.95 3.3 3.3-1.9.35-2.95 1.4-3.3 3.3-.35-1.9-1.4-2.95-3.3-3.3 1.9-.35 2.95-1.4 3.3-3.3Z"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-book" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M4.5 5.5h5.2c1.15 0 2.3.62 2.3 1.72v11.25c0-1.1-1.15-1.72-2.3-1.72H4.5V5.5Z"></path>
+                <path d="M19.5 5.5h-5.2c-1.15 0-2.3.62-2.3 1.72v11.25c0-1.1 1.15-1.72 2.3-1.72h5.2V5.5Z"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-group" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M9.2 11.1a3.15 3.15 0 1 0 0-6.3 3.15 3.15 0 0 0 0 6.3Z"></path>
+                <path d="M3.7 19.2c.45-3.05 2.35-4.85 5.5-4.85s5.05 1.8 5.5 4.85"></path>
+                <path d="M15.8 11.2a2.55 2.55 0 1 0 0-5.1"></path>
+                <path d="M16.4 14.45c2.35.28 3.75 1.88 4.05 4.52"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-heart" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 19.25 5.55 12.8a4 4 0 0 1 0-5.65 4 4 0 0 1 5.65 0l.8.8.8-.8a4 4 0 0 1 5.65 5.65L12 19.25Z"></path>
+              </svg>
+            </span>
 
-        <label class="basics-field">
-          Mobile <span>Optional</span>
-          <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
-        </label>
+            <fieldset class="choice-cluster gender-cluster">
+              <legend>I am</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="man">
+                <span class="choice-icon male" aria-hidden="true"></span> Man
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="woman">
+                <span class="choice-icon female" aria-hidden="true"></span> Woman
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="non_binary">
+                <span class="choice-icon person" aria-hidden="true"></span> Non-binary
+              </button>
+            </fieldset>
 
-        <label class="basics-field">
-          Profile photo <span>Optional</span>
-          <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-        </label>
-        <img class="profile-photo-preview" id="profile-photo-preview" alt="" hidden />
+            <fieldset class="choice-cluster interest-cluster">
+              <legend>Interested in</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="women">
+                <span class="choice-icon female" aria-hidden="true"></span> Women
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="men">
+                <span class="choice-icon male" aria-hidden="true"></span> Men
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="everyone">
+                <span class="choice-icon group" aria-hidden="true"></span> Everyone
+              </button>
+            </fieldset>
 
-        <button class="auth-primary" id="save-dating-basics" type="submit">
-          Continue
-        </button>
-        <p class="auth-status" id="dating-basics-status"></p>
+            <fieldset class="choice-cluster intent-cluster">
+              <legend>Looking for</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="meaningful">
+                <span class="choice-icon target" aria-hidden="true"></span> Meaningful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="casual">
+                <span class="choice-icon heart" aria-hidden="true"></span> Something casual
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="not_sure">
+                <span class="choice-icon calendar" aria-hidden="true"></span> Not sure yet
+              </button>
+            </fieldset>
+
+            <fieldset class="choice-cluster style-cluster">
+              <legend>Conversation style</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="balanced">
+                <span class="choice-icon bubble" aria-hidden="true"></span> Balanced
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="playful">
+                <span class="choice-icon leaf" aria-hidden="true"></span> Light &amp; playful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="thoughtful">
+                <span class="choice-icon heart" aria-hidden="true"></span> Deep &amp; thoughtful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="direct">
+                <span class="choice-icon target" aria-hidden="true"></span> Direct &amp; clear
+              </button>
+            </fieldset>
+
+            <div class="profile-core" aria-hidden="true">
+              <!-- <span class="profile-node node-top-left"></span>
+              <span class="profile-node node-top-right"></span>
+              <span class="profile-node node-bottom-left"></span>
+              <span class="profile-node node-bottom-right"></span> -->
+              <span class="profile-core-letter" aria-hidden="true">O</span>
+            </div>
+          </div>
+
+          <div class="about-you-step" data-onboarding-step="2" hidden>
+            <div>
+              <p class="eyebrow">About you</p>
+              <h2>Tell Omiryn where to start</h2>
+              <p>These details stay private and help anchor your profile before conversation takes over.</p>
+            </div>
+            <div class="about-you-fields">
+              <label class="basics-field compact">
+                Name
+                <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" />
+              </label>
+              <label class="basics-field compact">
+                City
+                <input id="profile-city" type="text" placeholder="Where are you based?" autocomplete="address-level2" />
+              </label>
+              <label class="basics-field compact">
+                Mobile <span>Optional</span>
+                <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+              </label>
+            </div>
+          </div>
+
+          <div class="builder-footer">
+            <div class="builder-stepper" aria-label="Profile setup progress">
+              <span class="active" data-step-indicator="1"><b>1</b><em>Basics</em><small>Set your direction</small></span>
+              <span data-step-indicator="2"><b>2</b><em>About you</em><small>Share more about you</small></span>
+              <span data-step-indicator="3"><b>3</b><em>Values</em><small>Your core values</small></span>
+              <span data-step-indicator="4"><b>4</b><em>Review</em><small>Review &amp; finish</small></span>
+            </div>
+            <div class="builder-actions">
+              <button class="secondary-button" id="onboarding-back-step" type="button" hidden>
+                Back
+              </button>
+              <button class="auth-primary" id="onboarding-next-step" type="button">
+                Continue
+              </button>
+              <button class="auth-primary" id="save-dating-basics" type="submit" hidden>
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
       </form>
     </section>
 
