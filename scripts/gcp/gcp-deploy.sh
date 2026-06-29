@@ -32,6 +32,25 @@ if ! gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY" \
     --description "Omiryn application images"
 fi
 
+PROJECT_NUMBER="$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)')"
+RUNTIME_SERVICE_ACCOUNT="${GCP_RUNTIME_SERVICE_ACCOUNT:-${PROJECT_NUMBER}-compute@developer.gserviceaccount.com}"
+
+if [ -n "${PROFILE_PHOTO_GCS_BUCKET:-}" ]; then
+  if ! gcloud storage buckets describe "gs://${PROFILE_PHOTO_GCS_BUCKET}" >/dev/null 2>&1; then
+    gcloud storage buckets create "gs://${PROFILE_PHOTO_GCS_BUCKET}" \
+      --location "$GCP_REGION" \
+      --uniform-bucket-level-access
+  fi
+  gcloud storage buckets add-iam-policy-binding "gs://${PROFILE_PHOTO_GCS_BUCKET}" \
+    --member "serviceAccount:${RUNTIME_SERVICE_ACCOUNT}" \
+    --role roles/storage.objectAdmin >/dev/null
+  if [ "${PROFILE_PHOTO_GCS_PUBLIC_READ:-false}" = "true" ]; then
+    gcloud storage buckets add-iam-policy-binding "gs://${PROFILE_PHOTO_GCS_BUCKET}" \
+      --member allUsers \
+      --role roles/storage.objectViewer >/dev/null
+  fi
+fi
+
 echo "Building image: $IMAGE_URI"
 gcloud builds submit "$PROJECT_ROOT" --tag "$IMAGE_URI"
 
@@ -56,7 +75,20 @@ env_vars=(
   "DB_DISABLE_POOL=${DB_DISABLE_POOL:-true}"
   "AGENT_PROVIDER=${AGENT_PROVIDER:-mock}"
   "PROFILE_DEBUG_DATA_ENABLED=${PROFILE_DEBUG_DATA_ENABLED:-false}"
+  "PROFILE_PHOTO_MAX_MB=${PROFILE_PHOTO_MAX_MB:-10}"
 )
+
+if [ -n "${PROFILE_PHOTO_GCS_BUCKET:-}" ]; then
+  env_vars+=("PROFILE_PHOTO_GCS_BUCKET=$PROFILE_PHOTO_GCS_BUCKET")
+fi
+
+if [ -n "${PROFILE_PHOTO_GCS_PREFIX:-}" ]; then
+  env_vars+=("PROFILE_PHOTO_GCS_PREFIX=$PROFILE_PHOTO_GCS_PREFIX")
+fi
+
+if [ -n "${PROFILE_PHOTO_GCS_PUBLIC_BASE_URL:-}" ]; then
+  env_vars+=("PROFILE_PHOTO_GCS_PUBLIC_BASE_URL=$PROFILE_PHOTO_GCS_PUBLIC_BASE_URL")
+fi
 
 deploy_args=(
   run deploy "$GCP_SERVICE"
