@@ -19,6 +19,10 @@ sql_user_password = ""
 create_cloud_run_service = false
 container_image          = ""
 
+# Profile photo uploads. Leave bucket name empty to use PROJECT-service-profile-photos.
+profile_photo_bucket_name        = ""
+profile_photo_bucket_public_read = false
+
 # Optional custom domain through Global HTTPS Load Balancer + Cloud CDN.
 create_https_load_balancer  = false
 load_balancer_domain_names  = []

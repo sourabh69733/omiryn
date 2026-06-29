@@ -7,6 +7,15 @@ locals {
     GROQ_API_KEY          = var.secret_names.groq_api_key
     OPENAI_API_KEY        = var.secret_names.openai_api_key
   }
+
+  cloud_run_runtime_env = merge(
+    var.runtime_env,
+    {
+      PROFILE_PHOTO_GCS_BUCKET = google_storage_bucket.profile_photos.name
+      PROFILE_PHOTO_GCS_PREFIX = "profile_photos"
+      PROFILE_PHOTO_MAX_MB     = "10"
+    }
+  )
 }
 
 resource "google_cloud_run_v2_service" "app" {
@@ -52,7 +61,7 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       dynamic "env" {
-        for_each = var.runtime_env
+        for_each = local.cloud_run_runtime_env
         content {
           name  = env.key
           value = env.value
@@ -78,6 +87,7 @@ resource "google_cloud_run_v2_service" "app" {
     google_project_service.required,
     google_secret_manager_secret_iam_member.cloud_run_secret_access,
     google_project_iam_member.cloud_sql_client,
+    google_storage_bucket_iam_member.cloud_run_profile_photo_writer,
   ]
 }
 

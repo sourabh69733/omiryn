@@ -118,6 +118,18 @@ variable "runtime_env" {
   }
 }
 
+variable "profile_photo_bucket_name" {
+  description = "Cloud Storage bucket for uploaded profile photos. Leave empty to use PROJECT-service-profile-photos."
+  type        = string
+  default     = ""
+}
+
+variable "profile_photo_bucket_public_read" {
+  description = "Grant public object read on the profile photo bucket. Required if the app returns direct storage.googleapis.com image URLs."
+  type        = bool
+  default     = false
+}
+
 variable "create_https_load_balancer" {
   description = "Create a global external HTTPS load balancer in front of Cloud Run."
   type        = bool

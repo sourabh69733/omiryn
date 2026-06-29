@@ -14,6 +14,10 @@ output "cloud_run_service_account" {
   value = google_service_account.cloud_run.email
 }
 
+output "profile_photo_bucket_name" {
+  value = google_storage_bucket.profile_photos.name
+}
+
 output "secret_names" {
   value = var.secret_names
 }
