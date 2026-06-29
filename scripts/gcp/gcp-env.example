@@ -29,6 +29,15 @@ AUTH_REQUIRED=true
 DB_DISABLE_POOL=true
 AGENT_PROVIDER=mock
 PROFILE_DEBUG_DATA_ENABLED=false
+PROFILE_PHOTO_MAX_MB=10
+
+# Optional. If set, profile photos upload to GCS instead of local disk.
+PROFILE_PHOTO_GCS_BUCKET=
+PROFILE_PHOTO_GCS_PREFIX=profile_photos
+# Optional custom public base URL/CDN. Without this the app uses storage.googleapis.com.
+PROFILE_PHOTO_GCS_PUBLIC_BASE_URL=
+# Set true if direct storage.googleapis.com image URLs should be browser-readable.
+PROFILE_PHOTO_GCS_PUBLIC_READ=false
 
 # Secret Manager names. These secrets must exist before deploy.
 DATABASE_URL_SECRET=omiryn-database-url
