@@ -635,12 +635,24 @@ def save_data_point_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
         "metadata_json": feedback.get("metadata") or {},
     }
     with ENGINE.begin() as connection:
+        fact_row = connection.execute(
+            select(profile_facts).where(
+                profile_facts.c.id == payload["profile_fact_id"],
+                profile_facts.c.user_id == payload["user_id"],
+            )
+        ).mappings().first()
         existing = connection.execute(
             select(data_point_feedback).where(
                 data_point_feedback.c.user_id == payload["user_id"],
                 data_point_feedback.c.profile_fact_id == payload["profile_fact_id"],
             )
         ).mappings().first()
+        metadata_json = _data_point_feedback_metadata(
+            payload["metadata_json"],
+            existing,
+            fact_row,
+        )
+        payload["metadata_json"] = metadata_json
         if existing:
             feedback_id = existing["id"]
             connection.execute(
@@ -657,6 +669,20 @@ def save_data_point_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
         else:
             feedback_id = payload["id"]
             connection.execute(data_point_feedback.insert().values(**payload))
+
+        if fact_row:
+            connection.execute(
+                profile_facts.update()
+                .where(profile_facts.c.id == payload["profile_fact_id"])
+                .values(
+                    **_profile_fact_feedback_update_values(
+                        payload["rating"],
+                        metadata_json,
+                        fact_row,
+                    ),
+                    updated_at=func.now(),
+                )
+            )
 
         row = connection.execute(
             select(data_point_feedback).where(data_point_feedback.c.id == feedback_id)
@@ -754,6 +780,19 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
     evidence = _dedupe_evidence(
         list(existing["evidence_json"] or []) + list(incoming["evidence_json"] or [])
     )
+    if existing["status"] == "rejected":
+        return {
+            "value_json": incoming["value_json"],
+            "label": incoming["label"],
+            "confidence": min(existing["confidence"] or 0, incoming["confidence"], 0.2),
+            "source_kind": incoming["source_kind"],
+            "source_id": incoming["source_id"] or existing["source_id"],
+            "evidence_json": evidence,
+            "status": "rejected",
+            "visibility": incoming["visibility"] or existing["visibility"],
+            "used_for_matching": False,
+            "used_for_chat_context": False,
+        }
     return {
         "value_json": incoming["value_json"],
         "label": incoming["label"],
@@ -765,6 +804,55 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
         "visibility": incoming["visibility"] or existing["visibility"],
         "used_for_matching": incoming["used_for_matching"],
         "used_for_chat_context": incoming["used_for_chat_context"],
+    }
+
+
+def _data_point_feedback_metadata(
+    metadata: Any,
+    existing_feedback: Any | None,
+    fact_row: Any | None,
+) -> dict[str, Any]:
+    payload = dict(metadata) if isinstance(metadata, dict) else {}
+    existing_metadata = (
+        existing_feedback["metadata_json"]
+        if existing_feedback and isinstance(existing_feedback["metadata_json"], dict)
+        else {}
+    )
+    if isinstance(existing_metadata.get("original_fact"), dict):
+        payload["original_fact"] = existing_metadata["original_fact"]
+    elif fact_row:
+        payload["original_fact"] = {
+            "status": fact_row["status"],
+            "confidence": fact_row["confidence"],
+            "used_for_matching": fact_row["used_for_matching"],
+            "used_for_chat_context": fact_row["used_for_chat_context"],
+        }
+    return payload
+
+
+def _profile_fact_feedback_update_values(
+    rating: str,
+    metadata: dict[str, Any],
+    fact_row: Any,
+) -> dict[str, Any]:
+    current_confidence = _bounded_confidence(fact_row["confidence"])
+    if rating == "disagree":
+        return {
+            "status": "rejected",
+            "confidence": min(current_confidence, 0.2),
+            "used_for_matching": False,
+            "used_for_chat_context": False,
+        }
+
+    original = metadata.get("original_fact") if isinstance(metadata.get("original_fact"), dict) else {}
+    original_confidence = _bounded_confidence(original.get("confidence", current_confidence))
+    return {
+        "status": "active",
+        "confidence": min(1.0, max(current_confidence, original_confidence, 0.9)),
+        "used_for_matching": bool(original.get("used_for_matching", fact_row["used_for_matching"])),
+        "used_for_chat_context": bool(
+            original.get("used_for_chat_context", fact_row["used_for_chat_context"])
+        ),
     }
 
 

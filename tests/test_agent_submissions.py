@@ -30,6 +30,7 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    get_profile_fact,
     list_data_point_extraction_debug,
     list_data_point_feedback,
     list_agent_context_snapshots,
@@ -480,9 +481,37 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["feedback"]["rating"], "disagree")
+        self.assertEqual(response.json()["fact"]["status"], "rejected")
+        self.assertFalse(response.json()["fact"]["used_for_matching"])
+        self.assertFalse(response.json()["fact"]["used_for_chat_context"])
+        self.assertLessEqual(response.json()["fact"]["confidence"], 0.2)
         stored_feedback = list_data_point_feedback(user_id="user-a")
         self.assertEqual(len(stored_feedback), 1)
         self.assertEqual(stored_feedback[0]["profile_fact_id"], fact["id"])
+        self.assertEqual(stored_feedback[0]["metadata"]["original_fact"]["status"], "active")
+        self.assertEqual(
+            list_profile_facts("user-a", used_for_chat_context=True),
+            [],
+        )
+
+        upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "whatsapp_topics",
+                "key": "location",
+                "value": {"topics": ["location", "voice call", "meetup"]},
+                "label": "Talked about location again",
+                "confidence": 0.92,
+                "source_kind": "whatsapp_import",
+                "source_id": "source-a",
+                "used_for_matching": True,
+                "used_for_chat_context": True,
+            }
+        )
+        rejected_fact = get_profile_fact(fact["id"], "user-a")
+        self.assertEqual(rejected_fact["status"], "rejected")
+        self.assertFalse(rejected_fact["used_for_matching"])
+        self.assertFalse(rejected_fact["used_for_chat_context"])
 
         update_response = self.client.post(
             f"/api/me/profile-facts/{fact['id']}/feedback",
@@ -491,6 +520,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(len(list_data_point_feedback(user_id="user-a")), 1)
         self.assertEqual(update_response.json()["feedback"]["rating"], "agree")
+        self.assertEqual(update_response.json()["fact"]["status"], "active")
+        self.assertFalse(update_response.json()["fact"]["used_for_matching"])
+        self.assertTrue(update_response.json()["fact"]["used_for_chat_context"])
+        self.assertGreaterEqual(update_response.json()["fact"]["confidence"], 0.9)
 
         with patch.dict("os.environ", {"PROFILE_DEBUG_DATA_ENABLED": "true"}):
             profile_response = self.client.get("/api/me/profile")

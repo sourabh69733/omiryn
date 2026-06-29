@@ -579,7 +579,19 @@ async def create_data_point_feedback(
             },
         }
     )
-    return {"feedback": save_data_point_feedback(feedback)}
+    saved_feedback = save_data_point_feedback(feedback)
+    updated_fact = get_profile_fact(fact_id, user.id)
+    return {
+        "feedback": saved_feedback,
+        "fact": (
+            {
+                **updated_fact,
+                "feedback": _data_point_feedback_summary_for_fact(saved_feedback),
+            }
+            if updated_fact
+            else None
+        ),
+    }
 
 
 @app.get("/api/agent/usage")

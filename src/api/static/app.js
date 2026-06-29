@@ -1097,7 +1097,7 @@ async function submitDataPointFeedback(pointId, payload) {
     }
     activeDataPointFeedbackId = null;
     closeDataPointFeedbackDialog(false);
-    updateDataPointFeedbackState(pointId, data.feedback || null);
+    updateDataPointFeedbackState(pointId, data.feedback || null, data.fact || null);
     renderDataPointFeedbackSurfaces();
     if (profileStatus) {
       profileStatus.textContent = "Data point feedback saved.";
@@ -1109,10 +1109,10 @@ async function submitDataPointFeedback(pointId, payload) {
   }
 }
 
-function updateDataPointFeedbackState(pointId, feedback) {
+function updateDataPointFeedbackState(pointId, feedback, fact = null) {
   const updatePoint = (point) =>
     String(point.id) === String(pointId)
-      ? { ...point, feedback }
+      ? { ...point, ...(fact || {}), feedback }
       : point;
   profileFactList = profileFactList.map(updatePoint);
   profileFactGroupsData = Object.fromEntries(
