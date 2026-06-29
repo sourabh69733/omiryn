@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -21,6 +22,11 @@ except ModuleNotFoundError:  # pragma: no cover - keeps tests usable before deps
 
 if load_dotenv:
     load_dotenv(PROJECT_ROOT / ".env")
+
+try:
+    from google.cloud import storage as gcs_storage
+except ModuleNotFoundError:  # pragma: no cover - optional outside GCP/photo uploads
+    gcs_storage = None
 
 from agent.providers import (
     AgentProviderError,
@@ -87,7 +93,12 @@ from storage import (
 STATIC_DIR = Path(__file__).parent / "static"
 PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
-PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+PROFILE_PHOTO_MAX_BYTES = int(
+    float(os.getenv("PROFILE_PHOTO_MAX_MB", "10")) * 1024 * 1024
+)
+PROFILE_PHOTO_GCS_BUCKET = os.getenv("PROFILE_PHOTO_GCS_BUCKET", "").strip()
+PROFILE_PHOTO_GCS_PREFIX = os.getenv("PROFILE_PHOTO_GCS_PREFIX", "profile_photos").strip("/")
+PROFILE_PHOTO_GCS_PUBLIC_BASE_URL = os.getenv("PROFILE_PHOTO_GCS_PUBLIC_BASE_URL", "").strip().rstrip("/")
 PROFILE_PHOTO_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -386,6 +397,8 @@ async def put_dating_basics(
         _clean_optional_text(payload.phone),
         (existing_profile or {}).get("profile_photo_url"),
         (existing_profile or {}).get("profile_photo_urls") or [],
+        (existing_profile or {}).get("profile_photo_file_name"),
+        (existing_profile or {}).get("profile_photo_file_names") or [],
     )
     return {"complete": True, "profile": profile}
 
@@ -445,6 +458,8 @@ async def put_me_profile(
         _clean_optional_text(payload.phone),
         existing_profile.get("profile_photo_url"),
         existing_profile.get("profile_photo_urls") or [],
+        existing_profile.get("profile_photo_file_name"),
+        existing_profile.get("profile_photo_file_names") or [],
     )
     return {"profile": profile}
 
@@ -465,12 +480,8 @@ async def put_me_profile_photo(
     if not content:
         raise HTTPException(status_code=400, detail="Profile photo is empty.")
     if len(content) > PROFILE_PHOTO_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Profile photo must be 5 MB or smaller.")
-
-    filename = f"{user.id}-{uuid4().hex}{extension}"
-    photo_path = PROFILE_UPLOAD_DIR / filename
-    photo_path.write_bytes(content)
-    photo_url = f"/uploads/profile_photos/{filename}"
+        max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
+        raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
 
     existing_profile = get_user_profile(user.id)
     existing_photo_urls = list((existing_profile or {}).get("profile_photo_urls") or [])
@@ -478,8 +489,22 @@ async def put_me_profile_photo(
         existing_photo_urls = [str((existing_profile or {}).get("profile_photo_url"))]
     if len(existing_photo_urls) >= 4:
         raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
+    existing_photo_file_names = list((existing_profile or {}).get("profile_photo_file_names") or [])
+    if not existing_photo_file_names and (existing_profile or {}).get("profile_photo_file_name"):
+        existing_photo_file_names = [str((existing_profile or {}).get("profile_photo_file_name"))]
+
+    photo_url, photo_file_name = _store_profile_photo(
+        user_id=user.id,
+        content=content,
+        content_type=content_type,
+        extension=extension,
+    )
     profile_photo_urls = [*existing_photo_urls, photo_url][:4]
+    profile_photo_file_names = [*existing_photo_file_names, photo_file_name][:4]
     primary_photo_url = str((existing_profile or {}).get("profile_photo_url") or profile_photo_urls[0])
+    primary_photo_file_name = str(
+        (existing_profile or {}).get("profile_photo_file_name") or profile_photo_file_names[0]
+    )
     if existing_profile:
         profile = save_user_profile(
             user.id,
@@ -491,6 +516,8 @@ async def put_me_profile_photo(
             _clean_optional_text(existing_profile.get("phone")),
             primary_photo_url,
             profile_photo_urls,
+            primary_photo_file_name,
+            profile_photo_file_names,
         )
     else:
         profile = save_user_profile(
@@ -503,8 +530,16 @@ async def put_me_profile_photo(
             None,
             photo_url,
             [photo_url],
+            photo_file_name,
+            [photo_file_name],
         )
-    return {"profile_photo_url": primary_photo_url, "profile_photo_urls": profile_photo_urls, "profile": profile}
+    return {
+        "profile_photo_url": primary_photo_url,
+        "profile_photo_urls": profile_photo_urls,
+        "profile_photo_file_name": primary_photo_file_name,
+        "profile_photo_file_names": profile_photo_file_names,
+        "profile": profile,
+    }
 
 
 @app.get("/api/me/profile-facts")
@@ -1487,6 +1522,40 @@ def _profile_with_auth_defaults(
     if not profile or profile.get("display_name") or not user.display_name:
         return profile
     return {**profile, "display_name": user.display_name}
+
+
+def _profile_photo_public_url(object_name: str) -> str:
+    if PROFILE_PHOTO_GCS_PUBLIC_BASE_URL:
+        return f"{PROFILE_PHOTO_GCS_PUBLIC_BASE_URL}/{quote(object_name)}"
+    if PROFILE_PHOTO_GCS_BUCKET:
+        return f"https://storage.googleapis.com/{PROFILE_PHOTO_GCS_BUCKET}/{quote(object_name)}"
+    return f"/uploads/profile_photos/{object_name}"
+
+
+def _store_profile_photo(
+    *,
+    user_id: str,
+    content: bytes,
+    content_type: str,
+    extension: str,
+) -> tuple[str, str]:
+    if PROFILE_PHOTO_GCS_BUCKET:
+        if gcs_storage is None:
+            raise HTTPException(
+                status_code=500,
+                detail="GCP profile photo storage is configured but google-cloud-storage is not installed.",
+            )
+        object_prefix = f"{PROFILE_PHOTO_GCS_PREFIX}/" if PROFILE_PHOTO_GCS_PREFIX else ""
+        object_name = f"{object_prefix}{user_id}/{uuid4().hex}{extension}"
+        client = gcs_storage.Client()
+        blob = client.bucket(PROFILE_PHOTO_GCS_BUCKET).blob(object_name)
+        blob.upload_from_string(content, content_type=content_type)
+        return _profile_photo_public_url(object_name), object_name
+
+    filename = f"{user_id}-{uuid4().hex}{extension}"
+    photo_path = PROFILE_UPLOAD_DIR / filename
+    photo_path.write_bytes(content)
+    return _profile_photo_public_url(filename), filename
 
 
 def _basic_profile_complete(profile: dict[str, object] | None) -> bool:

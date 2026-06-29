@@ -201,6 +201,8 @@ user_profiles = Table(
     Column("phone", String, nullable=True),
     Column("profile_photo_url", String, nullable=True),
     Column("profile_photo_urls", JSON, nullable=True),
+    Column("profile_photo_file_name", String, nullable=True),
+    Column("profile_photo_file_names", JSON, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -490,6 +492,8 @@ def _ensure_runtime_columns() -> None:
             "phone",
             "profile_photo_url",
             "profile_photo_urls",
+            "profile_photo_file_name",
+            "profile_photo_file_names",
         ),
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
@@ -513,7 +517,7 @@ def _ensure_runtime_columns() -> None:
                     column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
                     if column_name == "age":
                         column_type = "INTEGER"
-                    if column_name == "profile_photo_urls":
+                    if column_name in {"profile_photo_urls", "profile_photo_file_names"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
                     connection.execute(
@@ -1065,6 +1069,8 @@ def get_user_profile(user_id: str) -> dict[str, Any] | None:
         "phone": row["phone"],
         "profile_photo_url": row["profile_photo_url"],
         "profile_photo_urls": row["profile_photo_urls"] or [],
+        "profile_photo_file_name": row["profile_photo_file_name"],
+        "profile_photo_file_names": row["profile_photo_file_names"] or [],
         "created_at": _isoformat_utc(row["created_at"]),
         "updated_at": _isoformat_utc(row["updated_at"]),
     }
@@ -1080,6 +1086,8 @@ def save_user_profile(
     phone: str | None = None,
     profile_photo_url: str | None = None,
     profile_photo_urls: list[str] | None = None,
+    profile_photo_file_name: str | None = None,
+    profile_photo_file_names: list[str] | None = None,
 ) -> dict[str, Any]:
     payload = {
         "user_id": user_id,
@@ -1091,6 +1099,9 @@ def save_user_profile(
         "phone": phone,
         "profile_photo_url": profile_photo_url,
         "profile_photo_urls": profile_photo_urls or ([profile_photo_url] if profile_photo_url else []),
+        "profile_photo_file_name": profile_photo_file_name,
+        "profile_photo_file_names": profile_photo_file_names
+        or ([profile_photo_file_name] if profile_photo_file_name else []),
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
