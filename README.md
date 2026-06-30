@@ -200,5 +200,6 @@ The agent package is grouped by responsibility so the context-engineered flow is
 - `context_engine/` - retrieval, context budgeting, prompt assembly, behavior/tone, and context snapshots.
 - `memory_engine/` - durable profile facts, data-point extraction/review, user feedback, and WhatsApp-derived memory.
 - `profile_engine/` - structured dating profile extraction and normalization.
+- `evals/` - deterministic regression evals for fact capture and trace integrity.
 
 Import new agent code from these grouped packages directly.
