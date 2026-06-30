@@ -35,8 +35,8 @@ def main() -> None:
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
 
-    from agent.profile_facts import extract_profile_facts_from_message
-    from agent.providers import assess_user_message_quality
+    from agent.memory_engine.profile_facts import extract_profile_facts_from_message
+    from agent.runtime.providers import assess_user_message_quality
     from storage import get_conversation, init_db, list_conversations, upsert_profile_fact
 
     init_db()
