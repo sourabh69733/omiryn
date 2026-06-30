@@ -34,6 +34,8 @@ from storage import (
     list_data_point_extraction_debug,
     list_data_point_feedback,
     list_agent_context_snapshots,
+    list_agent_trace_steps,
+    list_agent_traces,
     list_context_sources,
     list_profile_facts,
     list_whatsapp_chunks,
@@ -1383,6 +1385,23 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(snapshots[0]["message_index"], 2)
         self.assertGreaterEqual(snapshots[0]["summary"]["included_source_count"], 1)
         self.assertTrue(snapshots[0]["summary"]["used_structured_whatsapp"])
+        traces = list_agent_traces(conversation_id, "user-a")
+        self.assertEqual(len(traces), 1)
+        self.assertEqual(traces[0]["status"], "completed")
+        self.assertEqual(traces[0]["summary"]["quality_valid"], True)
+        trace_steps = list_agent_trace_steps(traces[0]["id"], user_id="user-a")
+        self.assertEqual(
+            [step["step_name"] for step in trace_steps],
+            [
+                "input_guardrail",
+                "memory_write",
+                "retrieval",
+                "context_pack",
+                "model_call",
+                "context_snapshot",
+            ],
+        )
+        self.assertTrue(trace_steps[2]["metadata"]["source_count"] >= 1)
 
         app.dependency_overrides.clear()
         admin_response = self.client.get("/api/admin/users/user-a")

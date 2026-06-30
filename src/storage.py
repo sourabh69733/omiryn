@@ -102,6 +102,36 @@ agent_context_snapshots = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+agent_traces = Table(
+    "agent_traces",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=True),
+    Column("conversation_id", String, nullable=False),
+    Column("turn_index", Integer, nullable=False),
+    Column("agent_mode", String, nullable=True),
+    Column("agent_tone", String, nullable=True),
+    Column("model", String, nullable=True),
+    Column("status", String, nullable=False),
+    Column("summary_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+)
+
+agent_trace_steps = Table(
+    "agent_trace_steps",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("trace_id", String, nullable=False),
+    Column("user_id", String, nullable=True),
+    Column("conversation_id", String, nullable=False),
+    Column("step_index", Integer, nullable=False),
+    Column("step_name", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 conversation_context_sources = Table(
     "conversation_context_sources",
     metadata,
@@ -474,6 +504,14 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_context_snapshots.delete().where(
                 agent_context_snapshots.c.conversation_id == conversation_id
             )
+        )
+        connection.execute(
+            agent_trace_steps.delete().where(
+                agent_trace_steps.c.conversation_id == conversation_id
+            )
+        )
+        connection.execute(
+            agent_traces.delete().where(agent_traces.c.conversation_id == conversation_id)
         )
         connection.execute(
             agent_conversations.delete().where(agent_conversations.c.id == conversation_id)
@@ -1125,6 +1163,149 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
     }
     with ENGINE.begin() as connection:
         connection.execute(agent_usage_events.insert().values(**payload))
+
+
+def save_agent_trace(trace: dict[str, Any]) -> dict[str, Any]:
+    user_id = trace.get("user_id") or _conversation_user_id(trace.get("conversation_id"))
+    payload = {
+        "id": trace.get("id") or str(uuid4()),
+        "user_id": user_id,
+        "conversation_id": trace["conversation_id"],
+        "turn_index": trace["turn_index"],
+        "agent_mode": trace.get("agent_mode"),
+        "agent_tone": trace.get("agent_tone"),
+        "model": trace.get("model"),
+        "status": trace.get("status") or "running",
+        "summary_json": maybe_encrypt_json(user_id, trace.get("summary") or {}),
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_traces.insert().values(**payload))
+        row = connection.execute(
+            select(agent_traces).where(agent_traces.c.id == payload["id"])
+        ).mappings().first()
+    return _agent_trace_from_row(row)
+
+
+def finish_agent_trace(
+    trace_id: str,
+    *,
+    status: str,
+    summary: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(agent_traces).where(agent_traces.c.id == trace_id)
+        ).mappings().first()
+        if not existing:
+            return None
+        user_id = existing["user_id"]
+        existing_summary = decrypt_json(user_id, existing["summary_json"])
+        merged_summary = {
+            **(existing_summary if isinstance(existing_summary, dict) else {}),
+            **(summary or {}),
+        }
+        connection.execute(
+            agent_traces.update()
+            .where(agent_traces.c.id == trace_id)
+            .values(
+                status=status,
+                summary_json=maybe_encrypt_json(user_id, merged_summary),
+                completed_at=func.now(),
+            )
+        )
+        row = connection.execute(
+            select(agent_traces).where(agent_traces.c.id == trace_id)
+        ).mappings().first()
+    return _agent_trace_from_row(row) if row else None
+
+
+def save_agent_trace_step(step: dict[str, Any]) -> dict[str, Any]:
+    user_id = step.get("user_id") or _conversation_user_id(step.get("conversation_id"))
+    payload = {
+        "id": step.get("id") or str(uuid4()),
+        "trace_id": step["trace_id"],
+        "user_id": user_id,
+        "conversation_id": step["conversation_id"],
+        "step_index": step["step_index"],
+        "step_name": step["step_name"],
+        "status": step.get("status") or "ok",
+        "metadata_json": maybe_encrypt_json(user_id, step.get("metadata") or {}),
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_trace_steps.insert().values(**payload))
+        row = connection.execute(
+            select(agent_trace_steps).where(agent_trace_steps.c.id == payload["id"])
+        ).mappings().first()
+    return _agent_trace_step_from_row(row)
+
+
+def list_agent_traces(
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(agent_traces).order_by(agent_traces.c.created_at.desc())
+    if conversation_id:
+        statement = statement.where(agent_traces.c.conversation_id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_traces.c.user_id == user_id)
+    if limit:
+        statement = statement.limit(limit)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_trace_from_row(row) for row in rows]
+
+
+def list_agent_trace_steps(
+    trace_id: str | None = None,
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
+    statement = select(agent_trace_steps).order_by(
+        agent_trace_steps.c.step_index.asc(),
+        agent_trace_steps.c.created_at.asc(),
+    )
+    if trace_id:
+        statement = statement.where(agent_trace_steps.c.trace_id == trace_id)
+    if conversation_id:
+        statement = statement.where(agent_trace_steps.c.conversation_id == conversation_id)
+    if user_id is not None:
+        statement = statement.where(agent_trace_steps.c.user_id == user_id)
+
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_trace_step_from_row(row) for row in rows]
+
+
+def _agent_trace_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "turn_index": row["turn_index"],
+        "agent_mode": row["agent_mode"],
+        "agent_tone": row["agent_tone"],
+        "model": row["model"],
+        "status": row["status"],
+        "summary": decrypt_json(row["user_id"], row["summary_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+        "completed_at": _isoformat_utc(row["completed_at"]) if row["completed_at"] else None,
+    }
+
+
+def _agent_trace_step_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "trace_id": row["trace_id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "step_index": row["step_index"],
+        "step_name": row["step_name"],
+        "status": row["status"],
+        "metadata": decrypt_json(row["user_id"], row["metadata_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
 
 
 def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:

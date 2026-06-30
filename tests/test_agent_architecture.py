@@ -12,7 +12,11 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
             patch("agent.runtime.orchestrator.build_reply_context") as build_context,
             patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
             patch("agent.runtime.orchestrator.save_agent_context_snapshot") as save_snapshot,
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
+            patch("agent.runtime.orchestrator.finish_agent_trace") as finish_trace,
         ):
+            save_trace.return_value = {"id": "trace-1"}
             build_context.return_value = AgentContext(
                 user_profile={"user_id": "user-a", "interested_in": "women"},
                 context_sources=[
@@ -57,6 +61,17 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["conversation_id"], "conversation-1")
         self.assertEqual(snapshot["message_index"], 2)
         self.assertEqual(snapshot["summary"]["included_source_count"], 1)
+        save_trace.assert_called_once()
+        self.assertEqual(save_trace_step.call_count, 6)
+        finish_trace.assert_called_once_with(
+            "trace-1",
+            status="completed",
+            summary={
+                "ending_message_count": 3,
+                "quality_valid": True,
+                "reply_chars": len("Makes sense, tell me a little more."),
+            },
+        )
 
     async def test_orchestrator_marks_low_information_messages(self) -> None:
         with (
@@ -64,7 +79,11 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
             patch("agent.runtime.orchestrator.build_reply_context") as build_context,
             patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
             patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
         ):
+            save_trace.return_value = {"id": "trace-1"}
             build_context.return_value = AgentContext()
             model_call.return_value = "That does not look like a real answer."
 
