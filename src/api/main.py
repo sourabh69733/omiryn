@@ -28,34 +28,34 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional outside GCP/photo uploads
     gcs_storage = None
 
-from agent.providers import (
+from agent.runtime.providers import (
     AgentProviderError,
     agent_runtime_status,
     extract_profile,
 )
 from admin.routes import ADMIN_STATIC_DIR, router as admin_router
-from agent.context import (
+from agent.context_engine.context import (
     STYLE_CONTEXT_SOURCE_TYPES,
     build_profile_extraction_context_sources,
     build_reply_context_sources,
     selected_style_source_exists,
 )
-from agent.data_point_feedback import normalize_data_point_feedback
-from agent.data_point_extraction import (
+from agent.memory_engine.data_point_feedback import normalize_data_point_feedback
+from agent.memory_engine.data_point_extraction import (
     capture_hybrid_whatsapp_data_points,
     capture_llm_whatsapp_data_points,
     data_point_extractor_mode,
     should_run_hybrid_data_point_review,
     should_run_llm_data_point_extraction,
 )
-from agent.data_points import normalize_data_point
+from agent.memory_engine.data_points import normalize_data_point
 from agent.feedback import normalize_message_feedback
-from agent.memory import (
+from agent.memory_engine.memory import (
     capture_deep_profile_facts_from_conversation,
     should_run_deep_profile_fact_extraction,
 )
-from agent.orchestrator import run_agent_turn
-from agent.whatsapp_data_points import extract_whatsapp_data_points
+from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_points
+from agent.runtime.orchestrator import run_agent_turn
 from auth import CurrentUser, current_user, public_auth_config
 from ingestion.whatsapp import (
     WHATSAPP_IMPORT_MAX_CHARS,
