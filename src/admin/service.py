@@ -12,6 +12,8 @@ from storage import (
     _unprotect_messages,
     agent_conversations,
     agent_context_snapshots,
+    agent_trace_steps,
+    agent_traces,
     agent_message_feedback,
     agent_usage_events,
     conversation_context_sources,
@@ -37,6 +39,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         usage_events,
         snapshot["feedback_rows"],
         snapshot["context_snapshot_rows"],
+        snapshot["trace_rows"],
         snapshot["data_point_review_rows"],
     )
 
@@ -61,6 +64,8 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             "learned_fact_count": len(snapshot["fact_rows"]),
             "context_source_count": len(snapshot["context_rows"]),
             "context_snapshot_count": len(snapshot["context_snapshot_rows"]),
+            "agent_trace_count": len(snapshot["trace_rows"]),
+            "agent_trace_step_count": len(snapshot["trace_step_rows"]),
             "data_point_review_count": len(snapshot["data_point_review_rows"]),
             "feedback_count": len(snapshot["feedback_rows"]),
             "usage": usage_summary,
@@ -71,6 +76,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         "recent_conversations": [
             _conversation_summary(row, snapshot["context_rows"], usage_events)
             | _conversation_context_snapshot_summary(row, snapshot["context_snapshot_rows"])
+            | _conversation_trace_summary(row, snapshot["trace_rows"], snapshot["trace_step_rows"])
             for row in snapshot["conversation_rows"][:limit]
         ],
         "recent_drafts": [_draft_summary(row) for row in snapshot["draft_rows"][:limit]],
@@ -85,6 +91,7 @@ def _dashboard_activity(
     usage_events: list[dict[str, Any]],
     feedback_rows: list[Any],
     context_snapshot_rows: list[Any],
+    trace_rows: list[Any],
     data_point_review_rows: list[Any],
     days: int = 14,
 ) -> dict[str, Any]:
@@ -140,6 +147,13 @@ def _dashboard_activity(
             buckets[created_at]["_active_user_ids"].add(user_id)
             active_user_ids_in_window.add(user_id)
 
+    for row in trace_rows:
+        created_at = _date_from_value(row["created_at"])
+        user_id = row["user_id"]
+        if created_at in buckets and user_id:
+            buckets[created_at]["_active_user_ids"].add(user_id)
+            active_user_ids_in_window.add(user_id)
+
     for row in data_point_review_rows:
         created_at = _date_from_value(row["created_at"])
         user_id = row["user_id"]
@@ -184,6 +198,7 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
     conversations = [
         _conversation_summary(row, snapshot["context_rows"], usage_events)
         | _conversation_context_snapshot_summary(row, snapshot["context_snapshot_rows"])
+        | _conversation_trace_summary(row, snapshot["trace_rows"], snapshot["trace_step_rows"])
         for row in snapshot["conversation_rows"]
         if row["user_id"] == user_id
     ]
@@ -210,6 +225,16 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         for row in snapshot["context_snapshot_rows"]
         if row["user_id"] == user_id
     ]
+    trace_steps = [
+        _trace_step_detail(row)
+        for row in snapshot["trace_step_rows"]
+        if row["user_id"] == user_id
+    ]
+    traces = [
+        _trace_detail(row, trace_steps)
+        for row in snapshot["trace_rows"]
+        if row["user_id"] == user_id
+    ]
     data_point_reviews = [
         _data_point_review_detail(row)
         for row in snapshot["data_point_review_rows"]
@@ -227,6 +252,8 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         "feedback_summary": _summarize_feedback(feedback),
         "context_snapshots": context_snapshots[:limit],
         "context_snapshot_summary": _summarize_context_snapshots(context_snapshots),
+        "agent_traces": traces[:limit],
+        "agent_trace_summary": _summarize_traces(traces),
         "data_point_reviews": data_point_reviews[:limit],
         "data_point_review_summary": _summarize_data_point_reviews(data_point_reviews),
     }
@@ -249,6 +276,16 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
             ).mappings().all(),
             "context_snapshot_rows": connection.execute(
                 select(agent_context_snapshots).order_by(agent_context_snapshots.c.created_at.desc())
+            ).mappings().all(),
+            "trace_rows": connection.execute(
+                select(agent_traces).order_by(agent_traces.c.created_at.desc())
+            ).mappings().all(),
+            "trace_step_rows": connection.execute(
+                select(agent_trace_steps).order_by(
+                    agent_trace_steps.c.conversation_id.asc(),
+                    agent_trace_steps.c.step_index.asc(),
+                    agent_trace_steps.c.created_at.asc(),
+                )
             ).mappings().all(),
             "data_point_review_rows": connection.execute(
                 select(data_point_extraction_debug).order_by(
@@ -368,6 +405,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             "context_rows",
             "feedback_rows",
             "context_snapshot_rows",
+            "trace_rows",
             "data_point_review_rows",
         )
         for row in snapshot[key]
@@ -385,6 +423,7 @@ def _admin_users(snapshot: dict[str, list[Any]], usage_events: list[dict[str, An
             snapshot["context_rows"],
             snapshot["feedback_rows"],
             snapshot["context_snapshot_rows"],
+            snapshot["trace_rows"],
             snapshot["data_point_review_rows"],
             usage_events,
         )
@@ -402,6 +441,7 @@ def _user_summary(
     context_rows: list[Any],
     feedback_rows: list[Any],
     context_snapshot_rows: list[Any],
+    trace_rows: list[Any],
     data_point_review_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -412,6 +452,7 @@ def _user_summary(
     sources = [row for row in context_rows if row["user_id"] == user_id]
     feedback = [row for row in feedback_rows if row["user_id"] == user_id]
     context_snapshots = [row for row in context_snapshot_rows if row["user_id"] == user_id]
+    traces = [row for row in trace_rows if row["user_id"] == user_id]
     data_point_reviews = [row for row in data_point_review_rows if row["user_id"] == user_id]
     events = [event for event in usage_events if event.get("user_id") == user_id]
     feedback_summary = _summarize_feedback(feedback)
@@ -423,6 +464,7 @@ def _user_summary(
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
         *[row["created_at"] for row in context_snapshots],
+        *[row["created_at"] for row in traces],
         *[row["created_at"] for row in data_point_reviews],
         *[event.get("created_at") for event in events],
     ]
@@ -433,6 +475,7 @@ def _user_summary(
         *[row["created_at"] for row in sources],
         *[row["created_at"] for row in feedback],
         *[row["created_at"] for row in context_snapshots],
+        *[row["created_at"] for row in traces],
         *[row["created_at"] for row in data_point_reviews],
         *[event.get("created_at") for event in events],
     ]
@@ -462,6 +505,7 @@ def _user_summary(
         "learned_fact_count": len(facts),
         "feedback_count": len(feedback),
         "context_snapshot_count": len(context_snapshots),
+        "agent_trace_count": len(traces),
         "data_point_review_count": len(data_point_reviews),
         "negative_feedback_count": (
             feedback_summary["off"] + feedback_summary["bad"] + feedback_summary["harmful"]
@@ -555,6 +599,24 @@ def _conversation_context_snapshot_summary(
     }
 
 
+def _conversation_trace_summary(
+    row: Any,
+    trace_rows: list[Any],
+    trace_step_rows: list[Any],
+) -> dict[str, Any]:
+    conversation_id = row["id"]
+    traces = [trace for trace in trace_rows if trace["conversation_id"] == conversation_id]
+    latest = traces[0] if traces else None
+    return {
+        "agent_trace_count": len(traces),
+        "latest_agent_trace": (
+            _trace_detail(latest, [_trace_step_detail(step) for step in trace_step_rows])
+            if latest
+            else None
+        ),
+    }
+
+
 def _context_snapshot_detail(row: Any | None) -> dict[str, Any] | None:
     if not row:
         return None
@@ -566,6 +628,55 @@ def _context_snapshot_detail(row: Any | None) -> dict[str, Any] | None:
         "summary": decrypt_json(row["user_id"], row["summary_json"]),
         "context": decrypt_json(row["user_id"], row["context_json"]),
         "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _trace_detail(row: Any | None, steps: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not row:
+        return None
+    trace_id = row["id"]
+    trace_steps = [step for step in steps if step["trace_id"] == trace_id]
+    return {
+        "id": trace_id,
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "turn_index": row["turn_index"],
+        "agent_mode": row["agent_mode"],
+        "agent_tone": row["agent_tone"],
+        "model": row["model"],
+        "status": row["status"],
+        "summary": decrypt_json(row["user_id"], row["summary_json"]),
+        "steps": trace_steps,
+        "created_at": _isoformat_utc(row["created_at"]),
+        "completed_at": _isoformat_utc(row["completed_at"]) if row["completed_at"] else None,
+    }
+
+
+def _trace_step_detail(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "trace_id": row["trace_id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "step_index": row["step_index"],
+        "step_name": row["step_name"],
+        "status": row["status"],
+        "metadata": decrypt_json(row["user_id"], row["metadata_json"]),
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _summarize_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
+    step_counts: dict[str, int] = {}
+    for trace in traces:
+        for step in trace.get("steps") or []:
+            step_name = str(step.get("step_name") or "unknown")
+            step_counts[step_name] = step_counts.get(step_name, 0) + 1
+    return {
+        "total": len(traces),
+        "completed": sum(1 for trace in traces if trace.get("status") == "completed"),
+        "failed": sum(1 for trace in traces if trace.get("status") == "failed"),
+        "step_counts": step_counts,
     }
 
 

@@ -77,6 +77,8 @@ from storage import (
     list_profile_facts,
     list_data_point_feedback,
     list_user_context_sources,
+    list_agent_trace_steps,
+    list_agent_traces,
     list_agent_usage_events,
     list_agent_message_feedback,
     save_context_source,
@@ -618,6 +620,29 @@ async def conversation_agent_usage(
         "summary": summarize_agent_usage(conversation_id, _user_id(user)),
         "events": list_agent_usage_events(conversation_id, _user_id(user)),
         "limits": _configured_usage_limits(),
+    }
+
+
+@app.get("/api/agent/conversations/{conversation_id}/traces")
+async def conversation_agent_traces(
+    conversation_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    _get_existing_conversation(conversation_id, user)
+    traces = list_agent_traces(conversation_id, _user_id(user))
+    steps = list_agent_trace_steps(conversation_id=conversation_id, user_id=_user_id(user))
+    steps_by_trace: dict[str, list[dict[str, object]]] = {}
+    for step in steps:
+        steps_by_trace.setdefault(str(step["trace_id"]), []).append(step)
+    return {
+        "count": len(traces),
+        "traces": [
+            {
+                **trace,
+                "steps": steps_by_trace.get(str(trace["id"]), []),
+            }
+            for trace in traces
+        ],
     }
 
 

@@ -1402,6 +1402,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
             ],
         )
         self.assertTrue(trace_steps[2]["metadata"]["source_count"] >= 1)
+        trace_response = self.client.get(f"/api/agent/conversations/{conversation_id}/traces")
+        self.assertEqual(trace_response.status_code, 200)
+        self.assertEqual(trace_response.json()["count"], 1)
+        self.assertEqual(
+            trace_response.json()["traces"][0]["steps"][3]["step_name"],
+            "context_pack",
+        )
 
         app.dependency_overrides.clear()
         admin_response = self.client.get("/api/admin/users/user-a")
@@ -1411,6 +1418,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(detail["context_snapshot_summary"]["total"], 1)
         self.assertEqual(detail["context_snapshots"][0]["conversation_id"], conversation_id)
         self.assertTrue(detail["conversations"][0]["latest_context_snapshot"])
+        self.assertEqual(detail["agent_trace_summary"]["total"], 1)
+        self.assertEqual(detail["agent_traces"][0]["steps"][4]["step_name"], "model_call")
+        self.assertTrue(detail["conversations"][0]["latest_agent_trace"])
 
     def test_admin_usage_dashboard_response_matches_usage_contract(self) -> None:
         save_agent_usage_event(
