@@ -756,11 +756,17 @@ def list_data_point_extraction_debug(
 
 
 def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
+    category, key = _canonical_profile_fact_category_key(
+        fact["category"],
+        fact["key"],
+        fact.get("label"),
+        fact.get("value") or fact.get("value_json"),
+    )
     return {
         "id": fact.get("id") or str(uuid4()),
         "user_id": fact["user_id"],
-        "category": fact["category"],
-        "key": fact["key"],
+        "category": category,
+        "key": key,
         "value_json": fact.get("value") or fact.get("value_json") or {},
         "label": fact["label"],
         "confidence": _bounded_confidence(fact.get("confidence", 0.5)),
@@ -774,6 +780,30 @@ def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
         "used_for_matching": bool(fact.get("used_for_matching", True)),
         "used_for_chat_context": bool(fact.get("used_for_chat_context", False)),
     }
+
+
+def _canonical_profile_fact_category_key(
+    category: Any,
+    key: Any,
+    label: Any,
+    value: Any,
+) -> tuple[str, str]:
+    raw_category = str(category or "")
+    raw_key = str(key or "")
+    terms = _fact_term_set(" ".join([raw_category, raw_key, str(label or ""), _fact_value_text(value)]))
+    if terms & {"honesty", "honest", "truthful", "transparent", "transparency"}:
+        return "values", "honesty"
+    if terms & {"respect", "respectful"}:
+        return "values", "mutual_respect"
+    if "family" in terms:
+        return "values", "family"
+    if terms & {"ambition", "ambitious", "career", "growth"}:
+        return "values", "ambition"
+    if terms & {"maturity", "mature"} and "emotional" in terms:
+        return "values", "emotional_maturity"
+    if "calm" in terms or {"low", "drama"}.issubset(terms):
+        return "communication", "calm_low_drama"
+    return raw_category, raw_key
 
 
 def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, Any]:
@@ -929,6 +959,10 @@ def _fact_value_text(value: Any) -> str:
 
 
 def _normalized_fact_terms(text_value: str) -> str:
+    return "_".join(sorted(_fact_term_set(text_value)))
+
+
+def _fact_term_set(text_value: str) -> set[str]:
     stopwords = {
         "a",
         "an",
@@ -953,7 +987,7 @@ def _normalized_fact_terms(text_value: str) -> str:
         ).split()
         if token not in stopwords
     ]
-    return "_".join(sorted(dict.fromkeys(words)))
+    return set(words)
 
 
 def _singularize_token(token: str) -> str:

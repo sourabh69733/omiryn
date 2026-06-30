@@ -43,6 +43,7 @@ from storage import (
     list_whatsapp_style_profiles,
     reset_db,
     save_data_point_extraction_debug,
+    save_data_point_feedback,
     save_agent_message_feedback,
     save_agent_usage_event,
     upsert_profile_fact,
@@ -682,6 +683,80 @@ class AgentSubmissionApiTest(unittest.TestCase):
         evidence_texts = {item["text"] for item in facts[0]["evidence"]}
         self.assertIn("I am using dating apps right now.", evidence_quotes)
         self.assertIn("I am using dating apps right now.", evidence_texts)
+
+    def test_profile_fact_aliases_merge_at_write_time(self) -> None:
+        first = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "honesty",
+                "value": {"kind": "honesty"},
+                "label": "Values honesty",
+                "confidence": 0.72,
+                "evidence": [{"text": "Honesty matters to me."}],
+            }
+        )
+        second = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "honest_communication",
+                "value": {"kind": "honest_communication"},
+                "label": "Prefers honest communication",
+                "confidence": 0.86,
+                "evidence": [{"text": "I prefer honest communication."}],
+            }
+        )
+
+        facts = list_profile_facts("user-a")
+
+        self.assertEqual(first["id"], second["id"])
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0]["category"], "values")
+        self.assertEqual(facts[0]["key"], "honesty")
+        self.assertEqual(facts[0]["confidence"], 0.86)
+        self.assertEqual(len(facts[0]["evidence"]), 2)
+
+    def test_rejected_profile_fact_alias_stays_rejected_on_duplicate_upsert(self) -> None:
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "honesty",
+                "value": {"kind": "honesty"},
+                "label": "Values honesty",
+                "confidence": 0.72,
+                "used_for_matching": True,
+                "used_for_chat_context": True,
+            }
+        )
+        save_data_point_feedback(
+            {
+                "user_id": "user-a",
+                "profile_fact_id": fact["id"],
+                "rating": "disagree",
+                "reason": "wrong",
+            }
+        )
+
+        duplicate = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "honest_communication",
+                "value": {"kind": "honest_communication"},
+                "label": "Prefers honest communication",
+                "confidence": 0.95,
+                "used_for_matching": True,
+                "used_for_chat_context": True,
+            }
+        )
+
+        self.assertEqual(duplicate["id"], fact["id"])
+        self.assertEqual(duplicate["status"], "rejected")
+        self.assertFalse(duplicate["used_for_matching"])
+        self.assertFalse(duplicate["used_for_chat_context"])
+        self.assertLessEqual(duplicate["confidence"], 0.2)
 
     def test_raw_profile_data_points_are_env_gated(self) -> None:
         upsert_profile_fact(
