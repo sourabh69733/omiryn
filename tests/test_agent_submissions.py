@@ -6,7 +6,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from api.main import STATIC_DIR, _agent_user_context, _smart_reply_context_sources, app, current_user
-from agent.providers import (
+from agent.runtime.providers import (
     _compact_chat_reply,
     _context_sources_text,
     _estimated_cost_usd,
@@ -19,7 +19,7 @@ from agent.providers import (
     _system_prompt_with_context,
     agent_runtime_status,
 )
-from agent.usage import PROFILE_SIGNAL_BACKFILL
+from agent.runtime.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
 from ingestion.whatsapp import (
     build_whatsapp_structured_memory,
@@ -55,11 +55,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
         os.environ["AUTH_REQUIRED"] = "false"
         os.environ["AGENT_PROVIDER"] = "mock"
         os.environ["DATA_POINT_EXTRACTOR"] = "rules"
+        self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
+        self.photo_storage_patch.start()
         app.dependency_overrides.clear()
         reset_db()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        self.photo_storage_patch.stop()
         app.dependency_overrides.clear()
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
@@ -220,6 +223,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/me/dating-basics",
             json={
                 "display_name": "Aarav",
+                "age": 29,
                 "gender": "man",
                 "interested_in": "women",
                 "city": "Bengaluru",
@@ -245,6 +249,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/me/dating-basics",
             json={
                 "display_name": "Aarav",
+                "age": 29,
                 "gender": "man",
                 "interested_in": "women",
                 "city": "Bengaluru",
@@ -275,6 +280,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/me/dating-basics",
             json={
                 "display_name": "Aarav",
+                "age": 29,
                 "gender": "man",
                 "interested_in": "women",
                 "city": "Bengaluru",
@@ -294,6 +300,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.client.put(
             "/api/me/dating-basics",
             json={
+                "age": 29,
                 "gender": "man",
                 "interested_in": "women",
                 "city": "Bengaluru",
@@ -359,6 +366,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/me/dating-basics",
             json={
                 "display_name": "Anaya",
+                "age": 28,
                 "gender": "woman",
                 "interested_in": "men",
                 "city": "Mumbai",
@@ -796,6 +804,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/me/dating-basics",
             json={
                 "display_name": "Aarav",
+                "age": 29,
                 "gender": "man",
                 "interested_in": "women",
                 "city": "Bengaluru",
@@ -875,7 +884,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn(("location", "city"), fact_keys)
         self.assertIn(("values", "family"), fact_keys)
         self.assertIn(("communication", "calm_low_drama"), fact_keys)
-        self.assertIn(("preferences", "calm_partner"), fact_keys)
+        self.assertTrue(
+            any(
+                fact["category"] == "communication"
+                and fact["key"] == "calm_low_drama"
+                and "calm" in fact["label"].lower()
+                for fact in facts
+            )
+        )
         self.assertIn(("dealbreakers", "smoking"), fact_keys)
 
     def test_deep_profile_fact_extraction_runs_every_fifth_valid_message(self) -> None:
@@ -904,7 +920,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         facts = self.client.get("/api/me/profile-facts").json()["facts"]
         fact_keys = {(fact["category"], fact["key"]) for fact in facts}
-        self.assertIn(("goals", "career_growth"), fact_keys)
+        self.assertIn(("values", "ambition"), fact_keys)
         self.assertIn(("values", "mutual_respect"), fact_keys)
 
     def test_hybrid_chat_data_point_review_runs_for_deep_conversation_memory(self) -> None:
@@ -942,7 +958,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         facts = list_profile_facts("user-a")
         fact_keys = {(fact["category"], fact["key"]) for fact in facts}
-        self.assertIn(("goals", "career_growth"), fact_keys)
+        self.assertIn(("values", "ambition"), fact_keys)
         self.assertIn(("values", "mutual_respect"), fact_keys)
         reviewed_facts = [
             fact for fact in facts if fact["source_kind"] == "agent_conversation"

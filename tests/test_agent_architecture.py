@@ -1,17 +1,17 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.context import AgentContext
-from agent.orchestrator import run_agent_turn
+from agent.context_engine.context import AgentContext
+from agent.runtime.orchestrator import run_agent_turn
 
 
 class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
     async def test_orchestrator_builds_context_before_calling_model(self) -> None:
         with (
-            patch("agent.orchestrator.capture_profile_facts_from_user_message") as capture_facts,
-            patch("agent.orchestrator.build_reply_context") as build_context,
-            patch("agent.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
-            patch("agent.orchestrator.save_agent_context_snapshot") as save_snapshot,
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message") as capture_facts,
+            patch("agent.runtime.orchestrator.build_reply_context") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot") as save_snapshot,
         ):
             build_context.return_value = AgentContext(
                 user_profile={"user_id": "user-a", "interested_in": "women"},
@@ -60,10 +60,10 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_orchestrator_marks_low_information_messages(self) -> None:
         with (
-            patch("agent.orchestrator.capture_profile_facts_from_user_message"),
-            patch("agent.orchestrator.build_reply_context") as build_context,
-            patch("agent.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
-            patch("agent.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_reply_context") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
         ):
             build_context.return_value = AgentContext()
             model_call.return_value = "That does not look like a real answer."
