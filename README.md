@@ -194,6 +194,8 @@ The ChatGPT Action starter spec lives at
 
 Less swiping, better understanding, more intentional introductions.
 
+## Agent Code Layout
+
 The agent package is grouped by responsibility so the context-engineered flow is easier to follow.
 
 - `runtime/` - turn orchestration, provider calls, and usage request kinds.
@@ -203,3 +205,9 @@ The agent package is grouped by responsibility so the context-engineered flow is
 - `evals/` - deterministic regression evals for fact capture and trace integrity.
 
 Import new agent code from these grouped packages directly.
+
+Run deterministic local agent evals:
+
+```bash
+python scripts/evals/run_agent_evals.py
+```
