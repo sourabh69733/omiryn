@@ -41,7 +41,7 @@ button {
   background: var(--primary);
   cursor: pointer;
   font: inherit;
-  font-weight: 800;
+  font-weight: 560;
 }
 
 button:hover {
@@ -101,7 +101,7 @@ p {
   border-radius: 8px;
   color: #ffffff;
   background: var(--ink);
-  font-weight: 900;
+  font-weight: 650;
 }
 
 .brand strong,
@@ -135,7 +135,7 @@ td small {
   border-radius: 6px;
   color: var(--muted);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 560;
   padding: 9px 12px;
 }
 
@@ -155,7 +155,7 @@ td small {
 .eyebrow {
   color: var(--primary);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 680;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -173,7 +173,7 @@ td small {
 
 .admin-status {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 520;
 }
 
 .metric-grid {
@@ -634,6 +634,7 @@ td small {
 }
 
 .feedback-item {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -641,11 +642,12 @@ td small {
 }
 
 .feedback-item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
   gap: 10px;
   margin-bottom: 8px;
+  min-width: 0;
 }
 
 .feedback-item strong,
@@ -655,6 +657,7 @@ td small {
 
 .feedback-item strong {
   font-size: 13px;
+  font-weight: 580;
 }
 
 .feedback-item p,
@@ -676,6 +679,8 @@ td small {
   margin-top: 8px;
   color: var(--muted);
   font-size: 11px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .feedback-item details {
@@ -686,7 +691,7 @@ td small {
   cursor: pointer;
   color: var(--accent);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 560;
 }
 
 .snapshot-source-list {
@@ -701,12 +706,13 @@ td small {
 }
 
 .data-point-review-list {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
 }
 
 .data-point-review-item {
   display: grid;
   gap: 8px;
+  overflow: hidden;
 }
 
 .review-meta-row {
@@ -721,8 +727,9 @@ td small {
   color: var(--muted);
   background: #f8faf9;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 560;
   padding: 4px 8px;
+  overflow-wrap: anywhere;
 }
 
 .review-evidence {
@@ -775,6 +782,7 @@ td small {
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .provider-list {
@@ -905,8 +913,15 @@ td small {
   color: var(--muted);
   background: var(--soft);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 560;
   padding: 5px 9px;
+}
+
+.feedback-item-head .mono {
+  justify-self: end;
+  max-width: 100%;
+  text-align: right;
+  white-space: normal;
 }
 
 .status-pill.success,

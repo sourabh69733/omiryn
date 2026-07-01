@@ -412,7 +412,7 @@ async def get_me_profile(
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
-    sources = list_user_context_sources(user.id)
+    sources = _dedupe_context_sources(_reusable_context_sources(list_user_context_sources(user.id)))
     facts = list_profile_facts(user.id)
     data_point_feedback = list_data_point_feedback(user_id=user.id)
     data_point_feedback_by_fact = _latest_data_point_feedback_by_fact(data_point_feedback)
@@ -1796,6 +1796,23 @@ def _reusable_context_sources(sources: list[dict[str, object]]) -> list[dict[str
             and source["metadata"].get("original_source_id")
         )
     ]
+
+
+def _dedupe_context_sources(sources: list[dict[str, object]]) -> list[dict[str, object]]:
+    seen: set[tuple[str, str, str]] = set()
+    unique_sources: list[dict[str, object]] = []
+    for source in sources:
+        content = str(source.get("content") or "")
+        key = (
+            str(source.get("source_type") or ""),
+            str(source.get("title") or "").strip().lower(),
+            content.strip(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_sources.append(source)
+    return unique_sources
 
 
 def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, str]:
