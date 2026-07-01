@@ -194,10 +194,10 @@ const accountInterestedIn = document.querySelector("#account-interested-in");
 const accountCity = document.querySelector("#account-city");
 const accountPhone = document.querySelector("#account-phone");
 const accountPhoto = document.querySelector("#account-photo");
-const accountPhotoPreview = document.querySelector("#account-photo-preview");
+const accountPhotoPreviews = Array.from(document.querySelectorAll("[data-account-photo-preview]"));
+const accountPhotoTriggers = Array.from(document.querySelectorAll("[data-account-photo-trigger]"));
 const profileStatus = document.querySelector("#profile-status");
 const profileStyleList = document.querySelector("#profile-style-list");
-const profileMemoryList = document.querySelector("#profile-memory-list");
 const profileFactTotal = document.querySelector("#profile-fact-total");
 const profileFactGroups = document.querySelector("#profile-fact-groups");
 const rawProfileDataPanel = document.querySelector("#raw-profile-data-panel");
@@ -685,9 +685,8 @@ async function loadProfilePage() {
     if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
     if (accountCity) accountCity.value = profile.city || "";
     if (accountPhone) accountPhone.value = profile.phone || "";
-    renderProfilePhotoPreview(accountPhotoPreview, profile.profile_photo_url);
+    renderAccountPhotoGallery(profile.profile_photo_urls?.length ? profile.profile_photo_urls : [profile.profile_photo_url]);
     renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
-    renderProfileSources(profileMemoryList, data.memory_sources || [], "No imported memory yet.");
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
     renderRawProfileDataPoints(data.raw_internal_data_points || []);
     if (profileStatus) {
@@ -728,9 +727,13 @@ async function saveProfilePage(event) {
     if (!response.ok) {
       throw new Error(data.detail || "Could not save profile.");
     }
-    if (accountPhoto?.files?.[0]) {
-      const uploaded = await uploadProfilePhoto(accountPhoto.files[0]);
-      renderProfilePhotoPreview(accountPhotoPreview, uploaded.profile_photo_url);
+    const photoFiles = selectedAccountPhotoFiles();
+    if (photoFiles.length) {
+      let uploaded = null;
+      for (const file of photoFiles) {
+        uploaded = await uploadProfilePhoto(file);
+      }
+      renderAccountPhotoGallery(uploaded?.profile_photo_urls || [uploaded?.profile_photo_url]);
       accountPhoto.value = "";
     }
     datingBasicsComplete = true;
@@ -769,7 +772,7 @@ async function uploadProfilePhoto(file) {
 
 function renderProfilePhotoPreview(preview, url) {
   if (!preview) return;
-  const wrapper = preview.closest(".photo-slot, .photo-avatar-shell");
+  const wrapper = preview.closest(".photo-slot, .photo-avatar-shell, .profile-main-photo, .profile-thumb");
   if (!url) {
     preview.hidden = true;
     preview.removeAttribute("src");
@@ -787,8 +790,20 @@ function renderProfilePhotoGallery(urls = []) {
   });
 }
 
+function renderAccountPhotoGallery(urls = []) {
+  accountPhotoPreviews.forEach((preview, index) => {
+    renderProfilePhotoPreview(preview, urls[index] || "");
+  });
+}
+
 function selectedProfilePhotoFiles() {
   return Array.from(profilePhoto?.files || [])
+    .filter((file) => file.type?.startsWith("image/"))
+    .slice(0, 4);
+}
+
+function selectedAccountPhotoFiles() {
+  return Array.from(accountPhoto?.files || [])
     .filter((file) => file.type?.startsWith("image/"))
     .slice(0, 4);
 }
@@ -798,14 +813,9 @@ function previewSelectedPhotos() {
   renderProfilePhotoGallery(urls);
 }
 
-function previewSelectedPhoto(input, preview) {
-  const file = input?.files?.[0];
-  if (!file || !preview) return;
-  if (!file.type.startsWith("image/")) {
-    renderProfilePhotoPreview(preview, "");
-    return;
-  }
-  renderProfilePhotoPreview(preview, URL.createObjectURL(file));
+function previewSelectedAccountPhotos() {
+  const urls = selectedAccountPhotoFiles().map((file) => URL.createObjectURL(file));
+  renderAccountPhotoGallery(urls);
 }
 
 function renderProfileSources(container, sources, emptyText) {
@@ -3398,7 +3408,10 @@ profilePhoto?.addEventListener("change", previewSelectedPhotos);
   field?.addEventListener("input", () => setFieldError(field, ""));
   field?.addEventListener("change", () => setFieldError(field, ""));
 });
-accountPhoto?.addEventListener("change", () => previewSelectedPhoto(accountPhoto, accountPhotoPreview));
+accountPhoto?.addEventListener("change", previewSelectedAccountPhotos);
+accountPhotoTriggers.forEach((trigger) => {
+  trigger.addEventListener("click", () => accountPhoto?.click());
+});
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
 profileForm?.addEventListener("submit", saveProfilePage);
 deleteSessionDialog?.addEventListener("click", (event) => {

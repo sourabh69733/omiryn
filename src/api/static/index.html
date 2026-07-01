@@ -518,13 +518,51 @@
           <div class="usage-hero">
             <div class="screen-copy compact">
               <p class="eyebrow">Profile</p>
-              <h1>Your Omiryn memory.</h1>
-              <p>Manage account basics, match direction, and the context the agent has learned.</p>
+              <h1>Your profile.</h1>
+              <p>Keep photos, basics, and match direction clean before conversation takes over.</p>
             </div>
           </div>
 
           <div class="profile-layout">
-            <section class="profile-panel">
+            <section class="profile-panel profile-photo-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Photos</p>
+                  <h2>Profile gallery</h2>
+                </div>
+                <label class="profile-photo-upload">
+                  <input id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+                  <span>Choose photos</span>
+                </label>
+              </div>
+              <div class="profile-photo-gallery">
+                <button class="profile-main-photo" type="button" data-account-photo-trigger aria-label="Upload main profile photo">
+                  <img class="profile-gallery-img" id="account-photo-preview" data-account-photo-preview="0" alt="" hidden />
+                  <span class="profile-photo-empty">O</span>
+                  <span class="profile-main-badge">Main photo</span>
+                </button>
+                <div class="profile-thumb-stack">
+                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 2">
+                    <img class="profile-gallery-img" data-account-photo-preview="1" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 3">
+                    <img class="profile-gallery-img" data-account-photo-preview="2" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 4">
+                    <img class="profile-gallery-img" data-account-photo-preview="3" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                </div>
+              </div>
+              <div class="profile-photo-copy">
+                <strong>Show the real you.</strong>
+                <span>Upload up to 4 clear photos. Your first photo becomes the main profile image.</span>
+              </div>
+            </section>
+
+            <section class="profile-panel profile-info-panel">
               <div class="panel-heading">
                 <div>
                   <p class="eyebrow">Account</p>
@@ -566,30 +604,14 @@
                   <input id="account-city" type="text" placeholder="City" autocomplete="address-level2" required />
                 </label>
                 <label>
-                  Mobile
+                  Mobile (optional)
                   <input id="account-phone" type="tel" placeholder="+91..." autocomplete="tel" />
                 </label>
-                <label>
-                  Profile photo
-                  <input id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-                </label>
-                <img class="profile-photo-preview" id="account-photo-preview" alt="" hidden />
                 <button type="submit">Save profile</button>
                 <p class="quiet-note" id="profile-status">Profile details will appear after login.</p>
               </form>
             </section>
 
-            <section class="profile-panel profile-panel-wide">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Imported Memory</p>
-                  <h2>Context available to Omiryn</h2>
-                </div>
-              </div>
-              <div class="profile-source-list" id="profile-memory-list">
-                <div class="table-empty">No imported memory yet.</div>
-              </div>
-            </section>
           </div>
         </section>
 
