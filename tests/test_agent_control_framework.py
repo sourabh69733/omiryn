@@ -419,6 +419,27 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("friend_style", source_types)
         self.assertNotIn("manual_notes", source_types)
 
+    def test_context_budget_promotes_structured_whatsapp_for_direct_queries(self) -> None:
+        budgeted = budget_context_sources(
+            [
+                {
+                    "source_type": "data_points",
+                    "title": "Relevant data points",
+                    "content": "compact profile facts",
+                },
+                {
+                    "source_type": "whatsapp_structured_context",
+                    "title": "Structured WhatsApp context",
+                    "content": "Abhishek: wahi per rukna\nSourabh: thik h",
+                    "metadata": {"query_intent": ["whatsapp", "recent"]},
+                },
+            ],
+            source_limit=1,
+        )
+
+        self.assertEqual(len(budgeted), 1)
+        self.assertEqual(budgeted[0].source["source_type"], "whatsapp_structured_context")
+
     def test_context_text_uses_total_budget(self) -> None:
         context_text = context_sources_text(
             [

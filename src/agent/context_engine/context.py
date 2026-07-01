@@ -73,12 +73,47 @@ MEMORY_TRIGGER_PHRASES = {
     "whatsapp chat",
 }
 RECENCY_QUERY_TERMS = {"last", "latest", "recent", "previous", "pichli", "pehle", "before"}
+WHATSAPP_QUERY_TERMS = {
+    "whatsapp",
+    "message",
+    "messages",
+    "msg",
+    "chat",
+    "convo",
+    "conversation",
+    "sender",
+    "sent",
+    "reply",
+    "replies",
+}
+STYLE_QUERY_TERMS = {"style", "tone", "talk", "talking", "text", "texts", "way", "baat"}
+TOPIC_QUERY_TERMS = {"topic", "topics", "about", "baate", "baat"}
+WHATSAPP_QUERY_PHRASES = {
+    "hum kya",
+    "kaise baat",
+    "kaise text",
+    "kis style",
+    "kis bare",
+    "kya baat",
+    "kya baate",
+    "last convo",
+    "last message",
+    "pichli baat",
+    "uploaded chat",
+    "whatsapp chat",
+}
 
 
 @dataclass(frozen=True)
 class AgentContext:
     user_profile: dict[str, Any] | None = None
     context_sources: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ContextQueryIntent:
+    labels: tuple[str, ...] = ()
+    prefer_structured_whatsapp: bool = False
 
 
 def build_reply_context(
@@ -106,6 +141,7 @@ def build_reply_context_sources(
     user_text: str,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
+    query_intent = _context_query_intent(user_text)
     all_sources = list_context_sources(conversation_id, user_id)
     attached_sources = _valid_attached_context_sources(all_sources, user_id)
     selected_styles = _selected_style_sources(all_sources, style_source_id)
@@ -117,15 +153,28 @@ def build_reply_context_sources(
         selected_styles,
         user_text,
         user_id,
+        query_intent,
     )
 
     if selected_styles:
         selected_style_ids = {_source_identity(source) for source in selected_styles}
-        return selected_styles + data_point_sources + structured_whatsapp_sources + [
+        memory_sources = _ordered_memory_context_sources(
+            data_point_sources,
+            structured_whatsapp_sources,
+            query_intent,
+        )
+        return selected_styles + memory_sources + [
             source for source in retrieved_sources if _source_identity(source) not in selected_style_ids
         ]
 
-    return data_point_sources + structured_whatsapp_sources + retrieved_sources
+    return (
+        _ordered_memory_context_sources(
+            data_point_sources,
+            structured_whatsapp_sources,
+            query_intent,
+        )
+        + retrieved_sources
+    )
 
 
 def build_profile_extraction_context_sources(
@@ -254,6 +303,7 @@ def _structured_whatsapp_context_sources(
     selected_styles: list[dict[str, Any]],
     user_text: str,
     user_id: str | None,
+    query_intent: ContextQueryIntent,
 ) -> list[dict[str, Any]]:
     if not selected_styles and not _should_retrieve_memory(user_text):
         return []
@@ -270,7 +320,7 @@ def _structured_whatsapp_context_sources(
     if not imports:
         return []
 
-    return [
+    sources = [
         source
         for source in (
             _structured_whatsapp_context_source(item, user_text, user_id)
@@ -278,6 +328,7 @@ def _structured_whatsapp_context_sources(
         )
         if source
     ]
+    return [_with_query_intent(source, query_intent) for source in sources]
 
 
 def _active_whatsapp_context_source_ids(
@@ -335,6 +386,53 @@ def _structured_whatsapp_context_source(
             "retrieved_chunk_count": min(len(ranked_chunks), WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT),
         },
     }
+
+
+def _ordered_memory_context_sources(
+    data_point_sources: list[dict[str, Any]],
+    structured_whatsapp_sources: list[dict[str, Any]],
+    query_intent: ContextQueryIntent,
+) -> list[dict[str, Any]]:
+    if query_intent.prefer_structured_whatsapp:
+        return structured_whatsapp_sources + data_point_sources
+    return data_point_sources + structured_whatsapp_sources
+
+
+def _with_query_intent(
+    source: dict[str, Any],
+    query_intent: ContextQueryIntent,
+) -> dict[str, Any]:
+    if not query_intent.labels:
+        return source
+    metadata = dict(source.get("metadata") or {})
+    metadata["query_intent"] = list(query_intent.labels)
+    return {**source, "metadata": metadata}
+
+
+def _context_query_intent(user_text: str) -> ContextQueryIntent:
+    normalized = _normalized_memory_text(user_text)
+    query_terms = _memory_terms(user_text)
+    labels: list[str] = []
+    if any(term in query_terms for term in WHATSAPP_QUERY_TERMS) or any(
+        phrase in normalized for phrase in WHATSAPP_QUERY_PHRASES
+    ):
+        labels.append("whatsapp")
+    if query_terms & RECENCY_QUERY_TERMS:
+        labels.append("recent")
+    if query_terms & STYLE_QUERY_TERMS or any(
+        phrase in normalized for phrase in {"kaise baat", "kaise text", "kis style"}
+    ):
+        labels.append("style")
+    if query_terms & TOPIC_QUERY_TERMS:
+        labels.append("topics")
+
+    prefer_structured = bool({"whatsapp", "recent", "style", "topics"} & set(labels)) and (
+        "whatsapp" in labels
+        or "style" in labels
+        or ("recent" in labels and any(term in query_terms for term in WHATSAPP_QUERY_TERMS))
+        or ("topics" in labels and any(term in query_terms for term in WHATSAPP_QUERY_TERMS))
+    )
+    return ContextQueryIntent(tuple(labels), prefer_structured)
 
 
 def _structured_whatsapp_context_text(

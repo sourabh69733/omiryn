@@ -2218,7 +2218,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
         data_point_source = next(
             source for source in sources if source["source_type"] == "data_points"
         )
+        self.assertEqual(sources[0]["source_type"], "whatsapp_structured_context")
+        self.assertIn("whatsapp", sources[0]["metadata"]["query_intent"])
         self.assertIn("WhatsApp chat makes casual plans", data_point_source["content"])
+
+        style_sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "can you talk in Aarav tone?",
+            "user-a",
+        )
+        self.assertEqual(style_sources[0]["source_type"], "whatsapp_structured_context")
+        self.assertIn("style", style_sources[0]["metadata"]["query_intent"])
+
+        generic_sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "what do you know about my preferences?",
+            "user-a",
+        )
+        self.assertEqual(generic_sources[0]["source_type"], "data_points")
 
     def test_whatsapp_import_can_use_llm_data_point_extractor(self) -> None:
         async def user_a() -> CurrentUser:

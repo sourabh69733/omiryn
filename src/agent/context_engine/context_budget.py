@@ -112,6 +112,12 @@ def _source_priority(source: dict[str, Any]) -> int:
     metadata = source.get("metadata") or {}
     if isinstance(metadata, dict) and metadata.get("selected"):
         priority += 20
+    if (
+        source_type == "whatsapp_structured_context"
+        and isinstance(metadata, dict)
+        and bool({"whatsapp", "style"} & set(metadata.get("query_intent") or []))
+    ):
+        priority += 35
     return priority
 
 

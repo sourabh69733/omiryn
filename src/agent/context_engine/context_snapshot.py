@@ -91,6 +91,7 @@ def _safe_metadata(metadata: Any) -> dict[str, Any]:
         "import_id",
         "original_source_id",
         "point_count",
+        "query_intent",
         "retrieved_chunk_count",
         "selected_sender",
         "style_kind",
