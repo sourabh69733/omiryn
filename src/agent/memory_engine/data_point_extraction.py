@@ -564,13 +564,15 @@ def _profile_fact_candidate(
 
 def _conversation_data_point_excerpt(messages: list[dict[str, object]]) -> str:
     recent_messages = [
-        message
-        for message in messages[-24:]
-        if message.get("role") in {"user", "assistant"} and message.get("content")
+        (index, message)
+        for index, message in enumerate(messages[-24:], start=max(0, len(messages) - 24))
+        if message.get("role") == "user"
+        and message.get("quality") != "low_information"
+        and message.get("content")
     ]
     lines = [
-        f"{message.get('role', 'unknown')}: {' '.join(str(message.get('content') or '').split())}"
-        for message in recent_messages
+        f"user[{index}]: {' '.join(str(message.get('content') or '').split())}"
+        for index, message in recent_messages
     ]
     return "\n".join(lines)[:LLM_CONTEXT_CHAR_LIMIT]
 

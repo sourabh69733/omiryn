@@ -608,6 +608,19 @@ def _messages_for_profile_extraction(messages: list[dict[str, str]]) -> list[dic
     ]
 
 
+def _user_messages_for_memory_extraction(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        {
+            **message,
+            "message_index": index,
+        }
+        for index, message in enumerate(messages)
+        if message.get("role") == "user"
+        and message.get("quality") != "low_information"
+        and message.get("content")
+    ]
+
+
 def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     provider_messages = []
     for message in messages:
@@ -697,16 +710,16 @@ def _conversation_and_context_text(
 
 
 def _deep_fact_extraction_text(messages: list[dict[str, str]]) -> str:
-    profile_messages = _messages_for_profile_extraction(messages)
+    profile_messages = _user_messages_for_memory_extraction(messages)
     recent_messages = profile_messages[-24:]
     conversation_text = "\n".join(
-        f"{message.get('role', 'unknown')}: {message.get('content', '')}"
+        f"user[{message.get('message_index', '-')}]: {message.get('content', '')}"
         for message in recent_messages
         if message.get("content")
     )
     return (
-        "Conversation for fact extraction. Extract durable matching facts only from the "
-        "user's own words and behavior.\n\n"
+        "User messages for fact extraction. Extract durable matching facts only from "
+        "these user-authored lines. Never use assistant replies as evidence.\n\n"
         f"{conversation_text}"
     )
 

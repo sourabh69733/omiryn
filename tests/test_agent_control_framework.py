@@ -5,6 +5,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from agent.memory_engine.data_point_extraction import (
+    _conversation_data_point_excerpt,
     build_data_point_review_prompt,
     normalize_llm_data_point_reviews,
     normalize_llm_data_points,
@@ -18,6 +19,7 @@ from agent.memory_engine.whatsapp_data_points import (
     extract_whatsapp_data_point_candidates,
     extract_whatsapp_data_points,
 )
+from agent.runtime.providers import _deep_fact_extraction_text
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
 from storage import reset_db
@@ -278,6 +280,35 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(payload["source_title"], "Riya chat")
         self.assertEqual(payload["candidates"][0]["key"], "coffee_plan")
         self.assertIn("coffee first, then walk", payload["source_excerpt"])
+
+    def test_conversation_data_point_excerpt_excludes_assistant_messages(self) -> None:
+        excerpt = _conversation_data_point_excerpt(
+            [
+                {"role": "user", "content": "I value honesty in relationships."},
+                {"role": "assistant", "content": "You seem to want marriage soon."},
+                {"role": "user", "content": "Career growth matters to me."},
+            ]
+        )
+
+        self.assertIn("user[0]: I value honesty in relationships.", excerpt)
+        self.assertIn("user[2]: Career growth matters to me.", excerpt)
+        self.assertNotIn("assistant", excerpt)
+        self.assertNotIn("marriage soon", excerpt)
+
+    def test_deep_fact_extraction_text_excludes_assistant_messages(self) -> None:
+        extraction_text = _deep_fact_extraction_text(
+            [
+                {"role": "user", "content": "I prefer calm communication."},
+                {"role": "assistant", "content": "You are probably looking for commitment."},
+                {"role": "user", "content": "I like ambitious people."},
+            ]
+        )
+
+        self.assertIn("user[0]: I prefer calm communication.", extraction_text)
+        self.assertIn("user[2]: I like ambitious people.", extraction_text)
+        self.assertIn("Never use assistant replies as evidence.", extraction_text)
+        self.assertNotIn("assistant:", extraction_text)
+        self.assertNotIn("commitment", extraction_text)
 
     def test_llm_review_parser_handles_approve_rewrite_and_reject(self) -> None:
         candidates = [
