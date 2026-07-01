@@ -486,27 +486,62 @@ async def put_me_profile_photo(
         raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
 
     existing_profile = get_user_profile(user.id)
-    existing_photo_urls = list((existing_profile or {}).get("profile_photo_urls") or [])
+    existing_photo_urls = [
+        str(url) if isinstance(url, str) else ""
+        for url in ((existing_profile or {}).get("profile_photo_urls") or [])
+    ][:4]
     if not existing_photo_urls and (existing_profile or {}).get("profile_photo_url"):
         existing_photo_urls = [str((existing_profile or {}).get("profile_photo_url"))]
-    if len(existing_photo_urls) >= 4:
-        raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
-    existing_photo_file_names = list((existing_profile or {}).get("profile_photo_file_names") or [])
+    existing_photo_file_names = [
+        str(file_name) if isinstance(file_name, str) else ""
+        for file_name in ((existing_profile or {}).get("profile_photo_file_names") or [])
+    ][:4]
     if not existing_photo_file_names and (existing_profile or {}).get("profile_photo_file_name"):
         existing_photo_file_names = [str((existing_profile or {}).get("profile_photo_file_name"))]
+    raw_slot = request.query_params.get("slot")
+    photo_slot: int | None = None
+    if raw_slot not in (None, ""):
+        try:
+            photo_slot = int(raw_slot)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.") from None
+        if photo_slot < 0 or photo_slot > 3:
+            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.")
+    if photo_slot is None and len(existing_photo_urls) >= 4:
+        raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
 
-    photo_url, photo_file_name = _store_profile_photo(
-        user_id=user.id,
-        content=content,
-        content_type=content_type,
-        extension=extension,
-    )
-    profile_photo_urls = [*existing_photo_urls, photo_url][:4]
-    profile_photo_file_names = [*existing_photo_file_names, photo_file_name][:4]
-    primary_photo_url = str((existing_profile or {}).get("profile_photo_url") or profile_photo_urls[0])
-    primary_photo_file_name = str(
-        (existing_profile or {}).get("profile_photo_file_name") or profile_photo_file_names[0]
-    )
+    try:
+        photo_url, photo_file_name = _store_profile_photo(
+            user_id=user.id,
+            content=content,
+            content_type=content_type,
+            extension=extension,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Profile photo upload failed for user %s", user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not store profile photo. Check GCS bucket access or unset PROFILE_PHOTO_GCS_BUCKET locally.",
+        ) from exc
+    profile_photo_urls = existing_photo_urls[:4]
+    profile_photo_file_names = existing_photo_file_names[:4]
+    while len(profile_photo_urls) <= (photo_slot or -1):
+        profile_photo_urls.append("")
+    while len(profile_photo_file_names) < len(profile_photo_urls):
+        profile_photo_file_names.append("")
+    if photo_slot is not None and photo_slot < len(profile_photo_urls):
+        profile_photo_urls[photo_slot] = photo_url
+        profile_photo_file_names[photo_slot] = photo_file_name
+    else:
+        profile_photo_urls = [*profile_photo_urls, photo_url][:4]
+        profile_photo_file_names = [*profile_photo_file_names, photo_file_name][:4]
+    profile_photo_urls = profile_photo_urls[:4]
+    profile_photo_file_names = profile_photo_file_names[:4]
+    primary_photo_index = next((index for index, url in enumerate(profile_photo_urls) if url), 0)
+    primary_photo_url = profile_photo_urls[primary_photo_index] or photo_url
+    primary_photo_file_name = profile_photo_file_names[primary_photo_index] or photo_file_name
     if existing_profile:
         profile = save_user_profile(
             user.id,

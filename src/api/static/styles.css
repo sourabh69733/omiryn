@@ -3327,35 +3327,13 @@ p {
   gap: 16px;
 }
 
-.profile-photo-upload {
-  position: relative;
-  display: inline-flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(35, 107, 99, 0.24);
-  border-radius: 999px;
-  background: rgba(93, 220, 206, 0.1);
-  color: var(--teal);
-  padding: 0 18px;
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-}
-
-.profile-photo-upload:hover {
-  transform: translateY(-1px);
-  border-color: rgba(35, 107, 99, 0.42);
-  background: rgba(93, 220, 206, 0.16);
-}
-
-.profile-photo-upload input {
+.profile-photo-input {
   position: absolute;
-  inset: 0;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
+  clip-path: inset(50%);
 }
 
 .profile-photo-gallery {
@@ -3363,29 +3341,54 @@ p {
   grid-template-columns: minmax(0, 1fr) 102px;
   gap: 14px;
   padding: 18px 18px 0;
+  align-items: stretch;
 }
 
 .profile-main-photo,
 .profile-thumb {
   position: relative;
   overflow: hidden;
+  display: block;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
   border: 1px solid rgba(35, 107, 99, 0.18);
   background: linear-gradient(135deg, rgba(239, 252, 249, 0.98), rgba(255, 255, 255, 0.96));
   box-shadow: 0 18px 45px rgba(15, 37, 35, 0.08);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.profile-main-photo:hover,
+.profile-thumb:hover,
+.profile-main-photo:focus-visible,
+.profile-thumb:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(35, 107, 99, 0.34);
+  box-shadow: 0 22px 52px rgba(15, 37, 35, 0.11);
+}
+
+.profile-main-photo:focus-visible,
+.profile-thumb:focus-visible {
+  outline: 3px solid rgba(93, 220, 206, 0.32);
+  outline-offset: 3px;
 }
 
 .profile-main-photo {
-  min-height: 420px;
+  height: clamp(360px, 42vw, 560px);
+  min-height: 0;
   border-radius: 28px;
 }
 
 .profile-thumb-stack {
   display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
 .profile-thumb {
-  aspect-ratio: 1;
+  min-height: 0;
   border-radius: 24px;
 }
 
@@ -4228,10 +4231,15 @@ p {
 
   .profile-thumb-stack {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: none;
   }
 
   .profile-main-photo {
-    min-height: 340px;
+    height: clamp(320px, 75vw, 480px);
+  }
+
+  .profile-thumb {
+    aspect-ratio: 1;
   }
 
   .chat-sidebar,

@@ -530,27 +530,24 @@
                   <p class="eyebrow">Photos</p>
                   <h2>Profile gallery</h2>
                 </div>
-                <label class="profile-photo-upload">
-                  <input id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
-                  <span>Choose photos</span>
-                </label>
+                <input class="profile-photo-input" id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
               </div>
               <div class="profile-photo-gallery">
-                <button class="profile-main-photo" type="button" data-account-photo-trigger aria-label="Upload main profile photo">
+                <button class="profile-main-photo" type="button" data-account-photo-trigger="0" aria-label="Upload main profile photo">
                   <img class="profile-gallery-img" id="account-photo-preview" data-account-photo-preview="0" alt="" hidden />
                   <span class="profile-photo-empty">O</span>
                   <span class="profile-main-badge">Main photo</span>
                 </button>
                 <div class="profile-thumb-stack">
-                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 2">
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="1" aria-label="Upload profile photo 2">
                     <img class="profile-gallery-img" data-account-photo-preview="1" alt="" hidden />
                     <span class="profile-photo-empty">+</span>
                   </button>
-                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 3">
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="2" aria-label="Upload profile photo 3">
                     <img class="profile-gallery-img" data-account-photo-preview="2" alt="" hidden />
                     <span class="profile-photo-empty">+</span>
                   </button>
-                  <button class="profile-thumb" type="button" data-account-photo-trigger aria-label="Upload profile photo 4">
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="3" aria-label="Upload profile photo 4">
                     <img class="profile-gallery-img" data-account-photo-preview="3" alt="" hidden />
                     <span class="profile-photo-empty">+</span>
                   </button>

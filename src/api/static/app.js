@@ -21,6 +21,8 @@ let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
 let onboardingStep = 1;
 let activeFeedbackMessageIndex = null;
+let accountProfilePhotoUrls = [];
+let pendingAccountPhotoSlot = 0;
 const messageFeedbackState = new Map();
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
@@ -727,15 +729,6 @@ async function saveProfilePage(event) {
     if (!response.ok) {
       throw new Error(data.detail || "Could not save profile.");
     }
-    const photoFiles = selectedAccountPhotoFiles();
-    if (photoFiles.length) {
-      let uploaded = null;
-      for (const file of photoFiles) {
-        uploaded = await uploadProfilePhoto(file);
-      }
-      renderAccountPhotoGallery(uploaded?.profile_photo_urls || [uploaded?.profile_photo_url]);
-      accountPhoto.value = "";
-    }
     datingBasicsComplete = true;
     if (basicsName) basicsName.value = data.profile.display_name || "";
     if (profileGender) profileGender.value = data.profile.gender || "";
@@ -753,12 +746,13 @@ async function saveProfilePage(event) {
   }
 }
 
-async function uploadProfilePhoto(file) {
+async function uploadProfilePhoto(file, slot = null) {
   if (!file) return {};
   if (!file.type || !file.type.startsWith("image/")) {
     throw new Error("Choose an image file for your profile photo.");
   }
-  const response = await apiFetch("/api/me/profile-photo", {
+  const slotQuery = Number.isInteger(slot) ? `?slot=${slot}` : "";
+  const response = await apiFetch(`/api/me/profile-photo${slotQuery}`, {
     method: "PUT",
     headers: { "Content-Type": file.type },
     body: await file.arrayBuffer()
@@ -791,6 +785,7 @@ function renderProfilePhotoGallery(urls = []) {
 }
 
 function renderAccountPhotoGallery(urls = []) {
+  accountProfilePhotoUrls = urls.slice(0, 4);
   accountPhotoPreviews.forEach((preview, index) => {
     renderProfilePhotoPreview(preview, urls[index] || "");
   });
@@ -802,20 +797,41 @@ function selectedProfilePhotoFiles() {
     .slice(0, 4);
 }
 
-function selectedAccountPhotoFiles() {
-  return Array.from(accountPhoto?.files || [])
-    .filter((file) => file.type?.startsWith("image/"))
-    .slice(0, 4);
-}
-
 function previewSelectedPhotos() {
   const urls = selectedProfilePhotoFiles().map((file) => URL.createObjectURL(file));
   renderProfilePhotoGallery(urls);
 }
 
-function previewSelectedAccountPhotos() {
-  const urls = selectedAccountPhotoFiles().map((file) => URL.createObjectURL(file));
-  renderAccountPhotoGallery(urls);
+async function uploadSelectedAccountPhoto() {
+  const file = accountPhoto?.files?.[0];
+  if (!file) return;
+  if (!file.type?.startsWith("image/")) {
+    if (profileStatus) profileStatus.textContent = "Choose an image file for your profile photo.";
+    accountPhoto.value = "";
+    return;
+  }
+  const previewUrls = [...accountProfilePhotoUrls];
+  previewUrls[pendingAccountPhotoSlot] = URL.createObjectURL(file);
+  accountPhotoPreviews.forEach((preview, index) => {
+    renderProfilePhotoPreview(preview, previewUrls[index] || "");
+  });
+  if (profileStatus) {
+    profileStatus.textContent = "Uploading photo...";
+  }
+  try {
+    const uploaded = await uploadProfilePhoto(file, pendingAccountPhotoSlot);
+    renderAccountPhotoGallery(uploaded?.profile_photo_urls || [uploaded?.profile_photo_url]);
+    if (profileStatus) {
+      profileStatus.textContent = "Photo uploaded.";
+    }
+  } catch (error) {
+    renderAccountPhotoGallery(accountProfilePhotoUrls);
+    if (profileStatus) {
+      profileStatus.textContent = error.message;
+    }
+  } finally {
+    accountPhoto.value = "";
+  }
 }
 
 function renderProfileSources(container, sources, emptyText) {
@@ -3408,9 +3424,12 @@ profilePhoto?.addEventListener("change", previewSelectedPhotos);
   field?.addEventListener("input", () => setFieldError(field, ""));
   field?.addEventListener("change", () => setFieldError(field, ""));
 });
-accountPhoto?.addEventListener("change", previewSelectedAccountPhotos);
+accountPhoto?.addEventListener("change", uploadSelectedAccountPhoto);
 accountPhotoTriggers.forEach((trigger) => {
-  trigger.addEventListener("click", () => accountPhoto?.click());
+  trigger.addEventListener("click", () => {
+    pendingAccountPhotoSlot = Number(trigger.dataset.accountPhotoTrigger) || 0;
+    accountPhoto?.click();
+  });
 });
 datingBasicsForm?.addEventListener("submit", saveDatingBasicsProfile);
 profileForm?.addEventListener("submit", saveProfilePage);

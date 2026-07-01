@@ -273,6 +273,53 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response.json()["profile_photo_url"],
         )
 
+    def test_profile_photo_slot_upload_preserves_existing_slots(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        save_response = self.client.put(
+            "/api/me/dating-basics",
+            json={
+                "display_name": "Aarav",
+                "age": 29,
+                "gender": "man",
+                "interested_in": "women",
+                "city": "Bengaluru",
+            },
+        )
+        self.assertEqual(save_response.status_code, 200)
+
+        first_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"first-image",
+            headers={"content-type": "image/png"},
+        )
+        self.assertEqual(first_response.status_code, 200)
+        first_url = first_response.json()["profile_photo_urls"][0]
+
+        third_response = self.client.put(
+            "/api/me/profile-photo?slot=2",
+            content=b"third-image",
+            headers={"content-type": "image/png"},
+        )
+        self.assertEqual(third_response.status_code, 200)
+        third_urls = third_response.json()["profile_photo_urls"]
+        self.assertEqual(third_urls[0], first_url)
+        self.assertEqual(third_urls[1], "")
+        third_url = third_urls[2]
+
+        second_response = self.client.put(
+            "/api/me/profile-photo?slot=1",
+            content=b"second-image",
+            headers={"content-type": "image/png"},
+        )
+        self.assertEqual(second_response.status_code, 200)
+        second_urls = second_response.json()["profile_photo_urls"]
+        self.assertEqual(second_urls[0], first_url)
+        self.assertTrue(second_urls[1].startswith("/uploads/profile_photos/"))
+        self.assertEqual(second_urls[2], third_url)
+
     def test_agent_initial_persona_uses_interested_gender(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
