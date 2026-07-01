@@ -1288,6 +1288,11 @@ def matches_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
+@app.get("/style")
+def style_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
+
+
 @app.get("/profile")
 def profile_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)

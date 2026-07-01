@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn | Your Matchmaker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260628-onboarding-gallery-row" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260701-app-nav" />
   </head>
   <body>
     <section class="auth-screen" id="auth-screen" hidden>
@@ -259,6 +259,12 @@
             <small>Talk first. Match better.</small>
           </span>
         </a>
+
+        <nav class="app-nav" aria-label="Main navigation">
+          <a class="active" href="/app" data-nav="interview">Chat</a>
+          <a href="/style" data-nav="style">Style</a>
+          <a href="/matches" data-nav="matches">Matches</a>
+        </nav>
 
         <div class="header-actions">
           <div class="auth-control" id="auth-control">
@@ -573,11 +579,36 @@
               </form>
             </section>
 
-            <section class="profile-panel">
+            <section class="profile-panel profile-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Imported Memory</p>
+                  <h2>Context available to Omiryn</h2>
+                </div>
+              </div>
+              <div class="profile-source-list" id="profile-memory-list">
+                <div class="table-empty">No imported memory yet.</div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen style-screen" id="style-screen" hidden>
+          <div class="style-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Style</p>
+              <h1>How Omiryn should sound.</h1>
+              <p>Keep imported speaking styles and tone references in one calm place.</p>
+            </div>
+            <button id="style-import-whatsapp" type="button">Import text style</button>
+          </div>
+
+          <div class="style-layout">
+            <section class="profile-panel style-main-panel">
               <div class="panel-heading">
                 <div>
                   <p class="eyebrow">Learned Style</p>
-                  <h2>How the agent can speak</h2>
+                  <h2>Saved speaking references</h2>
                 </div>
               </div>
               <div class="profile-source-list" id="profile-style-list">
@@ -585,7 +616,25 @@
               </div>
             </section>
 
-            <section class="profile-panel profile-panel-wide">
+            <aside class="profile-panel style-settings-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Reply Feel</p>
+                  <h2>Default tone</h2>
+                </div>
+              </div>
+              <div class="style-tone-grid">
+                <span>Auto</span>
+                <span>Casual</span>
+                <span>Warm</span>
+                <span>Direct</span>
+              </div>
+              <p class="quiet-note">
+                Chat can still override tone per conversation. Style sources are attached from the chat controls.
+              </p>
+            </aside>
+
+            <section class="profile-panel profile-panel-wide style-learning-panel">
               <div class="panel-heading profile-facts-heading">
                 <div>
                   <p class="eyebrow">Learned About You</p>
@@ -601,7 +650,7 @@
               </div>
             </section>
 
-            <section class="profile-panel profile-panel-wide raw-data-panel" id="raw-profile-data-panel" hidden>
+            <section class="profile-panel profile-panel-wide raw-data-panel style-learning-panel" id="raw-profile-data-panel" hidden>
               <div class="panel-heading profile-facts-heading">
                 <div>
                   <p class="eyebrow">Debug Memory</p>
@@ -613,18 +662,22 @@
                 <div class="table-empty">Raw profile data is disabled.</div>
               </div>
             </section>
+          </div>
+        </section>
 
-            <section class="profile-panel profile-panel-wide">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Imported Memory</p>
-                  <h2>Context available to Omiryn</h2>
-                </div>
-              </div>
-              <div class="profile-source-list" id="profile-memory-list">
-                <div class="table-empty">No imported memory yet.</div>
-              </div>
-            </section>
+        <section class="screen matches-screen" id="matches-screen" hidden>
+          <div class="coming-soon-panel">
+            <p class="eyebrow">Matches</p>
+            <h1>Matching engine coming soon.</h1>
+            <p>
+              This space will show candidates, score reasoning, conflicts, and conversation starters once matching is ready.
+            </p>
+            <div class="coming-soon-grid">
+              <span>Candidate profiles</span>
+              <span>Match score</span>
+              <span>Why it matched</span>
+              <span>Conflict checks</span>
+            </div>
           </div>
         </section>
 
@@ -940,6 +993,6 @@ Rules:
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/static/app.js?v=20260614-friend-style"></script>
+    <script src="/static/app.js?v=20260701-app-nav"></script>
   </body>
 </html>

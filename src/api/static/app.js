@@ -78,7 +78,9 @@ const dataPointFeedbackReasons = [
 const routes = {
   interview: document.querySelector("#interview-screen"),
   review: document.querySelector("#review-screen"),
-  profile: document.querySelector("#profile-screen")
+  profile: document.querySelector("#profile-screen"),
+  style: document.querySelector("#style-screen"),
+  matches: document.querySelector("#matches-screen")
 };
 
 const chatLog = document.querySelector("#chat-log");
@@ -135,6 +137,7 @@ const whatsappStyleName = document.querySelector("#whatsapp-style-name");
 const whatsappFiles = document.querySelector("#whatsapp-files");
 const whatsappContent = document.querySelector("#whatsapp-content");
 const openWhatsappStyle = document.querySelector("#open-whatsapp-style");
+const styleImportWhatsapp = document.querySelector("#style-import-whatsapp");
 const whatsappStyleDialog = document.querySelector("#whatsapp-style-dialog");
 const closeWhatsappStyle = document.querySelector("#close-whatsapp-style");
 const cancelWhatsappStyle = document.querySelector("#cancel-whatsapp-style");
@@ -230,12 +233,14 @@ const draftInputs = {
 
 function showScreen(name) {
   Object.entries(routes).forEach(([key, element]) => {
-    element.hidden = key !== name;
+    if (element) {
+      element.hidden = key !== name;
+    }
   });
   document.querySelectorAll("[data-nav]").forEach((link) => {
     link.classList.toggle("active", link.dataset.nav === name);
   });
-  if (name === "profile") {
+  if (name === "profile" || name === "style") {
     loadProfilePage();
   }
 }
@@ -3300,6 +3305,7 @@ openContextMemory?.addEventListener("click", openContextMemoryDialog);
 closeContextMemory?.addEventListener("click", closeContextMemoryDialog);
 cancelContextMemory?.addEventListener("click", closeContextMemoryDialog);
 openWhatsappStyle?.addEventListener("click", openWhatsappStyleDialog);
+styleImportWhatsapp?.addEventListener("click", openWhatsappStyleDialog);
 closeWhatsappStyle?.addEventListener("click", closeWhatsappStyleDialog);
 cancelWhatsappStyle?.addEventListener("click", closeWhatsappStyleDialog);
 copyContextPrompt?.addEventListener("click", copyContextImportPrompt);
@@ -3362,6 +3368,19 @@ loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
+document.querySelectorAll("[data-nav]").forEach((link) => {
+  link.addEventListener("click", (event) => {
+    const targetScreen = link.dataset.nav;
+    if (!targetScreen || !routes[targetScreen]) return;
+    event.preventDefault();
+    window.history.pushState({}, "", link.getAttribute("href") || "/app");
+    showScreen(targetScreen);
+    if (targetScreen === "interview") {
+      restoreOrStartConversation();
+      focusChatInput();
+    }
+  });
+});
 profileGender?.addEventListener("change", updateInterestedInDefault);
 profileInterestedIn?.addEventListener("change", syncBasicsOptionButtons);
 basicsOptionButtons.forEach((button) => {
@@ -3423,6 +3442,10 @@ async function bootApp() {
     loadDraft(draftId);
   } else if (window.location.pathname === "/profile") {
     showScreen("profile");
+  } else if (window.location.pathname === "/style") {
+    showScreen("style");
+  } else if (window.location.pathname === "/matches") {
+    showScreen("matches");
   } else {
     if (window.location.pathname === "/usage") {
       window.history.replaceState({}, "", "/app");
