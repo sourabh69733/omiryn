@@ -90,66 +90,75 @@ async def run_agent_evals(
     persist: bool = True,
     suite_name: str = "agent_regression",
 ) -> dict[str, Any]:
-    os.environ["AGENT_PROVIDER"] = "mock"
-    os.environ["AUTH_REQUIRED"] = "false"
-    os.environ["DATA_POINT_EXTRACTOR"] = "rules"
-    if reset:
-        reset_db()
+    env_names = ("AGENT_PROVIDER", "AUTH_REQUIRED", "DATA_POINT_EXTRACTOR")
+    previous_env = {name: os.environ.get(name) for name in env_names}
+    try:
+        os.environ["AGENT_PROVIDER"] = "mock"
+        os.environ["AUTH_REQUIRED"] = "false"
+        os.environ["DATA_POINT_EXTRACTOR"] = "rules"
+        if reset:
+            reset_db()
 
-    eval_run = (
-        save_agent_eval_run(
-            {
-                "suite_name": suite_name,
-                "provider": os.getenv("AGENT_PROVIDER", "mock"),
-                "model": "mock",
-                "status": "running",
-                "metadata": {
-                    "case_count": len(EVAL_CASES),
-                    "runner": "agent.evals.runner",
-                },
-            }
-        )
-        if persist
-        else None
-    )
-    results = [await _run_case(case) for case in EVAL_CASES]
-    passed = sum(1 for result in results if result.passed)
-    failed = len(results) - passed
-    if eval_run:
-        for result in results:
-            save_agent_eval_case_result(
+        eval_run = (
+            save_agent_eval_run(
                 {
-                    "run_id": eval_run["id"],
-                    "case_id": result.case_id,
-                    "status": "passed" if result.passed else "failed",
-                    "failures": result.failures,
-                    "expected": {
-                        "facts": _fact_payload(result.expected_facts),
-                        "trace_steps": result.expected_trace_steps,
+                    "suite_name": suite_name,
+                    "provider": os.getenv("AGENT_PROVIDER", "mock"),
+                    "model": "mock",
+                    "status": "running",
+                    "metadata": {
+                        "case_count": len(EVAL_CASES),
+                        "runner": "agent.evals.runner",
                     },
-                    "observed": {
-                        "facts": _fact_payload(result.observed_facts),
-                        "trace_steps": result.observed_trace_steps,
-                    },
-                    "trace_count": result.trace_count,
                 }
             )
-        finish_agent_eval_run(
-            eval_run["id"],
-            status="passed" if failed == 0 else "failed",
-            passed=passed,
-            failed=failed,
-            total=len(results),
+            if persist
+            else None
         )
+        results = [await _run_case(case) for case in EVAL_CASES]
+        passed = sum(1 for result in results if result.passed)
+        failed = len(results) - passed
+        if eval_run:
+            for result in results:
+                save_agent_eval_case_result(
+                    {
+                        "run_id": eval_run["id"],
+                        "case_id": result.case_id,
+                        "status": "passed" if result.passed else "failed",
+                        "failures": result.failures,
+                        "expected": {
+                            "facts": _fact_payload(result.expected_facts),
+                            "trace_steps": result.expected_trace_steps,
+                        },
+                        "observed": {
+                            "facts": _fact_payload(result.observed_facts),
+                            "trace_steps": result.observed_trace_steps,
+                        },
+                        "trace_count": result.trace_count,
+                    }
+                )
+            finish_agent_eval_run(
+                eval_run["id"],
+                status="passed" if failed == 0 else "failed",
+                passed=passed,
+                failed=failed,
+                total=len(results),
+            )
 
-    return {
-        "run_id": eval_run["id"] if eval_run else None,
-        "suite_name": suite_name,
-        "passed": passed,
-        "failed": failed,
-        "total": len(results),
-        "results": [_result_payload(result) for result in results],
-    }
+        return {
+            "run_id": eval_run["id"] if eval_run else None,
+            "suite_name": suite_name,
+            "passed": passed,
+            "failed": failed,
+            "total": len(results),
+            "results": [_result_payload(result) for result in results],
+        }
+    finally:
+        for name, value in previous_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 async def _run_case(case: AgentEvalCase) -> AgentEvalResult:

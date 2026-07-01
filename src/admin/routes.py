@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from admin.auth import require_admin_user
-from admin.service import admin_overview, admin_user_detail
+from admin.service import admin_eval_runs, admin_overview, admin_user_detail
 from auth import CurrentUser
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
@@ -80,3 +80,11 @@ async def admin_usage_endpoint(
         "events": overview["recent_usage_events"],
         "limits": overview["limits"],
     }
+
+
+@router.get("/api/admin/evals")
+async def admin_evals_endpoint(
+    limit: int = 50,
+    _: CurrentUser = Depends(require_admin_user),
+) -> dict[str, object]:
+    return admin_eval_runs(limit=limit)

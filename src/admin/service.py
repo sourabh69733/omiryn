@@ -14,6 +14,8 @@ from storage import (
     agent_context_snapshots,
     agent_trace_steps,
     agent_traces,
+    agent_eval_case_results,
+    agent_eval_runs,
     agent_message_feedback,
     agent_usage_events,
     conversation_context_sources,
@@ -66,6 +68,8 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
             "context_snapshot_count": len(snapshot["context_snapshot_rows"]),
             "agent_trace_count": len(snapshot["trace_rows"]),
             "agent_trace_step_count": len(snapshot["trace_step_rows"]),
+            "agent_eval_run_count": len(snapshot["eval_run_rows"]),
+            "agent_eval_failure_count": sum(1 for row in snapshot["eval_run_rows"] if row["failed"] > 0),
             "data_point_review_count": len(snapshot["data_point_review_rows"]),
             "feedback_count": len(snapshot["feedback_rows"]),
             "usage": usage_summary,
@@ -81,6 +85,23 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         ],
         "recent_drafts": [_draft_summary(row) for row in snapshot["draft_rows"][:limit]],
         "recent_usage_events": usage_events[:limit],
+        "recent_eval_runs": [
+            _eval_run_detail(row, snapshot["eval_case_rows"])
+            for row in snapshot["eval_run_rows"][:limit]
+        ],
+    }
+
+
+def admin_eval_runs(limit: int = 50) -> dict[str, Any]:
+    limit = max(1, min(limit, 200))
+    snapshot = _load_admin_snapshot()
+    runs = [
+        _eval_run_detail(row, snapshot["eval_case_rows"])
+        for row in snapshot["eval_run_rows"][:limit]
+    ]
+    return {
+        "summary": _summarize_eval_runs(runs),
+        "runs": runs,
     }
 
 
@@ -285,6 +306,14 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
                     agent_trace_steps.c.conversation_id.asc(),
                     agent_trace_steps.c.step_index.asc(),
                     agent_trace_steps.c.created_at.asc(),
+                )
+            ).mappings().all(),
+            "eval_run_rows": connection.execute(
+                select(agent_eval_runs).order_by(agent_eval_runs.c.created_at.desc())
+            ).mappings().all(),
+            "eval_case_rows": connection.execute(
+                select(agent_eval_case_results).order_by(
+                    agent_eval_case_results.c.created_at.asc()
                 )
             ).mappings().all(),
             "data_point_review_rows": connection.execute(
@@ -677,6 +706,53 @@ def _summarize_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "completed": sum(1 for trace in traces if trace.get("status") == "completed"),
         "failed": sum(1 for trace in traces if trace.get("status") == "failed"),
         "step_counts": step_counts,
+    }
+
+
+def _eval_run_detail(row: Any, case_rows: list[Any]) -> dict[str, Any]:
+    run_id = row["id"]
+    cases = [
+        _eval_case_detail(case)
+        for case in case_rows
+        if case["run_id"] == run_id
+    ]
+    return {
+        "id": run_id,
+        "suite_name": row["suite_name"],
+        "provider": row["provider"],
+        "model": row["model"],
+        "status": row["status"],
+        "passed": row["passed"],
+        "failed": row["failed"],
+        "total": row["total"],
+        "metadata": row["metadata_json"] or {},
+        "cases": cases,
+        "created_at": _isoformat_utc(row["created_at"]),
+        "completed_at": _isoformat_utc(row["completed_at"]) if row["completed_at"] else None,
+    }
+
+
+def _eval_case_detail(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "run_id": row["run_id"],
+        "case_id": row["case_id"],
+        "status": row["status"],
+        "failures": row["failures_json"] or [],
+        "expected": row["expected_json"] or {},
+        "observed": row["observed_json"] or {},
+        "trace_count": row["trace_count"],
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _summarize_eval_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "total": len(runs),
+        "passed": sum(1 for run in runs if run.get("status") == "passed"),
+        "failed": sum(1 for run in runs if run.get("status") == "failed"),
+        "case_total": sum(int(run.get("total") or 0) for run in runs),
+        "case_failures": sum(int(run.get("failed") or 0) for run in runs),
     }
 
 
