@@ -94,7 +94,7 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
     vague_answers = {""}
     junk_answers = {"asdf", "qwerty", "test", "knl", "blah", "random"}
 
-# For now it is
+    # For now, it should return always true.
     return {"valid": True}
 
     if not normalized:
