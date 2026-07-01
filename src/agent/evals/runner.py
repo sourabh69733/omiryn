@@ -10,10 +10,13 @@ from uuid import uuid4
 
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
+    finish_agent_eval_run,
     list_agent_trace_steps,
     list_agent_traces,
     list_profile_facts,
     reset_db,
+    save_agent_eval_case_result,
+    save_agent_eval_run,
     save_conversation,
 )
 
@@ -40,7 +43,9 @@ class AgentEvalResult:
     case_id: str
     passed: bool
     failures: list[str]
+    expected_facts: list[tuple[str, str]]
     observed_facts: list[tuple[str, str]]
+    expected_trace_steps: list[str]
     observed_trace_steps: list[str]
     trace_count: int
 
@@ -80,18 +85,68 @@ EVAL_CASES = [
 ]
 
 
-async def run_agent_evals(reset: bool = True) -> dict[str, Any]:
+async def run_agent_evals(
+    reset: bool = True,
+    persist: bool = True,
+    suite_name: str = "agent_regression",
+) -> dict[str, Any]:
     os.environ["AGENT_PROVIDER"] = "mock"
     os.environ["AUTH_REQUIRED"] = "false"
     os.environ["DATA_POINT_EXTRACTOR"] = "rules"
     if reset:
         reset_db()
 
+    eval_run = (
+        save_agent_eval_run(
+            {
+                "suite_name": suite_name,
+                "provider": os.getenv("AGENT_PROVIDER", "mock"),
+                "model": "mock",
+                "status": "running",
+                "metadata": {
+                    "case_count": len(EVAL_CASES),
+                    "runner": "agent.evals.runner",
+                },
+            }
+        )
+        if persist
+        else None
+    )
     results = [await _run_case(case) for case in EVAL_CASES]
     passed = sum(1 for result in results if result.passed)
+    failed = len(results) - passed
+    if eval_run:
+        for result in results:
+            save_agent_eval_case_result(
+                {
+                    "run_id": eval_run["id"],
+                    "case_id": result.case_id,
+                    "status": "passed" if result.passed else "failed",
+                    "failures": result.failures,
+                    "expected": {
+                        "facts": _fact_payload(result.expected_facts),
+                        "trace_steps": result.expected_trace_steps,
+                    },
+                    "observed": {
+                        "facts": _fact_payload(result.observed_facts),
+                        "trace_steps": result.observed_trace_steps,
+                    },
+                    "trace_count": result.trace_count,
+                }
+            )
+        finish_agent_eval_run(
+            eval_run["id"],
+            status="passed" if failed == 0 else "failed",
+            passed=passed,
+            failed=failed,
+            total=len(results),
+        )
+
     return {
+        "run_id": eval_run["id"] if eval_run else None,
+        "suite_name": suite_name,
         "passed": passed,
-        "failed": len(results) - passed,
+        "failed": failed,
         "total": len(results),
         "results": [_result_payload(result) for result in results],
     }
@@ -166,7 +221,9 @@ async def _run_case(case: AgentEvalCase) -> AgentEvalResult:
         case_id=case.id,
         passed=not failures,
         failures=failures,
+        expected_facts=sorted(case.expected_facts),
         observed_facts=observed_facts,
+        expected_trace_steps=case.expected_trace_steps,
         observed_trace_steps=observed_trace_steps,
         trace_count=len(traces),
     )
@@ -199,22 +256,36 @@ def _result_payload(result: AgentEvalResult) -> dict[str, Any]:
         "case_id": result.case_id,
         "passed": result.passed,
         "failures": result.failures,
-        "observed_facts": [
-            {"category": category, "key": key}
-            for category, key in result.observed_facts
-        ],
+        "expected_facts": _fact_payload(result.expected_facts),
+        "observed_facts": _fact_payload(result.observed_facts),
+        "expected_trace_steps": result.expected_trace_steps,
         "observed_trace_steps": result.observed_trace_steps,
         "trace_count": result.trace_count,
     }
 
 
+def _fact_payload(facts: list[tuple[str, str]]) -> list[dict[str, str]]:
+    return [
+        {"category": category, "key": key}
+        for category, key in facts
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run deterministic Omiryn agent evals.")
     parser.add_argument("--no-reset", action="store_true", help="Do not reset the configured eval DB.")
+    parser.add_argument("--no-persist", action="store_true", help="Do not write eval run rows.")
+    parser.add_argument("--suite", default="agent_regression", help="Eval suite name.")
     parser.add_argument("--json", action="store_true", help="Print JSON output.")
     args = parser.parse_args()
 
-    report = asyncio.run(run_agent_evals(reset=not args.no_reset))
+    report = asyncio.run(
+        run_agent_evals(
+            reset=not args.no_reset,
+            persist=not args.no_persist,
+            suite_name=args.suite,
+        )
+    )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

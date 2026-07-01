@@ -132,6 +132,36 @@ agent_trace_steps = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+agent_eval_runs = Table(
+    "agent_eval_runs",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("suite_name", String, nullable=False),
+    Column("provider", String, nullable=False),
+    Column("model", String, nullable=True),
+    Column("status", String, nullable=False),
+    Column("passed", Integer, nullable=False),
+    Column("failed", Integer, nullable=False),
+    Column("total", Integer, nullable=False),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+)
+
+agent_eval_case_results = Table(
+    "agent_eval_case_results",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("run_id", String, nullable=False),
+    Column("case_id", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("failures_json", JSON, nullable=False),
+    Column("expected_json", JSON, nullable=False),
+    Column("observed_json", JSON, nullable=False),
+    Column("trace_count", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 conversation_context_sources = Table(
     "conversation_context_sources",
     metadata,
@@ -1276,6 +1306,131 @@ def list_agent_trace_steps(
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_agent_trace_step_from_row(row) for row in rows]
+
+
+def save_agent_eval_run(run: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "id": run.get("id") or str(uuid4()),
+        "suite_name": run["suite_name"],
+        "provider": run.get("provider") or "unknown",
+        "model": run.get("model"),
+        "status": run.get("status") or "running",
+        "passed": int(run.get("passed") or 0),
+        "failed": int(run.get("failed") or 0),
+        "total": int(run.get("total") or 0),
+        "metadata_json": run.get("metadata") or {},
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_eval_runs.insert().values(**payload))
+        row = connection.execute(
+            select(agent_eval_runs).where(agent_eval_runs.c.id == payload["id"])
+        ).mappings().first()
+    return _agent_eval_run_from_row(row)
+
+
+def finish_agent_eval_run(
+    run_id: str,
+    *,
+    status: str,
+    passed: int,
+    failed: int,
+    total: int,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(agent_eval_runs).where(agent_eval_runs.c.id == run_id)
+        ).mappings().first()
+        if not existing:
+            return None
+        existing_metadata = existing["metadata_json"] or {}
+        connection.execute(
+            agent_eval_runs.update()
+            .where(agent_eval_runs.c.id == run_id)
+            .values(
+                status=status,
+                passed=passed,
+                failed=failed,
+                total=total,
+                metadata_json={**existing_metadata, **(metadata or {})},
+                completed_at=func.now(),
+            )
+        )
+        row = connection.execute(
+            select(agent_eval_runs).where(agent_eval_runs.c.id == run_id)
+        ).mappings().first()
+    return _agent_eval_run_from_row(row) if row else None
+
+
+def save_agent_eval_case_result(result: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "id": result.get("id") or str(uuid4()),
+        "run_id": result["run_id"],
+        "case_id": result["case_id"],
+        "status": result.get("status") or ("passed" if result.get("passed") else "failed"),
+        "failures_json": result.get("failures") or [],
+        "expected_json": result.get("expected") or {},
+        "observed_json": result.get("observed") or {},
+        "trace_count": int(result.get("trace_count") or 0),
+    }
+    with ENGINE.begin() as connection:
+        connection.execute(agent_eval_case_results.insert().values(**payload))
+        row = connection.execute(
+            select(agent_eval_case_results).where(
+                agent_eval_case_results.c.id == payload["id"]
+            )
+        ).mappings().first()
+    return _agent_eval_case_result_from_row(row)
+
+
+def list_agent_eval_runs(limit: int | None = None) -> list[dict[str, Any]]:
+    statement = select(agent_eval_runs).order_by(agent_eval_runs.c.created_at.desc())
+    if limit:
+        statement = statement.limit(limit)
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_eval_run_from_row(row) for row in rows]
+
+
+def list_agent_eval_case_results(run_id: str | None = None) -> list[dict[str, Any]]:
+    statement = select(agent_eval_case_results).order_by(
+        agent_eval_case_results.c.created_at.asc()
+    )
+    if run_id:
+        statement = statement.where(agent_eval_case_results.c.run_id == run_id)
+    with ENGINE.begin() as connection:
+        rows = connection.execute(statement).mappings().all()
+    return [_agent_eval_case_result_from_row(row) for row in rows]
+
+
+def _agent_eval_run_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "suite_name": row["suite_name"],
+        "provider": row["provider"],
+        "model": row["model"],
+        "status": row["status"],
+        "passed": row["passed"],
+        "failed": row["failed"],
+        "total": row["total"],
+        "metadata": row["metadata_json"],
+        "created_at": _isoformat_utc(row["created_at"]),
+        "completed_at": _isoformat_utc(row["completed_at"]) if row["completed_at"] else None,
+    }
+
+
+def _agent_eval_case_result_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "run_id": row["run_id"],
+        "case_id": row["case_id"],
+        "status": row["status"],
+        "failures": row["failures_json"],
+        "expected": row["expected_json"],
+        "observed": row["observed_json"],
+        "trace_count": row["trace_count"],
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
 
 
 def _agent_trace_from_row(row: Any) -> dict[str, Any]:
