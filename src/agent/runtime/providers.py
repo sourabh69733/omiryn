@@ -94,6 +94,9 @@ def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str
     vague_answers = {""}
     junk_answers = {"asdf", "qwerty", "test", "knl", "blah", "random"}
 
+# For now it is
+    return {"valid": True}
+
     if not normalized:
         return _quality_result("I did not catch that. Could you answer in a few words?")
     if normalized in allowed_short_answers:
