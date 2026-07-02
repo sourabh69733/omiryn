@@ -1686,8 +1686,37 @@ function renderMessages() {
 
     chatLog.appendChild(bubble);
   });
+  if (isSendingMessage) {
+    chatLog.appendChild(renderTypingIndicator());
+  }
   chatLog.scrollTop = chatLog.scrollHeight;
   updateSidebarMeta();
+}
+
+function renderTypingIndicator() {
+  const bubble = document.createElement("div");
+  bubble.className = "message agent typing-message";
+  bubble.setAttribute("role", "status");
+  bubble.setAttribute("aria-live", "polite");
+
+  const content = document.createElement("div");
+  content.className = "message-content typing-content";
+
+  const label = document.createElement("span");
+  label.className = "sr-only";
+  label.textContent = `${currentAgentName || defaultAgentName()} is typing`;
+  content.appendChild(label);
+
+  const dots = document.createElement("span");
+  dots.className = "typing-dots";
+  dots.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < 3; index += 1) {
+    dots.appendChild(document.createElement("span"));
+  }
+  content.appendChild(dots);
+
+  bubble.appendChild(content);
+  return bubble;
 }
 
 function renderMessageFeedback(messageIndex) {
