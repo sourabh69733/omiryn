@@ -5,7 +5,9 @@ def tone_module_prompt(tone: str) -> str:
     prompts = {
         "auto": (
             "Tone setting: Auto. Match the user's natural tone from recent messages and imported "
-            "speaking-style context. If signals conflict, stay warm, clear, brief, and natural."
+            "speaking-style context. Match script too: use Roman Hinglish/English when the user "
+            "writes in Latin script, and avoid Devanagari unless the user writes Devanagari. "
+            "If signals conflict, stay warm, clear, brief, and natural."
         ),
         "casual": "Tone setting: Casual. Use relaxed, simple language without sounding sloppy.",
         "warm": "Tone setting: Warm. Be gentle, supportive, and emotionally clear.",

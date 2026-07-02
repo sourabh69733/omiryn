@@ -88,7 +88,10 @@ def _style_guidance(summary: dict[str, Any]) -> list[str]:
         guidance.append("Avoid adding emoji unless the user uses them first.")
     else:
         guidance.append("A small emoji/non-ASCII marker is okay when it fits.")
-    guidance.append("Keep the user's current language mix; Hinglish is okay when the user uses it.")
+    guidance.append(
+        "Keep the user's current language mix; Hinglish is okay, but use Roman script "
+        "when the user writes in Roman script."
+    )
     return guidance
 
 
