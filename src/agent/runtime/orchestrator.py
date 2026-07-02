@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from agent.context_engine.context import build_reply_context
-from agent.context_engine.context_snapshot import build_context_snapshot
+from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.memory import capture_profile_facts_from_user_message
 from agent.runtime.providers import assess_user_message_quality, generate_agent_reply
 from storage import (
@@ -97,12 +96,17 @@ async def run_agent_turn(
             },
         }
     )
-    context = build_reply_context(
-        conversation_id,
-        user_text,
+    context_package = build_model_context_package(
+        conversation_id=conversation_id,
+        user_text=user_text,
         user_id=user_id,
         user_profile=user_profile,
+        model=model,
+        agent_tone=agent_tone,
+        agent_name=agent_name,
         style_source_id=style_source_id,
+        user_message_index=len(updated_messages) - 1,
+        assistant_message_index=len(updated_messages),
     )
     save_agent_trace_step(
         {
@@ -113,22 +117,16 @@ async def run_agent_turn(
             "step_name": "retrieval",
             "status": "ok",
             "metadata": {
-                "source_count": len(context.context_sources),
-                "source_types": _source_type_counts(context.context_sources),
-                "has_user_profile": bool(context.user_profile),
+                "source_count": len(context_package.context_sources),
+                "source_types": _source_type_counts(context_package.context_sources),
+                "has_user_profile": bool(context_package.user_profile),
+                "query_intent": list(context_package.query_intent.labels)
+                if context_package.query_intent
+                else [],
             },
         }
     )
-    context_snapshot = build_context_snapshot(
-        context.context_sources,
-        conversation_id=conversation_id,
-        user_id=user_id,
-        user_message_index=len(updated_messages) - 1,
-        assistant_message_index=len(updated_messages),
-        model=model,
-        agent_tone=agent_tone,
-        style_source_id=style_source_id,
-    )
+    context_snapshot = context_package.snapshot or {}
     save_agent_trace_step(
         {
             "trace_id": trace_id,
@@ -148,8 +146,9 @@ async def run_agent_turn(
             agent_mode=agent_mode,
             agent_tone=agent_tone,
             agent_name=agent_name,
-            context_sources=context.context_sources,
-            user_profile=context.user_profile,
+            context_sources=context_package.context_sources,
+            user_profile=context_package.user_profile,
+            system_prompt=context_package.system_prompt,
         )
     except Exception as error:
         save_agent_trace_step(
@@ -183,6 +182,7 @@ async def run_agent_turn(
             "metadata": {
                 "reply_chars": len(reply),
                 "model": model,
+                "prompt_version": context_package.prompt_version,
                 "agent_mode": agent_mode,
                 "agent_tone": agent_tone,
             },

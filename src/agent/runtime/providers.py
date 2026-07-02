@@ -10,21 +10,24 @@ from typing import Any
 import httpx
 
 from agent.profile_engine.extraction import normalize_extracted_profile
-from agent.context_engine.behavior import (
-    agent_persona_for_interest,
-    behavior_prompt,
-    tone_prompt,
+from agent.context_engine.prompt_engine.modules.behavior import (
+    behavior_module_prompt,
+    build_companion_behavior,
 )
-from agent.context_engine.prompt_builder import (
+from agent.context_engine.prompt_engine.modules.identity import agent_persona_for_interest
+from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
+from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     context_sources_text,
     truncate_for_context,
 )
-from agent.context_engine.prompt_sections import (
-    COMPANION_SYSTEM_PROMPT,
+from agent.context_engine.prompt_engine.versions.v1 import COMPANION_SYSTEM_PROMPT
+from agent.memory_engine.extraction.prompts import (
     DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
     DATA_POINT_REVIEW_SYSTEM_PROMPT,
     DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+)
+from agent.profile_engine.prompts import (
     EXTRACTION_REPAIR_PROMPT,
     EXTRACTION_SYSTEM_PROMPT,
 )
@@ -56,60 +59,7 @@ class AgentProviderError(RuntimeError):
 
 
 def assess_user_message_quality(messages: list[dict[str, str]]) -> dict[str, str | bool]:
-    latest_user_message = next(
-        (message for message in reversed(messages) if message.get("role") == "user"),
-        None,
-    )
-    if not latest_user_message:
-        return {"valid": True}
-
-    text = latest_user_message.get("content", "")
-    if _is_greeting_only(text):
-        return {"valid": True}
-
-    normalized = _normalized_user_text(text)
-    allowed_short_answers = {
-        "casual",
-        "exploring",
-        "longterm",
-        "long_term",
-        "marriage",
-        "yes",
-        "yep",
-        "yeah",
-        "yup",
-        "ok",
-        "okay",
-        "hmm",
-        "hm",
-        "no",
-        "haan",
-        "ha",
-        "han",
-        "nahi",
-        "nhi",
-        "na",
-        "serious",
-    }
-    vague_answers = {""}
-    junk_answers = {"asdf", "qwerty", "test", "knl", "blah", "random"}
-
-    # For now, it should return always true.
-    return {"valid": True}
-
-    if not normalized:
-        return _quality_result("I did not catch that. Could you answer in a few words?")
-    if normalized in allowed_short_answers:
-        return {"valid": True}
-    if normalized in vague_answers:
-        return _quality_result("That is a little too vague. Could you say what you mean in one sentence?")
-    if normalized in junk_answers:
-        return _quality_result("That does not look like a real answer. Could you answer the question directly?")
-    if len(normalized) < 2:
-        return _quality_result("I did not get enough information. Could you answer with a little more detail?")
-    if _looks_like_gibberish(normalized):
-        return _quality_result("That looks unclear. Could you rephrase it in normal words?")
-
+    # Disabled for now. Keep the function boundary so we can restore the real guardrail later.
     return {"valid": True}
 
 
@@ -122,6 +72,7 @@ async def generate_agent_reply(
     agent_name: str | None = None,
     context_sources: list[dict[str, Any]] | None = None,
     user_profile: dict[str, Any] | None = None,
+    system_prompt: str | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -149,7 +100,7 @@ async def generate_agent_reply(
         return _mock_reply(messages, user_profile, agent_name)
     if provider == "groq":
         return await _groq_chat(
-            _system_prompt_with_context(
+            system_prompt or _system_prompt_with_context(
                 ONBOARDING_SYSTEM_PROMPT,
                 context_sources,
                 agent_mode,
@@ -165,7 +116,7 @@ async def generate_agent_reply(
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return await _openai_compatible_chat(
             provider,
-            _system_prompt_with_context(
+            system_prompt or _system_prompt_with_context(
                 ONBOARDING_SYSTEM_PROMPT,
                 context_sources,
                 agent_mode,
@@ -180,7 +131,7 @@ async def generate_agent_reply(
         )
     if provider == "ollama":
         return await _ollama_chat(
-            _system_prompt_with_context(
+            system_prompt or _system_prompt_with_context(
                 ONBOARDING_SYSTEM_PROMPT,
                 context_sources,
                 agent_mode,
@@ -680,10 +631,8 @@ def _agent_persona_prompt(
     user_profile: dict[str, Any] | None,
     agent_name: str | None = None,
 ) -> str:
-    from agent.context_engine.behavior import build_companion_behavior
-
     behavior = build_companion_behavior(user_profile, agent_name=agent_name)
-    return behavior_prompt(behavior, user_profile)
+    return behavior_module_prompt(behavior, user_profile)
 
 
 def _agent_persona_for_interest(interested_in: str) -> dict[str, str]:
@@ -693,7 +642,7 @@ def _agent_persona_for_interest(interested_in: str) -> dict[str, str]:
 
 
 def _agent_tone_prompt(agent_tone: str) -> str:
-    return tone_prompt(agent_tone)
+    return tone_module_prompt(agent_tone)
 
 
 def _conversation_and_context_text(
