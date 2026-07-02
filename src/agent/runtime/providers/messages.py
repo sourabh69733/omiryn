@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agent.runtime.replies import MAX_REPLY_PARTS, REPLY_PART_SEPARATOR, REPLY_PART_WORD_LIMIT
+
 from .config import CHAT_ADVICE_REPLY_WORD_LIMIT, CHAT_REPLY_WORD_LIMIT, RECENT_CHAT_MESSAGE_LIMIT
 from .prompts import _context_sources_text, _truncate_for_context
 from .quality import _normalized_user_text
@@ -83,7 +85,7 @@ def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
     if not cleaned:
         return cleaned
 
-    limit = _chat_reply_word_limit(messages)
+    limit = _chat_reply_word_limit(messages, cleaned)
     words = cleaned.split()
     if len(words) <= limit:
         return cleaned
@@ -107,8 +109,13 @@ def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
         return compact
     return " ".join(words[:limit]).rstrip(" ,;:")
 
-def _chat_reply_word_limit(messages: list[dict[str, str]]) -> int:
+def _chat_reply_word_limit(
+    messages: list[dict[str, str]],
+    reply_text: str = "",
+) -> int:
     latest_user_text = _latest_user_text(messages)
+    if REPLY_PART_SEPARATOR in reply_text or _wants_continuous_reply(latest_user_text):
+        return MAX_REPLY_PARTS * REPLY_PART_WORD_LIMIT
     advice_markers = {
         "advice",
         "detail",
@@ -122,6 +129,30 @@ def _chat_reply_word_limit(messages: list[dict[str, str]]) -> int:
     if any(marker in latest_user_text for marker in advice_markers):
         return CHAT_ADVICE_REPLY_WORD_LIMIT
     return CHAT_REPLY_WORD_LIMIT
+
+def _wants_continuous_reply(latest_user_text: str) -> bool:
+    continuous_markers = {
+        "story",
+        "continue",
+        "continued",
+        "flow",
+        "scene",
+        "imagine",
+        "example",
+        "conversation",
+        "convo",
+        "roleplay",
+        "parts",
+        "detail",
+        "batao",
+        "sunao",
+        "kaise",
+        "kya hua",
+        "what happened",
+        "tell me",
+        "tell",
+    }
+    return any(marker in latest_user_text for marker in continuous_markers)
 
 def _latest_user_text(messages: list[dict[str, str]]) -> str:
     latest = next(

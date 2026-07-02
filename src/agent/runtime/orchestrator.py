@@ -6,6 +6,7 @@ from typing import Any
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.memory import capture_profile_facts_from_user_message
 from agent.runtime.providers import assess_user_message_quality, generate_agent_reply
+from agent.runtime.replies import split_assistant_reply
 from storage import (
     finish_agent_trace,
     save_agent_context_snapshot,
@@ -150,6 +151,7 @@ async def run_agent_turn(
             user_profile=context_package.user_profile,
             system_prompt=context_package.system_prompt,
         )
+        reply_parts = split_assistant_reply(reply)
     except Exception as error:
         save_agent_trace_step(
             {
@@ -181,6 +183,7 @@ async def run_agent_turn(
             "status": "ok",
             "metadata": {
                 "reply_chars": len(reply),
+                "reply_part_count": len(reply_parts),
                 "model": model,
                 "prompt_version": context_package.prompt_version,
                 "agent_mode": agent_mode,
@@ -188,7 +191,8 @@ async def run_agent_turn(
             },
         }
     )
-    updated_messages.append({"role": "assistant", "content": reply})
+    for reply_part in reply_parts:
+        updated_messages.append({"role": "assistant", "content": reply_part})
     save_agent_context_snapshot(context_snapshot)
     save_agent_trace_step(
         {
@@ -212,6 +216,7 @@ async def run_agent_turn(
             "ending_message_count": len(updated_messages),
             "quality_valid": quality_valid,
             "reply_chars": len(reply),
+            "reply_part_count": len(reply_parts),
         },
     )
     return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
