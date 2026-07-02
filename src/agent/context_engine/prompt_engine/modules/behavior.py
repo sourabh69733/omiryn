@@ -4,6 +4,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
+from agent.context_engine.prompt_engine.modules.identity import agent_persona_for_interest
+
 
 @dataclass(frozen=True)
 class CompanionBehavior:
@@ -16,7 +19,9 @@ class CompanionBehavior:
     ask_question_policy: str = "at_most_one_soft_question"
     dating_focus: str = "gradual_understanding_for_matching"
     safety_level: str = "high_trust_no_impersonation"
-    version: str = "companion-v1"
+    version: str = "v1"
+    version_name: str = "v1_companion_basic"
+    data_point_targets: tuple[str, ...] = ()
 
 
 def build_companion_behavior(
@@ -24,6 +29,7 @@ def build_companion_behavior(
     *,
     agent_name: str | None = None,
     tone: str = "auto",
+    prompt_version: PromptBehaviorVersion | None = None,
 ) -> CompanionBehavior:
     persona = agent_persona_for_interest(str((user_profile or {}).get("interested_in") or ""))
     if agent_name and agent_name.strip():
@@ -33,20 +39,18 @@ def build_companion_behavior(
         persona_presentation=persona["presentation"],
         tone=tone,
         max_reply_words=int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35")),
-        allow_light_playful=os.getenv("AGENT_ALLOW_LIGHT_PLAYFUL", "true").lower() == "true",
+        allow_light_playful=_allow_light_playful(prompt_version),
         allow_romantic_roleplay=False,
+        version=prompt_version.version_id if prompt_version else "v1",
+        version_name=prompt_version.name if prompt_version else "v1_companion_basic",
+        data_point_targets=prompt_version.data_point_targets if prompt_version else (),
     )
 
 
-def agent_persona_for_interest(interested_in: str) -> dict[str, str]:
-    if interested_in == "women":
-        return {"name": "Annie", "presentation": "girl/woman companion"}
-    if interested_in == "men":
-        return {"name": "Arjun", "presentation": "boy/man companion"}
-    return {"name": "Omi", "presentation": "warm neutral companion"}
-
-
-def behavior_prompt(behavior: CompanionBehavior, user_profile: dict[str, Any] | None) -> str:
+def behavior_module_prompt(
+    behavior: CompanionBehavior,
+    user_profile: dict[str, Any] | None,
+) -> str:
     gender = (user_profile or {}).get("gender") or "unknown"
     interested_in = (user_profile or {}).get("interested_in") or "unknown"
     display_name = (user_profile or {}).get("display_name") or "unknown"
@@ -68,7 +72,7 @@ def behavior_prompt(behavior: CompanionBehavior, user_profile: dict[str, Any] | 
         else "Do not romantic-roleplay, claim intimacy, or pretend to be a real partner."
     )
     return (
-        f"Behavior version: {behavior.version}.\n"
+        f"Prompt behavior version: {behavior.version} ({behavior.version_name}).\n"
         f"User identity: display_name={display_name}, email={email}.\n"
         f"User basics: gender={gender}, interested_in={interested_in}, "
         f"location={location}, country={country}.\n"
@@ -100,16 +104,10 @@ def companion_intent_prompt() -> str:
     )
 
 
-def tone_prompt(tone: str) -> str:
-    prompts = {
-        "auto": (
-            "Tone setting: Auto. Match the user's natural tone from recent messages and imported "
-            "speaking-style context. If signals conflict, stay warm, clear, brief, and natural."
-        ),
-        "casual": "Tone setting: Casual. Use relaxed, simple language without sounding sloppy.",
-        "warm": "Tone setting: Warm. Be gentle, supportive, and emotionally clear.",
-        "formal": "Tone setting: Formal. Be polished, structured, and respectful.",
-        "direct": "Tone setting: Direct. Be concise, specific, and low-fluff.",
-        "playful": "Tone setting: Playful. Be light and witty while staying respectful.",
-    }
-    return prompts.get(tone, prompts["auto"])
+def _allow_light_playful(prompt_version: PromptBehaviorVersion | None) -> bool:
+    env_value = os.getenv("AGENT_ALLOW_LIGHT_PLAYFUL")
+    if env_value is not None:
+        return env_value.lower() == "true"
+    if not prompt_version:
+        return True
+    return bool(prompt_version.reply_style.get("allow_light_playful", True))
