@@ -22,6 +22,7 @@ STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
 MEMORY_RETRIEVAL_LIMIT = 2
 DATA_POINT_CONTEXT_LIMIT = 4
 WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT = 2
+WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
 WHATSAPP_STRUCTURED_SOURCE_TYPE = "whatsapp_structured_context"
 MEMORY_TRIGGER_TERMS = {
@@ -262,7 +263,8 @@ def _structured_whatsapp_context_sources(
     user_id: str | None,
     query_intent: ContextQueryIntent,
 ) -> list[dict[str, Any]]:
-    if not selected_styles and not _should_retrieve_memory(user_text):
+    conversation_fuel = _should_retrieve_whatsapp_conversation_fuel(user_text)
+    if not selected_styles and not _should_retrieve_memory(user_text) and not conversation_fuel:
         return []
 
     source_ids = _active_whatsapp_context_source_ids(all_sources, attached_sources, selected_styles)
@@ -280,7 +282,12 @@ def _structured_whatsapp_context_sources(
     sources = [
         source
         for source in (
-            _structured_whatsapp_context_source(item, user_text, user_id)
+            _structured_whatsapp_context_source(
+                item,
+                user_text,
+                user_id,
+                conversation_fuel=conversation_fuel and not query_intent.prefer_structured_whatsapp,
+            )
             for item in imports
         )
         if source
@@ -315,6 +322,8 @@ def _structured_whatsapp_context_source(
     whatsapp_import: dict[str, Any],
     user_text: str,
     user_id: str | None,
+    *,
+    conversation_fuel: bool = False,
 ) -> dict[str, Any] | None:
     import_id = str(whatsapp_import["id"])
     memory = retrieve_whatsapp_memory(import_id, user_id)
@@ -326,12 +335,18 @@ def _structured_whatsapp_context_source(
 
     selected_sender = str(whatsapp_import.get("selected_sender") or "")
     ranked_chunks = _rank_whatsapp_chunks(chunks, user_text)
+    chunk_limit = (
+        WHATSAPP_FUEL_RETRIEVAL_LIMIT
+        if conversation_fuel
+        else WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT
+    )
     content = _structured_whatsapp_context_text(
         whatsapp_import,
         people,
         style_profiles,
-        ranked_chunks[:WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT],
+        ranked_chunks[:chunk_limit],
         selected_sender,
+        conversation_fuel=conversation_fuel,
     )
     return {
         "source_type": WHATSAPP_STRUCTURED_SOURCE_TYPE,
@@ -341,7 +356,8 @@ def _structured_whatsapp_context_source(
             "context_source_id": whatsapp_import.get("context_source_id"),
             "import_id": import_id,
             "selected_sender": selected_sender,
-            "retrieved_chunk_count": min(len(ranked_chunks), WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT),
+            "retrieved_chunk_count": min(len(ranked_chunks), chunk_limit),
+            "conversation_fuel": conversation_fuel,
         },
     }
 
@@ -373,13 +389,17 @@ def _structured_whatsapp_context_text(
     style_profiles: list[dict[str, Any]],
     chunks: list[dict[str, Any]],
     selected_sender: str,
+    *,
+    conversation_fuel: bool = False,
 ) -> str:
     sections = [
         "Structured WhatsApp context.",
         "Use this when the user asks about uploaded WhatsApp chat, people, topics, messages, or texting style.",
+        "When marked as conversation fuel, use one small topic or recent event to continue naturally.",
         "Do not claim live WhatsApp access; answer from this stored parsed import.",
         f"Import title: {whatsapp_import.get('title') or '-'}",
         f"Selected sender: {selected_sender or '-'}",
+        f"Mode: {'conversation fuel' if conversation_fuel else 'direct retrieval'}",
     ]
     if people:
         sections.extend(
@@ -421,6 +441,16 @@ def _structured_whatsapp_context_text(
         for chunk in chunks:
             sections.append(str(chunk.get("content") or ""))
     return "\n".join(sections)
+
+
+def _should_retrieve_whatsapp_conversation_fuel(user_text: str) -> bool:
+    terms = memory_terms(user_text)
+    if not terms:
+        return True
+    if len(terms) <= 4 and not _should_retrieve_memory(user_text):
+        return True
+    normalized = normalized_memory_text(user_text)
+    return normalized in {"haan", "haa", "yeah", "yes", "ok", "okay", "hmm", "acha", "batao"}
 
 
 def _ordered_style_profiles(

@@ -16,6 +16,7 @@ from agent.context_engine.prompt_engine.modules.conversation_flow import convers
 from agent.context_engine.prompt_engine.modules.data_point_targets import data_point_targets_prompt
 from agent.context_engine.prompt_engine.modules.memory_usage import memory_usage_prompt
 from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
+from agent.context_engine.prompt_engine.modules.whatsapp_usage import whatsapp_usage_prompt
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 
 
@@ -62,7 +63,13 @@ def build_system_prompt(
     ]
     context_text = context_sources_text(context_sources)
     if context_text:
-        sections.extend([memory_usage_prompt(prompt_version), context_text])
+        sections.extend(
+            [
+                memory_usage_prompt(prompt_version),
+                whatsapp_usage_prompt(context_sources),
+                context_text,
+            ]
+        )
     return "\n\n".join(section for section in sections if section)
 
 
