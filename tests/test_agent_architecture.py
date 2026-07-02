@@ -92,8 +92,53 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
                 "ending_message_count": 3,
                 "quality_valid": True,
                 "reply_chars": len("Makes sense, tell me a little more."),
+                "reply_part_count": 1,
             },
         )
+
+    async def test_orchestrator_can_append_multiple_assistant_reply_parts(self) -> None:
+        with (
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace") as finish_trace,
+        ):
+            save_trace.return_value = {"id": "trace-1"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "message_index": 2,
+                    "summary": {
+                        "included_source_count": 0,
+                        "rough_context_tokens": 0,
+                    },
+                },
+            )
+            model_call.return_value = (
+                "Haan, that Abhishek chat has a funny vibe. "
+                "<next_message> It feels very casual and direct."
+            )
+
+            result = await run_agent_turn(
+                conversation_id="conversation-1",
+                messages=[{"role": "assistant", "content": "Tell me more."}],
+                user_text="haan",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(result.messages[-2]["content"], "Haan, that Abhishek chat has a funny vibe.")
+        self.assertEqual(result.messages[-1]["content"], "It feels very casual and direct.")
+        finish_trace.assert_called_once()
+        self.assertEqual(finish_trace.call_args.kwargs["summary"]["reply_part_count"], 2)
 
     async def test_orchestrator_keeps_message_quality_valid_while_guardrail_is_disabled(self) -> None:
         with (

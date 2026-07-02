@@ -24,6 +24,7 @@ from agent.memory_engine.whatsapp_data_points import (
     extract_whatsapp_data_points,
 )
 from agent.runtime.providers import _deep_fact_extraction_text
+from agent.runtime.replies import split_assistant_reply
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
 from storage import reset_db
@@ -61,6 +62,44 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("Agent persona: name=Annie", prompt)
         self.assertIn("Tone setting: Warm", prompt)
         self.assertIn("[llm_profile] Imported profile", prompt)
+
+    def test_prompt_builder_tells_model_to_keep_roman_hinglish(self) -> None:
+        prompt = build_companion_system_prompt(
+            user_profile={"interested_in": "women"},
+            agent_tone="auto",
+            context_sources=[],
+        )
+
+        self.assertIn("Roman Hinglish/English by default", prompt)
+        self.assertIn("avoid Devanagari", prompt)
+
+    def test_assistant_reply_normalizes_accidental_devanagari(self) -> None:
+        parts = split_assistant_reply(
+            "Maine socha, pehle tumhe khush dekhna \u091c\u0930\u0942\u0930\u0940 hai."
+        )
+
+        self.assertEqual(len(parts), 1)
+        self.assertNotIn("\u091c\u0930\u0942\u0930\u0940", parts[0])
+        self.assertIn("jaroori hai", parts[0])
+
+    def test_assistant_reply_strips_wrapping_dialogue_quotes(self) -> None:
+        parts = split_assistant_reply(
+            '"Ab tumse sach bolna chahta hoon." <next_message> '
+            '"But andar se thoda darr bhi lag raha hai."'
+        )
+
+        self.assertEqual(parts[0], "Ab tumse sach bolna chahta hoon.")
+        self.assertEqual(parts[1], "But andar se thoda darr bhi lag raha hai.")
+
+    def test_assistant_reply_strips_screenplay_speaker_labels(self) -> None:
+        parts = split_assistant_reply(
+            'Rahul: "Mujhe laga ki main khud ko hi samajh nahi pa raha tha." '
+            '<next_message> Siya: "Samajh gayi, ab hum dono milke plan banate hain."'
+        )
+
+        self.assertEqual(parts[0], "Mujhe laga ki main khud ko hi samajh nahi pa raha tha.")
+        self.assertEqual(parts[1], "Samajh gayi, ab hum dono milke plan banate hain.")
+        self.assertFalse(any(part.startswith(("Rahul:", "Siya:")) for part in parts))
 
     def test_prompt_version_registry_defaults_to_v1(self) -> None:
         version = get_prompt_behavior_version("unknown-version")

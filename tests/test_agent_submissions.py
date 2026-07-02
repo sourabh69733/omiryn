@@ -19,6 +19,7 @@ from agent.runtime.providers import (
     _system_prompt_with_context,
     agent_runtime_status,
 )
+from agent.runtime.replies import split_assistant_reply
 from agent.runtime.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
 from ingestion.whatsapp import (
@@ -1210,6 +1211,22 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertLessEqual(len(reply.split()), 35)
         self.assertNotIn("slowly figure", reply)
 
+    def test_story_replies_can_span_multiple_small_messages(self) -> None:
+        reply = _compact_chat_reply(
+            (
+                "Okay, imagine this. <next_message> He texts like he is already outside. "
+                "<next_message> Very little drama, just direct timing and location. "
+                "<next_message> Then suddenly he asks one small thing and waits. "
+                "<next_message> We can use that vibe without copying him exactly."
+            ),
+            [{"role": "user", "content": "tell me like a small story"}],
+        )
+        parts = split_assistant_reply(reply)
+
+        self.assertEqual(len(parts), 5)
+        self.assertTrue(all(len(part.split()) <= 15 for part in parts))
+        self.assertIn("without copying him exactly", parts[-1])
+
     def test_mock_companion_reply_stays_short(self) -> None:
         reply = _mock_reply(
             [
@@ -2178,7 +2195,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(create_response.status_code, 201)
 
         casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay")
-        self.assertEqual(casual_sources, [])
+        casual_structured_source = next(
+            source
+            for source in casual_sources
+            if source["source_type"] == "whatsapp_structured_context"
+        )
+        self.assertTrue(casual_structured_source["metadata"]["conversation_fuel"])
+        self.assertIn("Mode: conversation fuel", casual_structured_source["content"])
 
         whatsapp_sources = _smart_reply_context_sources(
             conversation_id,
