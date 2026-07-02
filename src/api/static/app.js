@@ -2,6 +2,8 @@ let messages = [];
 let conversationId = null;
 let activeDraftId = null;
 let isSendingMessage = false;
+let isAwaitingAgentReply = false;
+let isAssistantTyping = false;
 let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
 let lastDeleteTrigger = null;
@@ -24,6 +26,7 @@ let activeFeedbackMessageIndex = null;
 let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 const messageFeedbackState = new Map();
+const assistantMessagePlaybackDelayMs = 850;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -1686,7 +1689,7 @@ function renderMessages() {
 
     chatLog.appendChild(bubble);
   });
-  if (isSendingMessage) {
+  if (isAwaitingAgentReply || isAssistantTyping) {
     chatLog.appendChild(renderTypingIndicator());
   }
   chatLog.scrollTop = chatLog.scrollHeight;
@@ -2650,6 +2653,40 @@ function updateReadiness() {
   });
 }
 
+async function playConversationReply(nextMessages) {
+  if (!Array.isArray(nextMessages) || nextMessages.length <= messages.length) {
+    messages = Array.isArray(nextMessages) ? nextMessages : messages;
+    return;
+  }
+
+  const existingCount = messages.length;
+  const pendingMessages = nextMessages.slice(existingCount);
+  if (pendingMessages.length <= 1) {
+    messages = nextMessages;
+    return;
+  }
+
+  messages = nextMessages.slice(0, existingCount);
+  for (let index = 0; index < pendingMessages.length; index += 1) {
+    const pendingMessage = pendingMessages[index];
+    if (pendingMessage.role === "assistant" && index > 0) {
+      isAssistantTyping = true;
+      renderMessages();
+      await wait(assistantMessagePlaybackDelayMs);
+      isAssistantTyping = false;
+    }
+    messages.push(pendingMessage);
+    renderMessages();
+  }
+  messages = nextMessages;
+}
+
+function wait(durationMs) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+
 async function sendUserMessage() {
   if (isSendingMessage) return;
 
@@ -2659,6 +2696,8 @@ async function sendUserMessage() {
   messages.push({ role: "user", content: text });
   chatInput.value = "";
   isSendingMessage = true;
+  isAwaitingAgentReply = true;
+  isAssistantTyping = false;
   renderMessages();
   updateReadiness();
   focusChatInput();
@@ -2681,14 +2720,19 @@ async function sendUserMessage() {
       throw new Error(conversation.detail || "The agent could not reply.");
     }
 
-    messages = conversation.messages || messages;
+    isAwaitingAgentReply = false;
+    await playConversationReply(conversation.messages || messages);
   } catch (error) {
+    isAwaitingAgentReply = false;
+    isAssistantTyping = false;
     messages.push({
       role: "assistant",
       content: `I could not answer that yet. ${error.message}`
     });
   } finally {
     isSendingMessage = false;
+    isAwaitingAgentReply = false;
+    isAssistantTyping = false;
     renderMessages();
     updateReadiness();
     loadAgentUsage();
