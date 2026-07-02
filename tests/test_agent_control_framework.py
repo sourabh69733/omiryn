@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.memory_engine.data_point_extraction import (
     _conversation_data_point_excerpt,
     build_data_point_review_prompt,
@@ -13,7 +14,10 @@ from agent.memory_engine.data_point_extraction import (
 from agent.memory_engine.data_points import normalize_data_point, rank_data_points_for_context
 from agent.context_engine.context_budget import budget_context_sources
 from agent.memory_engine.profile_facts import extract_profile_facts_from_message
-from agent.context_engine.prompt_builder import build_companion_system_prompt, context_sources_text
+from agent.context_engine.prompt_engine.builder import (
+    build_companion_system_prompt,
+    context_sources_text,
+)
 from agent.context_engine.style_adapter import style_adaptation_guide
 from agent.memory_engine.whatsapp_data_points import (
     extract_whatsapp_data_point_candidates,
@@ -52,10 +56,18 @@ class AgentControlFrameworkTest(unittest.TestCase):
             ],
         )
 
-        self.assertIn("Behavior version: companion-v1", prompt)
+        self.assertIn("Internal prompt behavior version: v1_companion_basic", prompt)
+        self.assertIn("Prompt behavior version: v1 (v1_companion_basic)", prompt)
         self.assertIn("Agent persona: name=Annie", prompt)
         self.assertIn("Tone setting: Warm", prompt)
         self.assertIn("[llm_profile] Imported profile", prompt)
+
+    def test_prompt_version_registry_defaults_to_v1(self) -> None:
+        version = get_prompt_behavior_version("unknown-version")
+
+        self.assertEqual(version.version_id, "v1")
+        self.assertEqual(version.name, "v1_companion_basic")
+        self.assertIn("relationship_intent", version.data_point_targets)
 
     def test_data_points_default_to_matching_not_chat_context(self) -> None:
         point = normalize_data_point(

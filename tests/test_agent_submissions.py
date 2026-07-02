@@ -1055,7 +1055,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(facts_response.status_code, 200)
         self.assertEqual(facts_response.json()["facts"], [])
 
-    def test_low_quality_agent_answer_is_rejected_before_model_call(self) -> None:
+    def test_message_quality_guardrail_is_disabled_for_now(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
 
@@ -1066,14 +1066,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(message_response.status_code, 200)
         messages = message_response.json()["messages"]
-        self.assertEqual(messages[-2]["quality"], "low_information")
-        self.assertIn("real answer", messages[-1]["content"])
+        self.assertNotEqual(messages[-2].get("quality"), "low_information")
+        self.assertEqual(messages[-2]["content"], "knl")
+        self.assertEqual(messages[-1]["role"], "assistant")
 
         usage_response = self.client.get(f"/api/agent/conversations/{conversation_id}/usage")
         usage = usage_response.json()
         self.assertEqual(usage["summary"]["request_count"], 1)
-        self.assertEqual(usage["events"][0]["request_kind"], "input_guardrail")
-        self.assertEqual(usage["events"][0]["provider"], "guardrail")
+        self.assertNotEqual(usage["events"][0]["request_kind"], "input_guardrail")
 
     def test_yes_is_allowed_after_confirmation_question(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
