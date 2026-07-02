@@ -18,6 +18,8 @@ def build_context_snapshot(
     model: str | None,
     agent_tone: str,
     style_source_id: str | None,
+    prompt_version: str | None = None,
+    prompt_version_name: str | None = None,
 ) -> dict[str, Any]:
     budgeted_sources = budget_context_sources(context_sources)
     source_type_counts = Counter(
@@ -36,6 +38,8 @@ def build_context_snapshot(
             "assistant_message_index": assistant_message_index,
             "model": model,
             "agent_tone": agent_tone,
+            "prompt_version": prompt_version,
+            "prompt_version_name": prompt_version_name,
             "style_source_id": style_source_id,
             "source_count": len(context_sources),
             "included_source_count": len(budgeted_sources),
