@@ -6,6 +6,8 @@ import re
 from typing import Any
 import json
 
+import httpx
+
 from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_point_candidates
 from agent.runtime.providers import (
@@ -141,18 +143,36 @@ async def capture_hybrid_conversation_data_points(
                 candidates.append(candidate)
         if not candidates:
             return
-        reviews = await review_data_point_candidates(
-            candidates,
-            source_excerpt=_conversation_data_point_excerpt(messages),
-            source_title="In-app conversation",
-            selected_sender=None,
-            user_id=user_id,
-            source_id=conversation_id,
-            import_id=None,
-            source_kind="agent_conversation",
-            conversation_id=conversation_id,
-            model=model,
-        )
+        try:
+            reviews = await review_data_point_candidates(
+                candidates,
+                source_excerpt=_conversation_data_point_excerpt(messages),
+                source_title="In-app conversation",
+                selected_sender=None,
+                user_id=user_id,
+                source_id=conversation_id,
+                import_id=None,
+                source_kind="agent_conversation",
+                conversation_id=conversation_id,
+                model=model,
+            )
+        except Exception as error:
+            if not _provider_rate_limited(error):
+                raise
+            logger.warning(
+                "agent.data_points.hybrid_conversation_review_rate_limited "
+                "conversation_id=%s candidates=%s",
+                conversation_id,
+                len(candidates),
+            )
+            reviews = _rate_limit_fallback_reviews(
+                candidates,
+                user_id=user_id,
+                source_id=conversation_id,
+                import_id=None,
+                title="In-app conversation",
+                source_kind="agent_conversation",
+            )
         for review in reviews:
             save_data_point_extraction_debug(
                 {
@@ -172,7 +192,13 @@ async def capture_hybrid_conversation_data_points(
             )
             if review.get("point"):
                 upsert_profile_fact(normalize_data_point(review["point"]))
-    except Exception:
+    except Exception as error:
+        if _provider_rate_limited(error):
+            logger.warning(
+                "agent.data_points.hybrid_conversation_rate_limited conversation_id=%s",
+                conversation_id,
+            )
+            return
         logger.exception("agent.data_points.hybrid_conversation_failed conversation_id=%s", conversation_id)
 
 
@@ -220,16 +246,34 @@ async def capture_hybrid_whatsapp_data_points(
         )
         if not candidates:
             return
-        reviews = await review_rule_data_point_candidates(
-            memory,
-            candidates,
-            user_id=user_id,
-            source_id=source_id,
-            import_id=import_id,
-            title=title,
-            conversation_id=conversation_id,
-            model=model,
-        )
+        try:
+            reviews = await review_rule_data_point_candidates(
+                memory,
+                candidates,
+                user_id=user_id,
+                source_id=source_id,
+                import_id=import_id,
+                title=title,
+                conversation_id=conversation_id,
+                model=model,
+            )
+        except Exception as error:
+            if not _provider_rate_limited(error):
+                raise
+            logger.warning(
+                "agent.data_points.hybrid_whatsapp_review_rate_limited "
+                "source_id=%s candidates=%s",
+                source_id,
+                len(candidates),
+            )
+            reviews = _rate_limit_fallback_reviews(
+                candidates,
+                user_id=user_id,
+                source_id=source_id,
+                import_id=import_id,
+                title=title,
+                source_kind="whatsapp_import",
+            )
         for review in reviews:
             save_data_point_extraction_debug(
                 {
@@ -249,7 +293,10 @@ async def capture_hybrid_whatsapp_data_points(
             )
             if review.get("point"):
                 upsert_profile_fact(normalize_data_point(review["point"]))
-    except Exception:
+    except Exception as error:
+        if _provider_rate_limited(error):
+            logger.warning("agent.data_points.hybrid_capture_rate_limited source_id=%s", source_id)
+            return
         logger.exception("agent.data_points.hybrid_capture_failed source_id=%s", source_id)
 
 
@@ -313,6 +360,53 @@ def normalize_llm_data_point_reviews(
         )
         if review:
             reviews.append(review)
+    return reviews
+
+
+def _rate_limit_fallback_reviews(
+    candidates: list[dict[str, Any]],
+    *,
+    user_id: str,
+    source_id: str,
+    import_id: str | None,
+    title: str,
+    source_kind: str,
+) -> list[dict[str, Any]]:
+    raw_reviews = [
+        {
+            "candidate_key": candidate.get("key"),
+            "decision": "approve",
+            "what_we_learned": candidate.get("meaning") or candidate.get("label"),
+            "why_it_matters": "Kept without LLM review because the provider was rate-limited.",
+            "confidence": min(_confidence(candidate.get("confidence"), default=0.55), 0.62),
+            "evidence": candidate.get("evidence") or [],
+            "usage": candidate.get("usage") or {},
+            "final_point": _candidate_as_final_point(candidate),
+        }
+        for candidate in candidates[:LLM_MAX_POINTS]
+        if candidate.get("key")
+    ]
+    reviews = normalize_llm_data_point_reviews(
+        {"reviews": raw_reviews},
+        candidates,
+        user_id,
+        source_id,
+        import_id,
+        title,
+        source_kind=source_kind,
+    )
+    for review in reviews:
+        review["review"]["rate_limited"] = True
+        review["review"]["fallback"] = "provider_rate_limit"
+        if review.get("point"):
+            review["point"]["value"] = {
+                **review["point"]["value"],
+                "extractor": "hybrid_rate_limit_fallback",
+            }
+            llm_review = review["point"]["value"].get("llm_review")
+            if isinstance(llm_review, dict):
+                llm_review["rate_limited"] = True
+                llm_review["fallback"] = "provider_rate_limit"
     return reviews
 
 
@@ -716,3 +810,10 @@ def _privacy_level(value: Any) -> str:
 
 def _snake_key(value: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", value.lower())).strip("_")
+
+
+def _provider_rate_limited(error: Exception) -> bool:
+    if isinstance(error, httpx.HTTPStatusError) and error.response.status_code == 429:
+        return True
+    message = str(error).lower()
+    return "429" in message or "too many requests" in message
