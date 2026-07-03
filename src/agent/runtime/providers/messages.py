@@ -40,6 +40,7 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         if role not in {"assistant", "user", "system"} or content is None:
             continue
         provider_messages.append({"role": role, "content": str(content)})
+    provider_messages = _merge_adjacent_assistant_messages(provider_messages)
     if len(provider_messages) <= RECENT_CHAT_MESSAGE_LIMIT:
         return provider_messages
 
@@ -48,16 +49,8 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     return [_conversation_summary_message(older_messages)] + recent_messages
 
 def _conversation_summary_message(messages: list[dict[str, str]]) -> dict[str, str]:
-    user_lines = [
-        _truncate_for_context(message["content"], 160)
-        for message in messages
-        if message["role"] == "user"
-    ][-8:]
-    assistant_lines = [
-        _truncate_for_context(message["content"], 120)
-        for message in messages
-        if message["role"] == "assistant"
-    ][-4:]
+    user_lines = _summary_lines(messages, role="user", limit=5, char_limit=140)
+    assistant_lines = _summary_lines(messages, role="assistant", limit=3, char_limit=120)
     parts = [
         "Earlier conversation summary, compacted locally to save tokens.",
         "Use this only as rough continuity; prefer the recent messages for exact wording.",
@@ -67,6 +60,93 @@ def _conversation_summary_message(messages: list[dict[str, str]]) -> dict[str, s
     if assistant_lines:
         parts.append("Earlier assistant prompts: " + " | ".join(assistant_lines))
     return {"role": "system", "content": "\n".join(parts)}
+
+
+def _merge_adjacent_assistant_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    merged: list[dict[str, str]] = []
+    for message in messages:
+        if (
+            merged
+            and message["role"] == "assistant"
+            and merged[-1]["role"] == "assistant"
+        ):
+            merged[-1]["content"] = _join_message_parts(merged[-1]["content"], message["content"])
+            continue
+        merged.append(dict(message))
+    return merged
+
+
+def _join_message_parts(first: str, second: str) -> str:
+    first = first.strip()
+    second = second.strip()
+    if not first:
+        return second
+    if not second:
+        return first
+    return f"{first}\n{second}"
+
+
+def _summary_lines(
+    messages: list[dict[str, str]],
+    *,
+    role: str,
+    limit: int,
+    char_limit: int,
+) -> list[str]:
+    lines: list[str] = []
+    seen: set[str] = set()
+    for message in messages:
+        if message["role"] != role:
+            continue
+        content = " ".join(str(message.get("content") or "").split())
+        if not _summary_worthy(content, role):
+            continue
+        normalized = _normalized_user_text(content)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        lines.append(_truncate_for_context(content, char_limit))
+    return lines[-limit:]
+
+
+def _summary_worthy(content: str, role: str) -> bool:
+    normalized = _normalized_user_text(content)
+    if not normalized:
+        return False
+    low_signal = {
+        "aww thanks",
+        "bas",
+        "batao",
+        "chill",
+        "good",
+        "glad",
+        "ha",
+        "haan",
+        "hi",
+        "hmm",
+        "mast",
+        "na",
+        "nahi",
+        "nhi",
+        "nice",
+        "ok",
+        "okay",
+        "ohh",
+        "thanks",
+        "theek",
+        "tum sunoa",
+        "yep",
+        "yes",
+    }
+    if normalized in low_signal:
+        return False
+    if len(normalized) <= 3:
+        return False
+    word_count = len(normalized.split())
+    if role == "assistant" and word_count <= 2:
+        return False
+    return True
+
 
 def _conversation_and_context_text(
     messages: list[dict[str, str]],

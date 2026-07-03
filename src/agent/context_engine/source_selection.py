@@ -264,7 +264,8 @@ def _structured_whatsapp_context_sources(
     query_intent: ContextQueryIntent,
 ) -> list[dict[str, Any]]:
     conversation_fuel = _should_retrieve_whatsapp_conversation_fuel(user_text)
-    if not selected_styles and not _should_retrieve_memory(user_text) and not conversation_fuel:
+    should_retrieve = _should_retrieve_memory(user_text)
+    if not should_retrieve and not conversation_fuel:
         return []
 
     source_ids = _active_whatsapp_context_source_ids(all_sources, attached_sources, selected_styles)
@@ -446,11 +447,18 @@ def _structured_whatsapp_context_text(
 def _should_retrieve_whatsapp_conversation_fuel(user_text: str) -> bool:
     terms = memory_terms(user_text)
     if not terms:
-        return True
+        return False
     if len(terms) <= 4 and not _should_retrieve_memory(user_text):
-        return True
+        return False
     normalized = normalized_memory_text(user_text)
-    return normalized in {"haan", "haa", "yeah", "yes", "ok", "okay", "hmm", "acha", "batao"}
+    return normalized in {
+        "batao",
+        "tell",
+        "continue from whatsapp",
+        "continue from uploaded chat",
+        "uploaded chat se batao",
+        "whatsapp se batao",
+    }
 
 
 def _ordered_style_profiles(
