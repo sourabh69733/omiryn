@@ -435,6 +435,7 @@ function renderContextSnapshotItem(snapshot) {
   const context = snapshot.context || {};
   const sources = context.sources || [];
   const messages = snapshot.messages || {};
+  const promptDebug = messages.prompt_debug || {};
   const flags = [
     summary.used_data_points ? "data_points" : "",
     summary.used_structured_whatsapp ? "structured_whatsapp" : "",
@@ -449,7 +450,8 @@ function renderContextSnapshotItem(snapshot) {
         <span class="mono">${formatDate(snapshot.created_at)}</span>
       </div>
       <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
-      <p>${formatNumber(summary.context_chars || 0)} source chars · ${formatNumber(summary.rough_context_tokens || 0)} estimated context tokens · ${formatNumber(summary.source_count || 0)} candidates</p>
+      <p>${escapeHtml(contextSnapshotHeadline(summary, promptDebug))}</p>
+      <small>${escapeHtml(contextSnapshotSourceLine(summary))}</small>
       ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
       ${renderSnapshotTurnMessages(messages)}
       ${renderSnapshotPromptPayload(messages)}
@@ -465,6 +467,29 @@ function renderContextSnapshotItem(snapshot) {
       </details>
     </article>
   `;
+}
+
+function contextSnapshotHeadline(summary = {}, promptDebug = {}) {
+  if (promptDebug.total_chars || promptDebug.rough_tokens || promptDebug.provider_message_count) {
+    return [
+      `${formatNumber(promptDebug.total_chars || 0)} prompt chars`,
+      `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
+      `${formatNumber(promptDebug.provider_message_count || 0)} messages`
+    ].join(" · ");
+  }
+  return [
+    `${formatNumber(summary.context_chars || 0)} source chars`,
+    `${formatNumber(summary.rough_context_tokens || 0)} estimated context tokens`,
+    `${formatNumber(summary.source_count || 0)} candidates`
+  ].join(" · ");
+}
+
+function contextSnapshotSourceLine(summary = {}) {
+  return [
+    `${formatNumber(summary.context_chars || 0)} source chars`,
+    `${formatNumber(summary.rough_context_tokens || 0)} estimated source tokens`,
+    `${formatNumber(summary.source_count || 0)} candidates`
+  ].join(" · ");
 }
 
 function renderSnapshotTurnMessages(messages = {}) {
