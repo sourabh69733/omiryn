@@ -1,7 +1,7 @@
 import os
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi.testclient import TestClient
@@ -1016,6 +1016,53 @@ class AgentSubmissionApiTest(unittest.TestCase):
         ]
         self.assertTrue(reviewed_facts)
 
+    def test_hybrid_chat_data_point_review_falls_back_on_rate_limit(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+        rate_limit_error = httpx.HTTPStatusError(
+            "429 Too Many Requests",
+            request=request,
+            response=httpx.Response(429, request=request),
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "mock",
+                "DATA_POINT_EXTRACTOR": "hybrid",
+                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+            },
+        ), patch(
+            "agent.memory_engine.data_point_extraction.review_llm_data_point_candidates",
+            new=AsyncMock(side_effect=rate_limit_error),
+        ):
+            for index in range(2):
+                response = self.client.post(
+                    f"/api/agent/conversations/{conversation_id}/messages",
+                    json={
+                        "message": (
+                            f"Career growth and mutual respect matter to me in dating. "
+                            f"Useful detail {index}."
+                        )
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+
+        debug_rows = list_data_point_extraction_debug(user_id="user-a")
+        self.assertTrue(debug_rows)
+        self.assertTrue(all(row["review"]["rate_limited"] for row in debug_rows))
+
+        fallback_facts = [
+            fact
+            for fact in list_profile_facts("user-a")
+            if (fact["value"] or {}).get("extractor") == "hybrid_rate_limit_fallback"
+        ]
+        self.assertTrue(fallback_facts)
+
     def test_repeated_chat_fact_merges_evidence(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -1482,6 +1529,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
         detail = admin_response.json()
         self.assertEqual(detail["context_snapshot_summary"]["total"], 1)
         self.assertEqual(detail["context_snapshots"][0]["conversation_id"], conversation_id)
+        snapshot_detail = detail["context_snapshots"][0]
+        self.assertEqual(
+            snapshot_detail["messages"]["user"]["content"],
+            "what topics were in my uploaded whatsapp chat?",
+        )
+        self.assertTrue(snapshot_detail["messages"]["assistant"]["content"])
+        self.assertIn("system_prompt", snapshot_detail["messages"])
+        self.assertIn("provider", snapshot_detail["messages"])
+        self.assertEqual(snapshot_detail["messages"]["provider"][-1]["role"], "user")
+        self.assertIn("prompt_debug", snapshot_detail["messages"])
         self.assertTrue(detail["conversations"][0]["latest_context_snapshot"])
         self.assertEqual(detail["agent_trace_summary"]["total"], 1)
         self.assertEqual(detail["agent_traces"][0]["steps"][4]["step_name"], "model_call")
