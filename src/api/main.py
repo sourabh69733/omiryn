@@ -1087,6 +1087,8 @@ async def send_agent_message(
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
+    runtime = agent_runtime_status()
+    _sync_conversation_runtime(conversation, runtime)
 
     try:
         turn = await run_agent_turn(
@@ -1562,6 +1564,23 @@ def _normalize_selected_model(model: str | None, runtime: dict[str, object]) -> 
     if model_names:
         return model_names[0]
     return selected or None
+
+
+def _sync_conversation_runtime(
+    conversation: AgentConversation,
+    runtime: dict[str, object],
+) -> None:
+    runtime_provider = str(runtime.get("provider") or "")
+    available_models = runtime.get("available_models")
+    if not isinstance(available_models, list):
+        available_models = []
+    model_names = [str(candidate) for candidate in available_models]
+    if conversation.agent_provider != runtime_provider:
+        conversation.agent_provider = runtime_provider
+        conversation.agent_model = _normalize_selected_model(None, runtime)
+        return
+    if model_names and conversation.agent_model not in model_names:
+        conversation.agent_model = _normalize_selected_model(None, runtime)
 
 
 def _context_source_summary(

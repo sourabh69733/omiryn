@@ -20,6 +20,7 @@ from agent.runtime.providers import (
     _system_prompt_with_context,
     agent_runtime_status,
 )
+from agent.runtime.orchestrator import AgentTurnResult
 from agent.runtime.replies import split_assistant_reply
 from agent.runtime.usage import PROFILE_SIGNAL_BACKFILL
 from auth import CurrentUser
@@ -1220,10 +1221,52 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         compacted = _provider_messages(messages)
 
-        self.assertEqual(len(compacted), 13)
+        self.assertEqual(len(compacted), 9)
         self.assertEqual(compacted[0]["role"], "system")
         self.assertIn("Earlier conversation summary", compacted[0]["content"])
         self.assertEqual(compacted[-1]["content"], "message 17")
+
+    def test_provider_messages_skip_low_signal_summary_duplicates(self) -> None:
+        messages = [
+            {"role": "user", "content": "chill now talking to u"},
+            {"role": "assistant", "content": "Koi interesting plan ya chill vibe aaj ke liye?"},
+            {"role": "user", "content": "long way from hime"},
+            {"role": "assistant", "content": "Bas thoda kaam tha, ab relax kar raha hoon"},
+            {"role": "user", "content": "nhi"},
+            {"role": "user", "content": "nhi"},
+            {"role": "user", "content": "hi, how r u"},
+            {"role": "user", "content": "good"},
+            {"role": "user", "content": "tum sunoa"},
+            {"role": "user", "content": "who r u? ur name, gender? and ur tone?"},
+            {"role": "assistant", "content": "Annie hoon, ek AI companion"},
+            {"role": "user", "content": "tum batao"},
+            {"role": "assistant", "content": "Main yahan tumse chat karne ke liye hoon"},
+            {"role": "assistant", "content": "Aaj tumne kya interesting kiya?"},
+            {"role": "user", "content": "thoda ladki jaisa bolo"},
+            {"role": "assistant", "content": "Aaj ka din kaisa tha, cutie?"},
+            {"role": "user", "content": "ohh cutie"},
+            {"role": "assistant", "content": "Aww, thanks!"},
+            {"role": "assistant", "content": "Kaisa feel kar rahe ho aaj?"},
+            {"role": "user", "content": "mast"},
+            {"role": "assistant", "content": "Glad!"},
+            {"role": "assistant", "content": "Koi plan ya chill vibe aaj raat ka?"},
+            {"role": "user", "content": "nhi"},
+        ]
+
+        compacted = _provider_messages(messages)
+        summary = compacted[0]["content"]
+
+        self.assertNotIn("nhi | nhi", summary)
+        self.assertNotIn("good", summary)
+        self.assertNotIn("mast", summary)
+        self.assertIn("who r u? ur name, gender? and ur tone?", summary)
+        self.assertTrue(
+            any(
+                message["role"] == "assistant"
+                and "Aww, thanks!\nKaisa feel kar rahe ho aaj?" in message["content"]
+                for message in compacted
+            )
+        )
 
     def test_context_sources_are_capped_before_provider_call(self) -> None:
         context_text = _context_sources_text(
@@ -1980,6 +2023,52 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(tone_response.json()["selected_tone"], "direct")
         self.assertIn("detected_tone", tone_response.json())
 
+    def test_existing_conversation_model_syncs_when_provider_changes(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "groq",
+                "GROQ_MODEL": "openai/gpt-oss-120b",
+                "GROQ_AVAILABLE_MODELS": "openai/gpt-oss-120b",
+            },
+        ):
+            create_response = self.client.post(
+                "/api/agent/conversations",
+                json={"agent_model": "openai/gpt-oss-120b"},
+            )
+        conversation = create_response.json()
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "ollama",
+                "OLLAMA_MODEL": "llama3.1:8b",
+                "OLLAMA_AVAILABLE_MODELS": "llama3.1:8b,gpt-oss:20b",
+            },
+        ), patch(
+            "api.main.run_agent_turn",
+            new=AsyncMock(
+                return_value=AgentTurnResult(
+                    messages=conversation["messages"]
+                    + [
+                        {"role": "user", "content": "hi"},
+                        {"role": "assistant", "content": "hello"},
+                    ],
+                    quality_valid=True,
+                )
+            ),
+        ) as run_turn:
+            response = self.client.post(
+                f"/api/agent/conversations/{conversation['id']}/messages",
+                json={"message": "hi"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["agent_provider"], "ollama")
+        self.assertEqual(data["agent_model"], "llama3.1:8b")
+        self.assertEqual(run_turn.await_args.kwargs["model"], "llama3.1:8b")
+
     def test_conversation_can_import_external_context(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
@@ -2281,13 +2370,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(create_response.status_code, 201)
 
         casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay")
-        casual_structured_source = next(
-            source
-            for source in casual_sources
-            if source["source_type"] == "whatsapp_structured_context"
+        self.assertFalse(
+            any(source["source_type"] == "whatsapp_structured_context" for source in casual_sources)
         )
-        self.assertTrue(casual_structured_source["metadata"]["conversation_fuel"])
-        self.assertIn("Mode: conversation fuel", casual_structured_source["content"])
 
         whatsapp_sources = _smart_reply_context_sources(
             conversation_id,
@@ -2483,7 +2568,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(list_data_point_extraction_debug(user_id="user-a"), [])
 
-    def test_selected_style_source_packs_structured_whatsapp_context(self) -> None:
+    def test_selected_style_source_skips_structured_whatsapp_for_short_reply(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
         create_response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/whatsapp-import",
@@ -2505,8 +2590,19 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(sources[0]["source_type"], "friend_style")
+        self.assertFalse(
+            any(source["source_type"] == "whatsapp_structured_context" for source in sources)
+        )
+
+        explicit_sources = _smart_reply_context_sources(
+            conversation_id,
+            style_source_id,
+            "can you talk in Aarav tone from my uploaded whatsapp chat?",
+        )
         structured_source = next(
-            source for source in sources if source["source_type"] == "whatsapp_structured_context"
+            source
+            for source in explicit_sources
+            if source["source_type"] == "whatsapp_structured_context"
         )
         self.assertIn("Style adaptation guide for Aarav (selected)", structured_source["content"])
         self.assertIn("Do not claim to be this sender", structured_source["content"])
@@ -2538,6 +2634,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertTrue(
+            any(source["source_type"] == "whatsapp_structured_context" for source in sources)
+        )
+
+    def test_attached_whatsapp_source_skips_short_acknowledgement_context(self) -> None:
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+        create_response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Abhishek chat",
+                "user_sender": "Aarav",
+                "content": sample_whatsapp_export(),
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+
+        sources = _smart_reply_context_sources(
+            conversation_id,
+            None,
+            "nhi",
+        )
+
+        self.assertFalse(
             any(source["source_type"] == "whatsapp_structured_context" for source in sources)
         )
 

@@ -314,6 +314,34 @@ async def _ollama_chat(
             if request_kind == "chat_reply":
                 return _compact_chat_reply(content, messages)
             return content
+        except httpx.HTTPStatusError as error:
+            raw_usage = {"prompt_debug": prompt_debug}
+            detail = ""
+            try:
+                raw_usage["error"] = error.response.json()
+                detail = str(raw_usage["error"].get("error") or "")
+            except ValueError:
+                raw_usage["error_text"] = error.response.text[:500]
+                detail = error.response.text[:240]
+            _record_usage_event(
+                conversation_id=conversation_id,
+                request_kind=request_kind,
+                provider="ollama",
+                model=payload["model"],
+                success=False,
+                latency_ms=_elapsed_ms(started_at),
+                raw_usage=raw_usage,
+                error=str(error),
+            )
+            if error.response.status_code == 404:
+                raise AgentProviderError(
+                    "Ollama returned 404 for "
+                    f"{base_url}/api/chat using model '{payload['model']}'. "
+                    f"{detail or 'Check that the model is installed.'} "
+                    "Run `ollama list` and set OLLAMA_MODEL to an installed tag, "
+                    "for example `llama3.1:8b`."
+                ) from error
+            raise
         except Exception as error:
             _record_usage_event(
                 conversation_id=conversation_id,

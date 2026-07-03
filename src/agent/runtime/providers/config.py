@@ -5,7 +5,7 @@ from typing import Any
 
 from agent.context_engine.prompt_engine.versions.v1 import COMPANION_SYSTEM_PROMPT
 
-RECENT_CHAT_MESSAGE_LIMIT = int(os.getenv("AGENT_RECENT_MESSAGE_LIMIT", "12"))
+RECENT_CHAT_MESSAGE_LIMIT = int(os.getenv("AGENT_RECENT_MESSAGE_LIMIT", "8"))
 CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
@@ -40,7 +40,7 @@ def _provider_model(provider: str) -> str | None:
     if provider == "fireworks":
         return os.getenv("FIREWORKS_MODEL", "accounts/fireworks/models/gpt-oss-120b")
     if provider == "ollama":
-        return os.getenv("OLLAMA_MODEL", "llama3.1")
+        return os.getenv("OLLAMA_MODEL", "llama3.1:8b")
     if provider == "mock":
         return "mock"
     return None
@@ -74,7 +74,7 @@ def _available_models(provider: str) -> list[str]:
             ],
         )
     if provider == "ollama":
-        return _models_from_env("OLLAMA_AVAILABLE_MODELS", [os.getenv("OLLAMA_MODEL", "llama3.1")])
+        return _models_from_env("OLLAMA_AVAILABLE_MODELS", [os.getenv("OLLAMA_MODEL", "llama3.1:8b")])
     if provider == "mock":
         return ["mock"]
     return []
