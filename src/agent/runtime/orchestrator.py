@@ -5,7 +5,12 @@ from typing import Any
 
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.memory import capture_profile_facts_from_user_message
-from agent.runtime.providers import assess_user_message_quality, generate_agent_reply
+from agent.runtime.providers import (
+    _prompt_debug,
+    _provider_messages,
+    assess_user_message_quality,
+    generate_agent_reply,
+)
 from agent.runtime.replies import split_assistant_reply
 from storage import (
     finish_agent_trace,
@@ -128,6 +133,13 @@ async def run_agent_turn(
         }
     )
     context_snapshot = context_package.snapshot or {}
+    provider_messages = _provider_messages(updated_messages)
+    if context_snapshot:
+        context_snapshot.setdefault("context", {})["prompt"] = {
+            "system_prompt": context_package.system_prompt,
+            "provider_messages": provider_messages,
+            "prompt_debug": _prompt_debug(context_package.system_prompt, provider_messages),
+        }
     save_agent_trace_step(
         {
             "trace_id": trace_id,
@@ -190,9 +202,11 @@ async def run_agent_turn(
                 "agent_tone": agent_tone,
             },
         }
-    )
+        )
     for reply_part in reply_parts:
         updated_messages.append({"role": "assistant", "content": reply_part})
+    if context_snapshot:
+        context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = reply
     save_agent_context_snapshot(context_snapshot)
     save_agent_trace_step(
         {

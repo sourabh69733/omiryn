@@ -242,7 +242,7 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         if row["user_id"] == user_id
     ]
     context_snapshots = [
-        _context_snapshot_detail(row)
+        _context_snapshot_detail(row, snapshot["conversation_rows"])
         for row in snapshot["context_snapshot_rows"]
         if row["user_id"] == user_id
     ]
@@ -624,7 +624,7 @@ def _conversation_context_snapshot_summary(
     latest = snapshots[0] if snapshots else None
     return {
         "context_snapshot_count": len(snapshots),
-        "latest_context_snapshot": _context_snapshot_detail(latest) if latest else None,
+        "latest_context_snapshot": _context_snapshot_detail(latest, [row]) if latest else None,
     }
 
 
@@ -646,18 +646,76 @@ def _conversation_trace_summary(
     }
 
 
-def _context_snapshot_detail(row: Any | None) -> dict[str, Any] | None:
+def _context_snapshot_detail(
+    row: Any | None,
+    conversation_rows: list[Any] | None = None,
+) -> dict[str, Any] | None:
     if not row:
         return None
+    summary = decrypt_json(row["user_id"], row["summary_json"])
+    context = decrypt_json(row["user_id"], row["context_json"])
+    messages = _snapshot_messages(row, summary, context, conversation_rows or [])
     return {
         "id": row["id"],
         "user_id": row["user_id"],
         "conversation_id": row["conversation_id"],
         "message_index": row["message_index"],
-        "summary": decrypt_json(row["user_id"], row["summary_json"]),
-        "context": decrypt_json(row["user_id"], row["context_json"]),
+        "summary": summary,
+        "context": context,
+        "messages": messages,
         "created_at": _isoformat_utc(row["created_at"]),
     }
+
+
+def _snapshot_messages(
+    row: Any,
+    summary: dict[str, Any],
+    context: dict[str, Any],
+    conversation_rows: list[Any],
+) -> dict[str, Any]:
+    conversation = next(
+        (
+            candidate
+            for candidate in conversation_rows
+            if candidate["id"] == row["conversation_id"]
+        ),
+        None,
+    )
+    messages = _conversation_messages(conversation) if conversation else []
+    user_index = _int_or_none(summary.get("user_message_index"))
+    assistant_index = _int_or_none(summary.get("assistant_message_index"))
+    if assistant_index is None:
+        assistant_index = row["message_index"]
+    prompt = context.get("prompt") if isinstance(context, dict) else {}
+    if not isinstance(prompt, dict):
+        prompt = {}
+    return {
+        "user": _message_at(messages, user_index),
+        "assistant": _message_at(messages, assistant_index),
+        "provider": prompt.get("provider_messages") or [],
+        "assistant_reply": prompt.get("assistant_reply"),
+        "system_prompt": prompt.get("system_prompt"),
+        "prompt_debug": prompt.get("prompt_debug") or {},
+    }
+
+
+def _message_at(messages: list[dict[str, Any]], index: int | None) -> dict[str, Any] | None:
+    if index is None or index < 0 or index >= len(messages):
+        return None
+    message = messages[index]
+    return {
+        "index": index,
+        "role": message.get("role"),
+        "content": message.get("content"),
+        "quality": message.get("quality"),
+    }
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _trace_detail(row: Any | None, steps: list[dict[str, Any]]) -> dict[str, Any] | None:

@@ -410,7 +410,7 @@ function renderFactItem(fact) {
 function renderContextSnapshotSection(snapshots, summary = {}) {
   const visibleSnapshots = snapshots.slice(0, 6);
   const detail = [
-    `${formatNumber(summary.total_context_tokens || 0)} rough tokens`,
+    `${formatNumber(summary.total_context_tokens || 0)} estimated context tokens`,
     `${formatNumber(summary.style_guide_count || 0)} style guides`,
     `${formatNumber(summary.data_point_count || 0)} data-point uses`,
     `${formatNumber(summary.structured_whatsapp_count || 0)} WhatsApp context`
@@ -434,6 +434,7 @@ function renderContextSnapshotItem(snapshot) {
   const summary = snapshot.summary || {};
   const context = snapshot.context || {};
   const sources = context.sources || [];
+  const messages = snapshot.messages || {};
   const flags = [
     summary.used_data_points ? "data_points" : "",
     summary.used_structured_whatsapp ? "structured_whatsapp" : "",
@@ -448,8 +449,10 @@ function renderContextSnapshotItem(snapshot) {
         <span class="mono">${formatDate(snapshot.created_at)}</span>
       </div>
       <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
-      <p>${formatNumber(summary.context_chars || 0)} chars · ${formatNumber(summary.rough_context_tokens || 0)} rough tokens · ${formatNumber(summary.source_count || 0)} candidates</p>
+      <p>${formatNumber(summary.context_chars || 0)} source chars · ${formatNumber(summary.rough_context_tokens || 0)} estimated context tokens · ${formatNumber(summary.source_count || 0)} candidates</p>
       ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
+      ${renderSnapshotTurnMessages(messages)}
+      ${renderSnapshotPromptPayload(messages)}
       <details>
         <summary>Sources sent</summary>
         <div class="snapshot-source-list">
@@ -464,11 +467,93 @@ function renderContextSnapshotItem(snapshot) {
   `;
 }
 
+function renderSnapshotTurnMessages(messages = {}) {
+  const user = messages.user;
+  const assistant = messages.assistant;
+  const assistantReply = messages.assistant_reply;
+  if (!user && !assistant && !assistantReply) return "";
+
+  return `
+    <details>
+      <summary>User message and reply</summary>
+      <div class="snapshot-source-list">
+        ${
+          user
+            ? renderSnapshotMessage("User message", user)
+            : '<div class="table-empty">User message was not found in the saved conversation.</div>'
+        }
+        ${
+          assistant
+            ? renderSnapshotMessage("Saved assistant reply", assistant)
+            : assistantReply
+              ? `<article class="fact-item"><strong>Assistant reply</strong><blockquote>${escapeHtml(assistantReply)}</blockquote></article>`
+              : '<div class="table-empty">Assistant reply was not found in the saved conversation.</div>'
+        }
+      </div>
+    </details>
+  `;
+}
+
+function renderSnapshotMessage(label, message) {
+  const meta = [
+    message.role || "message",
+    Number.isInteger(message.index) ? `#${formatNumber(message.index + 1)}` : "",
+    message.quality ? `quality: ${message.quality}` : ""
+  ].filter(Boolean).join(" · ");
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(label)}</strong>
+      <small>${escapeHtml(meta)}</small>
+      ${message.content ? `<blockquote>${escapeHtml(message.content)}</blockquote>` : ""}
+    </article>
+  `;
+}
+
+function renderSnapshotPromptPayload(messages = {}) {
+  const systemPrompt = messages.system_prompt;
+  const providerMessages = Array.isArray(messages.provider) ? messages.provider : [];
+  const promptDebug = messages.prompt_debug || {};
+  if (!systemPrompt && !providerMessages.length) {
+    return `
+      <details>
+        <summary>Prompt sent to model</summary>
+        <div class="table-empty">Prompt payload was not stored for this older snapshot.</div>
+      </details>
+    `;
+  }
+
+  const payload = [
+    systemPrompt ? { role: "system", content: systemPrompt } : null,
+    ...providerMessages
+  ].filter(Boolean);
+
+  return `
+    <details>
+      <summary>Prompt sent to model</summary>
+      ${
+        Object.keys(promptDebug).length
+          ? `<small>${escapeHtml(promptDebugLabel(promptDebug))}</small>`
+          : ""
+      }
+      <pre class="debug-json">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+    </details>
+  `;
+}
+
+function promptDebugLabel(promptDebug = {}) {
+  return [
+    `${formatNumber(promptDebug.total_chars || 0)} chars`,
+    `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
+    `${formatNumber(promptDebug.system_chars || 0)} system chars`,
+    `${formatNumber(promptDebug.provider_message_count || 0)} messages`
+  ].join(" · ");
+}
+
 function renderContextSnapshotSource(source) {
   return `
     <article class="fact-item">
       <strong>${escapeHtml(source.title || "Untitled source")}</strong>
-      <small>${escapeHtml(source.source_type || "context")} · ${formatNumber(source.included_chars || 0)} chars · ${formatNumber(source.rough_tokens || 0)} rough tokens${source.truncated ? " · truncated" : ""}</small>
+      <small>${escapeHtml(source.source_type || "context")} · ${formatNumber(source.included_chars || 0)} chars · ${formatNumber(source.rough_tokens || 0)} estimated source tokens${source.truncated ? " · truncated" : ""}</small>
       ${source.preview ? `<blockquote>${escapeHtml(source.preview)}</blockquote>` : ""}
     </article>
   `;
@@ -1061,6 +1146,7 @@ function usageKindLabel(kind) {
     profile_extract: "Profile extraction",
     profile_extract_repair: "Extraction repair",
     data_point_extract: "Data point extraction",
+    profile_fact_extract: "Profile fact extraction",
     profile_signal_extract: "Signal extraction",
     profile_signal_backfill: "Signal backfill",
     profile_fact_aggregate: "Fact aggregation",
