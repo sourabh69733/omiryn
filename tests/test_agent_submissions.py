@@ -14,6 +14,7 @@ from agent.runtime.providers import (
     _groq_rate_limit_headers,
     _mock_reply,
     _openai_compatible_provider_config,
+    _provider_error_detail,
     _prompt_debug,
     _provider_token_costs,
     _provider_messages,
@@ -1915,6 +1916,18 @@ class AgentSubmissionApiTest(unittest.TestCase):
             config["chat_url"],
             "https://api.fireworks.ai/inference/v1/chat/completions",
         )
+
+    def test_provider_error_detail_extracts_nested_message(self) -> None:
+        detail = _provider_error_detail(
+            {
+                "error": {
+                    "message": "Account is suspended.",
+                    "code": "PRECONDITION_FAILED",
+                }
+            }
+        )
+
+        self.assertEqual(detail, "Account is suspended. (PRECONDITION_FAILED)")
 
     def test_provider_cost_estimate_uses_provider_specific_env(self) -> None:
         with patch.dict(

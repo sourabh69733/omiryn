@@ -7,6 +7,7 @@ from .clients import (
     _ollama_chat,
     _openai_compatible_chat,
     _openai_compatible_provider_config,
+    _provider_error_detail,
     _provider_rate_limit_headers,
 )
 from .config import (

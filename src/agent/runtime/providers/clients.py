@@ -79,12 +79,15 @@ async def _openai_compatible_chat(
             return content
         except httpx.HTTPStatusError as error:
             raw_usage = {"prompt_debug": prompt_debug}
+            detail = ""
             if error.response is not None:
                 raw_usage["rate_limit"] = _provider_rate_limit_headers(error.response)
                 try:
                     raw_usage["error"] = error.response.json()
+                    detail = _provider_error_detail(raw_usage["error"])
                 except ValueError:
                     raw_usage["error_text"] = error.response.text[:500]
+                    detail = error.response.text[:240]
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -95,6 +98,10 @@ async def _openai_compatible_chat(
                 raw_usage=raw_usage,
                 error=str(error),
             )
+            if detail:
+                raise AgentProviderError(
+                    f"{provider} returned HTTP {error.response.status_code}: {detail}"
+                ) from error
             raise
         except Exception as error:
             _record_usage_event(
@@ -152,6 +159,22 @@ def _openai_compatible_provider_config(
         }
 
     raise AgentProviderError(f"Unsupported OpenAI-compatible provider: {provider}")
+
+
+def _provider_error_detail(error_payload: Any) -> str:
+    if isinstance(error_payload, dict):
+        error = error_payload.get("error")
+        if isinstance(error, dict):
+            message = str(error.get("message") or "").strip()
+            code = str(error.get("code") or "").strip()
+            if message and code:
+                return f"{message} ({code})"
+            if message:
+                return message
+        message = str(error_payload.get("message") or "").strip()
+        if message:
+            return message
+    return ""
 
 def _provider_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
     return {
