@@ -1191,6 +1191,8 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
         "error": event.get("error"),
         "raw_usage_json": event.get("raw_usage") or {},
     }
+    if event.get("created_at") is not None:
+        payload["created_at"] = event["created_at"]
     with ENGINE.begin() as connection:
         connection.execute(agent_usage_events.insert().values(**payload))
 
@@ -1651,6 +1653,8 @@ def summarize_agent_usage(
         sum(event["estimated_cost_usd"] or 0 for event in events),
         8,
     )
+    provider_model_breakdown = _provider_model_usage_breakdown(events)
+    latest_event = events[0] if events else None
     return {
         "conversation_id": conversation_id,
         "request_count": len(events),
@@ -1668,7 +1672,53 @@ def summarize_agent_usage(
         ),
         "estimated_cost_usd": estimated_cost_usd,
         "estimated_cost_inr": _estimated_cost_inr(estimated_cost_usd),
+        "latest_provider": latest_event["provider"] if latest_event else None,
+        "latest_model": latest_event["model"] if latest_event else None,
+        "provider_model_breakdown": provider_model_breakdown,
     }
+
+
+def _provider_model_usage_breakdown(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    breakdown: dict[tuple[str, str], dict[str, Any]] = {}
+    for event in events:
+        provider = str(event.get("provider") or "unknown")
+        model = str(event.get("model") or "unknown")
+        key = (provider, model)
+        if key not in breakdown:
+            breakdown[key] = {
+                "provider": provider,
+                "model": model,
+                "request_count": 0,
+                "successful_request_count": 0,
+                "failed_request_count": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "estimated_cost_usd": 0,
+                "latest_at": None,
+            }
+        row = breakdown[key]
+        row["request_count"] += 1
+        if event.get("success"):
+            row["successful_request_count"] += 1
+        else:
+            row["failed_request_count"] += 1
+        row["prompt_tokens"] += event.get("prompt_tokens") or 0
+        row["completion_tokens"] += event.get("completion_tokens") or 0
+        row["total_tokens"] += event.get("total_tokens") or 0
+        row["estimated_cost_usd"] = round(
+            row["estimated_cost_usd"] + (event.get("estimated_cost_usd") or 0),
+            8,
+        )
+        created_at = event.get("created_at")
+        if created_at and (row["latest_at"] is None or str(created_at) > str(row["latest_at"])):
+            row["latest_at"] = created_at
+
+    return sorted(
+        breakdown.values(),
+        key=lambda row: (int(row["total_tokens"]), int(row["request_count"])),
+        reverse=True,
+    )
 
 
 def _average_int(total: int, count: int) -> int:

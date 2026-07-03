@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn Admin</title>
-    <link rel="stylesheet" href="/admin/static/styles.css?v=20260620-admin-visibility" />
+    <link rel="stylesheet" href="/admin/static/styles.css?v=20260703-model-usage" />
   </head>
   <body>
     <div class="admin-shell">
@@ -214,7 +214,7 @@
               <small>Provider/network errors</small>
             </article>
             <article class="metric-card">
-              <span>Groq 429s</span>
+              <span>Provider 429s</span>
               <strong id="usage-rate-limits">0</strong>
               <small id="usage-rate-limit-detail">No recent throttling</small>
             </article>
@@ -224,12 +224,12 @@
             <section class="usage-panel usage-panel-wide">
               <div class="panel-heading">
                 <div>
-                  <p class="eyebrow">Groq Limits</p>
+                  <p class="eyebrow">Provider Limits</p>
                   <h2>Rate-limit health</h2>
                 </div>
               </div>
               <div class="rate-limit-grid" id="rate-limit-grid">
-                <div class="table-empty">Rate-limit headers will appear after new Groq calls.</div>
+                <div class="table-empty">Rate-limit headers will appear after provider calls.</div>
               </div>
             </section>
 
@@ -300,6 +300,6 @@
         </section>
       </main>
     </div>
-    <script src="/admin/static/app.js?v=20260620-admin-visibility"></script>
+    <script src="/admin/static/app.js?v=20260703-model-usage"></script>
   </body>
 </html>

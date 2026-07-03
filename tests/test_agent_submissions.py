@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import httpx
@@ -1500,6 +1501,23 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "total_tokens": 120,
                 "latency_ms": 50,
                 "raw_usage": {},
+                "created_at": datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc),
+            }
+        )
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": None,
+                "request_kind": "chat_reply",
+                "provider": "fireworks",
+                "model": "accounts/fireworks/models/gpt-oss-120b",
+                "success": True,
+                "prompt_tokens": 200,
+                "completion_tokens": 40,
+                "total_tokens": 240,
+                "latency_ms": 75,
+                "raw_usage": {},
+                "created_at": datetime(2026, 1, 1, 10, 1, tzinfo=timezone.utc),
             }
         )
         with patch.dict(
@@ -1515,9 +1533,20 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["summary"]["request_count"], 1)
-        self.assertEqual(data["summary"]["total_tokens"], 120)
-        self.assertEqual(data["events"][0]["provider"], "groq")
+        self.assertEqual(data["summary"]["request_count"], 2)
+        self.assertEqual(data["summary"]["total_tokens"], 360)
+        self.assertEqual(data["summary"]["latest_provider"], "fireworks")
+        self.assertEqual(data["summary"]["latest_model"], "accounts/fireworks/models/gpt-oss-120b")
+        model_rows = {
+            (row["provider"], row["model"]): row
+            for row in data["summary"]["provider_model_breakdown"]
+        }
+        self.assertEqual(
+            model_rows[("fireworks", "accounts/fireworks/models/gpt-oss-120b")]["total_tokens"],
+            240,
+        )
+        self.assertEqual(model_rows[("groq", "llama-3.3-70b-versatile")]["total_tokens"], 120)
+        self.assertEqual(data["events"][0]["provider"], "fireworks")
         self.assertEqual(data["limits"]["groq_rpd"], 1000)
         self.assertEqual(data["limits"]["groq_tpd"], 100000)
         self.assertEqual(data["limits"]["groq_rpm"], 30)

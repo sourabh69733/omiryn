@@ -84,7 +84,7 @@ function configureRoute() {
   const titles = {
     dashboard: ["Dashboard", "Live view of users and product health."],
     users: ["Users", "Track every user profile, onboarding session, and learned signal."],
-    usage: ["Usage", "Track Groq and agent API calls, tokens, failures, and cost."]
+    usage: ["Usage", "Track agent model calls, tokens, failures, and cost."]
   };
   const [title, subtitle] = titles[state.route] || titles.dashboard;
   document.querySelector("#page-title").textContent = title;
@@ -734,18 +734,17 @@ async function loadUsageDashboard() {
 
 function renderUsageDashboard(summary, events = [], limits = {}) {
   renderUsageSummary(summary, events);
-  renderProviderMix(events);
-  renderGroqRateLimitHealth(events, limits);
+  renderProviderMix(summary, events);
+  renderProviderRateLimitHealth(events, limits);
   renderTokensByMinute(events);
   renderUsageEvents(events);
 }
 
-function renderGroqRateLimitHealth(events, limits = {}) {
+function renderProviderRateLimitHealth(events, limits = {}) {
   if (!rateLimitGrid) return;
 
-  const groqEvents = events.filter((event) => event.provider === "groq");
-  const rateLimitedEvents = groqEvents.filter((event) => isRateLimitEvent(event));
-  const localDaily = localGroqDaily(groqEvents);
+  const rateLimitedEvents = events.filter((event) => isRateLimitEvent(event));
+  const localDaily = localProviderDaily(events);
   const todayRateLimitedEvents = localDaily.events.filter((event) => isRateLimitEvent(event));
   if (usageRateLimits) {
     usageRateLimits.textContent = formatNumber(todayRateLimitedEvents.length);
@@ -756,14 +755,14 @@ function renderGroqRateLimitHealth(events, limits = {}) {
       : "No recent throttling";
   }
 
-  const localRate = localGroqRate(groqEvents);
+  const localRate = localProviderRate(events);
   rateLimitGrid.innerHTML = `
     ${usageLimitMetric("RPM", localRate.rpmValue, limits.groq_rpm, "Requests consumed in last 60 seconds")}
     ${usageLimitMetric("RPD", localDaily.requests, limits.groq_rpd, "Requests consumed today")}
     ${usageLimitMetric("TPM", localRate.tpm, limits.groq_tpm, "Tokens consumed in last 60 seconds")}
     ${usageLimitMetric("TPD", localDaily.tokens, limits.groq_tpd, `${formatNumber(localDaily.promptTokens)} input / ${formatNumber(localDaily.completionTokens)} output today`)}
-    ${rateLimitMetric("Total requests", formatNumber(groqEvents.length), "All logged Groq requests")}
-    ${rateLimitMetric("Total tokens", formatNumber(totalGroqTokens(groqEvents)), "All logged Groq input + output tokens")}
+    ${rateLimitMetric("Recent requests", formatNumber(events.length), "Recent logged provider requests")}
+    ${rateLimitMetric("Recent tokens", formatNumber(totalProviderTokens(events)), "Recent logged input + output tokens")}
     ${rateLimitMetric("429 today", formatNumber(todayRateLimitedEvents.length), `${formatNumber(rateLimitedEvents.length)} total 429 responses logged`)}
   `;
 }
@@ -802,7 +801,7 @@ function usageLimitEnvName(label) {
     TPM: "GROQ_TPM_LIMIT",
     TPD: "GROQ_TPD_LIMIT"
   };
-  return envNames[label] || "GROQ_*_LIMIT";
+  return envNames[label] || "provider limit env";
 }
 
 function isRateLimitEvent(event) {
@@ -810,7 +809,7 @@ function isRateLimitEvent(event) {
   return error.includes("429") || error.toLowerCase().includes("too many requests");
 }
 
-function localGroqRate(events) {
+function localProviderRate(events) {
   const now = Date.now();
   const windowStart = now - 60_000;
   const windowEvents = events.filter((event) => {
@@ -828,7 +827,7 @@ function localGroqRate(events) {
   };
 }
 
-function localGroqDaily(events) {
+function localProviderDaily(events) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const todayEvents = events.filter((event) => {
@@ -846,14 +845,17 @@ function localGroqDaily(events) {
   };
 }
 
-function totalGroqTokens(events) {
+function totalProviderTokens(events) {
   return events.reduce((total, event) => total + (event.total_tokens || 0), 0);
 }
 
 function renderUsageSummary(summary, events = []) {
   const averageUsage = averageChatUsage(events, summary);
+  const latestModel = [summary.latest_provider, summary.latest_model].filter(Boolean).join(" · ");
   usageRequests.textContent = formatNumber(summary.request_count || 0);
-  usageRequestDetail.textContent = `${formatNumber(summary.successful_request_count || 0)} successful`;
+  usageRequestDetail.textContent = latestModel
+    ? `${formatNumber(summary.successful_request_count || 0)} successful · latest ${latestModel}`
+    : `${formatNumber(summary.successful_request_count || 0)} successful`;
   usageTotalTokens.textContent = formatNumber(summary.total_tokens || 0);
   usageTokenDetail.textContent = `${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output`;
   usageAverageInputTokens.textContent = formatNumber(averageUsage.prompt);
@@ -894,29 +896,15 @@ function averageChatUsage(events, summary = {}) {
   };
 }
 
-function renderProviderMix(events) {
-  if (!events.length) {
+function renderProviderMix(summary, events = []) {
+  const rows = Array.isArray(summary.provider_model_breakdown)
+    ? summary.provider_model_breakdown
+    : providerRowsFromEvents(events);
+
+  if (!rows.length) {
     providerList.innerHTML = '<div class="table-empty">No agent usage yet.</div>';
     return;
   }
-
-  const totals = events.reduce((accumulator, event) => {
-    const key = `${event.provider || "unknown"} · ${event.model || "unknown"}`;
-    if (!accumulator[key]) {
-      accumulator[key] = {
-        provider: event.provider || "unknown",
-        model: event.model || "unknown",
-        requests: 0,
-        tokens: 0,
-        cost: 0
-      };
-    }
-    accumulator[key].requests += 1;
-    accumulator[key].tokens += event.total_tokens || 0;
-    accumulator[key].cost += event.estimated_cost_usd || 0;
-    return accumulator;
-  }, {});
-  const rows = Object.values(totals).sort((first, second) => second.tokens - first.tokens);
 
   providerList.innerHTML = `
     <table class="provider-table">
@@ -934,9 +922,9 @@ function renderProviderMix(events) {
             (row) => `
               <tr>
                 <td>${escapeHtml(row.provider)}<small>${escapeHtml(row.model)}</small></td>
-                <td class="mono">${formatNumber(row.requests)}</td>
-                <td class="mono">${formatNumber(row.tokens)}</td>
-                <td class="mono">${row.cost ? formatUsd(row.cost) : "-"}</td>
+                <td class="mono">${formatNumber(row.request_count || row.requests || 0)}<small>${formatNumber(row.failed_request_count || 0)} failed</small></td>
+                <td class="mono">${formatNumber(row.total_tokens || row.tokens || 0)}<small>${formatNumber(row.prompt_tokens || 0)} in / ${formatNumber(row.completion_tokens || 0)} out</small></td>
+                <td class="mono">${row.estimated_cost_usd || row.cost ? formatUsd(row.estimated_cost_usd || row.cost) : "-"}</td>
               </tr>
             `
           )
@@ -944,6 +932,32 @@ function renderProviderMix(events) {
       </tbody>
     </table>
   `;
+}
+
+function providerRowsFromEvents(events) {
+  const totals = events.reduce((accumulator, event) => {
+    const key = `${event.provider || "unknown"} · ${event.model || "unknown"}`;
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        provider: event.provider || "unknown",
+        model: event.model || "unknown",
+        request_count: 0,
+        failed_request_count: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        estimated_cost_usd: 0
+      };
+    }
+    accumulator[key].request_count += 1;
+    if (!event.success) accumulator[key].failed_request_count += 1;
+    accumulator[key].prompt_tokens += event.prompt_tokens || 0;
+    accumulator[key].completion_tokens += event.completion_tokens || 0;
+    accumulator[key].total_tokens += event.total_tokens || 0;
+    accumulator[key].estimated_cost_usd += event.estimated_cost_usd || 0;
+    return accumulator;
+  }, {});
+  return Object.values(totals).sort((first, second) => second.total_tokens - first.total_tokens);
 }
 
 function renderTokensByMinute(events) {
