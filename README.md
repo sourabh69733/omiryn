@@ -162,13 +162,13 @@ FIREWORKS_MODEL=accounts/fireworks/models/gpt-oss-120b
 # local model
 AGENT_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1
+OLLAMA_MODEL=llama3.1:8b
 ```
 
 For Ollama, start Ollama separately and pull a model first, for example:
 
 ```bash
-ollama pull llama3.1
+ollama pull llama3.1:8b
 ```
 
 Then open:
