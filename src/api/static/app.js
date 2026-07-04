@@ -499,7 +499,7 @@ function defaultInterestedIn(gender) {
 }
 
 function renderOnboardingStep(step = onboardingStep) {
-  onboardingStep = Math.max(1, Math.min(2, Number(step) || 1));
+  onboardingStep = 1;
   onboardingStepPanels.forEach((panel) => {
     panel.hidden = Number(panel.dataset.onboardingStep) !== onboardingStep;
   });
@@ -512,10 +512,10 @@ function renderOnboardingStep(step = onboardingStep) {
     onboardingBackStep.hidden = onboardingStep === 1;
   }
   if (onboardingNextStep) {
-    onboardingNextStep.hidden = onboardingStep !== 1;
+    onboardingNextStep.hidden = true;
   }
   if (saveDatingBasics) {
-    saveDatingBasics.hidden = onboardingStep !== 2;
+    saveDatingBasics.hidden = false;
   }
   clearDatingBasicsFieldErrors();
   if (datingBasicsStatus) {
@@ -524,13 +524,7 @@ function renderOnboardingStep(step = onboardingStep) {
 }
 
 function goToNextOnboardingStep() {
-  if (!profileGender?.value || !profileInterestedIn?.value) {
-    if (datingBasicsStatus) {
-      datingBasicsStatus.textContent = "Choose your direction to continue.";
-    }
-    return;
-  }
-  renderOnboardingStep(2);
+  renderOnboardingStep(1);
   basicsName?.focus();
 }
 

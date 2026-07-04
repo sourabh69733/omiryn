@@ -74,6 +74,7 @@
           <input class="sr-only" id="profile-intent" type="hidden" value="meaningful" />
           <input class="sr-only" id="profile-conversation-style" type="hidden" value="balanced" />
 
+          <!-- Preference canvas disabled for first onboarding pass.
           <div class="profile-canvas" data-onboarding-step="1">
             <div class="canvas-rings" aria-hidden="true"></div>
             <span class="orbit-icon orbit-spark" aria-hidden="true">
@@ -165,8 +166,9 @@
               <span class="profile-core-letter" aria-hidden="true">O</span>
             </div>
           </div>
+          -->
 
-          <div class="about-you-step" data-onboarding-step="2" hidden>
+          <div class="about-you-step" data-onboarding-step="1">
             <div>
               <p class="eyebrow">About you</p>
               <h2>Tell Omiryn where to start</h2>
@@ -230,18 +232,22 @@
           </div>
 
           <div class="builder-footer">
+            <!-- Multi-step onboarding disabled while only About you is shown.
             <div class="builder-stepper" aria-label="Profile setup progress">
               <span class="active" data-step-indicator="1"><b>1</b><em>Basics</em><small>Set your direction</small></span>
               <span data-step-indicator="2"><b>2</b><em>About you</em><small>Share more about you</small></span>
             </div>
+            -->
             <div class="builder-actions">
+              <!-- Preference step navigation disabled for first onboarding pass.
               <button class="secondary-button" id="onboarding-back-step" type="button" hidden>
                 Back
               </button>
               <button class="auth-primary" id="onboarding-next-step" type="button">
                 Continue
               </button>
-              <button class="auth-primary" id="save-dating-basics" type="submit" hidden>
+              -->
+              <button class="auth-primary" id="save-dating-basics" type="submit">
                 Continue
               </button>
             </div>
