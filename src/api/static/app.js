@@ -110,6 +110,9 @@ const sidebarUsageList = document.querySelector("#sidebar-usage-list");
 const sideTabButtons = document.querySelectorAll("[data-side-tab]");
 const sidePanels = document.querySelectorAll("[data-side-panel]");
 const historyList = document.querySelector("#history-list");
+const openHistorySheet = document.querySelector("#open-history-sheet");
+const closeHistorySheet = document.querySelector("#close-history-sheet");
+const chatSidebar = document.querySelector(".chat-sidebar");
 const deleteSessionDialog = document.querySelector("#delete-session-dialog");
 const deleteSessionId = document.querySelector("#delete-session-id");
 const confirmDeleteSession = document.querySelector("#confirm-delete-session");
@@ -242,6 +245,7 @@ function showScreen(name) {
       element.hidden = key !== name;
     }
   });
+  closeMobileHistorySheet();
   document.querySelectorAll("[data-nav]").forEach((link) => {
     link.classList.toggle("active", link.dataset.nav === name);
   });
@@ -1394,6 +1398,7 @@ function forgetStoredConversation() {
 }
 
 async function startConversation() {
+  closeMobileHistorySheet();
   await loadAgentStatus();
   chatInput.disabled = true;
   if (extractProfile) extractProfile.disabled = true;
@@ -1603,7 +1608,7 @@ function updateAgentStatusModel() {
   if (chatTitle) {
     chatTitle.textContent = agentName;
   }
-  agentStatus.textContent = `${provider} · ${agentToneLabel(selectedAgentTone())} · ${contextSelectionLabel()} · ${selectedAgentModel() || "no model"}`;
+  agentStatus.textContent = `${provider} · ${agentToneLabel(selectedAgentTone())} · ${selectedAgentModel() || "no model"}`;
 }
 
 async function updateConversationModel() {
@@ -1941,6 +1946,19 @@ function showSidePanel(name) {
   }
 }
 
+function openMobileHistorySheet() {
+  if (!chatSidebar || !appShell) return;
+  showSidePanel("history");
+  appShell.classList.add("history-sheet-open");
+  chatSidebar.classList.add("is-open");
+  closeHistorySheet?.focus();
+}
+
+function closeMobileHistorySheet() {
+  appShell?.classList.remove("history-sheet-open");
+  chatSidebar?.classList.remove("is-open");
+}
+
 async function loadConversationHistory() {
   if (!historyList) return;
 
@@ -1985,7 +2003,7 @@ function renderConversationHistory(conversations) {
         <div class="history-title-row">
           <strong class="history-agent-name" title="Double click to rename">${escapeHtml(title)}</strong>
         </div>
-        <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} context</span>
+        <span>${formatNumber(conversation.message_count || 0)} messages · ${formatNumber(conversation.context_source_count || 0)} signals</span>
         <small>${escapeHtml(updatedAt)}</small>
       </div>
       <button class="history-delete" type="button" aria-label="Delete conversation ${escapeHtml(title)}" title="Delete conversation">
@@ -1996,16 +2014,20 @@ function renderConversationHistory(conversations) {
       </button>
     `;
     item.addEventListener("click", () => {
-      loadConversation(conversation.id).catch((error) => {
-        historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
-      });
+      loadConversation(conversation.id)
+        .then(closeMobileHistorySheet)
+        .catch((error) => {
+          historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+        });
     });
     item.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      loadConversation(conversation.id).catch((error) => {
-        historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
-      });
+      loadConversation(conversation.id)
+        .then(closeMobileHistorySheet)
+        .catch((error) => {
+          historyList.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
+        });
     });
     item.querySelector(".history-agent-name")?.addEventListener("dblclick", (event) => {
       event.preventDefault();
@@ -3382,6 +3404,8 @@ sendMessage.addEventListener("click", () => {
 });
 resetChat?.addEventListener("click", startConversation);
 sidebarResetChat?.addEventListener("click", startConversation);
+openHistorySheet?.addEventListener("click", openMobileHistorySheet);
+closeHistorySheet?.addEventListener("click", closeMobileHistorySheet);
 extractProfile?.addEventListener("click", extractConversationDraft);
 saveDraft.addEventListener("click", saveDraftEdits);
 approveDraft.addEventListener("click", approveCurrentDraft);
@@ -3449,6 +3473,7 @@ whatsappStyleDialog?.addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
+  closeMobileHistorySheet();
   if (factEvidenceDialog && !factEvidenceDialog.hidden) {
     closeFactEvidenceDialog();
   }
@@ -3522,6 +3547,14 @@ document.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
+  if (
+    appShell?.classList.contains("history-sheet-open") &&
+    chatSidebar &&
+    !chatSidebar.contains(event.target) &&
+    !openHistorySheet?.contains(event.target)
+  ) {
+    closeMobileHistorySheet();
+  }
   if (activeFeedbackMessageIndex !== null && !event.target.closest(".message-feedback")) {
     closeFeedbackPopover();
   }

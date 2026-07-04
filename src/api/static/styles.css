@@ -1216,6 +1216,10 @@ p {
   box-shadow: 0 8px 18px rgba(31, 95, 91, 0.16);
 }
 
+.app-nav a::before {
+  display: none;
+}
+
 .auth-control {
   display: flex;
   align-items: center;
@@ -1353,6 +1357,28 @@ p {
   background: rgba(255, 255, 255, 0.76);
   box-shadow: var(--shadow);
   overflow: hidden;
+}
+
+.mobile-sheet-heading {
+  display: none;
+}
+
+.mobile-history-button {
+  display: none;
+}
+
+.sheet-close-button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.sheet-close-button:hover {
+  color: var(--ink);
+  background: #f4f9f7;
 }
 
 .sidebar-heading {
@@ -3142,6 +3168,11 @@ p {
   padding: 0 18px 18px;
 }
 
+.style-context-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .style-learning-panel {
   grid-column: 1 / -1;
 }
@@ -4343,6 +4374,10 @@ p {
 }
 
 @media (max-width: 680px) {
+  body {
+    background: #fbfaf7;
+  }
+
   .basics-intro,
   .basics-builder {
     padding: 22px;
@@ -4398,22 +4433,104 @@ p {
   }
 
   .app-shell {
-    padding: 14px;
+    padding: 10px 10px calc(88px + env(safe-area-inset-bottom));
+    min-height: 100vh;
   }
 
   .app-header {
-    align-items: flex-start;
-    grid-template-columns: 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    align-items: center;
+    grid-template-columns: 1fr auto;
+    min-height: 56px;
+    border-bottom: 1px solid rgba(31, 95, 91, 0.1);
+    background: rgba(251, 250, 247, 0.94);
+    padding: 4px 0 10px;
+  }
+
+  .brand {
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand small {
+    display: none;
+  }
+
+  .header-actions {
+    justify-content: flex-end;
+  }
+
+  .auth-email,
+  .auth-button,
+  #logout-user {
+    display: none;
   }
 
   .app-nav {
+    position: fixed;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     justify-self: stretch;
-    overflow-x: auto;
+    overflow: hidden;
+    border-color: rgba(31, 95, 91, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 46px rgba(23, 32, 38, 0.16);
+    padding: 6px;
+    backdrop-filter: blur(18px);
   }
 
   .app-nav a {
-    flex: 1;
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    min-height: 48px;
+    border-radius: 8px;
+    padding: 5px 4px;
+    font-size: 11px;
     text-align: center;
+  }
+
+  .app-nav a::before {
+    display: block;
+    color: currentColor;
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .app-nav a[data-nav="interview"]::before {
+    content: "●";
+  }
+
+  .app-nav a[data-nav="style"]::before {
+    content: "Aa";
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .app-nav a[data-nav="matches"]::before {
+    content: "◇";
+  }
+
+  .app-nav a[data-nav="profile"]::before {
+    content: "○";
+  }
+
+  .app-nav a.active {
+    color: var(--primary);
+    background: #eef8f3;
+    box-shadow: none;
   }
 
   .progress-nav {
@@ -4436,6 +4553,197 @@ p {
 
   .profile-fact-list {
     grid-template-columns: 1fr;
+  }
+
+  .interview-screen {
+    padding-top: 8px;
+  }
+
+  .chat-workspace {
+    display: block;
+    height: auto;
+    min-height: 0;
+  }
+
+  .app-shell.history-sheet-open::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(23, 32, 38, 0.3);
+    backdrop-filter: blur(4px);
+  }
+
+  .chat-sidebar {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    height: min(76vh, 620px);
+    max-height: calc(100vh - 40px);
+    min-height: 0;
+    border: 0;
+    border-radius: 14px 14px 0 0;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 -22px 60px rgba(23, 32, 38, 0.24);
+    transform: translateY(105%);
+    transition: transform 0.2s ease;
+  }
+
+  .chat-sidebar.is-open {
+    transform: translateY(0);
+  }
+
+  .mobile-sheet-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+    padding: 14px 16px 10px;
+  }
+
+  .mobile-sheet-heading::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 44px;
+    height: 4px;
+    border-radius: 999px;
+    background: #d4dfdc;
+    transform: translateX(-50%);
+  }
+
+  .mobile-sheet-heading h2 {
+    margin-top: 2px;
+    font-size: 19px;
+  }
+
+  .side-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .side-panel {
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .chat-card {
+    height: calc(100vh - 142px - env(safe-area-inset-bottom));
+    min-height: 480px;
+    border-radius: 8px;
+  }
+
+  .agentic-chat .card-heading {
+    align-items: center;
+    flex-direction: row;
+    padding: 12px;
+  }
+
+  .chat-title-lockup {
+    min-width: 0;
+  }
+
+  .agentic-chat .card-heading h2 {
+    font-size: 18px;
+  }
+
+  .agentic-chat .agent-status {
+    font-size: 11px;
+  }
+
+  .chat-controls {
+    align-items: center;
+    flex-direction: row;
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .mobile-history-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    border-color: rgba(92, 219, 199, 0.26);
+    color: #c7efeb;
+    background: rgba(92, 219, 199, 0.1);
+    padding: 0 11px;
+    font-size: 12px;
+  }
+
+  .chat-context-control {
+    display: none;
+  }
+
+  .chat-controls .model-picker {
+    display: none;
+  }
+
+  .agentic-chat .agent-status {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agentic-chat .chat-log {
+    padding: 16px 12px;
+  }
+
+  .agentic-chat .message {
+    max-width: 88%;
+  }
+
+  .composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .agentic-chat .composer {
+    padding: 10px;
+  }
+
+  .agentic-chat .composer input {
+    min-height: 46px;
+  }
+
+  .agentic-chat .composer button {
+    min-width: 64px;
+    min-height: 46px;
+    padding: 0 13px;
+  }
+
+  .style-hero,
+  .usage-hero {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .style-hero button {
+    width: 100%;
+  }
+
+  .style-layout {
+    gap: 12px;
+  }
+
+  .style-main-panel {
+    min-height: 220px;
+    order: 1;
+  }
+
+  .style-context-panel {
+    order: 2;
+  }
+
+  .style-settings-panel {
+    order: 3;
+  }
+
+  .style-learning-panel,
+  .raw-data-panel {
+    order: 4;
   }
 
   .raw-data-item {
@@ -4481,10 +4789,14 @@ p {
     min-height: 560px;
   }
 
-  .agentic-chat .card-heading,
+  .agentic-chat .card-heading {
+    align-items: center;
+    flex-direction: row;
+  }
+
   .chat-controls {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 
   .model-picker {
@@ -4496,7 +4808,7 @@ p {
   }
 
   .composer {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .draft-form {
