@@ -219,18 +219,12 @@ def _wants_continuous_reply(latest_user_text: str) -> bool:
         "scene",
         "imagine",
         "example",
-        "conversation",
-        "convo",
         "roleplay",
         "parts",
-        "detail",
-        "batao",
         "sunao",
-        "kaise",
-        "kya hua",
-        "what happened",
-        "tell me",
-        "tell",
+        "long form",
+        "long story",
+        "what happened next",
     }
     return any(marker in latest_user_text for marker in continuous_markers)
 

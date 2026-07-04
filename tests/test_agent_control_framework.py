@@ -82,6 +82,14 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertNotIn("\u091c\u0930\u0942\u0930\u0940", parts[0])
         self.assertIn("jaroori hai", parts[0])
 
+    def test_assistant_reply_does_not_auto_split_normal_sentences(self) -> None:
+        parts = split_assistant_reply(
+            "Haan, uska tone kaafi direct lagta hai. Thoda casual bhi hai. "
+            "Main us vibe ko soft way mein follow kar sakti hoon."
+        )
+
+        self.assertEqual(len(parts), 1)
+
     def test_assistant_reply_strips_wrapping_dialogue_quotes(self) -> None:
         parts = split_assistant_reply(
             '"Ab tumse sach bolna chahta hoon." <next_message> '

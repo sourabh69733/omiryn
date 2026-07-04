@@ -15,10 +15,10 @@ def split_assistant_reply(reply: str) -> list[str]:
     if not cleaned:
         return [""]
 
-    if REPLY_PART_SEPARATOR in cleaned:
-        raw_parts = [part.strip() for part in cleaned.split(REPLY_PART_SEPARATOR)]
-    else:
-        raw_parts = _sentence_parts(cleaned)
+    if REPLY_PART_SEPARATOR not in cleaned:
+        return [_normalize_chat_bubble(cleaned)]
+
+    raw_parts = [part.strip() for part in cleaned.split(REPLY_PART_SEPARATOR)]
 
     parts: list[str] = []
     for raw_part in raw_parts:
@@ -26,13 +26,6 @@ def split_assistant_reply(reply: str) -> list[str]:
 
     cleaned_parts = [_normalize_chat_bubble(part) for part in parts if part]
     return _limit_parts(cleaned_parts, MAX_REPLY_PARTS) or [_normalize_chat_bubble(cleaned)]
-
-
-def _sentence_parts(text: str) -> list[str]:
-    parts = [part.strip() for part in re.split(r"(?<=[.!?।])\s+", text) if part.strip()]
-    if len(parts) <= 1 and len(text.split()) <= REPLY_PART_WORD_LIMIT:
-        return [text]
-    return parts or [text]
 
 
 def _word_limited_parts(text: str, word_limit: int) -> list[str]:

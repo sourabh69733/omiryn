@@ -1303,6 +1303,20 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertLessEqual(len(reply.split()), 35)
         self.assertNotIn("slowly figure", reply)
 
+    def test_batao_style_questions_do_not_enable_continuous_reply_budget(self) -> None:
+        reply = _compact_chat_reply(
+            (
+                "Abhishek ka style simple aur direct lagta hai. "
+                "Woh pehle practical cheez pakadta hai, phir halka sa casual line daalta hai. "
+                "Uske messages mein zyada drama nahi hai, bas short timing, location, "
+                "aur thoda friendly confidence hai. "
+                "Main us vibe ko copy nahi karungi, bas soft natural version rakhungi."
+            ),
+            [{"role": "user", "content": "batao abhishek kis style mai baat kerta hai"}],
+        )
+
+        self.assertLessEqual(len(reply.split()), 35)
+
     def test_story_replies_can_span_multiple_small_messages(self) -> None:
         reply = _compact_chat_reply(
             (
