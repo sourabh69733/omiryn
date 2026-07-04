@@ -3142,32 +3142,6 @@ p {
   min-height: 420px;
 }
 
-.style-tone-grid {
-  display: grid;
-  gap: 10px;
-  padding: 18px;
-}
-
-.style-tone-grid span {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  background: #f8faf9;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 520;
-}
-
-.style-tone-grid span:first-child {
-  border-color: rgba(31, 95, 91, 0.18);
-  color: var(--primary);
-  background: #eef8f3;
-}
-
-.style-settings-panel .quiet-note {
-  padding: 0 18px 18px;
-}
-
 .style-context-panel {
   display: grid;
   gap: 16px;
@@ -4737,13 +4711,9 @@ p {
     order: 2;
   }
 
-  .style-settings-panel {
-    order: 3;
-  }
-
   .style-learning-panel,
   .raw-data-panel {
-    order: 4;
+    order: 3;
   }
 
   .raw-data-item {
