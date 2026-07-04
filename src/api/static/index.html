@@ -611,32 +611,19 @@
           <div class="style-hero">
             <div class="screen-copy compact">
               <p class="eyebrow">Style</p>
-              <h1>How Omiryn should sound.</h1>
-              <p>Keep imported speaking styles and tone references in one calm place.</p>
+              <h1>Saved memories.</h1>
+              <p>Keep useful context and imported chat references in one simple library.</p>
             </div>
-            <button id="style-import-whatsapp" type="button">Import text style</button>
           </div>
 
           <div class="style-layout">
-            <section class="profile-panel style-main-panel">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Learned Style</p>
-                  <h2>Saved speaking references</h2>
-                </div>
-              </div>
-              <div class="profile-source-list" id="profile-style-list">
-                <div class="table-empty">No learned text style yet.</div>
-              </div>
-            </section>
-
             <section class="profile-panel profile-panel-wide style-context-panel">
               <div class="context-intro">
                 <span class="context-visual" aria-hidden="true">M</span>
                 <div>
-                  <p class="eyebrow">Context Library</p>
-                  <h2>Memory and sources</h2>
-                  <p>Keep saved context, imported style, and source material in one place.</p>
+                  <p class="eyebrow">Library</p>
+                  <h2>Saved memories</h2>
+                  <p>Use WhatsApp exports or pasted GPT summaries to give Omiryn better context.</p>
                 </div>
               </div>
 
@@ -644,29 +631,27 @@
                 <div class="context-card-heading">
                   <span class="context-card-icon" aria-hidden="true">✓</span>
                   <div>
-                    <h3>Saved memory</h3>
-                    <p>These sources can shape the agent and matching signals when useful.</p>
+                    <h3>Saved memories</h3>
+                    <p>These sources can shape chat and matching signals when useful.</p>
                   </div>
                 </div>
                 <div class="context-source-list" id="context-source-list"></div>
               </div>
 
               <div class="context-action-grid">
-                <button class="context-action-button" id="open-context-memory" type="button">
-                  <span class="context-card-icon" aria-hidden="true">+</span>
-                  <strong>Add memory</strong>
-                  <small>Paste a profile summary, chat export, or manual notes.</small>
-                </button>
                 <button class="context-action-button" id="open-whatsapp-style" type="button">
                   <span class="context-card-icon" aria-hidden="true">Aa</span>
-                  <strong>Import text style</strong>
+                  <strong>Upload WhatsApp chat</strong>
                   <small>Learn tone from a WhatsApp export.</small>
+                </button>
+                <button class="context-action-button" id="open-context-memory" type="button">
+                  <span class="context-card-icon" aria-hidden="true">+</span>
+                  <strong>Paste GPT content</strong>
+                  <small>Paste a profile summary, chat export, or manual notes.</small>
                 </button>
               </div>
               <p class="quiet-note" id="context-status">No imported context yet.</p>
-              <p class="quiet-note" id="whatsapp-status">
-                Text style imports will appear here after upload.
-              </p>
+              <p class="quiet-note" id="whatsapp-status"></p>
               <div class="whatsapp-import-log" id="whatsapp-import-log"></div>
             </section>
 
@@ -1021,7 +1006,7 @@ Rules:
           <div class="context-modal-actions">
             <button class="secondary-button" id="cancel-whatsapp-style" type="button">Cancel</button>
             <button class="secondary-button" id="save-whatsapp-import" type="button">
-              Import text style
+              Upload WhatsApp chat
             </button>
           </div>
         </div>

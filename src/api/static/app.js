@@ -212,7 +212,6 @@ const accountPhoto = document.querySelector("#account-photo");
 const accountPhotoPreviews = Array.from(document.querySelectorAll("[data-account-photo-preview]"));
 const accountPhotoTriggers = Array.from(document.querySelectorAll("[data-account-photo-trigger]"));
 const profileStatus = document.querySelector("#profile-status");
-const profileStyleList = document.querySelector("#profile-style-list");
 const profileFactTotal = document.querySelector("#profile-fact-total");
 const profileFactGroups = document.querySelector("#profile-fact-groups");
 const rawProfileDataPanel = document.querySelector("#raw-profile-data-panel");
@@ -806,7 +805,6 @@ async function loadProfilePage() {
     await setLocationControls(accountState, accountCity, profile.city || "");
     if (accountPhone) accountPhone.value = profile.phone || "";
     renderAccountPhotoGallery(profile.profile_photo_urls?.length ? profile.profile_photo_urls : [profile.profile_photo_url]);
-    renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
     renderRawProfileDataPoints(data.raw_internal_data_points || []);
     if (profileStatus) {
