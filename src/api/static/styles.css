@@ -4751,11 +4751,41 @@ p {
   }
 
   .chat-context-control {
-    display: none;
+    display: grid;
   }
 
   .chat-controls .model-picker {
     display: none;
+  }
+
+  .chat-controls .chat-context-control {
+    display: grid;
+    min-width: 98px;
+    max-width: 128px;
+  }
+
+  .chat-context-control > span {
+    display: none;
+  }
+
+  .chat-context-control .context-picker-button {
+    min-height: 34px;
+    overflow: hidden;
+    border-color: rgba(92, 219, 199, 0.26);
+    color: #c7efeb;
+    background: rgba(92, 219, 199, 0.1);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 620;
+    padding: 0 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-context-control .context-picker-menu {
+    right: 0;
+    width: min(320px, calc(100vw - 24px));
+    max-height: min(300px, 54vh);
   }
 
   .agentic-chat .agent-status {
