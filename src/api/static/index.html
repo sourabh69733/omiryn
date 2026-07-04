@@ -260,15 +260,21 @@
           </span>
         </a>
 
-        <nav class="app-nav" aria-label="Main navigation">
+        <nav class="app-nav" id="main-navigation" aria-label="Main navigation">
           <a class="active" href="/app" data-nav="interview">Chat</a>
           <a href="/style" data-nav="style">Style</a>
           <a href="/matches" data-nav="matches">Matches</a>
-          <a href="/profile" data-nav="profile">Profile</a>
         </nav>
 
         <div class="header-actions">
           <div class="auth-control" id="auth-control">
+            <button class="secondary-button menu-button" id="menu-button" type="button" aria-label="Open menu" aria-controls="main-navigation" aria-expanded="false">
+              <span class="menu-icon" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </button>
             <button class="auth-user" id="auth-user" type="button" hidden aria-label="Open profile">
               <span class="auth-avatar" id="auth-avatar" aria-hidden="true">O</span>
               <span class="auth-email" id="auth-email">Signed in</span>

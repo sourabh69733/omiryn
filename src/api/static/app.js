@@ -218,6 +218,8 @@ const logoutUser = document.querySelector("#logout-user");
 const authUser = document.querySelector("#auth-user");
 const authAvatar = document.querySelector("#auth-avatar");
 const authEmail = document.querySelector("#auth-email");
+const menuButton = document.querySelector("#menu-button");
+const appNav = document.querySelector("#main-navigation");
 
 const saveDraft = document.querySelector("#save-draft");
 const approveDraft = document.querySelector("#approve-draft");
@@ -246,12 +248,24 @@ function showScreen(name) {
     }
   });
   closeMobileHistorySheet();
+  closeAppMenu();
   document.querySelectorAll("[data-nav]").forEach((link) => {
     link.classList.toggle("active", link.dataset.nav === name);
   });
   if (name === "profile" || name === "style") {
     loadProfilePage();
   }
+}
+
+function closeAppMenu() {
+  appNav?.classList.remove("is-open");
+  menuButton?.setAttribute("aria-expanded", "false");
+}
+
+function toggleAppMenu() {
+  if (!appNav || !menuButton) return;
+  const isOpen = appNav.classList.toggle("is-open");
+  menuButton.setAttribute("aria-expanded", String(isOpen));
 }
 
 function currentDraftIdFromPath() {
@@ -3492,11 +3506,16 @@ loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
+menuButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleAppMenu();
+});
 document.querySelectorAll("[data-nav]").forEach((link) => {
   link.addEventListener("click", (event) => {
     const targetScreen = link.dataset.nav;
     if (!targetScreen || !routes[targetScreen]) return;
     event.preventDefault();
+    closeAppMenu();
     window.history.pushState({}, "", link.getAttribute("href") || "/app");
     showScreen(targetScreen);
     if (targetScreen === "interview") {
@@ -3541,12 +3560,20 @@ document.addEventListener("keydown", (event) => {
     closeDeleteSessionDialog();
   }
   if (event.key === "Escape") {
+    closeAppMenu();
     closeContextPicker();
     closeFeedbackPopover();
     closeDataPointFeedbackDialog();
   }
 });
 document.addEventListener("click", (event) => {
+  if (
+    appNav?.classList.contains("is-open") &&
+    !appNav.contains(event.target) &&
+    !menuButton?.contains(event.target)
+  ) {
+    closeAppMenu();
+  }
   if (
     appShell?.classList.contains("history-sheet-open") &&
     chatSidebar &&
