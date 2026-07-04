@@ -52,7 +52,7 @@ from agent.memory_engine.data_points import normalize_data_point
 from agent.feedback import normalize_message_feedback
 from agent.memory_engine.memory import (
     capture_deep_profile_facts_from_conversation,
-    should_run_deep_profile_fact_extraction,
+    should_run_conversation_data_point_extraction,
 )
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_points
 from agent.runtime.orchestrator import run_agent_turn
@@ -1108,7 +1108,12 @@ async def send_agent_message(
 
     conversation.messages = turn.messages
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
-    if should_run_deep_profile_fact_extraction(_user_id(user), conversation.messages, turn.quality_valid):
+    if should_run_conversation_data_point_extraction(
+        conversation.id,
+        _user_id(user),
+        conversation.messages,
+        turn.quality_valid,
+    ):
         background_tasks.add_task(
             capture_deep_profile_facts_from_conversation,
             conversation.id,

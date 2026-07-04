@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.memory_engine.data_point_extraction import (
     _conversation_data_point_excerpt,
+    build_data_point_candidate_review_prompt,
     build_data_point_review_prompt,
     normalize_llm_data_point_reviews,
     normalize_llm_data_points,
@@ -340,6 +341,25 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["key"], "coffee_plan")
         self.assertIn("coffee first, then walk", payload["source_excerpt"])
 
+    def test_data_point_review_prompt_can_include_existing_points(self) -> None:
+        prompt = build_data_point_candidate_review_prompt(
+            [{"key": "calm_tone", "label": "Prefers calm tone"}],
+            source_excerpt="user[2]: I prefer calm communication.",
+            source_title="In-app conversation",
+            selected_sender=None,
+            existing_points=[
+                {
+                    "category": "communication",
+                    "key": "calm_low_drama",
+                    "label": "Prefers calm communication",
+                }
+            ],
+        )
+        payload = json.loads(prompt)
+
+        self.assertEqual(payload["existing_points"][0]["key"], "calm_low_drama")
+        self.assertEqual(payload["candidates"][0]["key"], "calm_tone")
+
     def test_conversation_data_point_excerpt_excludes_assistant_messages(self) -> None:
         excerpt = _conversation_data_point_excerpt(
             [
@@ -448,6 +468,37 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(reviews[1]["review"]["rejection_reason"], "Only a keyword, not useful memory.")
         self.assertEqual(reviews[2]["point"]["key"], "short_whatsapp_replies")
         self.assertTrue(reviews[2]["point"]["value"]["used_for_style"])
+
+    def test_llm_review_parser_handles_duplicate_existing_decision(self) -> None:
+        candidates = [
+            {
+                "key": "calm_tone",
+                "category": "communication",
+                "label": "Prefers calm tone",
+                "meaning": "Useful later.",
+                "evidence": ["I prefer calm communication."],
+            }
+        ]
+        reviews = normalize_llm_data_point_reviews(
+            {
+                "reviews": [
+                    {
+                        "candidate_key": "calm_tone",
+                        "decision": "duplicate_of_existing",
+                        "rejection_reason": "Already covered by calm_low_drama.",
+                    }
+                ]
+            },
+            candidates,
+            "user-a",
+            "conversation-a",
+            None,
+            "In-app conversation",
+            source_kind="agent_conversation",
+        )
+
+        self.assertEqual(reviews[0]["decision"], "duplicate_of_existing")
+        self.assertIsNone(reviews[0]["point"])
 
     def test_llm_review_parser_rejects_invalid_reviews(self) -> None:
         candidates = [

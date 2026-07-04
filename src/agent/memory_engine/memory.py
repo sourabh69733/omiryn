@@ -9,11 +9,12 @@ from agent.memory_engine.data_point_extraction import (
 )
 from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.profile_facts import extract_profile_facts_from_message
+from agent.memory_engine.utils import conversation_extraction_window
 from agent.runtime.providers import extract_deep_profile_facts
-from storage import upsert_profile_fact
+from storage import list_data_point_extraction_debug, save_data_point_extraction_debug, upsert_profile_fact
 
 logger = logging.getLogger(__name__)
-DEEP_FACT_EXTRACTION_INTERVAL = int(os.getenv("PROFILE_FACT_DEEP_EXTRACT_INTERVAL", "5"))
+DEEP_FACT_EXTRACTION_INTERVAL = int(os.getenv("PROFILE_FACT_DEEP_EXTRACT_INTERVAL", "7"))
 
 
 def deep_fact_extraction_interval() -> int:
@@ -48,15 +49,69 @@ def should_run_deep_profile_fact_extraction(
     messages: list[dict[str, object]],
     quality_valid: bool,
 ) -> bool:
+    return should_run_conversation_data_point_extraction(
+        conversation_id="",
+        user_id=user_id,
+        messages=messages,
+        quality_valid=quality_valid,
+    )
+
+
+def should_run_conversation_data_point_extraction(
+    conversation_id: str,
+    user_id: str | None,
+    messages: list[dict[str, object]],
+    quality_valid: bool,
+) -> bool:
     interval = deep_fact_extraction_interval()
     if not user_id or not quality_valid or interval <= 0:
         return False
-    valid_user_messages = sum(
-        1
-        for message in messages
-        if message.get("role") == "user" and message.get("quality") != "low_information"
+    pending_messages = pending_data_point_messages(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        messages=messages,
     )
-    return valid_user_messages > 0 and valid_user_messages % interval == 0
+    return len(pending_messages) >= interval
+
+
+def pending_data_point_messages(
+    *,
+    conversation_id: str,
+    user_id: str,
+    messages: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    last_extracted_index = _last_extracted_message_index(user_id, conversation_id)
+    pending: list[dict[str, object]] = []
+    for index, message in enumerate(messages):
+        if message.get("role") != "user":
+            continue
+        if message.get("quality") == "low_information":
+            continue
+        if not message.get("content"):
+            continue
+        if index <= last_extracted_index:
+            continue
+        pending.append({**message, "message_index": index})
+    return pending
+
+
+def _last_extracted_message_index(user_id: str, conversation_id: str) -> int:
+    if not conversation_id:
+        return -1
+    rows = list_data_point_extraction_debug(
+        user_id=user_id,
+        source_id=conversation_id,
+        limit=50,
+    )
+    indexes: list[int] = []
+    for row in rows:
+        if row.get("source_kind") != "agent_conversation":
+            continue
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        window = metadata.get("extraction_window") if isinstance(metadata, dict) else None
+        if isinstance(window, dict) and isinstance(window.get("end_message_index"), int):
+            indexes.append(window["end_message_index"])
+    return max(indexes) if indexes else -1
 
 
 async def capture_deep_profile_facts_from_conversation(
@@ -66,21 +121,74 @@ async def capture_deep_profile_facts_from_conversation(
     model: str | None,
 ) -> None:
     try:
+        pending_messages = pending_data_point_messages(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            messages=messages,
+        )
+        if not pending_messages:
+            return
         if should_run_hybrid_data_point_review():
             await capture_hybrid_conversation_data_points(
-                messages,
+                pending_messages,
                 user_id=user_id,
                 conversation_id=conversation_id,
                 model=model,
             )
             return
         facts = await extract_deep_profile_facts(
-            messages,  # type: ignore[arg-type]
+            pending_messages,  # type: ignore[arg-type]
             user_id,
             conversation_id=conversation_id,
             model=model,
+        )
+        _save_conversation_extraction_marker(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            messages=pending_messages,
+            decision="extract" if facts else "no_useful_data",
+            fact_count=len(facts),
+            extractor="deep_profile_fact_extract",
         )
         for fact in facts:
             upsert_profile_fact(normalize_data_point(fact))
     except Exception:
         logger.exception("agent.deep_facts.capture_failed conversation_id=%s", conversation_id)
+
+
+def _save_conversation_extraction_marker(
+    *,
+    user_id: str,
+    conversation_id: str,
+    messages: list[dict[str, object]],
+    decision: str,
+    fact_count: int,
+    extractor: str,
+) -> None:
+    window = conversation_extraction_window(messages)
+    if not window:
+        return
+    save_data_point_extraction_debug(
+        {
+            "user_id": user_id,
+            "source_kind": "agent_conversation",
+            "source_id": conversation_id,
+            "import_id": None,
+            "candidate_key": "conversation_window",
+            "decision": decision,
+            "candidate": {
+                "key": "conversation_window",
+                "message_count": window["user_message_count"],
+            },
+            "review": {
+                "decision": decision,
+                "reason": "Processed pending user-only message window.",
+                "fact_count": fact_count,
+            },
+            "metadata": {
+                "title": "In-app conversation",
+                "extractor": extractor,
+                "extraction_window": window,
+            },
+        }
+    )

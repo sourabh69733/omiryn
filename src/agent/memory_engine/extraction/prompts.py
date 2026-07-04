@@ -4,6 +4,8 @@ DEEP_FACT_EXTRACTION_SYSTEM_PROMPT = """Extract private Omiryn matching memory f
 Return only valid JSON. Do not include markdown.
 Use this shape:
 {
+  "decision": "extract",
+  "reason": "Short reason",
   "facts": [
     {
       "category": "values",
@@ -16,6 +18,9 @@ Use this shape:
   ]
 }
 Rules:
+- If the pending window contains only filler, continuation prompts, weak replies,
+  repeated acknowledgements, or no durable user signal, return:
+  {"decision":"no_useful_data","reason":"...","facts":[]}
 - Extract only facts about the user, not the assistant or other people.
 - Prefer many small facts over broad summaries.
 - Useful categories: dating_intent, values, lifestyle, communication, conflict_style,
@@ -33,6 +38,8 @@ DATA_POINT_EXTRACTION_SYSTEM_PROMPT = """Extract high-quality Omiryn data point 
 Return only valid JSON. Do not include markdown.
 Use this shape:
 {
+  "decision": "extract",
+  "reason": "Short reason",
   "data_points": [
     {
       "category": "conversation_context",
@@ -50,6 +57,8 @@ Use this shape:
   ]
 }
 Rules:
+- If the source does not contain meaningful durable user/context/style signal,
+  return {"decision":"no_useful_data","reason":"...","data_points":[]}.
 - Extract meaning, not keywords. Do not create points like "talked about location".
 - Only include points that would be useful in a future chat, matching, or style adaptation.
 - For relationship_intent/dating_intent, only include a specific outcome or
@@ -96,7 +105,10 @@ Decision rules:
 - approve: candidate is already good; final_point may lightly normalize it.
 - rewrite: candidate is useful but label/meaning/category should be improved; final_point is required.
 - merge: candidate should be folded into a broader final_point; final_point is required.
+- duplicate_of_existing: candidate is already covered by existing_points; rejection_reason is required and final_point must be null.
+- too_weak: candidate has some signal but not enough durable value; rejection_reason is required and final_point must be null.
 - reject: candidate is weak/random/private/unsupported; rejection_reason is required and final_point must be null.
+- If all candidates are weak, reject them. Do not approve a point just to return something.
 Review questions:
 - What did we learn?
 - Why does it matter?

@@ -24,7 +24,7 @@ def _user_messages_for_memory_extraction(messages: list[dict[str, str]]) -> list
     return [
         {
             **message,
-            "message_index": index,
+            "message_index": message.get("message_index", index),
         }
         for index, message in enumerate(messages)
         if message.get("role") == "user"

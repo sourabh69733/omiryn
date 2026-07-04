@@ -7,6 +7,10 @@ import httpx
 from fastapi.testclient import TestClient
 
 from api.main import STATIC_DIR, _agent_user_context, _smart_reply_context_sources, app, current_user
+from agent.memory_engine.memory import (
+    pending_data_point_messages,
+    should_run_conversation_data_point_extraction,
+)
 from agent.runtime.providers import (
     _compact_chat_reply,
     _context_sources_text,
@@ -975,6 +979,97 @@ class AgentSubmissionApiTest(unittest.TestCase):
         fact_keys = {(fact["category"], fact["key"]) for fact in facts}
         self.assertIn(("values", "ambition"), fact_keys)
         self.assertIn(("values", "mutual_respect"), fact_keys)
+
+    def test_data_point_extraction_uses_pending_user_window(self) -> None:
+        messages = [
+            {"role": "user", "content": "Career growth matters to me."},
+            {"role": "assistant", "content": "Makes sense."},
+            {"role": "user", "content": "Mutual respect is important."},
+            {"role": "assistant", "content": "Got it."},
+            {"role": "user", "content": "then"},
+        ]
+
+        with patch.dict(os.environ, {"PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "3"}):
+            self.assertTrue(
+                should_run_conversation_data_point_extraction(
+                    "conversation-a",
+                    "user-a",
+                    messages,
+                    quality_valid=True,
+                )
+            )
+
+        self.assertEqual(
+            [
+                message["message_index"]
+                for message in pending_data_point_messages(
+                    conversation_id="conversation-a",
+                    user_id="user-a",
+                    messages=messages,
+                )
+            ],
+            [0, 2, 4],
+        )
+
+    def test_data_point_extraction_does_not_reprocess_processed_window(self) -> None:
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-a",
+                "source_kind": "agent_conversation",
+                "source_id": "conversation-a",
+                "candidate_key": "conversation_window",
+                "decision": "no_useful_data",
+                "metadata": {
+                    "extraction_window": {
+                        "start_message_index": 0,
+                        "end_message_index": 4,
+                        "user_message_count": 3,
+                    }
+                },
+            }
+        )
+        messages = [
+            {"role": "user", "content": "Career growth matters to me."},
+            {"role": "assistant", "content": "Makes sense."},
+            {"role": "user", "content": "Mutual respect is important."},
+            {"role": "assistant", "content": "Got it."},
+            {"role": "user", "content": "then"},
+        ]
+
+        self.assertEqual(
+            pending_data_point_messages(
+                conversation_id="conversation-a",
+                user_id="user-a",
+                messages=messages,
+            ),
+            [],
+        )
+
+    def test_no_useful_data_window_is_recorded_for_empty_extraction_result(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        conversation_id = self.client.post("/api/agent/conversations").json()["id"]
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "mock",
+                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+            },
+        ):
+            for message in ("then", "..."):
+                response = self.client.post(
+                    f"/api/agent/conversations/{conversation_id}/messages",
+                    json={"message": message},
+                )
+                self.assertEqual(response.status_code, 200)
+
+        rows = list_data_point_extraction_debug(user_id="user-a", source_id=conversation_id)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["decision"], "no_useful_data")
+        self.assertEqual(rows[0]["metadata"]["extraction_window"]["user_message_count"], 2)
 
     def test_hybrid_chat_data_point_review_runs_for_deep_conversation_memory(self) -> None:
         async def signed_in_user() -> CurrentUser:

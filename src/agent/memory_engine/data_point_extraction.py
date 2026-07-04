@@ -9,6 +9,7 @@ import json
 import httpx
 
 from agent.memory_engine.data_points import normalize_data_point
+from agent.memory_engine.utils import conversation_extraction_window
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_point_candidates
 from agent.runtime.providers import (
     extract_deep_profile_facts,
@@ -16,7 +17,7 @@ from agent.runtime.providers import (
     review_llm_data_point_candidates,
 )
 from ingestion.whatsapp import WhatsappStructuredMemory
-from storage import save_data_point_extraction_debug, upsert_profile_fact
+from storage import list_profile_facts, save_data_point_extraction_debug, upsert_profile_fact
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ VALID_CATEGORIES = {
     "whatsapp_recent_events",
     "whatsapp_tone_traits",
 }
-VALID_REVIEW_DECISIONS = {"approve", "rewrite", "merge", "reject"}
+VALID_REVIEW_DECISIONS = {"approve", "rewrite", "merge", "reject", "duplicate_of_existing", "too_weak"}
 
 
 def data_point_extractor_mode() -> str:
@@ -105,6 +106,7 @@ async def review_data_point_candidates(
             source_excerpt=source_excerpt,
             source_title=source_title,
             selected_sender=selected_sender,
+            existing_points=_compact_existing_data_points(user_id),
         ),
         conversation_id=conversation_id,
         model=model,
@@ -142,6 +144,15 @@ async def capture_hybrid_conversation_data_points(
             if candidate:
                 candidates.append(candidate)
         if not candidates:
+            _save_conversation_window_debug(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                messages=messages,
+                decision="no_useful_data",
+                candidate_count=0,
+                saved_point_count=0,
+                extractor="hybrid_conversation_review",
+            )
             return
         try:
             reviews = await review_data_point_candidates(
@@ -173,6 +184,7 @@ async def capture_hybrid_conversation_data_points(
                 title="In-app conversation",
                 source_kind="agent_conversation",
             )
+        saved_point_count = 0
         for review in reviews:
             save_data_point_extraction_debug(
                 {
@@ -187,11 +199,33 @@ async def capture_hybrid_conversation_data_points(
                     "metadata": {
                         "title": "In-app conversation",
                         "extractor": "hybrid_conversation_review",
+                        "extraction_window": conversation_extraction_window(messages),
                     },
                 }
             )
             if review.get("point"):
+                saved_point_count += 1
                 upsert_profile_fact(normalize_data_point(review["point"]))
+        if not reviews:
+            _save_conversation_window_debug(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                messages=messages,
+                decision="no_useful_data",
+                candidate_count=len(candidates),
+                saved_point_count=0,
+                extractor="hybrid_conversation_review",
+            )
+        elif saved_point_count == 0:
+            _save_conversation_window_debug(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                messages=messages,
+                decision="too_weak",
+                candidate_count=len(candidates),
+                saved_point_count=0,
+                extractor="hybrid_conversation_review",
+            )
     except Exception as error:
         if _provider_rate_limited(error):
             logger.warning(
@@ -513,12 +547,15 @@ def _normalize_llm_data_point_review(
         "rejection_reason": rejection_reason or None,
     }
 
-    if decision == "reject":
+    if decision in {"reject", "duplicate_of_existing", "too_weak"}:
         if not rejection_reason:
-            return None
+            if decision == "reject":
+                return None
+            rejection_reason = "Candidate should not be saved as a new data point."
+            review["rejection_reason"] = rejection_reason
         return {
             "candidate_key": candidate_key,
-            "decision": "reject",
+            "decision": decision,
             "candidate": candidate,
             "review": review,
             "point": None,
@@ -607,11 +644,13 @@ def build_data_point_candidate_review_prompt(
     source_excerpt: str,
     source_title: str,
     selected_sender: str | None,
+    existing_points: list[dict[str, Any]] | None = None,
 ) -> str:
     payload = {
         "source_title": source_title,
         "selected_sender": selected_sender or "unknown",
         "source_excerpt": source_excerpt[:LLM_CONTEXT_CHAR_LIMIT],
+        "existing_points": existing_points or [],
         "candidates": candidates[:LLM_MAX_POINTS],
     }
     return json.dumps(payload, ensure_ascii=False)
@@ -670,6 +709,63 @@ def _conversation_data_point_excerpt(messages: list[dict[str, object]]) -> str:
     ]
     return "\n".join(lines)[:LLM_CONTEXT_CHAR_LIMIT]
 
+
+def _compact_existing_data_points(user_id: str) -> list[dict[str, Any]]:
+    points: list[dict[str, Any]] = []
+    for fact in list_profile_facts(user_id)[:40]:
+        if fact.get("status") != "active":
+            continue
+        value = fact.get("value") if isinstance(fact.get("value"), dict) else {}
+        points.append(
+            {
+                "category": fact.get("category"),
+                "key": fact.get("key"),
+                "label": fact.get("label"),
+                "meaning": value.get("meaning") or value.get("detail"),
+                "confidence": fact.get("confidence"),
+            }
+        )
+    return points[:25]
+
+
+def _save_conversation_window_debug(
+    *,
+    user_id: str,
+    conversation_id: str,
+    messages: list[dict[str, object]],
+    decision: str,
+    candidate_count: int,
+    saved_point_count: int,
+    extractor: str,
+) -> None:
+    window = conversation_extraction_window(messages)
+    if not window:
+        return
+    save_data_point_extraction_debug(
+        {
+            "user_id": user_id,
+            "source_kind": "agent_conversation",
+            "source_id": conversation_id,
+            "import_id": None,
+            "candidate_key": "conversation_window",
+            "decision": decision,
+            "candidate": {
+                "key": "conversation_window",
+                "message_count": window["user_message_count"],
+            },
+            "review": {
+                "decision": decision,
+                "reason": "Processed pending user-only message window.",
+                "candidate_count": candidate_count,
+                "saved_point_count": saved_point_count,
+            },
+            "metadata": {
+                "title": "In-app conversation",
+                "extractor": extractor,
+                "extraction_window": window,
+            },
+        }
+    )
 
 def _sample_messages(memory: WhatsappStructuredMemory) -> list[Any]:
     if len(memory.messages) <= 80:
