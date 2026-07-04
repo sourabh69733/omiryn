@@ -25,6 +25,8 @@ let onboardingStep = 1;
 let activeFeedbackMessageIndex = null;
 let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
+let onboardingProfilePhotoFiles = Array(4).fill(null);
+let pendingOnboardingPhotoSlot = 0;
 const messageFeedbackState = new Map();
 const assistantMessagePlaybackDelayMs = 850;
 
@@ -194,6 +196,7 @@ const profilePhone = document.querySelector("#profile-phone");
 const profilePhoto = document.querySelector("#profile-photo");
 const profilePhotoPreview = document.querySelector("#profile-photo-preview");
 const profilePhotoPreviews = Array.from(document.querySelectorAll("[data-photo-preview]"));
+const profilePhotoTriggers = Array.from(document.querySelectorAll("[data-profile-photo-trigger]"));
 const profileForm = document.querySelector("#profile-form");
 const profileName = document.querySelector("#profile-name");
 const profileEmail = document.querySelector("#profile-email");
@@ -655,14 +658,16 @@ async function saveDatingBasicsProfile(event) {
     if (!response.ok) {
       throw new Error(data.detail || "Could not save dating basics.");
     }
-    const photoFiles = selectedProfilePhotoFiles();
+    const photoFiles = onboardingProfilePhotoFiles
+      .map((file, slot) => ({ file, slot }))
+      .filter((item) => item.file?.type?.startsWith("image/"));
     if (photoFiles.length) {
       let uploaded = null;
-      for (const file of photoFiles) {
-        uploaded = await uploadProfilePhoto(file);
+      for (const { file, slot } of photoFiles) {
+        uploaded = await uploadProfilePhoto(file, slot);
       }
       renderProfilePhotoGallery(uploaded?.profile_photo_urls || [uploaded?.profile_photo_url]);
-      profilePhoto.value = "";
+      onboardingProfilePhotoFiles = Array(4).fill(null);
     }
     datingBasicsComplete = true;
     if (profileName) profileName.value = basicsName.value.trim();
@@ -820,15 +825,19 @@ function renderAccountPhotoGallery(urls = []) {
   });
 }
 
-function selectedProfilePhotoFiles() {
-  return Array.from(profilePhoto?.files || [])
-    .filter((file) => file.type?.startsWith("image/"))
-    .slice(0, 4);
-}
-
 function previewSelectedPhotos() {
-  const urls = selectedProfilePhotoFiles().map((file) => URL.createObjectURL(file));
+  const file = profilePhoto?.files?.[0];
+  if (!file) return;
+  if (!file.type?.startsWith("image/")) {
+    onboardingProfilePhotoFiles[pendingOnboardingPhotoSlot] = null;
+    renderProfilePhotoGallery(onboardingProfilePhotoFiles.map((photoFile) => photoFile ? URL.createObjectURL(photoFile) : ""));
+    profilePhoto.value = "";
+    return;
+  }
+  onboardingProfilePhotoFiles[pendingOnboardingPhotoSlot] = file;
+  const urls = onboardingProfilePhotoFiles.map((photoFile) => photoFile ? URL.createObjectURL(photoFile) : "");
   renderProfilePhotoGallery(urls);
+  profilePhoto.value = "";
 }
 
 async function uploadSelectedAccountPhoto() {
@@ -3555,6 +3564,12 @@ onboardingNextStep?.addEventListener("click", goToNextOnboardingStep);
 onboardingBackStep?.addEventListener("click", goToPreviousOnboardingStep);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
 profilePhoto?.addEventListener("change", previewSelectedPhotos);
+profilePhotoTriggers.forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    pendingOnboardingPhotoSlot = Number(trigger.dataset.profilePhotoTrigger) || 0;
+    profilePhoto?.click();
+  });
+});
 [basicsName, profileDob, profileCity, profilePhone].forEach((field) => {
   field?.addEventListener("input", () => setFieldError(field, ""));
   field?.addEventListener("change", () => setFieldError(field, ""));

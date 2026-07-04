@@ -175,37 +175,37 @@
               <p>These details stay private and help anchor your profile before conversation takes over.</p>
             </div>
             <div class="about-you-fields">
-              <label class="basics-field compact photo-upload-field">
+              <div class="basics-field compact photo-upload-field">
                 Profile photos
                 <span class="photo-upload-card">
-                  <span class="photo-gallery-grid" aria-hidden="true">
-                    <span class="photo-slot photo-slot-main">
+                  <span class="photo-gallery-grid">
+                    <button class="photo-slot photo-slot-main" type="button" data-profile-photo-trigger="0" aria-label="Upload main profile photo">
                       <img class="profile-photo-preview" data-photo-preview="0" id="profile-photo-preview" alt="" hidden />
                       <span class="photo-avatar-placeholder">O</span>
                       <span class="photo-camera-mark"></span>
                       <small>Main photo</small>
-                    </span>
-                    <span class="photo-slot">
+                    </button>
+                    <button class="photo-slot" type="button" data-profile-photo-trigger="1" aria-label="Upload profile photo 2">
                       <img class="profile-photo-preview" data-photo-preview="1" alt="" hidden />
                       <span class="photo-plus-mark"></span>
-                    </span>
-                    <span class="photo-slot">
+                    </button>
+                    <button class="photo-slot" type="button" data-profile-photo-trigger="2" aria-label="Upload profile photo 3">
                       <img class="profile-photo-preview" data-photo-preview="2" alt="" hidden />
                       <span class="photo-plus-mark"></span>
-                    </span>
-                    <span class="photo-slot">
+                    </button>
+                    <button class="photo-slot" type="button" data-profile-photo-trigger="3" aria-label="Upload profile photo 4">
                       <img class="profile-photo-preview" data-photo-preview="3" alt="" hidden />
                       <span class="photo-plus-mark"></span>
-                    </span>
+                    </button>
                   </span>
                   <span class="photo-upload-copy">
                     <strong>Add your photos</strong>
                     <small>Choose up to 4 clear photos. Your first photo becomes the main profile image.</small>
-                    <span class="photo-upload-action">Choose photos</span>
+                    <button class="photo-upload-action" type="button" data-profile-photo-trigger="0">Choose photos</button>
                   </span>
-                  <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+                  <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
                 </span>
-              </label>
+              </div>
               <div class="about-you-inputs">
                 <label class="basics-field compact">
                   Name
@@ -248,7 +248,7 @@
               </button>
               -->
               <button class="auth-primary" id="save-dating-basics" type="submit">
-                Continue
+                Submit
               </button>
             </div>
           </div>

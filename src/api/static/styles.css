@@ -929,7 +929,6 @@ p {
     radial-gradient(circle at 14% 20%, rgba(127, 231, 217, 0.16), transparent 34%),
     rgba(255, 255, 255, 0.8);
   padding: 14px;
-  cursor: pointer;
   box-shadow:
     0 16px 44px rgba(23, 32, 38, 0.055),
     inset 0 1px 0 rgba(255, 255, 255, 0.86);
@@ -957,12 +956,15 @@ p {
   display: grid;
   width: 80px;
   height: 80px;
+  min-height: 0;
   place-items: center;
   border: 1px solid rgba(31, 95, 91, 0.12);
   border-radius: 20px;
   background:
     radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.26), transparent 32%),
     #eaf6f2;
+  cursor: pointer;
+  padding: 0;
   box-shadow:
     0 10px 26px rgba(23, 32, 38, 0.07),
     0 0 0 5px rgba(255, 255, 255, 0.68);
@@ -1096,6 +1098,7 @@ p {
 
 .photo-upload-action {
   width: fit-content;
+  min-height: 0;
   margin-top: 10px;
   border: 1px solid rgba(31, 95, 91, 0.16);
   border-radius: 999px;
@@ -1108,9 +1111,10 @@ p {
 
 .photo-upload-card input {
   position: absolute;
-  inset: 0;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 .app-header {
