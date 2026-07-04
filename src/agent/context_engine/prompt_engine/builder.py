@@ -15,6 +15,7 @@ from agent.context_engine.prompt_engine.modules.behavior import (
 from agent.context_engine.prompt_engine.modules.conversation_flow import conversation_flow_prompt
 from agent.context_engine.prompt_engine.modules.data_point_targets import data_point_targets_prompt
 from agent.context_engine.prompt_engine.modules.memory_usage import memory_usage_prompt
+from agent.context_engine.prompt_engine.modules.safety import safety_module_prompt
 from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
 from agent.context_engine.prompt_engine.modules.whatsapp_usage import whatsapp_usage_prompt
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
@@ -60,6 +61,7 @@ def build_system_prompt(
         conversation_flow_prompt(prompt_version),
         data_point_targets_prompt(prompt_version.data_point_targets),
         tone_module_prompt(behavior.tone),
+        safety_module_prompt(allow_mild_adult_humor=behavior.allow_mild_adult_humor),
     ]
     context_text = context_sources_text(context_sources)
     if context_text:

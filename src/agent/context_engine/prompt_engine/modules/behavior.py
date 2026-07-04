@@ -15,6 +15,7 @@ class CompanionBehavior:
     tone: str = "auto"
     max_reply_words: int = 35
     allow_light_playful: bool = True
+    allow_mild_adult_humor: bool = True
     allow_romantic_roleplay: bool = False
     ask_question_policy: str = "at_most_one_soft_question"
     dating_focus: str = "gradual_understanding_for_matching"
@@ -40,6 +41,7 @@ def build_companion_behavior(
         tone=tone,
         max_reply_words=int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35")),
         allow_light_playful=_allow_light_playful(prompt_version),
+        allow_mild_adult_humor=_allow_mild_adult_humor(prompt_version),
         allow_romantic_roleplay=False,
         version=prompt_version.version_id if prompt_version else "v1",
         version_name=prompt_version.name if prompt_version else "v1_companion_basic",
@@ -66,6 +68,11 @@ def behavior_module_prompt(
         if behavior.allow_light_playful
         else "Avoid playful teasing; stay warm and plain."
     )
+    adult_rule = (
+        "Mild adult/double-meaning humor is allowed only after the user invites that tone."
+        if behavior.allow_mild_adult_humor
+        else "Avoid adult/double-meaning humor."
+    )
     roleplay_rule = (
         "Romantic roleplay is allowed only if explicitly configured."
         if behavior.allow_romantic_roleplay
@@ -84,7 +91,7 @@ def behavior_module_prompt(
         f"Question policy: {behavior.ask_question_policy}.\n"
         f"Dating focus: {behavior.dating_focus}.\n"
         f"Safety level: {behavior.safety_level}.\n"
-        f"{playful_rule} {roleplay_rule}\n"
+        f"{playful_rule} {adult_rule} {roleplay_rule}\n"
         "Use identity/location/time only when naturally helpful. Do not mention the user's email "
         "unless they ask about account details. If location is only a default, treat it as uncertain. "
         "Speak from this persona in a casual WhatsApp-like way, like a single ongoing personal chat. "
@@ -107,7 +114,20 @@ def companion_intent_prompt() -> str:
 def _allow_light_playful(prompt_version: PromptBehaviorVersion | None) -> bool:
     env_value = os.getenv("AGENT_ALLOW_LIGHT_PLAYFUL")
     if env_value is not None:
-        return env_value.lower() == "true"
+        return _env_bool(env_value)
     if not prompt_version:
         return True
     return bool(prompt_version.reply_style.get("allow_light_playful", True))
+
+
+def _allow_mild_adult_humor(prompt_version: PromptBehaviorVersion | None) -> bool:
+    env_value = os.getenv("AGENT_ALLOW_MILD_ADULT_HUMOR")
+    if env_value is not None:
+        return _env_bool(env_value)
+    if not prompt_version:
+        return True
+    return bool(prompt_version.reply_style.get("allow_mild_adult_humor", True))
+
+
+def _env_bool(value: object) -> bool:
+    return str(value).strip().lower() == "true"

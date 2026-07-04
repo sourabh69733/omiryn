@@ -10,8 +10,11 @@ MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "5"))
 REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "15"))
 
 
-def split_assistant_reply(reply: str) -> list[str]:
-    cleaned = " ".join(normalize_assistant_script(str(reply or "")).strip().split())
+def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
+    cleaned = _soften_adult_safety_refusal(
+        " ".join(normalize_assistant_script(str(reply or "")).strip().split()),
+        user_text,
+    )
     if not cleaned:
         return [""]
 
@@ -78,3 +81,41 @@ def _strip_speaker_label(text: str) -> str:
         cleaned,
         count=1,
     ).strip()
+
+
+def _soften_adult_safety_refusal(reply: str, user_text: str | None) -> str:
+    if not _looks_like_stock_refusal(reply):
+        return reply
+    if not _looks_like_adult_flirty_request(user_text or ""):
+        return reply
+    return (
+        "Thoda spicy rakh sakti hoon, bas explicit nahi. "
+        "Teasing wali vibe chalegi, full hot scene nahi."
+    )
+
+
+def _looks_like_stock_refusal(reply: str) -> bool:
+    normalized = reply.strip().lower()
+    refusal_markers = (
+        "i'm sorry, but i can't help with that",
+        "i am sorry, but i can't help with that",
+        "i can't help with that",
+        "i cannot help with that",
+        "can't assist with that",
+        "cannot assist with that",
+    )
+    return any(marker in normalized for marker in refusal_markers)
+
+
+def _looks_like_adult_flirty_request(text: str) -> bool:
+    normalized = text.lower()
+    adult_terms = (
+        "adult",
+        "double meaning",
+        "hot",
+        "naughty",
+        "sexy",
+        "spicy",
+        "turn on",
+    )
+    return any(term in normalized for term in adult_terms)

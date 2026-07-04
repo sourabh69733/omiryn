@@ -163,7 +163,7 @@ async def run_agent_turn(
             user_profile=context_package.user_profile,
             system_prompt=context_package.system_prompt,
         )
-        reply_parts = split_assistant_reply(reply)
+        reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
             {

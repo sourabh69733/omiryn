@@ -74,6 +74,29 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("Roman Hinglish/English by default", prompt)
         self.assertIn("avoid Devanagari", prompt)
 
+    def test_prompt_builder_allows_only_mild_user_led_adult_humor(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            prompt = build_companion_system_prompt(
+                user_profile={"interested_in": "women"},
+                agent_tone="auto",
+                context_sources=[],
+            )
+
+        self.assertIn("mild adult humor", prompt)
+        self.assertIn("only when the user clearly invites", prompt)
+        self.assertIn("non-graphic", prompt)
+        self.assertIn("Do not write explicit sexual descriptions", prompt)
+
+    def test_prompt_builder_can_disable_mild_adult_humor_with_env(self) -> None:
+        with patch.dict("os.environ", {"AGENT_ALLOW_MILD_ADULT_HUMOR": "false"}):
+            prompt = build_companion_system_prompt(
+                user_profile={"interested_in": "women"},
+                agent_tone="auto",
+                context_sources=[],
+            )
+
+        self.assertIn("Avoid adult/double-meaning humor", prompt)
+
     def test_assistant_reply_normalizes_accidental_devanagari(self) -> None:
         parts = split_assistant_reply(
             "Maine socha, pehle tumhe khush dekhna \u091c\u0930\u0942\u0930\u0940 hai."
@@ -90,6 +113,24 @@ class AgentControlFrameworkTest(unittest.TestCase):
         )
 
         self.assertEqual(len(parts), 1)
+
+    def test_adult_request_stock_refusal_gets_soft_boundary(self) -> None:
+        parts = split_assistant_reply(
+            "I'm sorry, but I can't help with that.",
+            user_text="more sexy some hot content",
+        )
+
+        self.assertEqual(len(parts), 1)
+        self.assertNotIn("can't help", parts[0].lower())
+        self.assertIn("explicit nahi", parts[0])
+
+    def test_non_adult_stock_refusal_is_not_rewritten(self) -> None:
+        parts = split_assistant_reply(
+            "I'm sorry, but I can't help with that.",
+            user_text="help me hack this account",
+        )
+
+        self.assertIn("can't help", parts[0].lower())
 
     def test_assistant_reply_strips_wrapping_dialogue_quotes(self) -> None:
         parts = split_assistant_reply(

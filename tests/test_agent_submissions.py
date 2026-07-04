@@ -958,7 +958,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
 
-        with patch.dict(os.environ, {"AGENT_PROVIDER": "mock"}):
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PROVIDER": "mock",
+                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "5",
+            },
+        ):
             for index in range(5):
                 response = self.client.post(
                     f"/api/agent/conversations/{conversation_id}/messages",
