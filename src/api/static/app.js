@@ -1425,10 +1425,13 @@ function forgetStoredConversation() {
   }
 }
 
-async function startConversation() {
+async function startConversation(options = {}) {
+  const preserveChatFocus = Boolean(options.preserveChatFocus);
   closeMobileHistorySheet();
   await loadAgentStatus();
-  chatInput.disabled = true;
+  if (!preserveChatFocus) {
+    chatInput.disabled = true;
+  }
   if (extractProfile) extractProfile.disabled = true;
   const agentName = await nextConversationAgentName();
   const response = await apiFetch("/api/agent/conversations", {
@@ -2754,7 +2757,7 @@ async function sendUserMessage() {
 
   try {
     if (!conversationId) {
-      const conversation = await startConversation();
+      const conversation = await startConversation({ preserveChatFocus: true });
       messages = [...(conversation.messages || []), { role: "user", content: text }];
       renderMessages();
       updateReadiness();
@@ -3426,9 +3429,11 @@ chatInput.addEventListener("keydown", (event) => {
   event.stopPropagation();
   sendUserMessage();
 });
+sendMessage.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+});
 sendMessage.addEventListener("click", () => {
   sendUserMessage();
-  focusChatInput();
 });
 resetChat?.addEventListener("click", startConversation);
 sidebarResetChat?.addEventListener("click", startConversation);
