@@ -261,6 +261,9 @@ function showScreen(name) {
   if (name === "profile" || name === "style") {
     loadProfilePage();
   }
+  if (name === "style") {
+    loadContextSources();
+  }
   updateAppHeaderHeight();
 }
 
@@ -805,6 +808,10 @@ async function loadProfilePage() {
     await setLocationControls(accountState, accountCity, profile.city || "");
     if (accountPhone) accountPhone.value = profile.phone || "";
     renderAccountPhotoGallery(profile.profile_photo_urls?.length ? profile.profile_photo_urls : [profile.profile_photo_url]);
+    renderContextSources([
+      ...(data.memory_sources || []),
+      ...(data.style_sources || [])
+    ], { canDelete: false });
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
     renderRawProfileDataPoints(data.raw_internal_data_points || []);
     if (profileStatus) {
@@ -2327,7 +2334,7 @@ async function copyContextImportPrompt() {
 
 async function loadContextSources() {
   if (!conversationId) {
-    renderContextSources([]);
+    await loadReusableContextSources();
     renderActiveMemory([]);
     renderContextPickerOptions([]);
     return;
@@ -2346,6 +2353,22 @@ async function loadContextSources() {
     renderActiveMemory(data.sources || []);
     renderContextPickerOptions(data.available_sources || data.sources || []);
     loadDetectedTone();
+  } catch (error) {
+    setContextStatus(error.message);
+  }
+}
+
+async function loadReusableContextSources() {
+  try {
+    const response = await apiFetch("/api/me/profile");
+    if (!response.ok) {
+      throw new Error("Could not load saved memories.");
+    }
+    const data = await response.json();
+    renderContextSources([
+      ...(data.memory_sources || []),
+      ...(data.style_sources || [])
+    ], { canDelete: false });
   } catch (error) {
     setContextStatus(error.message);
   }
@@ -2549,8 +2572,9 @@ async function importWhatsappPayload(item) {
   return data;
 }
 
-function renderContextSources(sources) {
+function renderContextSources(sources, options = {}) {
   if (!contextSourceList) return;
+  const canDelete = options.canDelete ?? Boolean(conversationId);
 
   if (!sources.length) {
     contextSourceList.innerHTML = '<div class="context-source-empty">No saved memory yet.</div>';
@@ -2565,7 +2589,7 @@ function renderContextSources(sources) {
           <strong>${escapeHtml(source.title)}</strong>
           <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars${source.attached ? " · attached here" : ""}</span>
         </div>
-        <button
+        ${canDelete ? `<button
           class="context-source-delete"
           type="button"
           data-source-id="${escapeHtml(source.id)}"
@@ -2573,7 +2597,7 @@ function renderContextSources(sources) {
           title="Delete memory"
         >
           ×
-        </button>
+        </button>` : ""}
       </div>
     `)
     .join("");
