@@ -1952,12 +1952,12 @@ p {
 
 .context-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
-  padding: clamp(16px, 2vw, 22px);
+  padding: clamp(14px, 1.8vw, 18px);
 }
 
 .context-action-grid {
@@ -1997,6 +1997,8 @@ p {
 
 .context-action-button .context-card-icon {
   grid-row: 1 / span 2;
+  width: 44px;
+  height: 44px;
 }
 
 .context-action-button strong {
@@ -2022,16 +2024,16 @@ p {
 
 .context-card-heading {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
 }
 
 .context-card-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   border: 1px solid #cfe1dc;
   border-radius: 8px;
   color: var(--primary);
@@ -2041,12 +2043,12 @@ p {
 }
 
 .context-card-heading h3 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 580;
 }
 
 .context-card-heading p {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
@@ -2139,7 +2141,7 @@ p {
 
 .context-source-list {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   margin-top: 0;
 }
 
@@ -2147,7 +2149,7 @@ p {
   border: 1px solid #d7e5e1;
   border-radius: 8px;
   background: #ffffff;
-  padding: 11px;
+  padding: 10px 11px;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
@@ -2160,11 +2162,11 @@ p {
 }
 
 .context-source-copy strong {
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .context-source-copy span {
-  margin-top: 4px;
+  margin-top: 3px;
   color: var(--muted);
   font-size: 11px;
 }

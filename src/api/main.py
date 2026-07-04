@@ -762,6 +762,18 @@ def delete_conversation_context_source(
     return {"source_id": source_id, "status": "deleted"}
 
 
+@app.delete("/api/me/context-sources/{source_id}")
+def delete_me_context_source(
+    source_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    if not delete_user_context_source(source_id, user.id):
+        raise HTTPException(status_code=404, detail="Context source not found.")
+    return {"source_id": source_id, "status": "deleted"}
+
+
 @app.put("/api/agent/conversations/{conversation_id}/context-sources/attachments")
 def update_conversation_context_attachments(
     conversation_id: str,

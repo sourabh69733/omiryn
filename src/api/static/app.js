@@ -6,7 +6,9 @@ let isAwaitingAgentReply = false;
 let isAssistantTyping = false;
 let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
+let pendingDeleteContextSource = null;
 let lastDeleteTrigger = null;
+let lastDeleteMemoryTrigger = null;
 let currentAgentName = null;
 let profileFactsById = new Map();
 let profileFactList = [];
@@ -120,6 +122,10 @@ const deleteSessionDialog = document.querySelector("#delete-session-dialog");
 const deleteSessionId = document.querySelector("#delete-session-id");
 const confirmDeleteSession = document.querySelector("#confirm-delete-session");
 const cancelDeleteSession = document.querySelector("#cancel-delete-session");
+const deleteMemoryDialog = document.querySelector("#delete-memory-dialog");
+const deleteMemoryName = document.querySelector("#delete-memory-name");
+const confirmDeleteMemory = document.querySelector("#confirm-delete-memory");
+const cancelDeleteMemory = document.querySelector("#cancel-delete-memory");
 const factEvidenceDialog = document.querySelector("#fact-evidence-dialog");
 const factEvidenceTitle = document.querySelector("#fact-evidence-title");
 const factEvidenceSummary = document.querySelector("#fact-evidence-summary");
@@ -811,7 +817,7 @@ async function loadProfilePage() {
     renderContextSources([
       ...(data.memory_sources || []),
       ...(data.style_sources || [])
-    ], { canDelete: false });
+    ]);
     renderProfileFacts(data.learned_fact_groups || {}, data.learned_facts || []);
     renderRawProfileDataPoints(data.raw_internal_data_points || []);
     if (profileStatus) {
@@ -2257,6 +2263,30 @@ function closeDeleteSessionDialog() {
   lastDeleteTrigger = null;
 }
 
+function openDeleteMemoryDialog(sourceId, sourceTitle, trigger) {
+  if (!sourceId) return;
+  pendingDeleteContextSource = { id: sourceId, title: sourceTitle || "this memory" };
+  lastDeleteMemoryTrigger = trigger || null;
+  if (deleteMemoryName) {
+    deleteMemoryName.textContent = pendingDeleteContextSource.title;
+  }
+  if (deleteMemoryDialog) {
+    deleteMemoryDialog.hidden = false;
+  }
+  confirmDeleteMemory?.focus();
+}
+
+function closeDeleteMemoryDialog() {
+  if (deleteMemoryDialog) {
+    deleteMemoryDialog.hidden = true;
+  }
+  pendingDeleteContextSource = null;
+  if (lastDeleteMemoryTrigger && document.contains(lastDeleteMemoryTrigger)) {
+    lastDeleteMemoryTrigger.focus();
+  }
+  lastDeleteMemoryTrigger = null;
+}
+
 async function confirmDeleteConversation() {
   const id = pendingDeleteConversationId;
   if (!id) return;
@@ -2368,7 +2398,7 @@ async function loadReusableContextSources() {
     renderContextSources([
       ...(data.memory_sources || []),
       ...(data.style_sources || [])
-    ], { canDelete: false });
+    ]);
   } catch (error) {
     setContextStatus(error.message);
   }
@@ -2572,9 +2602,8 @@ async function importWhatsappPayload(item) {
   return data;
 }
 
-function renderContextSources(sources, options = {}) {
+function renderContextSources(sources) {
   if (!contextSourceList) return;
-  const canDelete = options.canDelete ?? Boolean(conversationId);
 
   if (!sources.length) {
     contextSourceList.innerHTML = '<div class="context-source-empty">No saved memory yet.</div>';
@@ -2589,29 +2618,35 @@ function renderContextSources(sources, options = {}) {
           <strong>${escapeHtml(source.title)}</strong>
           <span>${escapeHtml(contextSourceLabel(source.source_type))} · ${formatNumber(source.content_length)} chars${source.attached ? " · attached here" : ""}</span>
         </div>
-        ${canDelete ? `<button
+        <button
           class="context-source-delete"
           type="button"
           data-source-id="${escapeHtml(source.id)}"
+          data-source-title="${escapeHtml(source.title)}"
           aria-label="Delete ${escapeHtml(source.title)}"
           title="Delete memory"
         >
           ×
-        </button>` : ""}
+        </button>
       </div>
     `)
     .join("");
   contextSourceList.querySelectorAll(".context-source-delete").forEach((button) => {
-    button.addEventListener("click", () => deleteContextSource(button.dataset.sourceId));
+    button.addEventListener("click", () => {
+      openDeleteMemoryDialog(button.dataset.sourceId, button.dataset.sourceTitle, button);
+    });
   });
   setContextStatus(`${sources.length} uploaded context item${sources.length === 1 ? "" : "s"}.`);
 }
 
 async function deleteContextSource(sourceId) {
-  if (!conversationId || !sourceId) return;
+  if (!sourceId) return;
   try {
     setContextStatus("Deleting memory...", "working");
-    const response = await apiFetch(`/api/agent/conversations/${conversationId}/context-sources/${sourceId}`, {
+    const deleteUrl = conversationId
+      ? `/api/agent/conversations/${conversationId}/context-sources/${sourceId}`
+      : `/api/me/context-sources/${sourceId}`;
+    const response = await apiFetch(deleteUrl, {
       method: "DELETE"
     });
     const data = await response.json();
@@ -2626,6 +2661,17 @@ async function deleteContextSource(sourceId) {
   } catch (error) {
     setContextStatus(error.message, "error");
   }
+}
+
+async function confirmDeleteContextSource() {
+  const sourceId = pendingDeleteContextSource?.id;
+  if (!sourceId) return;
+  confirmDeleteMemory.disabled = true;
+  cancelDeleteMemory.disabled = true;
+  await deleteContextSource(sourceId);
+  confirmDeleteMemory.disabled = false;
+  cancelDeleteMemory.disabled = false;
+  closeDeleteMemoryDialog();
 }
 
 function contextSourceLabel(sourceType) {
@@ -3579,6 +3625,8 @@ saveWhatsappImport?.addEventListener("click", saveWhatsappStyleImport);
 whatsappFiles?.addEventListener("change", updateWhatsappFileSelectionStatus);
 confirmDeleteSession?.addEventListener("click", confirmDeleteConversation);
 cancelDeleteSession?.addEventListener("click", closeDeleteSessionDialog);
+confirmDeleteMemory?.addEventListener("click", confirmDeleteContextSource);
+cancelDeleteMemory?.addEventListener("click", closeDeleteMemoryDialog);
 closeFactEvidence?.addEventListener("click", closeFactEvidenceDialog);
 profileFactGroups?.addEventListener("click", (event) => {
   if (event.target.closest("[data-point-feedback]")) {
@@ -3603,6 +3651,11 @@ deleteSessionDialog?.addEventListener("click", (event) => {
     closeDeleteSessionDialog();
   }
 });
+deleteMemoryDialog?.addEventListener("click", (event) => {
+  if (event.target === deleteMemoryDialog) {
+    closeDeleteMemoryDialog();
+  }
+});
 contextMemoryDialog?.addEventListener("click", (event) => {
   if (event.target === contextMemoryDialog) {
     closeContextMemoryDialog();
@@ -3621,6 +3674,9 @@ document.addEventListener("keydown", (event) => {
   }
   if (deleteSessionDialog && !deleteSessionDialog.hidden) {
     closeDeleteSessionDialog();
+  }
+  if (deleteMemoryDialog && !deleteMemoryDialog.hidden) {
+    closeDeleteMemoryDialog();
   }
   if (contextMemoryDialog && !contextMemoryDialog.hidden) {
     closeContextMemoryDialog();

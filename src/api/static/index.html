@@ -893,6 +893,37 @@
       </section>
     </div>
 
+    <div class="confirm-overlay" id="delete-memory-dialog" hidden>
+      <section
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-memory-title"
+        aria-describedby="delete-memory-copy"
+      >
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+            <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <p class="eyebrow">Delete Memory</p>
+          <h2 id="delete-memory-title">Remove this saved memory?</h2>
+          <p id="delete-memory-copy">
+            This source will be removed from your saved memories and future context.
+          </p>
+          <p class="confirm-session" id="delete-memory-name">Memory</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="secondary-button" id="cancel-delete-memory" type="button">Cancel</button>
+          <button class="danger-button" id="confirm-delete-memory" type="button">
+            Delete memory
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div class="confirm-overlay" id="context-memory-dialog" hidden>
       <section
         class="context-modal"
