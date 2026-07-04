@@ -174,6 +174,7 @@ const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 const usageTableRowLimit = 20;
 const appShell = document.querySelector("#app-shell");
+const appHeader = document.querySelector(".app-header");
 const authScreen = document.querySelector("#auth-screen");
 const authScreenLogin = document.querySelector("#auth-screen-login");
 const authScreenStatus = document.querySelector("#auth-screen-status");
@@ -255,17 +256,28 @@ function showScreen(name) {
   if (name === "profile" || name === "style") {
     loadProfilePage();
   }
+  updateAppHeaderHeight();
 }
 
 function closeAppMenu() {
   appNav?.classList.remove("is-open");
   menuButton?.setAttribute("aria-expanded", "false");
+  updateAppHeaderHeight();
 }
 
 function toggleAppMenu() {
   if (!appNav || !menuButton) return;
   const isOpen = appNav.classList.toggle("is-open");
   menuButton.setAttribute("aria-expanded", String(isOpen));
+  updateAppHeaderHeight();
+}
+
+function updateAppHeaderHeight() {
+  if (!appShell || !appHeader) return;
+  window.requestAnimationFrame(() => {
+    const height = Math.ceil(appHeader.getBoundingClientRect().height);
+    appShell.style.setProperty("--app-header-height", `${height}px`);
+  });
 }
 
 function currentDraftIdFromPath() {
@@ -365,6 +377,7 @@ function renderAuthState() {
     logoutUser.hidden = false;
     logoutUser.disabled = false;
   }
+  updateAppHeaderHeight();
   renderAuthGate();
   loadDatingBasicsStatus();
   if (window.location.pathname === "/profile") {
@@ -399,6 +412,7 @@ function renderSignedOutAuth(label) {
     logoutUser.hidden = true;
     logoutUser.disabled = false;
   }
+  updateAppHeaderHeight();
   if (authScreenStatus) {
     authScreenStatus.textContent = label || "Sign in to continue.";
   }
@@ -3506,6 +3520,11 @@ loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
+window.addEventListener("resize", updateAppHeaderHeight);
+if (window.ResizeObserver && appHeader) {
+  const appHeaderObserver = new ResizeObserver(updateAppHeaderHeight);
+  appHeaderObserver.observe(appHeader);
+}
 menuButton?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleAppMenu();

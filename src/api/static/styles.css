@@ -4424,20 +4424,27 @@ p {
   }
 
   .app-shell {
+    --app-header-height: 56px;
     padding: 10px 10px calc(14px + env(safe-area-inset-bottom));
     min-height: 100vh;
   }
 
   .app-header {
-    position: sticky;
-    top: 0;
-    z-index: 20;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    z-index: 50;
     align-items: center;
     grid-template-columns: auto minmax(0, 1fr);
     min-height: 56px;
     border-bottom: 1px solid rgba(31, 95, 91, 0.1);
     background: rgba(251, 250, 247, 0.94);
     padding: 4px 0 10px;
+  }
+
+  main {
+    padding-top: calc(var(--app-header-height) + 8px);
   }
 
   .brand {
@@ -4604,12 +4611,16 @@ p {
   }
 
   .interview-screen {
-    padding-top: 8px;
+    padding-top: 0;
+  }
+
+  .interview-screen:not([hidden]) {
+    min-height: calc(100dvh - var(--app-header-height) - 28px - env(safe-area-inset-bottom));
   }
 
   .chat-workspace {
     display: block;
-    height: auto;
+    height: calc(100dvh - var(--app-header-height) - 28px - env(safe-area-inset-bottom));
     min-height: 0;
   }
 
@@ -4680,8 +4691,8 @@ p {
   }
 
   .chat-card {
-    height: calc(100dvh - 102px - env(safe-area-inset-bottom));
-    min-height: min(480px, calc(100dvh - 102px - env(safe-area-inset-bottom)));
+    height: 100%;
+    min-height: 0;
     border-radius: 8px;
   }
 
@@ -4831,6 +4842,16 @@ p {
 
   .chat-card {
     min-height: 560px;
+  }
+
+  .interview-screen:not([hidden]) .chat-card {
+    position: fixed;
+    top: calc(10px + var(--app-header-height) + 8px);
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    height: auto;
+    min-height: 0;
   }
 
   .agentic-chat .card-heading {
