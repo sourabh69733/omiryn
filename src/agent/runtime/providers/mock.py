@@ -66,17 +66,6 @@ def _mock_deep_profile_facts(
                 "evidence": "Mentions mutual respect.",
             }
         )
-    if not raw_facts:
-        raw_facts.append(
-            {
-                "category": "personality",
-                "key": "open_to_reflection",
-                "label": "Open to reflection",
-                "value": {"kind": "open_to_reflection"},
-                "confidence": 0.42,
-                "evidence": "Continues the onboarding conversation.",
-            }
-        )
     return _normalize_deep_profile_facts({"facts": raw_facts}, user_id, conversation_id)
 
 def _mock_llm_data_points(extraction_text: str) -> dict[str, Any]:
