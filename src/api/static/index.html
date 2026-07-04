@@ -218,8 +218,17 @@
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
+                  State
+                  <select id="profile-state" autocomplete="address-level1">
+                    <option value="">Choose state</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
                   City
-                  <input id="profile-city" type="text" placeholder="Where are you based?" autocomplete="address-level2" />
+                  <select id="profile-city" autocomplete="address-level2" disabled>
+                    <option value="">Choose city</option>
+                  </select>
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
@@ -575,8 +584,16 @@
                   </select>
                 </label>
                 <label>
-                  Location
-                  <input id="account-city" type="text" placeholder="City" autocomplete="address-level2" required />
+                  State
+                  <select id="account-state" autocomplete="address-level1" required>
+                    <option value="">Choose state</option>
+                  </select>
+                </label>
+                <label>
+                  City
+                  <select id="account-city" autocomplete="address-level2" required disabled>
+                    <option value="">Choose city</option>
+                  </select>
                 </label>
                 <label>
                   Mobile (optional)

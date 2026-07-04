@@ -27,6 +27,7 @@ let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 let onboardingProfilePhotoFiles = Array(4).fill(null);
 let pendingOnboardingPhotoSlot = 0;
+let indiaLocations = null;
 const messageFeedbackState = new Map();
 const assistantMessagePlaybackDelayMs = 850;
 
@@ -191,6 +192,7 @@ const profileDob = document.querySelector("#profile-dob");
 const profileGender = document.querySelector("#profile-gender");
 const profileInterestedIn = document.querySelector("#profile-interested-in");
 const basicsOptionButtons = Array.from(document.querySelectorAll("[data-profile-option]"));
+const profileState = document.querySelector("#profile-state");
 const profileCity = document.querySelector("#profile-city");
 const profilePhone = document.querySelector("#profile-phone");
 const profilePhoto = document.querySelector("#profile-photo");
@@ -203,6 +205,7 @@ const profileEmail = document.querySelector("#profile-email");
 const accountAge = document.querySelector("#account-age");
 const accountGender = document.querySelector("#account-gender");
 const accountInterestedIn = document.querySelector("#account-interested-in");
+const accountState = document.querySelector("#account-state");
 const accountCity = document.querySelector("#account-city");
 const accountPhone = document.querySelector("#account-phone");
 const accountPhoto = document.querySelector("#account-photo");
@@ -477,7 +480,7 @@ async function loadDatingBasicsStatus() {
       if (basicsName) basicsName.value = data.profile.display_name || googleDisplayName(authSession?.user) || "";
       if (profileGender) profileGender.value = data.profile.gender || "";
       if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
-      if (profileCity) profileCity.value = data.profile.city || "";
+      await setLocationControls(profileState, profileCity, data.profile.city || "");
       if (profilePhone) profilePhone.value = data.profile.phone || "";
       renderProfilePhotoGallery(data.profile.profile_photo_urls?.length ? data.profile.profile_photo_urls : [data.profile.profile_photo_url]);
       syncBasicsOptionButtons();
@@ -499,6 +502,86 @@ function defaultInterestedIn(gender) {
   if (gender === "man") return "women";
   if (gender === "woman") return "men";
   return "everyone";
+}
+
+async function loadIndiaLocations() {
+  if (indiaLocations) return indiaLocations;
+  const response = await fetch("/static/locations/india_locations.json");
+  if (!response.ok) {
+    throw new Error("Could not load location list.");
+  }
+  indiaLocations = await response.json();
+  populateStateSelect(profileState);
+  populateStateSelect(accountState);
+  return indiaLocations;
+}
+
+function populateStateSelect(select) {
+  if (!select || !indiaLocations) return;
+  const currentValue = select.value;
+  select.innerHTML = `<option value="">Choose state</option>`;
+  (indiaLocations.states || []).forEach((state) => {
+    const option = document.createElement("option");
+    option.value = state.code;
+    option.textContent = state.name;
+    select.appendChild(option);
+  });
+  if (currentValue) {
+    select.value = currentValue;
+  }
+}
+
+function populateCitySelect(stateSelect, citySelect, selectedCity = "") {
+  if (!citySelect || !indiaLocations) return;
+  const stateCode = stateSelect?.value || "";
+  const cities = stateCode ? indiaLocations.citiesByState?.[stateCode] || [] : [];
+  citySelect.innerHTML = `<option value="">${stateCode ? "Choose city" : "Choose state first"}</option>`;
+  cities.forEach((city) => {
+    const option = document.createElement("option");
+    option.value = city.name;
+    option.textContent = city.name;
+    citySelect.appendChild(option);
+  });
+  citySelect.disabled = !stateCode;
+  if (selectedCity) {
+    citySelect.value = selectedCity;
+  }
+}
+
+function stateNameFromCode(stateCode) {
+  return (indiaLocations?.states || []).find((state) => state.code === stateCode)?.name || "";
+}
+
+function stateCodeFromName(stateName) {
+  const normalized = String(stateName || "").trim().toLowerCase();
+  return (indiaLocations?.states || []).find((state) => state.name.toLowerCase() === normalized)?.code || "";
+}
+
+function parseStoredLocation(value) {
+  const parts = String(value || "").split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const stateName = parts[parts.length - 1];
+    return {
+      city: parts.slice(0, -1).join(", "),
+      stateCode: stateCodeFromName(stateName)
+    };
+  }
+  return { city: parts[0] || "", stateCode: "" };
+}
+
+function composeLocationValue(stateSelect, citySelect) {
+  const city = citySelect?.value?.trim() || "";
+  const stateName = stateNameFromCode(stateSelect?.value || "");
+  return city && stateName ? `${city}, ${stateName}` : city;
+}
+
+async function setLocationControls(stateSelect, citySelect, storedLocation = "") {
+  await loadIndiaLocations();
+  const parsed = parseStoredLocation(storedLocation);
+  if (stateSelect) {
+    stateSelect.value = parsed.stateCode;
+  }
+  populateCitySelect(stateSelect, citySelect, parsed.city);
 }
 
 function renderOnboardingStep(step = onboardingStep) {
@@ -604,14 +687,14 @@ function setFieldError(field, message = "") {
 }
 
 function clearDatingBasicsFieldErrors() {
-  [basicsName, profileDob, profileCity, profilePhone].forEach((field) => {
+  [basicsName, profileDob, profileState, profileCity, profilePhone].forEach((field) => {
     if (field) setFieldError(field, "");
   });
 }
 
 async function saveDatingBasicsProfile(event) {
   event.preventDefault();
-  if (!basicsName || !profileDob || !profileGender || !profileInterestedIn || !profileCity || !saveDatingBasics) return;
+  if (!basicsName || !profileDob || !profileGender || !profileInterestedIn || !profileState || !profileCity || !saveDatingBasics) return;
 
   clearDatingBasicsFieldErrors();
   const ageValue = ageFromDob(profileDob.value);
@@ -624,6 +707,7 @@ async function saveDatingBasicsProfile(event) {
     },
     { valid: Boolean(profileGender.value), message: "Choose your gender to continue.", field: profileGender },
     { valid: Boolean(profileInterestedIn.value), message: "Choose who you are interested in to continue.", field: profileInterestedIn },
+    { valid: Boolean(profileState.value), message: "State required", field: profileState },
     { valid: Boolean(profileCity.value.trim()), message: "City required", field: profileCity }
   ];
   const failedCheck = validationChecks.find((check) => !check.valid);
@@ -646,7 +730,7 @@ async function saveDatingBasicsProfile(event) {
         age: ageValue,
         gender: profileGender.value,
         interested_in: profileInterestedIn.value,
-        city: profileCity.value.trim(),
+        city: composeLocationValue(profileState, profileCity),
         phone: profilePhone?.value.trim() || null
       })
     });
@@ -674,7 +758,7 @@ async function saveDatingBasicsProfile(event) {
     if (accountAge) accountAge.value = String(ageValue);
     if (accountGender) accountGender.value = profileGender.value;
     if (accountInterestedIn) accountInterestedIn.value = profileInterestedIn.value;
-    if (accountCity) accountCity.value = profileCity.value.trim();
+    await setLocationControls(accountState, accountCity, composeLocationValue(profileState, profileCity));
     if (accountPhone) accountPhone.value = profilePhone?.value.trim() || "";
     if (datingBasicsStatus) {
       datingBasicsStatus.textContent = "";
@@ -719,7 +803,7 @@ async function loadProfilePage() {
     if (accountAge) accountAge.value = profile.age || "";
     if (accountGender) accountGender.value = profile.gender || "prefer_not_to_say";
     if (accountInterestedIn) accountInterestedIn.value = profile.interested_in || "everyone";
-    if (accountCity) accountCity.value = profile.city || "";
+    await setLocationControls(accountState, accountCity, profile.city || "");
     if (accountPhone) accountPhone.value = profile.phone || "";
     renderAccountPhotoGallery(profile.profile_photo_urls?.length ? profile.profile_photo_urls : [profile.profile_photo_url]);
     renderProfileSources(profileStyleList, data.style_sources || [], "No learned text style yet.");
@@ -744,7 +828,7 @@ async function saveProfilePage(event) {
   }
   try {
     const ageValue = Number(accountAge?.value);
-    if (!profileName?.value.trim() || !Number.isInteger(ageValue) || ageValue < 18 || ageValue > 100 || !accountCity?.value.trim()) {
+    if (!profileName?.value.trim() || !Number.isInteger(ageValue) || ageValue < 18 || ageValue > 100 || !accountState?.value || !accountCity?.value.trim()) {
       throw new Error("Name, age, and location are required.");
     }
     const response = await apiFetch("/api/me/profile", {
@@ -755,7 +839,7 @@ async function saveProfilePage(event) {
         age: ageValue,
         gender: accountGender.value,
         interested_in: accountInterestedIn.value,
-        city: accountCity?.value.trim() || null,
+        city: composeLocationValue(accountState, accountCity) || null,
         phone: accountPhone?.value.trim() || null
       })
     });
@@ -767,7 +851,7 @@ async function saveProfilePage(event) {
     if (basicsName) basicsName.value = data.profile.display_name || "";
     if (profileGender) profileGender.value = data.profile.gender || "";
     if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
-    if (profileCity) profileCity.value = data.profile.city || "";
+    await setLocationControls(profileState, profileCity, data.profile.city || "");
     if (profilePhone) profilePhone.value = data.profile.phone || "";
     syncBasicsOptionButtons();
     if (profileStatus) {
@@ -3560,9 +3644,22 @@ basicsOptionButtons.forEach((button) => {
 });
 syncBasicsOptionButtons();
 setDobBounds();
+loadIndiaLocations().catch((error) => {
+  if (datingBasicsStatus) {
+    datingBasicsStatus.textContent = error.message;
+  }
+});
 onboardingNextStep?.addEventListener("click", goToNextOnboardingStep);
 onboardingBackStep?.addEventListener("click", goToPreviousOnboardingStep);
 accountGender?.addEventListener("change", updateAccountInterestedInDefault);
+profileState?.addEventListener("change", () => {
+  populateCitySelect(profileState, profileCity);
+  setFieldError(profileState, "");
+  setFieldError(profileCity, "");
+});
+accountState?.addEventListener("change", () => {
+  populateCitySelect(accountState, accountCity);
+});
 profilePhoto?.addEventListener("change", previewSelectedPhotos);
 profilePhotoTriggers.forEach((trigger) => {
   trigger.addEventListener("click", () => {
@@ -3570,7 +3667,7 @@ profilePhotoTriggers.forEach((trigger) => {
     profilePhoto?.click();
   });
 });
-[basicsName, profileDob, profileCity, profilePhone].forEach((field) => {
+[basicsName, profileDob, profileState, profileCity, profilePhone].forEach((field) => {
   field?.addEventListener("input", () => setFieldError(field, ""));
   field?.addEventListener("change", () => setFieldError(field, ""));
 });
