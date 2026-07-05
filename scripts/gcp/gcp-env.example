@@ -26,10 +26,23 @@ GCP_CLOUDSQL_CONNECTION_NAME=
 # Runtime env
 AUTH_PROVIDER=supabase
 AUTH_REQUIRED=true
+SUPABASE_JWT_AUDIENCE=authenticated
 DB_DISABLE_POOL=true
-AGENT_PROVIDER=mock
+AGENT_PROVIDER=deepinfra
 PROFILE_DEBUG_DATA_ENABLED=false
 PROFILE_PHOTO_MAX_MB=10
+DATA_POINT_EXTRACTOR=rules
+PROFILE_FACT_DEEP_EXTRACT_INTERVAL=5
+
+# Agent provider config. Keep API keys in the secret section below.
+GROQ_MODEL=llama-3.1-8b-instant
+GROQ_AVAILABLE_MODELS=llama-3.1-8b-instant,llama-3.3-70b-versatile
+DEEPINFRA_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+DEEPINFRA_AVAILABLE_MODELS=meta-llama/Llama-3.3-70B-Instruct-Turbo,meta-llama/Llama-3.1-70B-Instruct-Turbo,deepseek-ai/DeepSeek-V3
+DEEPINFRA_INPUT_COST_PER_1M=0.10
+DEEPINFRA_OUTPUT_COST_PER_1M=0.32
+FIREWORKS_MODEL=accounts/fireworks/models/gpt-oss-120b
+FIREWORKS_AVAILABLE_MODELS=accounts/fireworks/models/gpt-oss-120b,accounts/fireworks/models/llama-v3p3-70b-instruct,accounts/fireworks/models/deepseek-v3p1
 
 # Optional. If set, profile photos upload to GCS instead of local disk.
 PROFILE_PHOTO_GCS_BUCKET=
@@ -44,7 +57,22 @@ DATABASE_URL_SECRET=omiryn-database-url
 ENCRYPTION_MASTER_KEY_SECRET=omiryn-encryption-master-key
 SUPABASE_URL_SECRET=omiryn-supabase-url
 SUPABASE_ANON_KEY_SECRET=omiryn-supabase-anon-key
+SECRET_KEY_SECRET=omiryn-secret-key
 
-# Optional AI provider secret names. Add more in scripts/gcp-deploy.sh if needed.
+# Optional AI provider secret names.
 GROQ_API_KEY_SECRET=
+DEEPINFRA_API_KEY_SECRET=omiryn-deepinfra-api-key
+FIREWORKS_API_KEY_SECRET=
 OPENAI_API_KEY_SECRET=
+
+# Secret values used only by scripts/gcp/gcp-sync-secrets.sh.
+# Do not commit real values.
+DATABASE_URL=
+ENCRYPTION_MASTER_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SECRET_KEY=
+GROQ_API_KEY=
+DEEPINFRA_API_KEY=
+FIREWORKS_API_KEY=
+OPENAI_API_KEY=

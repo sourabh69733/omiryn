@@ -54,3 +54,8 @@ join_by_comma() {
   local IFS=","
   echo "$*"
 }
+
+join_gcloud_dict_args() {
+  local IFS="@"
+  echo "^@^$*"
+}
