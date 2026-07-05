@@ -171,6 +171,33 @@ For Ollama, start Ollama separately and pull a model first, for example:
 ollama pull llama3.1:8b
 ```
 
+## GCP Runtime Env
+
+Use `.gcp.env` as the source of truth for Cloud Run runtime config:
+
+```bash
+cp scripts/gcp/gcp-env.example .gcp.env
+```
+
+Sync secret values to Secret Manager:
+
+```bash
+./scripts/gcp/gcp-sync-secrets.sh
+```
+
+Sync normal env vars and Secret Manager mappings to an existing Cloud Run service
+without rebuilding:
+
+```bash
+./scripts/gcp/gcp-sync-cloud-run-env.sh
+```
+
+Deploy a new image and runtime config together:
+
+```bash
+./scripts/gcp/gcp-deploy.sh
+```
+
 Then open:
 
 - App UI: `http://127.0.0.1:8000`
