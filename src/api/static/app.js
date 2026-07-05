@@ -31,7 +31,22 @@ let onboardingProfilePhotoFiles = Array(4).fill(null);
 let pendingOnboardingPhotoSlot = 0;
 let indiaLocations = null;
 const messageFeedbackState = new Map();
-const assistantMessagePlaybackDelayMs = 850;
+const typingSpeedProfiles = {
+  feminine: { wpm: 38 },
+  masculine: { wpm: 34 },
+  neutral: { wpm: 36 }
+};
+const userTypingProfile = {
+  wpm: null,
+  samples: 0,
+  draftStartedAt: null,
+  lastInputLength: 0
+};
+const typingTimeScale = 0.22;
+const minTypingDelayMs = 650;
+const maxTypingDelayMs = 5200;
+const minThinkingDelayMs = 700;
+const maxThinkingDelayMs = 3600;
 
 const contextImportPromptFallback = `I am using Omiryn to build a private personal profile about myself.
 
@@ -2861,7 +2876,7 @@ function updateReadiness() {
   });
 }
 
-async function playConversationReply(nextMessages) {
+async function playConversationReply(nextMessages, options = {}) {
   if (!Array.isArray(nextMessages) || nextMessages.length <= messages.length) {
     messages = Array.isArray(nextMessages) ? nextMessages : messages;
     return;
@@ -2869,24 +2884,110 @@ async function playConversationReply(nextMessages) {
 
   const existingCount = messages.length;
   const pendingMessages = nextMessages.slice(existingCount);
-  if (pendingMessages.length <= 1) {
-    messages = nextMessages;
-    return;
-  }
-
+  const timing = replyPlaybackTiming(options);
   messages = nextMessages.slice(0, existingCount);
+  let assistantMessageCount = 0;
   for (let index = 0; index < pendingMessages.length; index += 1) {
     const pendingMessage = pendingMessages[index];
-    if (pendingMessage.role === "assistant" && index > 0) {
+    if (pendingMessage.role === "assistant") {
+      assistantMessageCount += 1;
       isAssistantTyping = true;
       renderMessages();
-      await wait(assistantMessagePlaybackDelayMs);
+      await wait(assistantMessageDelayMs(pendingMessage, assistantMessageCount, timing));
       isAssistantTyping = false;
     }
     messages.push(pendingMessage);
     renderMessages();
   }
   messages = nextMessages;
+}
+
+function replyPlaybackTiming(options = {}) {
+  const userText = options.userText || latestUserMessageContent();
+  const modelWaitMs = Math.max(0, Number(options.modelWaitMs) || 0);
+  return {
+    modelWaitMs,
+    thinkingMs: humanThinkingDelayMs(userText),
+    profile: typingProfileForAgent()
+  };
+}
+
+function assistantMessageDelayMs(message, assistantMessageCount, timing) {
+  const typingMs = humanTypingDelayMs(message?.content || "", timing.profile);
+  if (assistantMessageCount === 1) {
+    return clamp(timing.thinkingMs + typingMs - timing.modelWaitMs, 0, maxThinkingDelayMs + maxTypingDelayMs);
+  }
+  return typingMs;
+}
+
+function humanThinkingDelayMs(userText) {
+  const words = wordCount(userText);
+  const questionBonus = /[?？]|\b(why|how|kaise|kya|kidhar|kab|should|can|tell|bata)\b/i.test(userText || "") ? 450 : 0;
+  return clamp(minThinkingDelayMs + words * 95 + questionBonus, minThinkingDelayMs, maxThinkingDelayMs);
+}
+
+function humanTypingDelayMs(text, profile) {
+  const words = Math.max(1, wordCount(text));
+  const wpm = Math.max(20, Number(profile?.wpm) || typingSpeedProfiles.neutral.wpm);
+  const literalTypingMs = (words / wpm) * 60000;
+  return clamp(literalTypingMs * typingTimeScale, minTypingDelayMs, maxTypingDelayMs);
+}
+
+function typingProfileForAgent() {
+  if (Number.isFinite(userTypingProfile.wpm)) {
+    return { wpm: clamp(userTypingProfile.wpm * 0.96, 24, 54) };
+  }
+  const name = String(currentAgentName || defaultAgentName()).trim();
+  if (agentNamePools.women.includes(name)) return typingSpeedProfiles.feminine;
+  if (agentNamePools.men.includes(name)) return typingSpeedProfiles.masculine;
+  return typingSpeedProfiles.neutral;
+}
+
+function trackUserTypingInput() {
+  const length = chatInput.value.length;
+  if (length <= 0) {
+    resetUserTypingDraft();
+    return;
+  }
+  if (!userTypingProfile.draftStartedAt || length < userTypingProfile.lastInputLength) {
+    userTypingProfile.draftStartedAt = performance.now();
+  }
+  userTypingProfile.lastInputLength = length;
+}
+
+function finalizeUserTypingSample(text) {
+  const startedAt = userTypingProfile.draftStartedAt;
+  resetUserTypingDraft();
+  if (!startedAt || !text) return;
+
+  const durationMinutes = (performance.now() - startedAt) / 60000;
+  const words = wordCount(text);
+  if (durationMinutes <= 0 || words < 2) return;
+
+  const sampleWpm = clamp(words / durationMinutes, 16, 80);
+  const previousWpm = Number.isFinite(userTypingProfile.wpm) ? userTypingProfile.wpm : sampleWpm;
+  const sampleWeight = userTypingProfile.samples === 0 ? 1 : 0.28;
+  userTypingProfile.wpm = previousWpm * (1 - sampleWeight) + sampleWpm * sampleWeight;
+  userTypingProfile.samples = Math.min(userTypingProfile.samples + 1, 20);
+}
+
+function resetUserTypingDraft() {
+  userTypingProfile.draftStartedAt = null;
+  userTypingProfile.lastInputLength = 0;
+}
+
+function latestUserMessageContent() {
+  const latest = [...messages].reverse().find((message) => message.role === "user");
+  return latest?.content || "";
+}
+
+function wordCount(text) {
+  const matches = String(text || "").trim().match(/\S+/g);
+  return matches ? matches.length : 0;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function wait(durationMs) {
@@ -2901,6 +3002,7 @@ async function sendUserMessage() {
   const text = chatInput.value.trim();
   if (!text) return;
 
+  finalizeUserTypingSample(text);
   messages.push({ role: "user", content: text });
   chatInput.value = "";
   isSendingMessage = true;
@@ -2917,11 +3019,13 @@ async function sendUserMessage() {
       renderMessages();
       updateReadiness();
     }
+    const modelRequestStartedAt = performance.now();
     const response = await apiFetch(`/api/agent/conversations/${conversationId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text })
     });
+    const modelWaitMs = performance.now() - modelRequestStartedAt;
     const conversation = await response.json();
 
     if (!response.ok) {
@@ -2929,7 +3033,10 @@ async function sendUserMessage() {
     }
 
     isAwaitingAgentReply = false;
-    await playConversationReply(conversation.messages || messages);
+    await playConversationReply(conversation.messages || messages, {
+      modelWaitMs,
+      userText: text
+    });
   } catch (error) {
     isAwaitingAgentReply = false;
     isAssistantTyping = false;
@@ -3584,6 +3691,7 @@ chatInput.addEventListener("keydown", (event) => {
   event.stopPropagation();
   sendUserMessage();
 });
+chatInput.addEventListener("input", trackUserTypingInput);
 sendMessage.addEventListener("pointerdown", (event) => {
   event.preventDefault();
 });

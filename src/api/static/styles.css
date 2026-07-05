@@ -4722,10 +4722,14 @@ p {
 
   .chat-title-lockup {
     min-width: 0;
+    max-width: 82px;
   }
 
   .agentic-chat .card-heading h2 {
+    overflow: hidden;
     font-size: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .agentic-chat .agent-status {
@@ -4736,18 +4740,18 @@ p {
     align-items: center;
     flex-direction: row;
     flex: 0 0 auto;
-    gap: 8px;
+    gap: 6px;
   }
 
   .mobile-history-button {
     display: inline-flex;
     align-items: center;
-    min-height: 34px;
+    min-height: 32px;
     border-color: rgba(92, 219, 199, 0.26);
     color: #c7efeb;
     background: rgba(92, 219, 199, 0.1);
-    padding: 0 11px;
-    font-size: 12px;
+    padding: 0 9px;
+    font-size: 11px;
   }
 
   .chat-context-control {
@@ -4760,8 +4764,8 @@ p {
 
   .chat-controls .chat-context-control {
     display: grid;
-    min-width: 98px;
-    max-width: 128px;
+    min-width: 82px;
+    max-width: 104px;
   }
 
   .chat-context-control > span {
@@ -4769,15 +4773,15 @@ p {
   }
 
   .chat-context-control .context-picker-button {
-    min-height: 34px;
+    min-height: 32px;
     overflow: hidden;
     border-color: rgba(92, 219, 199, 0.26);
     color: #c7efeb;
     background: rgba(92, 219, 199, 0.1);
     font-family: var(--font-ui);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 620;
-    padding: 0 10px;
+    padding: 0 8px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
