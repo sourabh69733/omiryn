@@ -56,7 +56,7 @@ from agent.memory_engine.memory import (
 )
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_points
 from agent.runtime.orchestrator import run_agent_turn
-from auth import CurrentUser, current_user, public_auth_config
+from security.auth import CurrentUser, current_user, public_auth_config
 from ingestion.whatsapp import (
     WHATSAPP_IMPORT_MAX_CHARS,
     build_whatsapp_structured_memory,

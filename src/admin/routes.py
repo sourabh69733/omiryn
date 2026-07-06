@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 from admin.auth import require_admin_user
 from admin.service import admin_eval_runs, admin_overview, admin_user_detail
-from auth import CurrentUser
+from security.auth import CurrentUser
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
 ADMIN_SHELL_HEADERS = {"Cache-Control": "no-store"}

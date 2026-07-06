@@ -5,7 +5,7 @@ from inspect import isawaitable, signature
 
 from fastapi import HTTPException, Request
 
-from auth import CurrentUser, auth_required, current_user
+from security.auth import CurrentUser, auth_required, current_user
 
 
 def configured_admin_emails() -> set[str]:

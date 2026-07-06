@@ -28,7 +28,7 @@ from agent.runtime.providers import (
 from agent.runtime.orchestrator import AgentTurnResult
 from agent.runtime.replies import split_assistant_reply
 from agent.runtime.usage import PROFILE_SIGNAL_BACKFILL
-from auth import CurrentUser
+from security.auth import CurrentUser
 from ingestion.whatsapp import (
     build_whatsapp_structured_memory,
     build_whatsapp_style_summary,
