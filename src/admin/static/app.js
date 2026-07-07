@@ -434,6 +434,8 @@ function renderContextSnapshotItem(snapshot) {
   const summary = snapshot.summary || {};
   const context = snapshot.context || {};
   const sources = context.sources || [];
+  const blocks = context.blocks || [];
+  const skippedBlocks = context.skipped_blocks || [];
   const messages = snapshot.messages || {};
   const promptDebug = messages.prompt_debug || {};
   const flags = [
@@ -452,9 +454,11 @@ function renderContextSnapshotItem(snapshot) {
       <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
       <p>${escapeHtml(contextSnapshotHeadline(summary, promptDebug))}</p>
       <small>${escapeHtml(contextSnapshotSourceLine(summary))}</small>
+      ${renderContextSnapshotPlannerLine(summary, context)}
       ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
       ${renderSnapshotTurnMessages(messages)}
       ${renderSnapshotPromptPayload(messages)}
+      ${renderContextPlannerDebug(context)}
       <details>
         <summary>Sources sent</summary>
         <div class="snapshot-source-list">
@@ -465,6 +469,19 @@ function renderContextSnapshotItem(snapshot) {
           }
         </div>
       </details>
+      ${
+        blocks.length || skippedBlocks.length
+          ? `
+            <details>
+              <summary>Context blocks</summary>
+              <div class="snapshot-source-list">
+                ${blocks.length ? blocks.map(renderContextBlock).join("") : '<div class="table-empty">No selected blocks.</div>'}
+                ${skippedBlocks.length ? skippedBlocks.map(renderSkippedContextBlock).join("") : ""}
+              </div>
+            </details>
+          `
+          : ""
+      }
     </article>
   `;
 }
@@ -490,6 +507,54 @@ function contextSnapshotSourceLine(summary = {}) {
     `${formatNumber(summary.rough_context_tokens || 0)} estimated source tokens`,
     `${formatNumber(summary.source_count || 0)} candidates`
   ].join(" · ");
+}
+
+function renderContextSnapshotPlannerLine(summary = {}, context = {}) {
+  const intent = context.intent || {};
+  const labels = Array.isArray(intent.labels) && intent.labels.length
+    ? intent.labels.join(", ")
+    : (summary.intent_labels || []).join(", ");
+  const details = [
+    summary.engine_version || "",
+    labels ? `intent: ${labels}` : "",
+    summary.conversation_move ? `move: ${summary.conversation_move}` : "",
+    summary.active_topic ? `topic: ${summary.active_topic}` : ""
+  ].filter(Boolean);
+  return details.length ? `<small>${escapeHtml(details.join(" · "))}</small>` : "";
+}
+
+function renderContextPlannerDebug(context = {}) {
+  const plan = context.conversation_plan || {};
+  const topicState = context.topic_state || [];
+  const intent = context.intent || {};
+  if (!Object.keys(plan).length && !topicState.length && !Object.keys(intent).length) return "";
+  return `
+    <details>
+      <summary>Planner debug</summary>
+      <pre class="debug-json">${escapeHtml(JSON.stringify({ intent, conversation_plan: plan, topic_state: topicState }, null, 2))}</pre>
+    </details>
+  `;
+}
+
+function renderContextBlock(block) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(block.title || "Context block")}</strong>
+      <small>${escapeHtml(block.source || "context")} · priority ${formatNumber(block.priority || 0)} · ${escapeHtml(block.position || "middle")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
+      ${block.include_reason ? `<small>${escapeHtml(block.include_reason)}</small>` : ""}
+      ${block.preview ? `<blockquote>${escapeHtml(block.preview)}</blockquote>` : ""}
+    </article>
+  `;
+}
+
+function renderSkippedContextBlock(block) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(block.title || "Skipped context")}</strong>
+      <small>Skipped · ${escapeHtml(block.source || "context")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
+      ${block.skip_reason ? `<small>${escapeHtml(block.skip_reason)}</small>` : ""}
+    </article>
+  `;
 }
 
 function renderSnapshotTurnMessages(messages = {}) {
