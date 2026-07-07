@@ -14,6 +14,46 @@ class AgentContext:
 class ContextQueryIntent:
     labels: tuple[str, ...] = ()
     prefer_structured_whatsapp: bool = False
+    confidence: float = 0.0
+    entities: tuple[str, ...] = ()
+    is_low_information: bool = False
+
+
+@dataclass(frozen=True)
+class ContextBlock:
+    id: str
+    title: str
+    content: str
+    source: str
+    priority: int = 10
+    position: str = "middle"
+    token_estimate: int = 0
+    include_reason: str = ""
+    skip_reason: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TopicState:
+    topic_id: str
+    label: str
+    bucket: str
+    status: str
+    depth: str = "shallow"
+    last_seen_turns_ago: int | None = None
+    repeat_count: int = 0
+    user_interest: str = "unknown"
+
+
+@dataclass(frozen=True)
+class ConversationPlan:
+    current_move: str
+    active_topic: str | None = None
+    avoid_topics: tuple[str, ...] = ()
+    suggested_topics: tuple[str, ...] = ()
+    data_targets: tuple[str, ...] = ()
+    tone_instruction: str = ""
+    reason: str = ""
 
 
 @dataclass(frozen=True)
