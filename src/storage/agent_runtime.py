@@ -70,6 +70,28 @@ def _agent_message_feedback_from_row(row: Any) -> dict[str, Any]:
 
 def save_agent_usage_event(event: dict[str, Any]) -> None:
     user_id = event.get("user_id") or _conversation_user_id(event.get("conversation_id"))
+    raw_usage = event.get("raw_usage") or {}
+    prompt_tokens = _usage_token_value(
+        event.get("prompt_tokens"),
+        raw_usage,
+        "prompt_tokens",
+        "input_tokens",
+        "prompt_eval_count",
+    )
+    completion_tokens = _usage_token_value(
+        event.get("completion_tokens"),
+        raw_usage,
+        "completion_tokens",
+        "output_tokens",
+        "eval_count",
+    )
+    total_tokens = _usage_token_value(
+        event.get("total_tokens"),
+        raw_usage,
+        "total_tokens",
+    )
+    if total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
     payload = {
         "id": event.get("id") or str(uuid4()),
         "user_id": user_id,
@@ -78,13 +100,13 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
         "provider": event["provider"],
         "model": event.get("model"),
         "success": event["success"],
-        "prompt_tokens": event.get("prompt_tokens"),
-        "completion_tokens": event.get("completion_tokens"),
-        "total_tokens": event.get("total_tokens"),
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
         "latency_ms": event.get("latency_ms"),
         "estimated_cost_usd": event.get("estimated_cost_usd"),
         "error": event.get("error"),
-        "raw_usage_json": event.get("raw_usage") or {},
+        "raw_usage_json": raw_usage,
     }
     if event.get("created_at") is not None:
         payload["created_at"] = event["created_at"]
@@ -420,26 +442,45 @@ def list_agent_usage_events(
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
 
-    return [
-        {
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "conversation_id": row["conversation_id"],
-            "request_kind": row["request_kind"],
-            "provider": row["provider"],
-            "model": row["model"],
-            "success": row["success"],
-            "prompt_tokens": row["prompt_tokens"],
-            "completion_tokens": row["completion_tokens"],
-            "total_tokens": row["total_tokens"],
-            "latency_ms": row["latency_ms"],
-            "estimated_cost_usd": row["estimated_cost_usd"],
-            "error": row["error"],
-            "raw_usage": row["raw_usage_json"],
-            "created_at": _isoformat_utc(row["created_at"]),
-        }
-        for row in rows
-    ]
+    return [_agent_usage_event_from_row(row) for row in rows]
+
+
+def _agent_usage_event_from_row(row: Any) -> dict[str, Any]:
+    raw_usage = row["raw_usage_json"] or {}
+    prompt_tokens = _usage_token_value(
+        row["prompt_tokens"],
+        raw_usage,
+        "prompt_tokens",
+        "input_tokens",
+        "prompt_eval_count",
+    )
+    completion_tokens = _usage_token_value(
+        row["completion_tokens"],
+        raw_usage,
+        "completion_tokens",
+        "output_tokens",
+        "eval_count",
+    )
+    total_tokens = _usage_token_value(row["total_tokens"], raw_usage, "total_tokens")
+    if total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "conversation_id": row["conversation_id"],
+        "request_kind": row["request_kind"],
+        "provider": row["provider"],
+        "model": row["model"],
+        "success": row["success"],
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "latency_ms": row["latency_ms"],
+        "estimated_cost_usd": row["estimated_cost_usd"],
+        "error": row["error"],
+        "raw_usage": raw_usage,
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
 
 
 def summarize_agent_usage(
@@ -533,6 +574,44 @@ def _average_int(total: int, count: int) -> int:
     if count <= 0:
         return 0
     return round(total / count)
+
+
+def _usage_token_value(
+    value: Any,
+    raw_usage: dict[str, Any] | None,
+    *keys: str,
+) -> int | None:
+    parsed_value = _int_or_none(value)
+    if parsed_value is not None:
+        return parsed_value
+    if not isinstance(raw_usage, dict):
+        return None
+    for key in keys:
+        parsed_value = _int_or_none(raw_usage.get(key))
+        if parsed_value is not None:
+            return parsed_value
+    nested_usage = raw_usage.get("usage")
+    if isinstance(nested_usage, dict):
+        for key in keys:
+            parsed_value = _int_or_none(nested_usage.get(key))
+            if parsed_value is not None:
+                return parsed_value
+    prompt_debug = raw_usage.get("prompt_debug")
+    if isinstance(prompt_debug, dict) and any(
+        key in {"prompt_tokens", "input_tokens", "prompt_eval_count", "total_tokens"}
+        for key in keys
+    ):
+        return _int_or_none(prompt_debug.get("rough_tokens"))
+    return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _estimated_cost_inr(estimated_cost_usd: float) -> float | None:

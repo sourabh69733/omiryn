@@ -948,6 +948,24 @@ def _summarize_feedback(feedback: list[Any]) -> dict[str, int]:
 
 
 def _usage_event_from_row(row: Any) -> dict[str, Any]:
+    raw_usage = row["raw_usage_json"] or {}
+    prompt_tokens = _usage_token_value(
+        row["prompt_tokens"],
+        raw_usage,
+        "prompt_tokens",
+        "input_tokens",
+        "prompt_eval_count",
+    )
+    completion_tokens = _usage_token_value(
+        row["completion_tokens"],
+        raw_usage,
+        "completion_tokens",
+        "output_tokens",
+        "eval_count",
+    )
+    total_tokens = _usage_token_value(row["total_tokens"], raw_usage, "total_tokens")
+    if total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
     return {
         "id": row["id"],
         "user_id": row["user_id"],
@@ -956,29 +974,85 @@ def _usage_event_from_row(row: Any) -> dict[str, Any]:
         "provider": row["provider"],
         "model": row["model"],
         "success": row["success"],
-        "prompt_tokens": row["prompt_tokens"],
-        "completion_tokens": row["completion_tokens"],
-        "total_tokens": row["total_tokens"],
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
         "latency_ms": row["latency_ms"],
         "estimated_cost_usd": row["estimated_cost_usd"],
         "error": row["error"],
-        "raw_usage": row["raw_usage_json"],
+        "raw_usage": raw_usage,
         "created_at": _isoformat_utc(row["created_at"]),
     }
 
 
 def _summarize_usage_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     successful_events = [event for event in events if event["success"]]
+    measured_events = [
+        event
+        for event in successful_events
+        if (event["total_tokens"] or event["prompt_tokens"] or event["completion_tokens"])
+    ]
     estimated_cost_usd = round(sum(event["estimated_cost_usd"] or 0 for event in events), 8)
+    prompt_tokens = sum(event["prompt_tokens"] or 0 for event in events)
+    completion_tokens = sum(event["completion_tokens"] or 0 for event in events)
+    total_tokens = sum(event["total_tokens"] or 0 for event in events)
     return {
         "request_count": len(events),
         "successful_request_count": len(successful_events),
         "failed_request_count": len(events) - len(successful_events),
-        "prompt_tokens": sum(event["prompt_tokens"] or 0 for event in events),
-        "completion_tokens": sum(event["completion_tokens"] or 0 for event in events),
-        "total_tokens": sum(event["total_tokens"] or 0 for event in events),
+        "measured_request_count": len(measured_events),
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "average_prompt_tokens_per_request": _average_int(
+            sum(event["prompt_tokens"] or 0 for event in measured_events),
+            len(measured_events),
+        ),
+        "average_completion_tokens_per_request": _average_int(
+            sum(event["completion_tokens"] or 0 for event in measured_events),
+            len(measured_events),
+        ),
+        "average_tokens_per_request": _average_int(
+            sum(event["total_tokens"] or 0 for event in measured_events),
+            len(measured_events),
+        ),
         "estimated_cost_usd": estimated_cost_usd,
     }
+
+
+def _average_int(total: int, count: int) -> int:
+    if count <= 0:
+        return 0
+    return round(total / count)
+
+
+def _usage_token_value(
+    value: Any,
+    raw_usage: dict[str, Any] | None,
+    *keys: str,
+) -> int | None:
+    parsed_value = _int_or_none(value)
+    if parsed_value is not None:
+        return parsed_value
+    if not isinstance(raw_usage, dict):
+        return None
+    for key in keys:
+        parsed_value = _int_or_none(raw_usage.get(key))
+        if parsed_value is not None:
+            return parsed_value
+    nested_usage = raw_usage.get("usage")
+    if isinstance(nested_usage, dict):
+        for key in keys:
+            parsed_value = _int_or_none(nested_usage.get(key))
+            if parsed_value is not None:
+                return parsed_value
+    prompt_debug = raw_usage.get("prompt_debug")
+    if isinstance(prompt_debug, dict) and any(
+        key in {"prompt_tokens", "input_tokens", "prompt_eval_count", "total_tokens"}
+        for key in keys
+    ):
+        return _int_or_none(prompt_debug.get("rough_tokens"))
+    return None
 
 
 def _latest_isoformat(values: list[Any]) -> str | None:

@@ -258,7 +258,7 @@ function renderUsers(users) {
       <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
       <td class="mono">${formatNumber(user.draft_count || 0)}<small>${formatNumber(user.approved_draft_count || 0)} approved</small></td>
       <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb / ${formatNumber(user.data_point_review_count || 0)} dp</small></td>
-      <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${formatUsd(user.usage?.estimated_cost_usd || 0)}</small></td>
+      <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${escapeHtml(userUsageTokenLine(user.usage))}</small></td>
       <td>${formatDate(user.last_activity_at)}</td>
     </tr>
   `).join("");
@@ -320,7 +320,7 @@ function renderUserReport(detail) {
       ${reportCard("Gender", profile.gender || "-", profileSource)}
       ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
       ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
-      ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), `${formatNumber(user.usage?.request_count || 0)} API calls`)}
+      ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), userUsageTokenLine(user.usage))}
       ${reportCard("Context debug", formatNumber(contextSnapshotSummary.total || contextSnapshots.length || 0), `${formatNumber(contextSnapshotSummary.total_context_tokens || 0)} rough tokens`)}
       ${reportCard("DP reviews", formatNumber(dataPointReviewSummary.total || dataPointReviews.length || 0), dataPointReviewSummaryDetail(dataPointReviewSummary))}
       ${reportCard("Feedback", formatNumber(feedbackSummary.total || feedback.length || 0), feedbackSummaryDetail(feedbackSummary))}
@@ -374,6 +374,15 @@ function reportCard(label, value, detail = "") {
       ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
     </article>
   `;
+}
+
+function userUsageTokenLine(usage = {}) {
+  const average = usage.average_tokens_per_request || 0;
+  const measured = usage.measured_request_count || usage.successful_request_count || 0;
+  const requestCount = usage.request_count || 0;
+  const cost = usage.estimated_cost_usd ? ` · ${formatUsd(usage.estimated_cost_usd)}` : "";
+  if (!requestCount) return "0 calls";
+  return `${formatNumber(average)} avg / call · ${formatNumber(measured)} measured · ${formatNumber(requestCount)} calls${cost}`;
 }
 
 function renderFactsSection(facts) {
