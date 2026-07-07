@@ -4807,6 +4807,42 @@ p {
     max-width: 88%;
   }
 
+  .agentic-chat .message.has-feedback {
+    min-width: min(190px, calc(100vw - 72px));
+    margin-bottom: 18px;
+  }
+
+  .message-feedback {
+    right: 8px;
+    bottom: -18px;
+    left: auto;
+    max-width: calc(100vw - 48px);
+  }
+
+  .message-feedback-actions {
+    flex-wrap: nowrap;
+    max-width: none;
+    gap: 4px;
+  }
+
+  .message-feedback-reaction {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+
+  .message-feedback-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .message-feedback-popover {
+    top: 34px;
+    left: 0;
+    width: min(280px, calc(100vw - 32px));
+    transform: none;
+  }
+
   .composer {
     grid-template-columns: minmax(0, 1fr) auto;
   }
