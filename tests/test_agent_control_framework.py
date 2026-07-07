@@ -5,6 +5,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
+from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.data_point_extraction import (
     _conversation_data_point_excerpt,
     build_data_point_candidate_review_prompt,
@@ -35,7 +36,11 @@ class AgentControlFrameworkTest(unittest.TestCase):
     def setUp(self) -> None:
         self.env_patch = patch.dict(
             "os.environ",
-            {"AGENT_PROVIDER": "mock", "AUTH_REQUIRED": "false"},
+            {
+                "AGENT_PROVIDER": "mock",
+                "AUTH_REQUIRED": "false",
+                "AGENT_BEHAVIOR_VERSION": "v1",
+            },
         )
         self.env_patch.start()
         reset_db()
@@ -157,6 +162,65 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(version.version_id, "v1")
         self.assertEqual(version.name, "v1_companion_basic")
         self.assertIn("relationship_intent", version.data_point_targets)
+
+    def test_v2_context_package_includes_planner_debug(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="haan",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v2",
+        )
+
+        self.assertEqual(package.prompt_version, "v2")
+        self.assertIn("Conversation plan for this turn", package.system_prompt)
+        self.assertIn("Boredom recovery", package.system_prompt)
+        self.assertEqual(package.snapshot["summary"]["engine_version"], "context_v2")
+        self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
+        self.assertIn("conversation_plan", package.snapshot["context"])
+
+    def test_v2_prompt_structure_skips_dynamic_boredom_section_when_not_needed(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="tell me about Abhishek tone",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v2",
+        )
+
+        self.assertIn("## Conversation Plan", package.system_prompt)
+        self.assertNotIn("## Boredom Recovery", package.system_prompt)
+
+    def test_v2_prompt_section_modes_can_disable_dynamic_sections(self) -> None:
+        with patch.dict("os.environ", {"AGENT_PROMPT_SECTION_MODES": "boredom_recovery=off"}):
+            package = build_model_context_package(
+                conversation_id="conversation-a",
+                user_text="haan",
+                user_id="user-a",
+                user_profile={"user_id": "user-a", "interested_in": "women"},
+                model="llama-70b",
+                agent_tone="auto",
+                agent_name="Annie",
+                style_source_id=None,
+                user_message_index=0,
+                assistant_message_index=1,
+                prompt_version_id="v2",
+            )
+
+        self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
+        self.assertNotIn("## Boredom Recovery", package.system_prompt)
 
     def test_data_points_default_to_matching_not_chat_context(self) -> None:
         point = normalize_data_point(
