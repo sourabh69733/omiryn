@@ -58,19 +58,6 @@
         </aside>
 
         <div class="basics-builder">
-          <select class="sr-only" id="profile-gender" aria-label="Gender">
-            <option value="">Select gender</option>
-            <option value="man" selected>Man</option>
-            <option value="woman">Woman</option>
-            <option value="non_binary">Non-binary</option>
-            <option value="prefer_not_to_say">Prefer not to say</option>
-          </select>
-          <select class="sr-only" id="profile-interested-in" aria-label="Interested in">
-            <option value="">Select preference</option>
-            <option value="women" selected>Women</option>
-            <option value="men">Men</option>
-            <option value="everyone">Everyone</option>
-          </select>
           <input class="sr-only" id="profile-intent" type="hidden" value="meaningful" />
           <input class="sr-only" id="profile-conversation-style" type="hidden" value="balanced" />
 
@@ -215,6 +202,27 @@
                 <label class="basics-field compact">
                   Date of birth
                   <input id="profile-dob" type="date" autocomplete="bday" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Gender
+                  <select id="profile-gender" autocomplete="sex" required>
+                    <option value="">Choose gender</option>
+                    <option value="man">Man</option>
+                    <option value="woman">Woman</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Interested in
+                  <select id="profile-interested-in" required>
+                    <option value="">Choose preference</option>
+                    <option value="women">Women</option>
+                    <option value="men">Men</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">

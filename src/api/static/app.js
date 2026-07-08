@@ -660,6 +660,7 @@ function selectBasicsOption(targetId, value, dispatchChange = true) {
 function updateInterestedInDefault() {
   if (!profileGender || !profileInterestedIn) return;
   profileInterestedIn.value = defaultInterestedIn(profileGender.value);
+  setFieldError(profileInterestedIn, "");
   syncBasicsOptionButtons();
 }
 
@@ -705,7 +706,7 @@ function setFieldError(field, message = "") {
 }
 
 function clearDatingBasicsFieldErrors() {
-  [basicsName, profileDob, profileState, profileCity, profilePhone].forEach((field) => {
+  [basicsName, profileDob, profileGender, profileInterestedIn, profileState, profileCity, profilePhone].forEach((field) => {
     if (field) setFieldError(field, "");
   });
 }
@@ -4073,7 +4074,10 @@ document.querySelectorAll("[data-nav]").forEach((link) => {
     }
   });
 });
-profileGender?.addEventListener("change", updateInterestedInDefault);
+profileGender?.addEventListener("change", () => {
+  setFieldError(profileGender, "");
+  updateInterestedInDefault();
+});
 profileInterestedIn?.addEventListener("change", syncBasicsOptionButtons);
 basicsOptionButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -4105,7 +4109,7 @@ profilePhotoTriggers.forEach((trigger) => {
     profilePhoto?.click();
   });
 });
-[basicsName, profileDob, profileState, profileCity, profilePhone].forEach((field) => {
+[basicsName, profileDob, profileGender, profileInterestedIn, profileState, profileCity, profilePhone].forEach((field) => {
   field?.addEventListener("input", () => setFieldError(field, ""));
   field?.addEventListener("change", () => setFieldError(field, ""));
 });
