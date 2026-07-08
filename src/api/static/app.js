@@ -78,8 +78,8 @@ const activeConversationStorageKey = "omiryn.activeConversationId";
 const whatsappImportMaxChars = 1000000;
 const agentNamePools = {
   women: ["Annie", "Mira", "Kiara", "Aisha", "Naina", "Riya", "Sana", "Meera"],
-  men: ["Arjun", "Kabir", "Aarav", "Reyansh", "Vihaan", "Ishaan", "Dev", "Rohan"],
-  everyone: ["Mira", "Annie", "Arjun", "Kiara", "Kabir", "Naina", "Aarav", "Sana"]
+  men: ["Kabir", "Billy", "Aarav", "Ishaan", "Veer"],
+  everyone: ["Mira", "Annie", "Kabir", "Kiara", "Billy", "Naina", "Aarav", "Sana"]
 };
 const feedbackReactions = [
   { rating: "good", label: "Good", icon: "good" },
@@ -1710,7 +1710,7 @@ function selectedAgentName() {
 function defaultAgentName() {
   const interestedIn = accountInterestedIn?.value || profileInterestedIn?.value || "";
   if (interestedIn === "women") return "Annie";
-  if (interestedIn === "men") return "Arjun";
+  if (interestedIn === "men") return "Kabir";
   return "Mira";
 }
 

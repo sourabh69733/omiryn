@@ -368,7 +368,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.post("/api/agent/conversations")
 
         self.assertEqual(response.status_code, 201)
-        self.assertIn("Arjun", response.json()["messages"][0]["content"])
+        self.assertIn("Kabir", response.json()["messages"][0]["content"])
 
     def test_agent_initial_message_uses_display_name_when_available(self) -> None:
         async def signed_in_user() -> CurrentUser:

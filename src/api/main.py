@@ -1898,7 +1898,7 @@ def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, s
     if interested_in == "women":
         return {"name": "Annie", "presentation": "girl"}
     if interested_in == "men":
-        return {"name": "Arjun", "presentation": "boy"}
+        return {"name": "Kabir", "presentation": "boy"}
     return {"name": "Mira", "presentation": "companion"}
 
 
@@ -1918,7 +1918,7 @@ def _initial_agent_message(
     greeting = f"Hey {display_name}, I'm {name}." if display_name else f"Hey, I'm {name}."
     if name == "Annie":
         return f"{greeting}"
-    if name == "Arjun":
+    if name in {"Kabir", "Billy", "Aarav", "Ishaan", "Veer"}:
         return f"{greeting}"
     return f"{greeting}"
 
