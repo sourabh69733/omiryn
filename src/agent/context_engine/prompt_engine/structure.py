@@ -12,22 +12,22 @@ PROMPT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_PROMPT_TOTAL_CHAR_BUDGET", "1200
 PROMPT_SECTION_CHAR_LIMIT = int(os.getenv("AGENT_PROMPT_SECTION_CHAR_LIMIT", "2600"))
 
 SECTION_MODES: dict[str, str] = {
-    "base_identity": "always",
-    "prompt_contract": "always",
-    "behavior": "always",
-    "language": "always",
+    "base_identity": "dynamic",
+    "prompt_contract": "dynamic",
+    "behavior": "dynamic",
+    "language": "dynamic",
     "intent": "dynamic",
-    "conversation_plan": "always",
+    "conversation_plan": "dynamic",
     "data_point_usage": "dynamic",
     "data_point_targets": "dynamic",
-    "tone": "always",
-    "safety": "always",
+    "tone": "dynamic",
+    "safety": "dynamic",
     "memory_usage": "dynamic",
     "whatsapp_usage": "dynamic",
     "context_sources": "dynamic",
     "boredom_recovery": "dynamic",
-    "output_format": "always",
-    "final_reminder": "always",
+    "output_format": "dynamic",
+    "final_reminder": "dynamic",
 }
 
 SECTION_CHAR_LIMITS: dict[str, int] = {

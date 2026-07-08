@@ -288,6 +288,7 @@ class UserMessage(BaseModel):
 class AgentMessageFeedbackCreate(BaseModel):
     rating: AgentMessageFeedbackRating
     reason: str | None = Field(default=None, max_length=80)
+    reasons: list[str] = Field(default_factory=list, max_length=8)
     comment: str | None = Field(default=None, max_length=1000)
 
 
@@ -1161,6 +1162,7 @@ async def create_agent_message_feedback(
                 "agent_provider": conversation.agent_provider,
                 "agent_model": conversation.agent_model,
                 "agent_name": conversation.agent_name,
+                "reasons": payload.reasons,
             },
         }
     )

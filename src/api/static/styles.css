@@ -2611,8 +2611,8 @@ p {
 .message-feedback {
   display: flex;
   position: absolute;
-  right: 8px;
-  bottom: -15px;
+  top: 8px;
+  right: -14px;
   z-index: 3;
   align-items: center;
   justify-content: flex-end;
@@ -2624,7 +2624,7 @@ p {
   display: flex;
   gap: 3px;
   opacity: 0;
-  transform: translateY(-3px);
+  transform: translateX(4px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
@@ -2635,39 +2635,39 @@ p {
 .message.agent:focus-within .message-feedback-actions,
 .message-feedback:has(.message-feedback-popover) .message-feedback-actions {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 
 .chat-log.feedback-open .message.agent:hover .message-feedback:not(.active) .message-feedback-actions,
 .chat-log.feedback-open .message.agent:focus-within .message-feedback:not(.active) .message-feedback-actions {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-3px);
+  transform: translateX(4px);
 }
 
 .chat-log.feedback-open .message-feedback:not(.active) {
   display: none;
 }
 
-.message-feedback-reaction {
+.message-feedback-trigger {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   border: 1px solid rgba(116, 224, 211, 0.24);
   border-radius: 999px;
-  color: #d7efeb;
+  color: #bfe8e2;
   background: rgba(12, 22, 27, 0.96);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
   cursor: pointer;
   line-height: 1;
   padding: 0;
 }
 
 .message-feedback-icon {
-  width: 26px;
-  height: 26px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.1;
@@ -2675,120 +2675,64 @@ p {
   stroke-linejoin: round;
 }
 
-.message-feedback-reaction[aria-label="Good"] {
-  color: #9ff0c2;
-  border-color: rgba(159, 240, 194, 0.28);
-}
-
-.message-feedback-reaction[aria-label="A little off"] {
-  color: #d9d0a2;
-  border-color: rgba(217, 208, 162, 0.28);
-}
-
-.message-feedback-reaction[aria-label="Bad"] {
-  color: #f3b38f;
-  border-color: rgba(243, 179, 143, 0.3);
-}
-
-.message-feedback-reaction[aria-label="Harmful"] {
-  color: #f08f8f;
-  border-color: rgba(240, 143, 143, 0.34);
-}
-
-.message-feedback-reaction:hover,
-.message-feedback-reaction:focus-visible {
+.message-feedback-trigger:hover,
+.message-feedback-trigger:focus-visible {
   border-color: rgba(116, 224, 211, 0.44);
   background: rgba(255, 255, 255, 0.075);
   outline: none;
   transform: translateY(-1px);
 }
 
-.message-feedback-reaction.selected {
-  border-width: 1.5px;
-  outline: none;
-  transform: translateY(-1px);
+.message-feedback-trigger.saved {
+  border-color: rgba(100, 216, 203, 0.46);
+  color: #64d8cb;
 }
 
-.message-feedback-reaction.selected[aria-label="Good"] {
-  border-color: rgba(159, 240, 194, 0.72);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(159, 240, 194, 0.22), rgba(159, 240, 194, 0.08)),
-    rgba(12, 22, 27, 0.98);
-  box-shadow:
-    0 0 0 2px rgba(159, 240, 194, 0.08),
-    0 10px 26px rgba(0, 0, 0, 0.28);
-}
-
-.message-feedback-reaction.selected[aria-label="A little off"] {
-  border-color: rgba(217, 208, 162, 0.72);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(217, 208, 162, 0.22), rgba(217, 208, 162, 0.08)),
-    rgba(12, 22, 27, 0.98);
-  box-shadow:
-    0 0 0 2px rgba(217, 208, 162, 0.08),
-    0 10px 26px rgba(0, 0, 0, 0.28);
-}
-
-.message-feedback-reaction.selected[aria-label="Bad"] {
-  border-color: rgba(243, 179, 143, 0.74);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(243, 179, 143, 0.24), rgba(243, 179, 143, 0.08)),
-    rgba(12, 22, 27, 0.98);
-  box-shadow:
-    0 0 0 2px rgba(243, 179, 143, 0.09),
-    0 10px 26px rgba(0, 0, 0, 0.28);
-}
-
-.message-feedback-reaction.selected[aria-label="Harmful"] {
-  border-color: rgba(240, 143, 143, 0.78);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(240, 143, 143, 0.26), rgba(240, 143, 143, 0.09)),
-    rgba(12, 22, 27, 0.98);
-  box-shadow:
-    0 0 0 2px rgba(240, 143, 143, 0.1),
-    0 10px 26px rgba(0, 0, 0, 0.28);
+.message-feedback-trigger.saved:hover::after,
+.message-feedback-trigger.saved:focus-visible::after {
+  content: "Submitted";
+  position: absolute;
+  right: 34px;
+  min-width: max-content;
+  border: 1px solid rgba(116, 224, 211, 0.18);
+  border-radius: 999px;
+  color: #bfe8e2;
+  background: rgba(12, 22, 27, 0.94);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  font-size: 10px;
+  font-weight: 560;
+  padding: 4px 8px;
 }
 
 .message-feedback-popover {
   display: grid;
-  position: absolute;
-  z-index: 4;
-  top: 30px;
-  left: 50%;
-  width: min(310px, calc(100vw - 48px));
-  gap: 8px;
+  position: fixed;
+  top: var(--feedback-popover-top, 96px);
+  left: var(--feedback-popover-left, 16px);
+  z-index: 70;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(300px, calc(100vh - 140px));
+  overflow-y: auto;
+  gap: 10px;
   border: 1px solid #31525a;
   border-radius: 8px;
   background: #122128;
   box-shadow: 0 18px 52px rgba(0, 0, 0, 0.28);
-  padding: 10px;
+  padding: 12px;
   pointer-events: auto;
-  transform: translateX(-50%);
 }
 
-.message-feedback-popover-readonly {
-  display: none;
-  min-width: 150px;
-  max-width: 240px;
-  gap: 4px;
-  pointer-events: none;
-}
-
-.message.agent:hover .message-feedback-popover-readonly,
-.message.agent:focus-within .message-feedback-popover-readonly {
-  display: grid;
+.message-feedback.placement-right .message-feedback-popover,
+.message-feedback.placement-left .message-feedback-popover,
+.message-feedback.placement-top .message-feedback-popover,
+.message-feedback.placement-bottom .message-feedback-popover {
+  right: auto;
 }
 
 .message-feedback-title {
   color: #dfecea;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 580;
-}
-
-.message-feedback-saved-comment {
-  color: #9fbab5;
-  font-size: 11px;
-  line-height: 1.35;
 }
 
 .message-feedback-reasons {
@@ -2817,21 +2761,47 @@ p {
 
 .message-feedback-comment {
   width: 100%;
+  /* min-height: 72px; */
+  resize: vertical;
   border: 1px solid #31525a;
   border-radius: 8px;
   color: #e9f2f0;
   background: rgba(255, 255, 255, 0.04);
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.35;
   padding: 8px 9px;
 }
 
+.message-feedback-comment::placeholder {
+  color: #819895;
+}
+
+.message-feedback-comment:focus {
+  border-color: #64d8cb;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(100, 216, 203, 0.16);
+}
+
+.message-feedback-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.message-feedback-cancel,
 .message-feedback-submit {
   justify-self: end;
   min-height: 28px;
   border-radius: 8px;
   font-size: 11px;
   padding: 5px 10px;
+}
+
+.message-feedback-cancel {
+  border: 1px solid #31525a;
+  color: #bdd5d1;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .message-chips {
@@ -4826,39 +4796,51 @@ p {
   }
 
   .agentic-chat .message.has-feedback {
-    min-width: min(190px, calc(100vw - 72px));
-    margin-bottom: 18px;
+    margin-bottom: 10px;
   }
 
   .message-feedback {
-    right: 8px;
-    bottom: -18px;
+    top: 8px;
+    right: -8px;
+    bottom: auto;
     left: auto;
-    max-width: calc(100vw - 48px);
+    max-width: none;
   }
 
   .message-feedback-actions {
-    flex-wrap: nowrap;
-    max-width: none;
-    gap: 4px;
+    gap: 0;
   }
 
-  .message-feedback-reaction {
+  .message-feedback-trigger {
     width: 30px;
     height: 30px;
     min-height: 30px;
   }
 
   .message-feedback-icon {
-    width: 22px;
-    height: 22px;
+    width: 15px;
+    height: 15px;
   }
 
   .message-feedback-popover {
-    top: 34px;
-    left: 0;
-    width: min(280px, calc(100vw - 32px));
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    z-index: 70;
+    width: fit-content;
+    max-height: min(420px, 72vh);
+    overflow-y: auto;
+    border-radius: 12px;
+    padding: 16px;
     transform: none;
+  }
+
+  .message-feedback-trigger.saved:hover::after,
+  .message-feedback-trigger.saved:focus-visible::after {
+    right: 0;
+    top: 34px;
   }
 
   .composer {
@@ -5000,6 +4982,11 @@ p {
   .data-point-feedback-card {
     opacity: 1;
     pointer-events: auto;
+    transform: none;
+  }
+
+  .message-feedback-actions {
+    opacity: 1;
     transform: none;
   }
 }

@@ -25,6 +25,7 @@ let profileDebugDataEnabled = false;
 let datingBasicsComplete = null;
 let onboardingStep = 1;
 let activeFeedbackMessageIndex = null;
+let feedbackPositionFrame = null;
 let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 let onboardingProfilePhotoFiles = Array(4).fill(null);
@@ -80,17 +81,9 @@ const agentNamePools = {
 };
 const feedbackReactions = [
   { rating: "good", label: "Good", icon: "good" },
-  { rating: "off", label: "A little off", icon: "off" },
-  { rating: "bad", label: "Bad", icon: "bad" },
+  { rating: "off", label: "Tone off", icon: "off" },
+  { rating: "bad", label: "Bad reply", icon: "bad" },
   { rating: "harmful", label: "Harmful", icon: "harmful" }
-];
-const feedbackReasons = [
-  { value: "not_me", label: "Not me" },
-  { value: "wrong_memory", label: "Wrong memory" },
-  { value: "bad_tone", label: "Bad tone" },
-  { value: "too_much", label: "Too much" },
-  { value: "not_helpful", label: "Not helpful" },
-  { value: "unsafe", label: "Unsafe" }
 ];
 const dataPointFeedbackReasons = [
   { value: "wrong", label: "Wrong" },
@@ -1812,7 +1805,9 @@ function titleCase(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function renderMessages() {
+function renderMessages(options = {}) {
+  const preserveScroll = Boolean(options.preserveScroll);
+  const previousScrollTop = chatLog.scrollTop;
   chatLog.innerHTML = "";
   chatLog.classList.toggle("feedback-open", activeFeedbackMessageIndex !== null);
   messages.forEach((message, index) => {
@@ -1841,7 +1836,7 @@ function renderMessages() {
   if (isAwaitingAgentReply || isAssistantTyping) {
     chatLog.appendChild(renderTypingIndicator());
   }
-  chatLog.scrollTop = chatLog.scrollHeight;
+  chatLog.scrollTop = preserveScroll ? previousScrollTop : chatLog.scrollHeight;
   updateSidebarMeta();
 }
 
@@ -1879,51 +1874,155 @@ function renderMessageFeedback(messageIndex) {
   if (activeFeedbackMessageIndex === messageIndex) {
     wrapper.classList.add("active");
   }
+  if (state.menuPlacement) {
+    wrapper.classList.add(`placement-${state.menuPlacement}`);
+  }
+  if (Number.isFinite(state.menuLeft)) {
+    wrapper.style.setProperty("--feedback-popover-left", `${state.menuLeft}px`);
+  }
+  if (Number.isFinite(state.menuTop)) {
+    wrapper.style.setProperty("--feedback-popover-top", `${state.menuTop}px`);
+  }
 
   const actions = document.createElement("div");
   actions.className = "message-feedback-actions";
-  feedbackReactions.forEach((reaction) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "message-feedback-reaction";
-    button.innerHTML = feedbackReactionIcon(reaction.icon);
-    button.title = reaction.label;
-    button.setAttribute("aria-label", reaction.label);
-    if (state.rating === reaction.rating) {
-      button.classList.add("selected");
-    }
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      handleFeedbackReaction(messageIndex, reaction.rating);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `message-feedback-trigger ${state.status === "saved" ? "saved" : ""}`;
+  button.innerHTML = feedbackFlagIcon();
+  button.title = state.status === "saved" ? "Feedback submitted. Edit feedback" : "Give feedback";
+  button.setAttribute(
+    "aria-label",
+    state.status === "saved" ? "Feedback submitted. Edit feedback" : "Give feedback on this reply"
+  );
+  button.setAttribute("aria-expanded", activeFeedbackMessageIndex === messageIndex ? "true" : "false");
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menuPosition = feedbackMenuPosition(button);
+    const previous = messageFeedbackState.get(messageIndex) || {};
+    messageFeedbackState.set(messageIndex, {
+      ...previous,
+      ...menuPosition
     });
-    actions.appendChild(button);
+    handleFeedbackOpen(messageIndex);
   });
+  actions.appendChild(button);
   wrapper.appendChild(actions);
 
   if (activeFeedbackMessageIndex === messageIndex && state.status !== "saved") {
     wrapper.appendChild(renderFeedbackPopover(messageIndex, state));
-  } else if (state.status === "saved" && (state.reason || state.comment)) {
-    wrapper.appendChild(renderSavedFeedbackPopover(state));
   }
 
   return wrapper;
 }
 
-function feedbackReactionIcon(kind) {
-  const mouth = {
-    good: '<path d="M8.2 13.2c1 .95 2.2 1.42 3.8 1.42s2.8-.47 3.8-1.42" />',
-    off: '<path d="M8.4 14h7.2" />',
-    bad: '<path d="M8.2 15.1c1-.95 2.2-1.42 3.8-1.42s2.8.47 3.8 1.42" />',
-    harmful: '<path d="M8.4 15.2h7.2" /><path d="M8.8 8.2l1.9 1.2" /><path d="M15.2 8.2l-1.9 1.2" />'
-  }[kind] || '<path d="M8.4 14h7.2" />';
-  const eyes = kind === "harmful"
-    ? ""
-    : '<circle cx="9" cy="9.5" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="9.5" r="1" fill="currentColor" stroke="none" />';
+function feedbackMenuPosition(anchorElement, menuElement = null) {
+  const anchor = anchorElement.getBoundingClientRect();
+  const chatBounds = feedbackMenuBounds();
+  const gap = 10;
+  const width = Math.min(menuElement?.offsetWidth || 340, chatBounds.right - chatBounds.left);
+  const height = Math.min(menuElement?.offsetHeight || 300, chatBounds.bottom - chatBounds.top);
+  const centerX = anchor.left + anchor.width / 2;
+  const centerY = anchor.top + anchor.height / 2;
+
+  const candidates = [
+    {
+      placement: "left",
+      left: anchor.left - width - gap,
+      top: centerY - height / 2
+    },
+    {
+      placement: "right",
+      left: anchor.right + gap,
+      top: centerY - height / 2
+    },
+    {
+      placement: "top",
+      left: centerX - width / 2,
+      top: anchor.top - height - gap
+    },
+    {
+      placement: "bottom",
+      left: centerX - width / 2,
+      top: anchor.bottom + gap
+    }
+  ].map((candidate, index) => {
+    const overflow = feedbackMenuOverflow(candidate, width, height, chatBounds);
+    return {
+      ...candidate,
+      index,
+      overflow,
+      score: overflow.total * 100 + index
+    };
+  });
+
+  const best = candidates.find((candidate) => candidate.overflow.total === 0)
+    || candidates.sort((first, second) => first.score - second.score)[0];
+  return {
+    menuPlacement: best.placement,
+    menuLeft: clamp(best.left, chatBounds.left, chatBounds.right - width),
+    menuTop: clamp(best.top, chatBounds.top, chatBounds.bottom - height)
+  };
+}
+
+function syncFeedbackPopoverPosition(messageIndex) {
+  const wrapper = chatLog.querySelector(`.message-feedback[data-message-index="${messageIndex}"]`);
+  const trigger = wrapper?.querySelector(".message-feedback-trigger");
+  const popover = wrapper?.querySelector(".message-feedback-popover");
+  if (!wrapper || !trigger || !popover) return;
+
+  const menuPosition = feedbackMenuPosition(trigger, popover);
+  const previous = messageFeedbackState.get(messageIndex) || {};
+  messageFeedbackState.set(messageIndex, {
+    ...previous,
+    ...menuPosition
+  });
+  wrapper.classList.remove("placement-left", "placement-right", "placement-top", "placement-bottom");
+  wrapper.classList.add(`placement-${menuPosition.menuPlacement}`);
+  wrapper.style.setProperty("--feedback-popover-left", `${menuPosition.menuLeft}px`);
+  wrapper.style.setProperty("--feedback-popover-top", `${menuPosition.menuTop}px`);
+}
+
+function scheduleFeedbackPopoverPositionSync() {
+  if (activeFeedbackMessageIndex === null || feedbackPositionFrame !== null) return;
+  feedbackPositionFrame = window.requestAnimationFrame(() => {
+    feedbackPositionFrame = null;
+    if (activeFeedbackMessageIndex !== null) {
+      syncFeedbackPopoverPosition(activeFeedbackMessageIndex);
+    }
+  });
+}
+
+function feedbackMenuBounds() {
+  const chatRect = chatLog?.getBoundingClientRect();
+  const margin = 12;
+  return {
+    left: Math.max(chatRect?.left ?? margin, margin),
+    right: Math.min(chatRect?.right ?? window.innerWidth - margin, window.innerWidth - margin),
+    top: Math.max(chatRect?.top ?? margin, margin),
+    bottom: Math.min(chatRect?.bottom ?? window.innerHeight - margin, window.innerHeight - margin)
+  };
+}
+
+function feedbackMenuOverflow(candidate, width, height, bounds) {
+  const left = Math.max(0, bounds.left - candidate.left);
+  const right = Math.max(0, candidate.left + width - bounds.right);
+  const top = Math.max(0, bounds.top - candidate.top);
+  const bottom = Math.max(0, candidate.top + height - bounds.bottom);
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    total: left + right + top + bottom
+  };
+}
+
+function feedbackFlagIcon() {
   return `
-    <svg class="message-feedback-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      ${eyes}
-      ${mouth}
+    <svg class="message-feedback-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 21V5.8" />
+      <path d="M5 5.8c3.6-2.1 6.8 1.9 10.5-.2 1.2-.7 2.3-.8 3.5-.3v9.2c-1.2-.5-2.3-.4-3.5.3-3.7 2.1-6.9-1.9-10.5.2V5.8Z" />
     </svg>
   `;
 }
@@ -1933,98 +2032,133 @@ function renderFeedbackPopover(messageIndex, state) {
   popover.className = "message-feedback-popover";
   popover.addEventListener("submit", (event) => {
     event.preventDefault();
+    const selectedReasons = selectedFeedbackReasons(popover);
     submitMessageFeedback(messageIndex, {
-      rating: state.rating || "off",
-      reason: popover.querySelector("[name='reason']")?.value || "other",
-      comment: popover.querySelector("[name='comment']")?.value || ""
+      rating: feedbackRatingFromReasons(selectedReasons),
+      reason: selectedReasons[0] || "other",
+      reasons: selectedReasons,
+      comment: popover.querySelector("[name='comment']")?.value.trim() || ""
     });
   });
 
   const title = document.createElement("span");
   title.className = "message-feedback-title";
-  title.textContent = "What felt off?";
+  title.textContent = "Improve this reply";
   popover.appendChild(title);
 
   const reasonList = document.createElement("div");
   reasonList.className = "message-feedback-reasons";
-  feedbackReasons.forEach((reason, index) => {
+  const selectedReasons = Array.isArray(state.reasons)
+    ? state.reasons
+    : [state.reason].filter(Boolean);
+  feedbackOptions().forEach((reason) => {
     const label = document.createElement("label");
     label.className = "message-feedback-reason";
     const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "reason";
+    input.type = "checkbox";
+    input.name = "reasons";
     input.value = reason.value;
-    if (index === 0) input.checked = true;
+    if (selectedReasons.includes(reason.value)) {
+      input.checked = true;
+    }
     label.appendChild(input);
     label.append(document.createTextNode(reason.label));
     reasonList.appendChild(label);
   });
   popover.appendChild(reasonList);
 
-  const input = document.createElement("input");
+  const input = document.createElement("textarea");
   input.className = "message-feedback-comment";
   input.name = "comment";
-  input.type = "text";
-  input.placeholder = "Optional detail";
-  input.maxLength = 280;
+  input.placeholder = "Tell us what should improve...";
+  input.maxLength = 500;
+  input.rows = 3;
+  input.value = state.comment || "";
   input.addEventListener("keydown", (event) => {
+    event.stopPropagation();
     if (event.key === "Escape") {
-      activeFeedbackMessageIndex = null;
-      renderMessages();
+      closeFeedbackPopover();
     }
   });
   popover.appendChild(input);
+
+  const footer = document.createElement("div");
+  footer.className = "message-feedback-footer";
+
+  const cancel = document.createElement("button");
+  cancel.className = "message-feedback-cancel";
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeFeedbackPopover();
+  });
+  footer.appendChild(cancel);
 
   const submit = document.createElement("button");
   submit.className = "message-feedback-submit";
   submit.type = "submit";
   submit.textContent = "Submit";
-  popover.appendChild(submit);
+  footer.appendChild(submit);
+  popover.appendChild(footer);
 
-  setTimeout(() => input.focus(), 0);
   return popover;
 }
 
-function renderSavedFeedbackPopover(state) {
-  const popover = document.createElement("div");
-  popover.className = "message-feedback-popover message-feedback-popover-readonly";
-  const reason = feedbackReasons.find((item) => item.value === state.reason)?.label;
-  if (reason) {
-    const reasonText = document.createElement("span");
-    reasonText.className = "message-feedback-title";
-    reasonText.textContent = reason;
-    popover.appendChild(reasonText);
-  }
-  if (state.comment) {
-    const comment = document.createElement("span");
-    comment.className = "message-feedback-saved-comment";
-    comment.textContent = state.comment;
-    popover.appendChild(comment);
-  }
-  return popover;
+function feedbackOptions() {
+  return feedbackReactions.map((reaction) => ({
+    value: `rating_${reaction.rating}`,
+    label: reaction.label
+  }));
 }
 
-function handleFeedbackReaction(messageIndex, rating) {
-  if (rating === "good") {
-    submitMessageFeedback(messageIndex, { rating });
-    return;
-  }
+function handleFeedbackOpen(messageIndex) {
   activeFeedbackMessageIndex = messageIndex;
-  messageFeedbackState.set(messageIndex, { rating, status: "editing" });
-  renderMessages();
+  const previous = messageFeedbackState.get(messageIndex) || {};
+  messageFeedbackState.set(messageIndex, {
+    rating: previous.rating || "good",
+    reason: previous.reason,
+    reasons: previous.reasons,
+    comment: previous.comment,
+    menuPlacement: previous.menuPlacement,
+    menuLeft: previous.menuLeft,
+    menuTop: previous.menuTop,
+    status: "editing"
+  });
+  renderMessages({ preserveScroll: true });
+  syncFeedbackPopoverPosition(messageIndex);
+}
+
+function selectedFeedbackReasons(form) {
+  return Array.from(form.querySelectorAll("[name='reasons']:checked"))
+    .map((input) => input.value)
+    .filter(Boolean);
+}
+
+function feedbackRatingFromReasons(reasons) {
+  if (reasons.includes("rating_harmful")) return "harmful";
+  if (reasons.includes("rating_bad")) return "bad";
+  if (reasons.includes("rating_off")) return "off";
+  return "good";
 }
 
 function closeFeedbackPopover() {
   if (activeFeedbackMessageIndex === null) return;
   activeFeedbackMessageIndex = null;
-  renderMessages();
+  renderMessages({ preserveScroll: true });
 }
 
 async function submitMessageFeedback(messageIndex, payload) {
   if (!conversationId) return;
-  messageFeedbackState.set(messageIndex, { rating: payload.rating, status: "saving" });
+  messageFeedbackState.set(messageIndex, {
+    rating: payload.rating,
+    reason: payload.reason || null,
+    reasons: payload.reasons || [],
+    comment: payload.comment || null,
+    status: "saving"
+  });
   activeFeedbackMessageIndex = null;
-  renderMessages();
+  renderMessages({ preserveScroll: true });
 
   try {
     const response = await apiFetch(
@@ -2042,13 +2176,14 @@ async function submitMessageFeedback(messageIndex, payload) {
     messageFeedbackState.set(messageIndex, {
       rating: data.feedback?.rating || payload.rating,
       reason: data.feedback?.reason || payload.reason || null,
+      reasons: data.feedback?.metadata?.reasons || payload.reasons || [],
       comment: data.feedback?.comment || payload.comment || null,
       status: "saved"
     });
   } catch {
     messageFeedbackState.set(messageIndex, { rating: payload.rating, status: "error" });
   }
-  renderMessages();
+  renderMessages({ preserveScroll: true });
 }
 
 function scrollToHighlightedMessage() {
@@ -3808,6 +3943,8 @@ authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
 authUser?.addEventListener("click", openProfilePage);
 window.addEventListener("resize", updateAppHeaderHeight);
+window.addEventListener("resize", scheduleFeedbackPopoverPositionSync);
+chatLog?.addEventListener("scroll", scheduleFeedbackPopoverPositionSync);
 if (window.ResizeObserver && appHeader) {
   const appHeaderObserver = new ResizeObserver(updateAppHeaderHeight);
   appHeaderObserver.observe(appHeader);
