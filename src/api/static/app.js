@@ -2944,6 +2944,7 @@ function typingProfileForAgent() {
 }
 
 function trackUserTypingInput() {
+  autoSizeChatInput();
   const length = chatInput.value.length;
   if (length <= 0) {
     resetUserTypingDraft();
@@ -2976,6 +2977,12 @@ function resetUserTypingDraft() {
   userTypingProfile.lastInputLength = 0;
 }
 
+function autoSizeChatInput() {
+  if (!chatInput || chatInput.tagName !== "TEXTAREA") return;
+  chatInput.style.height = "auto";
+  chatInput.style.height = `${Math.min(chatInput.scrollHeight, 140)}px`;
+}
+
 function latestUserMessageContent() {
   const latest = [...messages].reverse().find((message) => message.role === "user");
   return latest?.content || "";
@@ -3005,6 +3012,7 @@ async function sendUserMessage() {
   finalizeUserTypingSample(text);
   messages.push({ role: "user", content: text });
   chatInput.value = "";
+  autoSizeChatInput();
   isSendingMessage = true;
   isAwaitingAgentReply = true;
   isAssistantTyping = false;
@@ -3686,6 +3694,7 @@ chatForm.addEventListener("submit", (event) => {
 });
 chatInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
+  if (!event.metaKey && !event.ctrlKey) return;
 
   event.preventDefault();
   event.stopPropagation();
