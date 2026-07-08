@@ -270,11 +270,7 @@
     // ── Nav blur on scroll ──
     const nav = document.getElementById('nav-main');
     window.addEventListener('scroll', () => {
-      if (window.scrollY > 50) {
-        nav.style.background = 'rgba(10,10,15,0.85)';
-      } else {
-        nav.style.background = 'rgba(10,10,15,0.6)';
-      }
+      nav.classList.toggle('is-scrolled', window.scrollY > 50);
     });
   </script>
 
