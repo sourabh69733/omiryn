@@ -3935,7 +3935,7 @@ chatForm.addEventListener("submit", (event) => {
 });
 chatInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
-  if (!event.metaKey && !event.ctrlKey) return;
+  if (event.shiftKey || event.isComposing) return;
 
   event.preventDefault();
   event.stopPropagation();
