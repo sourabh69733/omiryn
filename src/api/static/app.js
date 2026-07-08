@@ -784,6 +784,8 @@ async function saveDatingBasicsProfile(event) {
     }
     onboardingStep = 1;
     renderAuthGate();
+    showScreen("interview");
+    await restoreOrStartConversation();
     focusChatInput();
   } catch (error) {
     if (/location|city/i.test(error.message)) {
@@ -1580,8 +1582,12 @@ async function restoreOrStartConversation() {
     hydrateConversation(conversation, { highlightMessageIndex: linkedTarget?.messageIndex });
   } catch {
     forgetStoredConversation();
-    prepareEmptyConversation();
-    await loadConversationHistory();
+    try {
+      await startConversation();
+    } catch {
+      prepareEmptyConversation();
+      await loadConversationHistory();
+    }
   }
 }
 
