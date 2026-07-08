@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agent.context_engine.models import AgentContext
 from agent.context_engine.source_selection import (
+    AGENT_BEHAVIOR_RULES_SOURCE_TYPE,
     DATA_POINT_SOURCE_TYPE,
     STYLE_CONTEXT_SOURCE_TYPES,
     WHATSAPP_STRUCTURED_SOURCE_TYPE,
@@ -13,6 +14,7 @@ from agent.context_engine.source_selection import (
 
 __all__ = [
     "AgentContext",
+    "AGENT_BEHAVIOR_RULES_SOURCE_TYPE",
     "DATA_POINT_SOURCE_TYPE",
     "STYLE_CONTEXT_SOURCE_TYPES",
     "WHATSAPP_STRUCTURED_SOURCE_TYPE",

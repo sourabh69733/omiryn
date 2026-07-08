@@ -10,6 +10,7 @@ CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "20
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
 
 SOURCE_TYPE_PRIORITY = {
+    "agent_behavior_rules": 115,
     "data_points": 100,
     "friend_style": 90,
     "whatsapp_chat": 85,
@@ -19,6 +20,7 @@ SOURCE_TYPE_PRIORITY = {
     "chat_export": 45,
 }
 SOURCE_TYPE_CHAR_LIMIT = {
+    "agent_behavior_rules": 1400,
     "data_points": 1200,
     "friend_style": STYLE_CONTEXT_CHAR_LIMIT,
     "whatsapp_chat": STYLE_CONTEXT_CHAR_LIMIT,

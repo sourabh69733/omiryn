@@ -233,6 +233,8 @@ def _conversation_plan_snapshot(plan: ConversationPlan) -> dict[str, Any]:
 
 
 def _block_position(source_type: str) -> str:
+    if source_type == "agent_behavior_rules":
+        return "start"
     if source_type == "data_points":
         return "start"
     if source_type in {"whatsapp_structured_context", "friend_style", "whatsapp_chat"}:
@@ -242,6 +244,7 @@ def _block_position(source_type: str) -> str:
 
 def _include_reason(source_type: str) -> str:
     reasons = {
+        "agent_behavior_rules": "High-priority user-taught agent behavior rules.",
         "data_points": "Relevant learned data points for this turn.",
         "whatsapp_structured_context": "Relevant uploaded WhatsApp context for topics, people, or style.",
         "friend_style": "Selected style source.",
@@ -260,6 +263,7 @@ def _snapshot_flags(source_summaries: list[dict[str, Any]]) -> dict[str, bool]:
     source_types = {str(source.get("source_type") or "") for source in source_summaries}
     return {
         "used_data_points": "data_points" in source_types,
+        "used_agent_behavior_rules": "agent_behavior_rules" in source_types,
         "used_structured_whatsapp": "whatsapp_structured_context" in source_types,
         "used_style_context": bool({"friend_style", "whatsapp_chat"} & source_types),
         "used_style_guide": "Style adaptation guide" in combined,
@@ -277,6 +281,8 @@ def _safe_metadata(metadata: Any) -> dict[str, Any]:
         "point_count",
         "query_intent",
         "retrieved_chunk_count",
+        "rule_count",
+        "rule_ids",
         "selected_sender",
         "style_kind",
         "style_name",
