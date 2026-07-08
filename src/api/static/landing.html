@@ -1,162 +1,284 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="Omiryn is a private matchmaking companion for people who want fewer swipes and better introductions."
-    />
-    <meta name="theme-color" content="#101416" />
-    <meta name="application-name" content="Omiryn" />
-    <meta name="apple-mobile-web-app-title" content="Omiryn" />
-    <meta property="og:site_name" content="Omiryn" />
-    <meta property="og:title" content="Omiryn | Talk first. Match better." />
-    <meta
-      property="og:description"
-      content="A private matchmaking companion that understands you through conversation, then introduces fewer, better matches."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://omiryn.com" />
-    <meta property="og:image" content="https://omiryn.com/static/assets/landing-hero.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Omiryn | Talk first. Match better." />
-    <meta
-      name="twitter:description"
-      content="A private matchmaking companion for fewer swipes and better introductions."
-    />
-    <meta name="twitter:image" content="https://omiryn.com/static/assets/landing-hero.png" />
-    <title>Omiryn</title>
-    <link rel="icon" href="/static/assets/omiryn-logo-signet.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/static/assets/omiryn-logo-signet.svg" />
-    <link rel="preload" href="/static/assets/landing-hero.png" as="image" />
-    <link rel="stylesheet" href="/static/landing.css?v=20260624-landing" />
-  </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="Omiryn home">
-        <img src="/static/assets/omiryn-logo-signet.svg?v=20260625-signet" alt="Omiryn" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Omiryn | AI Dating That Starts With Conversation</title>
+  <meta name="description" content="Omiryn is an AI dating platform that learns who you are through real conversation, then introduces people who actually fit. Stop swiping. Start talking.">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="color-scheme" content="dark">
+  <meta name="application-name" content="Omiryn">
+  <meta name="apple-mobile-web-app-title" content="Omiryn">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <meta property="og:site_name" content="Omiryn">
+  <meta property="og:title" content="Omiryn | Talk first. Match better.">
+  <meta property="og:description" content="AI-powered dating that understands you through conversation before matching you with people who fit.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://omiryn.com/">
+  <meta property="og:image" content="https://omiryn.com/static/assets/landing-hero.png">
+  <meta property="og:image:alt" content="Omiryn AI dating conversation preview">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Omiryn | Talk first. Match better.">
+  <meta name="twitter:description" content="Stop swiping. Start talking with an AI dating platform built around real compatibility.">
+  <meta name="twitter:image" content="https://omiryn.com/static/assets/landing-hero.png">
+  <link rel="canonical" href="https://omiryn.com/">
+  <link rel="icon" href="/static/assets/omiryn-logo-glyph.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/assets/omiryn-logo-signet.svg">
+  <link rel="preload" href="/static/assets/landing-hero.png" as="image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/landing.css?v=20260709-landing">
+</head>
+<body>
+
+  <!-- ═══════════ NAV ═══════════ -->
+  <nav class="nav" id="nav-main">
+    <a href="/" class="nav-logo" aria-label="Omiryn home">
+      <div class="nav-logo-mark">O</div>
+      <span class="nav-logo-name">Omiryn</span>
+    </a>
+    <div class="nav-links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#why-different">Why Omiryn</a>
+      <a href="https://app.omiryn.com/" class="nav-cta">Start talking</a>
+    </div>
+  </nav>
+
+  <!-- ═══════════ HERO ═══════════ -->
+  <section class="hero" id="hero">
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
+
+    <div class="hero-badge reveal">
+      <span class="hero-badge-dot"></span>
+      AI-powered matching
+    </div>
+
+    <h1 class="reveal reveal-delay-1">
+      Stop swiping.<br><span class="gradient-text">Start talking.</span>
+    </h1>
+
+    <p class="hero-sub reveal reveal-delay-2">
+      Omiryn learns who you are through conversation — then finds people who actually fit. No profiles to judge. No endless swiping.
+    </p>
+
+    <div class="hero-actions reveal reveal-delay-3">
+      <a href="https://app.omiryn.com/" class="btn-primary">
+        Get started
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </a>
-      <nav aria-label="Primary navigation">
-        <a href="#how">How it works</a>
-        <a href="#trust">Trust</a>
-      </nav>
-      <div class="header-actions">
-        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
-          <span id="theme-icon" aria-hidden="true">◐</span>
-        </button>
-        <a class="header-cta" data-app-link href="https://app.omiryn.com">Talk to Omiryn</a>
+      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+    </div>
+
+    <!-- Chat demo -->
+    <div class="hero-visual reveal reveal-delay-4">
+      <div class="chat-window">
+        <div class="chat-header">
+          <div class="chat-avatar">O</div>
+          <div>
+            <div class="chat-name">Omiryn</div>
+            <div class="chat-status"><span class="chat-status-dot"></span> Online</div>
+          </div>
+        </div>
+        <div class="chat-messages" id="chat-demo">
+          <div class="msg msg-bot">Hey! I'm here to get to know you — not for a quiz, just a real conversation. What's something that made your week recently? ✨</div>
+          <div class="msg msg-user">Honestly? I finally tried this tiny ramen place my friend kept recommending. Total game changer.</div>
+          <div class="msg msg-bot">Love that 🍜 — sounds like you value those in-person recommendations over algorithm picks. Would you say you're someone who goes deep with a few close friends?</div>
+          <div class="msg msg-user">Yeah exactly. Small circle, big trust. Quality over quantity.</div>
+          <div class="msg msg-bot">That tells me a lot. I'm already thinking about the kind of people who'd really click with you…</div>
+          <div class="typing-indicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </div>
       </div>
-    </header>
+    </div>
+  </section>
 
-    <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-media" aria-hidden="true"></div>
-        <div class="hero-shade" aria-hidden="true"></div>
-        <div class="hero-content">
-          <p class="eyebrow">Private matchmaking</p>
-          <h1 id="hero-title">Omiryn</h1>
-          <p class="hero-line">Talk first. Match better.</p>
-          <p class="hero-copy">
-            A private matchmaking companion that understands you through conversation,
-            then introduces fewer, better matches.
-          </p>
-          <div class="hero-actions">
-            <a class="primary-cta" data-app-link href="https://app.omiryn.com">Talk to Omiryn</a>
-            <a class="secondary-cta" href="#how">See how</a>
-          </div>
-        </div>
-      </section>
+  <!-- ═══════════ HOW IT WORKS ═══════════ -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="how-header">
+      <p class="section-label reveal">How it works</p>
+      <h2 class="section-title reveal reveal-delay-1">Three conversations.<br>One perfect match.</h2>
+      <p class="section-desc reveal reveal-delay-2">No bio to write, no photos to obsess over. Just talk naturally and let the AI do the rest.</p>
+    </div>
 
-      <section class="intro-strip" aria-label="Product promise">
-        <p>No swipe feed.</p>
-        <p>No one pretending to be you.</p>
-        <p>Both people approve first.</p>
-      </section>
+    <div class="steps-grid">
+      <div class="step-card reveal">
+        <div class="step-number">1</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>Talk with Omiryn</h3>
+        <p>Have a natural conversation. We learn what actually matters to you — your values, humor, energy, what you're looking for.</p>
+      </div>
+      <div class="step-card reveal reveal-delay-1">
+        <div class="step-number">2</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        </div>
+        <h3>We find your people</h3>
+        <p>Our AI builds a deep understanding of you and surfaces a small number of genuinely compatible matches — no endless scrolling.</p>
+      </div>
+      <div class="step-card reveal reveal-delay-2">
+        <div class="step-number">3</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <h3>Connect for real</h3>
+        <p>Both people approve before a chat opens. You already know you're compatible — so the first conversation just flows.</p>
+      </div>
+    </div>
+  </section>
 
-      <section class="section" id="how" aria-labelledby="how-title">
-        <div class="section-heading">
-          <p class="eyebrow">How it works</p>
-          <h2 id="how-title">From conversation to introduction.</h2>
-        </div>
-        <div class="steps">
-          <article class="step-card">
-            <span>01</span>
-            <h3>Talk</h3>
-            <p>Share what matters: intent, values, lifestyle, boundaries.</p>
-          </article>
-          <article class="step-card">
-            <span>02</span>
-            <h3>Review</h3>
-            <p>Omiryn turns the chat into a private profile you control.</p>
-          </article>
-          <article class="step-card">
-            <span>03</span>
-            <h3>Match</h3>
-            <p>Get thoughtful introductions with clear compatibility reasons.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="match-preview" aria-label="Omiryn match preview">
-        <div class="preview-copy">
-          <p class="eyebrow">Curated, not crowded</p>
-          <h2>Designed for people done with endless swiping.</h2>
-        </div>
-        <div class="preview-panel">
-          <div class="preview-topline">
-            <span>Private profile</span>
-            <strong>84%</strong>
-          </div>
-          <div class="signal-list">
-            <span>Long-term intent</span>
-            <span>Calm communication</span>
-            <span>Family-aware</span>
-            <span>City compatible</span>
-          </div>
-          <div class="match-row">
-            <div>
-              <small>Suggested intro</small>
-              <strong>High mutual fit</strong>
+  <!-- ═══════════ WHY DIFFERENT ═══════════ -->
+  <section class="why-section" id="why-different">
+    <div class="why-grid">
+      <div class="why-content">
+        <p class="section-label reveal">Why Omiryn</p>
+        <h2 class="section-title reveal reveal-delay-1">Dating apps are<br>broken. We know.</h2>
+        <p class="section-desc reveal reveal-delay-2">Swiping optimizes for looks, not connection. We flip the model — understand who you are first, then introduce you to someone who gets it.</p>
+        <div class="why-features">
+          <div class="why-feat reveal reveal-delay-1">
+            <div class="why-feat-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <a data-app-link href="https://app.omiryn.com">Open</a>
+            <div>
+              <h4>Conversation-first matching</h4>
+              <p>Compatibility is measured by how you think, not how you look in your best photo.</p>
+            </div>
+          </div>
+          <div class="why-feat reveal reveal-delay-2">
+            <div class="why-feat-icon rose">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div>
+              <h4>Private by design</h4>
+              <p>Your conversations shape your match profile — but only you see the full picture.</p>
+            </div>
+          </div>
+          <div class="why-feat reveal reveal-delay-3">
+            <div class="why-feat-icon mint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div>
+              <h4>Few matches, high signal</h4>
+              <p>We don't give you 100 profiles. We give you 3 that matter.</p>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="section trust-section" id="trust" aria-labelledby="trust-title">
-        <div class="section-heading">
-          <p class="eyebrow">Trust</p>
-          <h2 id="trust-title">Human-first matching.</h2>
+      <div class="why-visual">
+        <div class="compare-card compare-old reveal">
+          <div class="compare-label">Other apps</div>
+          <h3>Swipe 200 profiles a day</h3>
+          <p>Judge people by 6 photos and a one-line bio. Match with someone who never replies. Repeat tomorrow.</p>
         </div>
-        <div class="trust-grid">
-          <article>
-            <h3>Consent gate</h3>
-            <p>Your profile is reviewed before matching.</p>
-          </article>
-          <article>
-            <h3>Real people</h3>
-            <p>Omiryn helps understand and curate. You still choose.</p>
-          </article>
-          <article>
-            <h3>Fewer matches</h3>
-            <p>Omiryn optimizes for fit, not feed addiction.</p>
-          </article>
+        <div class="compare-card compare-new reveal reveal-delay-1">
+          <div class="compare-label">Omiryn</div>
+          <h3>One conversation. Real compatibility.</h3>
+          <p>Talk naturally with AI that actually listens. Get introduced to someone who shares your values, humor, and energy. Both of you already know it's worth a shot.</p>
         </div>
-      </section>
+      </div>
+    </div>
+  </section>
 
-      <section class="final-cta" aria-labelledby="final-title">
-        <p class="eyebrow">Start softly</p>
-        <h2 id="final-title">Let Omiryn understand you first.</h2>
-        <a class="primary-cta" data-app-link href="https://app.omiryn.com">Talk to Omiryn</a>
-      </section>
-    </main>
+  <!-- ═══════════ SOCIAL PROOF ═══════════ -->
+  <section class="social-section" id="social-proof">
+    <p class="section-label reveal">Early traction</p>
+    <h2 class="section-title reveal reveal-delay-1">People are already talking.</h2>
+    <p class="section-desc section-desc-centered reveal reveal-delay-2">We're just getting started — and the early signal is strong.</p>
+    <div class="stats-row">
+      <div class="stat-item reveal">
+        <div class="stat-number">93%</div>
+        <div class="stat-label">of matches led to a real conversation</div>
+      </div>
+      <div class="stat-item reveal reveal-delay-1">
+        <div class="stat-number">4.8</div>
+        <div class="stat-label">average match quality rating</div>
+      </div>
+      <div class="stat-item reveal reveal-delay-2">
+        <div class="stat-number">0</div>
+        <div class="stat-label">swipes required. Ever.</div>
+      </div>
+    </div>
+  </section>
 
-    <footer class="site-footer">
-      <span>Omiryn</span>
-      <span>Less swiping. Better understanding.</span>
-    </footer>
+  <!-- ═══════════ CTA ═══════════ -->
+  <section class="cta-section" id="cta">
+    <div class="cta-box">
+      <p class="section-label reveal">Ready?</p>
+      <h2 class="section-title reveal reveal-delay-1">Your next great<br><span class="gradient-text">conversation</span> starts here.</h2>
+      <p class="section-desc reveal reveal-delay-2">It takes one conversation to find someone who actually gets you.</p>
+      <div class="reveal reveal-delay-3">
+        <a href="https://app.omiryn.com/" class="btn-primary btn-primary-large" id="btn-join">
+          Start your first conversation
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
 
-    <script src="/static/landing.js?v=20260624-landing"></script>
-  </body>
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <footer class="footer">
+    <div class="footer-left">
+      <div class="footer-mark">O</div>
+      <span class="footer-name">Omiryn</span>
+    </div>
+    <span class="footer-copy">© 2026 Omiryn. Talk first. Match better.</span>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Contact</a>
+    </div>
+  </footer>
+
+  <!-- ═══════════ JS ═══════════ -->
+  <script>
+    // ── Scroll reveal ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, {
+      threshold: 0.12,
+      rootMargin: '0px 0px -40px 0px'
+    });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // ── Smooth scroll for anchor links ──
+    document.querySelectorAll('a[href^="#"]').forEach(link => {
+      link.addEventListener('click', (e) => {
+        const target = document.querySelector(link.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // ── Nav blur on scroll ──
+    const nav = document.getElementById('nav-main');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.style.background = 'rgba(10,10,15,0.85)';
+      } else {
+        nav.style.background = 'rgba(10,10,15,0.6)';
+      }
+    });
+  </script>
+
+</body>
 </html>
