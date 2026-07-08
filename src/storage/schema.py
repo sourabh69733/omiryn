@@ -259,6 +259,26 @@ profile_facts = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+agent_behavior_rules = Table(
+    "agent_behavior_rules",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("category", String, nullable=False),
+    Column("key", String, nullable=False),
+    Column("rule_text", String, nullable=False),
+    Column("avoid_text", String, nullable=True),
+    Column("prefer_text", String, nullable=True),
+    Column("confidence", Float, nullable=False),
+    Column("priority", Integer, nullable=False),
+    Column("source_kind", String, nullable=False),
+    Column("source_id", String, nullable=True),
+    Column("evidence_json", JSON, nullable=False),
+    Column("status", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 data_point_feedback = Table(
     "data_point_feedback",
     metadata,

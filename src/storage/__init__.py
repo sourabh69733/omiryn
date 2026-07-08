@@ -5,6 +5,7 @@ from .database import *
 from .database import _normalize_database_url, _reset_db_allowed
 from .conversations import *
 from .profile_facts import *
+from .agent_behavior import *
 from .agent_runtime import *
 from .users import *
 from .context_sources import *
