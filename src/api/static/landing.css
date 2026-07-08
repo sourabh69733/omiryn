@@ -24,7 +24,10 @@
       --gradient-glow: radial-gradient(circle at 50% 0%, rgba(180,154,255,0.18) 0%, transparent 60%);
     }
 
-    html { scroll-behavior: smooth; }
+    html {
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
 
     body {
       font-family: 'Inter', -apple-system, system-ui, sans-serif;
@@ -33,6 +36,7 @@
                         radial-gradient(ellipse 60% 50% at 80% 100%, rgba(255,126,179,0.06) 0%, transparent 50%);
       background-attachment: fixed;
       color: var(--text-primary);
+      width: 100%;
       min-height: 100vh;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
@@ -76,24 +80,13 @@
     .nav-logo {
       display: flex;
       align-items: center;
-      gap: 12px;
       text-decoration: none;
     }
-    .nav-logo-mark {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      background: var(--gradient-main);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: #fff;
-    }
-    .nav-logo-name {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text-primary);
-      letter-spacing: -0.3px;
+    .nav-logo img {
+      display: block;
+      width: 96px;
+      height: auto;
+      filter: drop-shadow(0 6px 16px rgba(180,154,255,0.18));
     }
     .nav-links {
       display: flex;
@@ -703,21 +696,12 @@
     .footer-left {
       display: flex;
       align-items: center;
-      gap: 10px;
     }
-    .footer-mark {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      background: var(--gradient-main);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Playfair Display', serif;
-      font-size: 13px;
-      color: #fff;
-    }
-    .footer-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-secondary);
+    .footer-logo {
+      display: block;
+      width: 92px;
+      height: auto;
+      filter: drop-shadow(0 6px 16px rgba(180,154,255,0.14));
     }
     .footer-copy {
       font-size: 13px;
@@ -740,7 +724,14 @@
        ══════════════════════════════════════════════ */
     @media (max-width: 900px) {
       .nav { padding: 16px 24px; }
+      .nav-logo img { width: 88px; }
       .nav-links a:not(.nav-cta) { display: none; }
+      .hero::before,
+      .how-it-works::before,
+      .social-section::before,
+      .cta-section::before {
+        width: 100vw;
+      }
       section { padding: 80px 24px; }
       .steps-grid { grid-template-columns: 1fr; max-width: 420px; }
       .why-grid { grid-template-columns: 1fr; gap: 40px; }
