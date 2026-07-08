@@ -908,6 +908,10 @@ def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
         (candidate for candidate in conversation_rows if candidate["id"] == row["conversation_id"]),
         None,
     )
+    metadata = row["metadata_json"] or {}
+    reasons = metadata.get("reasons") if isinstance(metadata, dict) else []
+    if not isinstance(reasons, list):
+        reasons = []
     return {
         "id": row["id"],
         "user_id": row["user_id"],
@@ -915,7 +919,9 @@ def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
         "message_index": row["message_index"],
         "rating": row["rating"],
         "reason": row["reason"],
+        "reasons": reasons,
         "comment": row["comment"],
+        "metadata": metadata,
         "message_preview": _feedback_message_preview(conversation, row["message_index"]),
         "created_at": _isoformat_utc(row["created_at"]),
     }

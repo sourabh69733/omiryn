@@ -660,6 +660,24 @@ td small {
   font-weight: 580;
 }
 
+.feedback-reason-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.feedback-reason-chips span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: #f7fbfa;
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.2;
+  padding: 5px 8px;
+}
+
 .feedback-item p,
 .feedback-item blockquote {
   margin: 8px 0 0;

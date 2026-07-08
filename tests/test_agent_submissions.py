@@ -1830,8 +1830,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "conversation_id": conversation_a,
                 "message_index": 0,
                 "rating": "off",
-                "reason": "wrong_memory",
+                "reason": "rating_off",
                 "comment": "This assumed something I never said.",
+                "metadata": {"reasons": ["rating_off", "rating_bad"]},
             }
         )
         save_data_point_extraction_debug(
@@ -1914,7 +1915,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["feedback"][0]["user_id"], "user-a")
         self.assertEqual(data["feedback"][0]["conversation_id"], conversation_a)
         self.assertEqual(data["feedback"][0]["rating"], "off")
-        self.assertEqual(data["feedback"][0]["reason"], "wrong_memory")
+        self.assertEqual(data["feedback"][0]["reason"], "rating_off")
+        self.assertEqual(data["feedback"][0]["reasons"], ["rating_off", "rating_bad"])
         self.assertEqual(data["feedback"][0]["comment"], "This assumed something I never said.")
         self.assertEqual(data["user"]["data_point_review_count"], 1)
         self.assertEqual(data["data_point_review_summary"]["total"], 1)

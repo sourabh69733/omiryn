@@ -695,7 +695,7 @@ function renderFeedbackSection(feedback, summary = {}) {
 }
 
 function renderFeedbackItem(item) {
-  const reason = item.reason ? feedbackReasonLabel(item.reason) : "No reason";
+  const reasons = feedbackItemReasons(item);
   const comment = (item.comment || "").trim();
   const preview = (item.message_preview || "").trim();
   return `
@@ -704,12 +704,22 @@ function renderFeedbackItem(item) {
         ${feedbackRatingPill(item.rating)}
         <span class="mono">${formatDate(item.created_at)}</span>
       </div>
-      <strong>${escapeHtml(reason)}</strong>
+      ${
+        reasons.length
+          ? `<div class="feedback-reason-chips">${reasons.map((reason) => `<span>${escapeHtml(feedbackReasonLabel(reason))}</span>`).join("")}</div>`
+          : `<strong>${escapeHtml("No reason")}</strong>`
+      }
       ${comment ? `<p>${escapeHtml(comment)}</p>` : ""}
       ${preview ? `<blockquote>${escapeHtml(preview)}</blockquote>` : ""}
       <small class="mono">${escapeHtml(item.conversation_id || "-")} · message ${formatNumber((item.message_index ?? 0) + 1)}</small>
     </article>
   `;
+}
+
+function feedbackItemReasons(item) {
+  const reasons = Array.isArray(item.reasons) ? item.reasons : [];
+  const legacyReason = item.reason ? [item.reason] : [];
+  return [...new Set([...reasons, ...legacyReason].filter(Boolean))];
 }
 
 function feedbackRatingPill(rating) {
@@ -829,6 +839,10 @@ function dataPointReviewSummaryDetail(summary = {}) {
 
 function feedbackReasonLabel(reason) {
   const labels = {
+    rating_good: "Good",
+    rating_off: "Tone off",
+    rating_bad: "Bad reply",
+    rating_harmful: "Harmful",
     not_me: "Not me",
     wrong_memory: "Wrong memory",
     bad_tone: "Bad tone",
