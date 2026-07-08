@@ -26,6 +26,8 @@ let datingBasicsComplete = null;
 let onboardingStep = 1;
 let activeFeedbackMessageIndex = null;
 let feedbackPositionFrame = null;
+let feedbackLoadedConversationId = null;
+let feedbackLoadPromise = null;
 let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 let onboardingProfilePhotoFiles = Array(4).fill(null);
@@ -1606,6 +1608,9 @@ function prepareEmptyConversation() {
   conversationId = null;
   currentAgentName = null;
   messages = [];
+  messageFeedbackState.clear();
+  feedbackLoadedConversationId = null;
+  feedbackLoadPromise = null;
   pendingContextSourceIds = [];
   chatInput.disabled = false;
   if (extractProfile) extractProfile.disabled = true;
@@ -1623,6 +1628,9 @@ function hydrateConversation(conversation, options = {}) {
   rememberConversation(conversation.id);
   currentAgentName = conversation.agent_name || defaultAgentName();
   messages = conversation.messages;
+  messageFeedbackState.clear();
+  feedbackLoadedConversationId = null;
+  feedbackLoadPromise = null;
   pendingMessageHighlightIndex = Number.isFinite(Number(options.highlightMessageIndex))
     ? Number(options.highlightMessageIndex)
     : null;
@@ -1888,28 +1896,30 @@ function renderMessageFeedback(messageIndex) {
   actions.className = "message-feedback-actions";
   const button = document.createElement("button");
   button.type = "button";
-  button.className = `message-feedback-trigger ${state.status === "saved" ? "saved" : ""}`;
+  button.className = `message-feedback-trigger ${state.status === "saved" ? "saved" : ""} ${state.status === "loading" ? "loading" : ""}`;
   button.innerHTML = feedbackFlagIcon();
-  button.title = state.status === "saved" ? "Feedback submitted. Edit feedback" : "Give feedback";
+  button.title = state.status === "loading"
+    ? "Loading feedback..."
+    : state.status === "saved"
+      ? "Feedback submitted. Edit feedback"
+      : "Give feedback";
   button.setAttribute(
     "aria-label",
-    state.status === "saved" ? "Feedback submitted. Edit feedback" : "Give feedback on this reply"
+    state.status === "loading"
+      ? "Loading feedback"
+      : state.status === "saved"
+        ? "Feedback submitted. Edit feedback"
+        : "Give feedback on this reply"
   );
   button.setAttribute("aria-expanded", activeFeedbackMessageIndex === messageIndex ? "true" : "false");
   button.addEventListener("click", (event) => {
     event.stopPropagation();
-    const menuPosition = feedbackMenuPosition(button);
-    const previous = messageFeedbackState.get(messageIndex) || {};
-    messageFeedbackState.set(messageIndex, {
-      ...previous,
-      ...menuPosition
-    });
-    handleFeedbackOpen(messageIndex);
+    handleFeedbackTriggerClick(messageIndex, button);
   });
   actions.appendChild(button);
   wrapper.appendChild(actions);
 
-  if (activeFeedbackMessageIndex === messageIndex && state.status !== "saved") {
+  if (activeFeedbackMessageIndex === messageIndex) {
     wrapper.appendChild(renderFeedbackPopover(messageIndex, state));
   }
 
@@ -2030,6 +2040,20 @@ function feedbackFlagIcon() {
 function renderFeedbackPopover(messageIndex, state) {
   const popover = document.createElement("form");
   popover.className = "message-feedback-popover";
+  if (state.status === "loading") {
+    popover.innerHTML = `
+      <span class="message-feedback-title">Loading feedback...</span>
+      <div class="message-feedback-loading" aria-hidden="true"><span></span><span></span><span></span></div>
+    `;
+    return popover;
+  }
+  if (state.status === "error") {
+    popover.innerHTML = `
+      <span class="message-feedback-title">Could not load feedback</span>
+      <p class="message-feedback-error">Try opening it again.</p>
+    `;
+    return popover;
+  }
   popover.addEventListener("submit", (event) => {
     event.preventDefault();
     const selectedReasons = selectedFeedbackReasons(popover);
@@ -2112,7 +2136,34 @@ function feedbackOptions() {
   }));
 }
 
-function handleFeedbackOpen(messageIndex) {
+async function handleFeedbackTriggerClick(messageIndex, button) {
+  const menuPosition = feedbackMenuPosition(button);
+  const previous = messageFeedbackState.get(messageIndex) || {};
+  activeFeedbackMessageIndex = messageIndex;
+  messageFeedbackState.set(messageIndex, {
+    ...previous,
+    ...menuPosition,
+    status: "loading"
+  });
+  renderMessages({ preserveScroll: true });
+  syncFeedbackPopoverPosition(messageIndex);
+
+  try {
+    await loadConversationFeedback();
+    openFeedbackEditor(messageIndex, menuPosition);
+  } catch {
+    const current = messageFeedbackState.get(messageIndex) || {};
+    messageFeedbackState.set(messageIndex, {
+      ...current,
+      ...menuPosition,
+      status: "error"
+    });
+    renderMessages({ preserveScroll: true });
+    syncFeedbackPopoverPosition(messageIndex);
+  }
+}
+
+function openFeedbackEditor(messageIndex, menuPosition = {}) {
   activeFeedbackMessageIndex = messageIndex;
   const previous = messageFeedbackState.get(messageIndex) || {};
   messageFeedbackState.set(messageIndex, {
@@ -2120,13 +2171,68 @@ function handleFeedbackOpen(messageIndex) {
     reason: previous.reason,
     reasons: previous.reasons,
     comment: previous.comment,
-    menuPlacement: previous.menuPlacement,
-    menuLeft: previous.menuLeft,
-    menuTop: previous.menuTop,
+    menuPlacement: menuPosition.menuPlacement || previous.menuPlacement,
+    menuLeft: Number.isFinite(menuPosition.menuLeft) ? menuPosition.menuLeft : previous.menuLeft,
+    menuTop: Number.isFinite(menuPosition.menuTop) ? menuPosition.menuTop : previous.menuTop,
     status: "editing"
   });
   renderMessages({ preserveScroll: true });
   syncFeedbackPopoverPosition(messageIndex);
+}
+
+async function loadConversationFeedback(options = {}) {
+  if (!conversationId) return;
+  const force = Boolean(options.force);
+  if (!force && feedbackLoadedConversationId === conversationId) return;
+  if (feedbackLoadPromise) return feedbackLoadPromise;
+
+  const loadingConversationId = conversationId;
+  feedbackLoadPromise = (async () => {
+    const response = await apiFetch(`/api/agent/conversations/${loadingConversationId}/feedback`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load feedback."));
+    }
+    if (conversationId !== loadingConversationId) return;
+    applyConversationFeedback(data.feedback || []);
+    feedbackLoadedConversationId = loadingConversationId;
+  })();
+
+  try {
+    await feedbackLoadPromise;
+  } finally {
+    feedbackLoadPromise = null;
+  }
+}
+
+function applyConversationFeedback(feedbackItems) {
+  if (!Array.isArray(feedbackItems)) return;
+  feedbackItems.forEach((item) => {
+    const messageIndex = Number(item.message_index);
+    if (!Number.isInteger(messageIndex)) return;
+    const previous = messageFeedbackState.get(messageIndex) || {};
+    if (previous.status === "saved" || previous.status === "editing" || previous.status === "saving") return;
+    messageFeedbackState.set(messageIndex, {
+      ...previous,
+      ...feedbackStateFromItem(item)
+    });
+  });
+}
+
+function feedbackStateFromItem(item) {
+  const metadata = item.metadata || {};
+  const reasons = Array.isArray(metadata.reasons)
+    ? metadata.reasons
+    : Array.isArray(item.reasons)
+      ? item.reasons
+      : [item.reason].filter(Boolean);
+  return {
+    rating: item.rating || feedbackRatingFromReasons(reasons),
+    reason: item.reason || reasons[0] || null,
+    reasons,
+    comment: item.comment || null,
+    status: "saved"
+  };
 }
 
 function selectedFeedbackReasons(form) {
