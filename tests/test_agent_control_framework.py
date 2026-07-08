@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.context_engine.engine import build_model_context_package
+from agent.memory_engine.memory import capture_profile_facts_from_user_message
 from agent.memory_engine.data_point_extraction import (
     _conversation_data_point_excerpt,
     build_data_point_candidate_review_prompt,
@@ -29,7 +30,7 @@ from agent.runtime.providers import _deep_fact_extraction_text
 from agent.runtime.replies import split_assistant_reply
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
-from storage import reset_db
+from storage import list_agent_behavior_rules, reset_db
 
 
 class AgentControlFrameworkTest(unittest.TestCase):
@@ -242,6 +243,41 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("## Boredom Recovery", package.system_prompt)
         self.assertIn("Do not start generic music, movie, truth-or-dare", package.system_prompt)
         self.assertIn("Repeated how-was-your-day", package.system_prompt)
+
+    def test_user_taught_agent_behavior_rule_is_saved_and_included_in_v2_context(self) -> None:
+        capture_profile_facts_from_user_message(
+            "conversation-a",
+            "user-a",
+            "first of all, u r not sunata hoon, you are sunati hoon.",
+            2,
+            True,
+        )
+
+        rules = list_agent_behavior_rules("user-a")
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0]["category"], "user_taught_phrase_rule")
+        self.assertEqual(rules[0]["avoid_text"], "sunata hoon")
+        self.assertEqual(rules[0]["prefer_text"], "sunati hoon")
+        self.assertIn("sunati hoon", rules[0]["rule_text"])
+        self.assertIn("same user-taught correction pattern", rules[0]["rule_text"])
+
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="haan ab ek funny story sunao",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=3,
+            assistant_message_index=4,
+            prompt_version_id="v2",
+        )
+
+        self.assertIn("User-taught behavior rules", package.system_prompt)
+        self.assertIn("sunati hoon", package.system_prompt)
+        self.assertTrue(package.snapshot["summary"]["used_agent_behavior_rules"])
 
     def test_data_points_default_to_matching_not_chat_context(self) -> None:
         point = normalize_data_point(
