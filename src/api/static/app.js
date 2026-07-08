@@ -1542,13 +1542,11 @@ async function startConversation(options = {}) {
     chatInput.disabled = true;
   }
   if (extractProfile) extractProfile.disabled = true;
-  const agentName = await nextConversationAgentName();
   const response = await apiFetch("/api/agent/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       agent_model: selectedAgentModel(),
-      agent_name: agentName,
       agent_tone: selectedAgentTone()
     })
   });
@@ -1714,28 +1712,6 @@ function defaultAgentName() {
   if (interestedIn === "women") return "Annie";
   if (interestedIn === "men") return "Arjun";
   return "Mira";
-}
-
-function agentNamePool() {
-  const interestedIn = accountInterestedIn?.value || profileInterestedIn?.value || "";
-  return agentNamePools[interestedIn] || agentNamePools.everyone;
-}
-
-async function nextConversationAgentName() {
-  const pool = agentNamePool();
-  try {
-    const conversations = await fetchConversationSummaries();
-    const usedNames = new Set(
-      conversations
-        .map((conversation) => String(conversation.agent_name || "").trim().toLowerCase())
-        .filter(Boolean)
-    );
-    const freshName = pool.find((name) => !usedNames.has(name.toLowerCase()));
-    if (freshName) return freshName;
-    return pool[conversations.length % pool.length] || defaultAgentName();
-  } catch {
-    return defaultAgentName();
-  }
 }
 
 function conversationAgentName(conversation) {

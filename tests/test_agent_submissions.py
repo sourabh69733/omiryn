@@ -349,6 +349,27 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertIn("Annie", response.json()["messages"][0]["content"])
 
+    def test_agent_initial_persona_uses_male_companion_for_men_interest(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        self.client.put(
+            "/api/me/dating-basics",
+            json={
+                "display_name": "Sourabh",
+                "age": 29,
+                "gender": "woman",
+                "interested_in": "men",
+                "city": "Bengaluru",
+            },
+        )
+
+        response = self.client.post("/api/agent/conversations")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("Arjun", response.json()["messages"][0]["content"])
+
     def test_agent_initial_message_uses_display_name_when_available(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com", display_name="Sourabh")

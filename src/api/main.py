@@ -1919,7 +1919,7 @@ def _initial_agent_message(
     if name == "Annie":
         return f"{greeting}"
     if name == "Arjun":
-        return f"{greeting} Let's just talk normally first, no interview vibes."
+        return f"{greeting}"
     return f"{greeting}"
 
 
