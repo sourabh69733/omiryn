@@ -274,7 +274,8 @@ def _v2_prompt_sections(
             content=boredom_recovery_prompt(conversation_plan),
             position="middle",
             priority=60,
-            include_when=lambda context: context.is_low_information,
+            include_when=lambda context: context.is_low_information
+            or "boredom_complaint" in context.intent_labels,
         ),
         PromptSection(
             id="output_format",

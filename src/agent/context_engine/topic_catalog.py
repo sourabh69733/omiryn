@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from agent.context_engine.models import ContextQueryIntent
 from agent.context_engine.utils import memory_terms, normalized_memory_text
 
+COMMON_STARTER_TOPIC_POLICY = (
+    "Do not start generic music, movie, truth-or-dare, or how-was-your-day topics.",
+    "Use common topics only when the user explicitly brings them up, or when tied to a sharper dating/personal angle.",
+)
+
 
 @dataclass(frozen=True)
 class TopicDefinition:
@@ -116,13 +121,16 @@ def _topic_score(
         score += 6
     if "story_or_long_reply" in labels and topic.bucket == "personal_story":
         score += 4
-    if "low_information" in labels and topic.bucket in {"romantic", "personal_story", "intimate_safe"}:
+    if (
+        {"low_information", "boredom_complaint"} & labels
+        and topic.bucket in {"romantic", "personal_story", "intimate_safe"}
+    ):
         score += 2
     return score
 
 
 def _default_topic_rotation(labels: set[str]) -> tuple[TopicDefinition, ...]:
-    if "low_information" in labels:
+    if {"low_information", "boredom_complaint"} & labels:
         preferred = {"future_partner_attention", "personal_stories", "safe_intimacy"}
     else:
         preferred = {"future_partner_attention", "emotional_side", "social_life"}

@@ -222,6 +222,27 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
         self.assertNotIn("## Boredom Recovery", package.system_prompt)
 
+    def test_v2_boredom_complaint_blocks_common_topic_starters(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="you are boring me, stop asking movies and music",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v2",
+        )
+
+        self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
+        self.assertIn("boredom_complaint", package.system_prompt)
+        self.assertIn("## Boredom Recovery", package.system_prompt)
+        self.assertIn("Do not start generic music, movie, truth-or-dare", package.system_prompt)
+        self.assertIn("Repeated how-was-your-day", package.system_prompt)
+
     def test_data_points_default_to_matching_not_chat_context(self) -> None:
         point = normalize_data_point(
             {

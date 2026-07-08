@@ -37,6 +37,19 @@ LOW_INFORMATION_TERMS = {"hmm", "hm", "ok", "okay", "yeah", "yes", "no", "haan",
 ADULT_FLIRTY_TERMS = {"sexy", "hot", "adult", "intimate", "flirt", "flirty", "romantic"}
 STORY_TERMS = {"story", "scene", "continue", "example", "imagine", "roleplay"}
 PROFILE_RECALL_PHRASES = {"what do you know", "about me", "know me", "meri profile"}
+BOREDOM_COMPLAINT_TERMS = {"boring", "bored", "bore", "same", "repeat", "repeated", "again"}
+BOREDOM_COMPLAINT_PHRASES = {
+    "you are boring",
+    "u are boring",
+    "boring me",
+    "bore kar",
+    "same question",
+    "same questions",
+    "common topics",
+    "kuch interesting",
+}
+COMMON_TOPIC_TERMS = {"movie", "movies", "music", "song", "songs"}
+COMMON_TOPIC_PHRASES = {"truth or dare", "how was your day", "hows your day"}
 
 
 def context_query_intent(user_text: str) -> ContextQueryIntent:
@@ -65,6 +78,14 @@ def context_query_intent(user_text: str) -> ContextQueryIntent:
         labels.append("adult_flirty")
     if query_terms & STORY_TERMS:
         labels.append("story_or_long_reply")
+    if query_terms & BOREDOM_COMPLAINT_TERMS or any(
+        phrase in normalized for phrase in BOREDOM_COMPLAINT_PHRASES
+    ):
+        labels.append("boredom_complaint")
+    if query_terms & COMMON_TOPIC_TERMS or any(
+        phrase in normalized for phrase in COMMON_TOPIC_PHRASES
+    ):
+        labels.append("common_topic")
     if is_low_information:
         labels.append("low_information")
 

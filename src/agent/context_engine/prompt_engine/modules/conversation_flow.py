@@ -25,7 +25,7 @@ def conversation_plan_prompt(
         f"- {state.label} | status={state.status}; depth={state.depth}; repeats={state.repeat_count}"
         for state in topic_states[:5]
     )
-    avoid_topics = "\n".join(f"- {topic}" for topic in plan.avoid_topics[:4])
+    avoid_topics = "\n".join(f"- {topic}" for topic in plan.avoid_topics[:8])
     suggested_topics = "\n".join(f"- {topic}" for topic in plan.suggested_topics[:3])
     return f"""Conversation plan for this turn:
 - Move: {plan.current_move}
@@ -45,4 +45,6 @@ Possible fresh angles:
 Rules:
 - Do not behave like an interviewer.
 - Prefer a playful observation, concrete recall, or specific guess before asking.
+- Do not start generic music, movie, truth-or-dare, or how-was-your-day topics unless the user explicitly brings them up.
+- If using music/movies, connect them to a sharper dating, memory, personality, or relationship angle.
 - Ask at most one natural question, and only if it improves the flow."""
