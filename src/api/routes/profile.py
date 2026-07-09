@@ -1,0 +1,313 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from agent.context_engine.context import STYLE_CONTEXT_SOURCE_TYPES
+from agent.memory_engine.data_point_feedback import normalize_data_point_feedback
+from security.auth import CurrentUser, current_user
+from storage import (
+    get_profile_fact,
+    get_user_profile,
+    list_data_point_feedback,
+    list_profile_facts,
+    list_user_context_sources,
+    save_data_point_feedback,
+    save_user_profile,
+)
+
+from ..config import PROFILE_PHOTO_CONTENT_TYPES, PROFILE_PHOTO_MAX_BYTES
+from ..helpers import (
+    _auth_user_payload,
+    _basic_profile_complete,
+    _clean_optional_text,
+    _context_source_summary,
+    _data_point_feedback_summary_for_fact,
+    _dedupe_context_sources,
+    _group_profile_facts,
+    _latest_data_point_feedback_by_fact,
+    _profile_debug_data_enabled,
+    _profile_facts_with_feedback,
+    _profile_with_auth_defaults,
+    _raw_profile_data_points,
+    _reusable_context_sources,
+    _store_profile_photo,
+    _summarize_data_point_feedback,
+    logger,
+)
+from ..models import DataPointFeedbackCreate, DatingBasics, UserProfilePatch
+
+router = APIRouter()
+
+
+@router.get("/api/me/dating-basics")
+async def get_dating_basics(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
+    return {
+        "complete": _basic_profile_complete(profile),
+        "profile": profile,
+    }
+
+
+@router.put("/api/me/dating-basics")
+async def put_dating_basics(
+    payload: DatingBasics,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    existing_profile = get_user_profile(user.id)
+    display_name = _clean_optional_text(
+        payload.display_name or (existing_profile or {}).get("display_name") or user.display_name
+    )
+    city = _clean_optional_text(payload.city or (existing_profile or {}).get("city"))
+    if not display_name:
+        raise HTTPException(status_code=422, detail="Name is required.")
+    if payload.age is None:
+        raise HTTPException(status_code=422, detail="Age is required.")
+    if not city:
+        raise HTTPException(status_code=422, detail="Location is required.")
+    profile = save_user_profile(
+        user.id,
+        payload.gender,
+        payload.interested_in,
+        display_name,
+        payload.age,
+        city,
+        _clean_optional_text(payload.phone),
+        (existing_profile or {}).get("profile_photo_url"),
+        (existing_profile or {}).get("profile_photo_urls") or [],
+        (existing_profile or {}).get("profile_photo_file_name"),
+        (existing_profile or {}).get("profile_photo_file_names") or [],
+    )
+    return {"complete": True, "profile": profile}
+
+
+@router.get("/api/me/profile")
+async def get_me_profile(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
+    sources = _dedupe_context_sources(_reusable_context_sources(list_user_context_sources(user.id)))
+    facts = list_profile_facts(user.id)
+    data_point_feedback = list_data_point_feedback(user_id=user.id)
+    data_point_feedback_by_fact = _latest_data_point_feedback_by_fact(data_point_feedback)
+    facts_with_feedback = _profile_facts_with_feedback(facts, data_point_feedback_by_fact)
+    response = {
+        "user": _auth_user_payload(user),
+        "profile": profile,
+        "learned_facts": facts_with_feedback,
+        "learned_fact_groups": _group_profile_facts(facts_with_feedback),
+        "data_point_feedback_summary": _summarize_data_point_feedback(data_point_feedback),
+        "style_sources": [
+            _context_source_summary(source)
+            for source in sources
+            if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
+        ],
+        "memory_sources": [
+            _context_source_summary(source)
+            for source in sources
+            if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
+        ],
+    }
+    if _profile_debug_data_enabled():
+        response["raw_internal_data_points"] = _raw_profile_data_points(
+            facts_with_feedback,
+            data_point_feedback_by_fact,
+        )
+    return response
+
+
+@router.put("/api/me/profile")
+async def put_me_profile(
+    payload: UserProfilePatch,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    existing_profile = get_user_profile(user.id) or {}
+    profile = save_user_profile(
+        user.id,
+        payload.gender,
+        payload.interested_in,
+        _clean_optional_text(payload.display_name),
+        payload.age,
+        _clean_optional_text(payload.city),
+        _clean_optional_text(payload.phone),
+        existing_profile.get("profile_photo_url"),
+        existing_profile.get("profile_photo_urls") or [],
+        existing_profile.get("profile_photo_file_name"),
+        existing_profile.get("profile_photo_file_names") or [],
+    )
+    return {"profile": profile}
+
+
+@router.put("/api/me/profile-photo")
+async def put_me_profile_photo(
+    request: Request,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    extension = PROFILE_PHOTO_CONTENT_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(status_code=415, detail="Upload a JPG, PNG, WebP, or GIF image.")
+
+    content = await request.body()
+    if not content:
+        raise HTTPException(status_code=400, detail="Profile photo is empty.")
+    if len(content) > PROFILE_PHOTO_MAX_BYTES:
+        max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
+        raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
+
+    existing_profile = get_user_profile(user.id)
+    existing_photo_urls = [
+        str(url) if isinstance(url, str) else ""
+        for url in ((existing_profile or {}).get("profile_photo_urls") or [])
+    ][:4]
+    if not existing_photo_urls and (existing_profile or {}).get("profile_photo_url"):
+        existing_photo_urls = [str((existing_profile or {}).get("profile_photo_url"))]
+    existing_photo_file_names = [
+        str(file_name) if isinstance(file_name, str) else ""
+        for file_name in ((existing_profile or {}).get("profile_photo_file_names") or [])
+    ][:4]
+    if not existing_photo_file_names and (existing_profile or {}).get("profile_photo_file_name"):
+        existing_photo_file_names = [str((existing_profile or {}).get("profile_photo_file_name"))]
+    raw_slot = request.query_params.get("slot")
+    photo_slot: int | None = None
+    if raw_slot not in (None, ""):
+        try:
+            photo_slot = int(raw_slot)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.") from None
+        if photo_slot < 0 or photo_slot > 3:
+            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.")
+    if photo_slot is None and len(existing_photo_urls) >= 4:
+        raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
+
+    try:
+        photo_url, photo_file_name = _store_profile_photo(
+            user_id=user.id,
+            content=content,
+            content_type=content_type,
+            extension=extension,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Profile photo upload failed for user %s", user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not store profile photo. Check GCS bucket access or unset PROFILE_PHOTO_GCS_BUCKET locally.",
+        ) from exc
+    profile_photo_urls = existing_photo_urls[:4]
+    profile_photo_file_names = existing_photo_file_names[:4]
+    while len(profile_photo_urls) <= (photo_slot or -1):
+        profile_photo_urls.append("")
+    while len(profile_photo_file_names) < len(profile_photo_urls):
+        profile_photo_file_names.append("")
+    if photo_slot is not None and photo_slot < len(profile_photo_urls):
+        profile_photo_urls[photo_slot] = photo_url
+        profile_photo_file_names[photo_slot] = photo_file_name
+    else:
+        profile_photo_urls = [*profile_photo_urls, photo_url][:4]
+        profile_photo_file_names = [*profile_photo_file_names, photo_file_name][:4]
+    profile_photo_urls = profile_photo_urls[:4]
+    profile_photo_file_names = profile_photo_file_names[:4]
+    primary_photo_index = next((index for index, url in enumerate(profile_photo_urls) if url), 0)
+    primary_photo_url = profile_photo_urls[primary_photo_index] or photo_url
+    primary_photo_file_name = profile_photo_file_names[primary_photo_index] or photo_file_name
+    if existing_profile:
+        profile = save_user_profile(
+            user.id,
+            str(existing_profile.get("gender") or "prefer_not_to_say"),
+            str(existing_profile.get("interested_in") or "everyone"),
+            _clean_optional_text(existing_profile.get("display_name")),
+            existing_profile.get("age"),
+            _clean_optional_text(existing_profile.get("city")),
+            _clean_optional_text(existing_profile.get("phone")),
+            primary_photo_url,
+            profile_photo_urls,
+            primary_photo_file_name,
+            profile_photo_file_names,
+        )
+    else:
+        profile = save_user_profile(
+            user.id,
+            "prefer_not_to_say",
+            "everyone",
+            user.display_name,
+            None,
+            None,
+            None,
+            photo_url,
+            [photo_url],
+            photo_file_name,
+            [photo_file_name],
+        )
+    return {
+        "profile_photo_url": primary_photo_url,
+        "profile_photo_urls": profile_photo_urls,
+        "profile_photo_file_name": primary_photo_file_name,
+        "profile_photo_file_names": profile_photo_file_names,
+        "profile": profile,
+    }
+
+
+@router.get("/api/me/profile-facts")
+async def get_me_profile_facts(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    facts = list_profile_facts(user.id)
+    return {"facts": facts, "groups": _group_profile_facts(facts)}
+
+
+@router.post("/api/me/profile-facts/{fact_id}/feedback")
+async def create_data_point_feedback(
+    fact_id: str,
+    payload: DataPointFeedbackCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    fact = get_profile_fact(fact_id, user.id)
+    if not fact:
+        raise HTTPException(status_code=404, detail="Data point not found.")
+
+    feedback = normalize_data_point_feedback(
+        {
+            "user_id": user.id,
+            "profile_fact_id": fact_id,
+            "rating": payload.rating,
+            "reason": payload.reason,
+            "comment": payload.comment,
+            "metadata": {
+                "category": fact.get("category"),
+                "key": fact.get("key"),
+                "source_kind": fact.get("source_kind"),
+                "source_id": fact.get("source_id"),
+            },
+        }
+    )
+    saved_feedback = save_data_point_feedback(feedback)
+    updated_fact = get_profile_fact(fact_id, user.id)
+    return {
+        "feedback": saved_feedback,
+        "fact": (
+            {
+                **updated_fact,
+                "feedback": _data_point_feedback_summary_for_fact(saved_feedback),
+            }
+            if updated_fact
+            else None
+        ),
+    }
+
