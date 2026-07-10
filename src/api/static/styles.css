@@ -2722,28 +2722,20 @@ p {
 
 .agentic-chat .message.agent {
   position: relative;
-  border-color: rgba(180, 154, 255, 0.2);
-  color: var(--ink);
+  border-color: rgba(180, 154, 255, 0.16);
+  color: #2f294a;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.38)),
-    linear-gradient(135deg, rgba(180, 154, 255, 0.22), rgba(255, 126, 179, 0.08), rgba(94, 234, 212, 0.07)),
-    rgba(249, 245, 255, 0.86);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
+    rgba(255, 255, 255, 0.86);
   box-shadow:
-    0 12px 28px rgba(64, 45, 118, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    0 10px 24px rgba(64, 45, 118, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(12px) saturate(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(1.06);
 }
 
 .agentic-chat .message.agent::before {
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: -1px;
-  width: 2px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--mint), var(--rose));
-  content: "";
+  content: none;
 }
 
 .agentic-chat .typing-message {
@@ -2801,16 +2793,22 @@ p {
 }
 
 .agentic-chat .message.user {
-  border-color: rgba(180, 154, 255, 0.16);
-  color: #2f294a;
+  position: relative;
+  border-color: rgba(180, 154, 255, 0.28);
+  color: var(--ink);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
-    rgba(255, 255, 255, 0.86);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
+    linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.15), rgba(94, 234, 212, 0.13)),
+    rgba(247, 241, 255, 0.92);
   box-shadow:
-    0 10px 24px rgba(64, 45, 118, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  backdrop-filter: blur(12px) saturate(1.06);
-  -webkit-backdrop-filter: blur(12px) saturate(1.06);
+    0 12px 30px rgba(64, 45, 118, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.agentic-chat .message.user::before {
+  content: none;
 }
 
 .agentic-chat .message.user.low-information {
