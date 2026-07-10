@@ -415,6 +415,11 @@ function googleDisplayName(user) {
   return metadata.full_name || metadata.name || metadata.display_name || "";
 }
 
+function signedInUserPhotoUrl() {
+  const metadata = authSession?.user?.user_metadata || {};
+  return metadata.avatar_url || metadata.picture || metadata.photo_url || "";
+}
+
 function appReturnUrl() {
   const path = window.location.pathname === "/" ? "/app" : window.location.pathname;
   return `${window.location.origin}${path}${window.location.search}${window.location.hash}`;
@@ -501,7 +506,9 @@ async function loadDatingBasicsStatus() {
       if (profileInterestedIn) profileInterestedIn.value = data.profile.interested_in || "";
       await setLocationControls(profileState, profileCity, data.profile.city || "");
       if (profilePhone) profilePhone.value = data.profile.phone || "";
-      renderProfilePhotoGallery(data.profile.profile_photo_urls?.length ? data.profile.profile_photo_urls : [data.profile.profile_photo_url]);
+      const profilePhotoUrls = data.profile.profile_photo_urls?.length ? data.profile.profile_photo_urls : [data.profile.profile_photo_url];
+      accountProfilePhotoUrls = profilePhotoUrls.filter(Boolean).slice(0, 4);
+      renderProfilePhotoGallery(profilePhotoUrls);
       syncBasicsOptionButtons();
     }
     renderAuthGate();
@@ -1805,8 +1812,12 @@ function renderMessages(options = {}) {
   chatLog.innerHTML = "";
   chatLog.classList.toggle("feedback-open", activeFeedbackMessageIndex !== null);
   messages.forEach((message, index) => {
+    const isAgent = message.role === "assistant";
+    const row = document.createElement("div");
+    row.className = `message-row ${isAgent ? "agent" : "user"}`;
+
     const bubble = document.createElement("div");
-    bubble.className = `message ${message.role === "assistant" ? "agent" : "user"}`;
+    bubble.className = `message ${isAgent ? "agent" : "user"}`;
     bubble.dataset.messageIndex = String(index);
     if (index === pendingMessageHighlightIndex) {
       bubble.classList.add("evidence-highlight");
@@ -1820,7 +1831,7 @@ function renderMessages(options = {}) {
     content.textContent = message.content;
     bubble.appendChild(content);
 
-    if (message.role === "assistant") {
+    if (isAgent) {
       bubble.classList.add("has-feedback");
       if (revealedFeedbackMessageIndex === index) {
         bubble.classList.add("feedback-revealed");
@@ -1833,7 +1844,14 @@ function renderMessages(options = {}) {
       bubble.appendChild(renderMessageFeedback(index));
     }
 
-    chatLog.appendChild(bubble);
+    if (isAgent) {
+      row.appendChild(renderChatAvatar("agent"));
+      row.appendChild(bubble);
+    } else {
+      row.appendChild(bubble);
+      row.appendChild(renderChatAvatar("user"));
+    }
+    chatLog.appendChild(row);
   });
   if (isAwaitingAgentReply || isAssistantTyping) {
     chatLog.appendChild(renderTypingIndicator());
@@ -1842,7 +1860,37 @@ function renderMessages(options = {}) {
   updateSidebarMeta();
 }
 
+function renderChatAvatar(role) {
+  const avatar = document.createElement("span");
+  avatar.className = `chat-avatar ${role}`;
+  avatar.setAttribute("aria-hidden", "true");
+
+  if (role === "agent") {
+    const image = document.createElement("img");
+    image.src = "/static/assets/omiryn-logo-glyph.svg";
+    image.alt = "";
+    avatar.appendChild(image);
+    return avatar;
+  }
+
+  const photoUrl = accountProfilePhotoUrls.find(Boolean) || signedInUserPhotoUrl();
+  if (photoUrl) {
+    const image = document.createElement("img");
+    image.src = photoUrl;
+    image.alt = "";
+    avatar.appendChild(image);
+    return avatar;
+  }
+
+  const name = profileName?.value || basicsName?.value || googleDisplayName(authSession?.user) || authSession?.user?.email || "U";
+  avatar.textContent = name.trim().slice(0, 1).toUpperCase() || "U";
+  return avatar;
+}
+
 function renderTypingIndicator() {
+  const row = document.createElement("div");
+  row.className = "message-row agent";
+
   const bubble = document.createElement("div");
   bubble.className = "message agent typing-message";
   bubble.setAttribute("role", "status");
@@ -1865,7 +1913,9 @@ function renderTypingIndicator() {
   content.appendChild(dots);
 
   bubble.appendChild(content);
-  return bubble;
+  row.appendChild(renderChatAvatar("agent"));
+  row.appendChild(bubble);
+  return row;
 }
 
 function renderMessageFeedback(messageIndex) {

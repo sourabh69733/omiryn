@@ -106,6 +106,8 @@ p {
 }
 
 .auth-mark {
+  width: 96px;
+  height: 43px;
   margin-bottom: 18px;
 }
 
@@ -182,6 +184,7 @@ p {
 }
 
 .basics-brand strong {
+  display: none;
   font-family: ui-serif, Georgia, "Times New Roman", serif;
   font-weight: 620;
 }
@@ -1171,21 +1174,33 @@ p {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 220px;
+  gap: 0;
+  min-width: 96px;
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 96px;
+  height: 43px;
+  border-radius: 0;
   color: #ffffff;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent),
-    linear-gradient(135deg, var(--primary), #5eead4);
+  background: transparent;
   font-weight: 650;
+  overflow: hidden;
+  box-shadow: none;
+  filter: drop-shadow(0 6px 16px rgba(180, 154, 255, 0.18));
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-copy {
+  display: none;
 }
 
 .brand strong {
@@ -2348,6 +2363,8 @@ p {
 }
 
 .agentic-chat .card-heading {
+  position: relative;
+  z-index: 12;
   padding: 16px 18px;
   border-bottom-color: rgba(180, 154, 255, 0.12);
   background:
@@ -2412,13 +2429,14 @@ p {
 .context-multiselect {
   position: relative;
   min-width: 230px;
+  z-index: 24;
 }
 
 .context-picker-button {
   width: 100%;
   min-height: 34px;
   border: 1px solid rgba(180, 154, 255, 0.16);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--ink);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58));
@@ -2429,20 +2447,38 @@ p {
   padding: 0 10px;
 }
 
+.context-picker-button:hover,
+.context-picker-button:focus-visible,
+.context-picker-button[aria-expanded="true"] {
+  border-color: rgba(180, 154, 255, 0.28);
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.62)),
+    rgba(180, 154, 255, 0.08);
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(180, 154, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
 .context-picker-menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 20;
+  z-index: 80;
   display: grid;
   gap: 6px;
   width: min(340px, 88vw);
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid rgba(180, 154, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 60px rgba(22, 52, 50, 0.16);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.78), transparent 36%),
+    var(--glass-bg);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.16);
+  -webkit-backdrop-filter: blur(20px) saturate(1.16);
   padding: 8px;
 }
 
@@ -2484,19 +2520,38 @@ p {
   padding: 10px;
 }
 
+.agentic-chat .chat-log {
+  position: relative;
+  z-index: 1;
+}
+
 .chat-title-lockup {
   display: grid;
-  grid-template-columns: 12px auto;
-  column-gap: 10px;
+  grid-template-columns: 36px auto;
+  column-gap: 12px;
   align-items: center;
 }
 
 .terminal-mark {
-  width: 9px;
-  height: 9px;
+  display: grid;
+  place-items: center;
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 126, 179, 0.16);
   border-radius: 999px;
-  background: var(--rose);
-  box-shadow: 0 0 0 5px rgba(255, 126, 179, 0.13);
+  background: #ffffff;
+  box-shadow:
+    0 10px 22px rgba(64, 45, 118, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.terminal-mark img {
+  display: block;
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
 }
 
 .card-heading h2,
@@ -2576,15 +2631,77 @@ p {
 }
 
 .message {
-  max-width: 78%;
+  max-width: min(78%, calc(100% - 48px));
   border-radius: 16px;
   padding: 13px 14px;
   font-size: 15px;
   line-height: 1.5;
 }
 
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  width: 100%;
+}
+
+.message-row.agent {
+  justify-content: flex-start;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.chat-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 31px;
+  height: 31px;
+  overflow: hidden;
+  border: 1px solid rgba(180, 154, 255, 0.18);
+  border-radius: 999px;
+  color: #2f294a;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
+    rgba(251, 248, 255, 0.92);
+  box-shadow:
+    0 8px 18px rgba(64, 45, 118, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chat-avatar.agent {
+  border-color: rgba(255, 126, 179, 0.18);
+  background: #ffffff;
+}
+
+.chat-avatar.agent img {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+}
+
+.chat-avatar.user {
+  border-color: rgba(106, 70, 255, 0.14);
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.36), transparent 32%),
+    linear-gradient(135deg, #6a46ff, #b49aff 52%, #ff7eb3);
+}
+
+.chat-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .agentic-chat .message {
-  max-width: min(82%, 680px);
+  max-width: min(82%, 680px, calc(100% - 48px));
   padding: 12px 14px;
   font-size: 13px;
   font-weight: 430;
@@ -3057,15 +3174,16 @@ p {
 .agentic-chat .composer button {
   display: grid;
   place-items: center;
-  border: 1px solid rgba(180, 154, 255, 0.1);
+  border: 1px solid rgba(106, 70, 255, 0.16);
   border-radius: 999px;
-  color: #2f294a;
+  color: #ffffff;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent),
-    var(--mint);
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.34), transparent 32%),
+    linear-gradient(135deg, #6a46ff 0%, #b49aff 48%, #ff7eb3 100%);
   box-shadow:
-    0 12px 26px rgba(180, 154, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.64);
+    0 14px 30px rgba(106, 70, 255, 0.22),
+    0 8px 18px rgba(255, 126, 179, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.46);
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
@@ -3074,11 +3192,12 @@ p {
 
 .agentic-chat .composer button:hover {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent),
-    #8ff3e6;
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.38), transparent 34%),
+    linear-gradient(135deg, #5c38f2 0%, #a98fff 48%, #f06fa9 100%);
   box-shadow:
-    0 14px 30px rgba(180, 154, 255, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+    0 16px 34px rgba(106, 70, 255, 0.25),
+    0 9px 20px rgba(255, 126, 179, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.52);
 }
 
 .send-message-icon {
@@ -4653,16 +4772,16 @@ p {
 
   .brand {
     min-width: 0;
-    width: 36px;
+    width: 82px;
     gap: 0;
   }
 
   .brand-mark {
-    width: 36px;
-    height: 36px;
+    width: 82px;
+    height: 37px;
   }
 
-  .brand > span:not(.brand-mark) {
+  .brand-copy {
     display: none;
   }
 
@@ -4912,7 +5031,7 @@ p {
 
   .chat-title-lockup {
     min-width: 0;
-    max-width: 82px;
+    max-width: 132px;
   }
 
   .agentic-chat .card-heading h2 {
@@ -4965,15 +5084,34 @@ p {
   .chat-context-control .context-picker-button {
     min-height: 32px;
     overflow: hidden;
-    border-color: rgba(92, 219, 199, 0.26);
-    color: #c7efeb;
-    background: rgba(92, 219, 199, 0.1);
+    border-color: rgba(180, 154, 255, 0.18);
+    color: var(--ink);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.66)),
+      rgba(180, 154, 255, 0.08);
+    box-shadow:
+      0 8px 22px rgba(64, 45, 118, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78);
     font-family: var(--font-ui);
     font-size: 11px;
     font-weight: 620;
     padding: 0 8px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .chat-context-control .context-picker-button:hover,
+  .chat-context-control .context-picker-button:focus-visible,
+  .chat-context-control .context-picker-button[aria-expanded="true"] {
+    border-color: rgba(180, 154, 255, 0.28);
+    color: var(--ink);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72)),
+      rgba(180, 154, 255, 0.12);
+    box-shadow:
+      0 0 0 3px rgba(180, 154, 255, 0.12),
+      0 10px 24px rgba(64, 45, 118, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82);
   }
 
   .chat-context-control .context-picker-menu {
@@ -4994,7 +5132,7 @@ p {
   }
 
   .agentic-chat .message {
-    max-width: 88%;
+    max-width: min(88%, calc(100% - 46px));
   }
 
   .agentic-chat .message.has-feedback {
@@ -5169,7 +5307,7 @@ p {
   }
 
   .message {
-    max-width: 92%;
+    max-width: min(92%, calc(100% - 46px));
   }
 
   .composer {
