@@ -82,6 +82,16 @@ const agentNamePools = {
   men: ["Kabir", "Billy", "Aarav", "Ishaan", "Veer"],
   everyone: ["Mira", "Annie", "Kabir", "Kiara", "Billy", "Naina", "Aarav", "Sana"]
 };
+const agentAvatarAssets = {
+  women: [
+    "/static/assets/agent_avatar/saree_female.png",
+    "/static/assets/agent_avatar/suite_female.png"
+  ],
+  men: [
+    "/static/assets/agent_avatar/jacket_male.png",
+    "/static/assets/agent_avatar/kurta_male.png"
+  ]
+};
 const feedbackReactions = [
   { rating: "good", label: "Good", icon: "good" },
   { rating: "off", label: "Tone off", icon: "off" },
@@ -106,6 +116,7 @@ const routes = {
 
 const chatLog = document.querySelector("#chat-log");
 const chatTitle = document.querySelector("#chat-title");
+const chatTitleAvatar = document.querySelector(".terminal-mark img");
 const chatForm = document.querySelector("#chat-form");
 const chatInput = document.querySelector("#chat-input");
 const sendMessage = document.querySelector("#send-message");
@@ -1723,6 +1734,31 @@ function selectedAgentName() {
   return currentAgentName;
 }
 
+function stableIndexForText(text, length) {
+  if (!length) return 0;
+  const value = String(text || "");
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash % length;
+}
+
+function agentGenderForName(name) {
+  const normalized = String(name || "").trim();
+  if (agentNamePools.men.includes(normalized)) return "men";
+  if (agentNamePools.women.includes(normalized)) return "women";
+  const interestedIn = accountInterestedIn?.value || profileInterestedIn?.value || "";
+  if (interestedIn === "men") return "men";
+  return "women";
+}
+
+function agentAvatarUrl(name = selectedAgentName() || defaultAgentName()) {
+  const gender = agentGenderForName(name);
+  const assets = agentAvatarAssets[gender] || agentAvatarAssets.women;
+  return assets[stableIndexForText(name || gender, assets.length)] || agentAvatarAssets.women[0];
+}
+
 function defaultAgentName() {
   const interestedIn = accountInterestedIn?.value || profileInterestedIn?.value || "";
   if (interestedIn === "women") return "Annie";
@@ -1745,6 +1781,9 @@ function updateAgentStatusModel() {
   const agentName = selectedAgentName() || defaultAgentName();
   if (chatTitle) {
     chatTitle.textContent = agentName;
+  }
+  if (chatTitleAvatar) {
+    chatTitleAvatar.src = agentAvatarUrl(agentName);
   }
   agentStatus.textContent = `${provider} · ${agentToneLabel(selectedAgentTone())} · ${selectedAgentModel() || "no model"}`;
 }
@@ -1777,6 +1816,7 @@ async function updateConversationModel() {
       agentToneSelect.value = conversation.agent_tone;
     }
     updateAgentStatusModel();
+    renderMessages({ preserveScroll: true });
     loadDetectedTone();
   } catch (error) {
     if (agentStatus) {
@@ -1867,7 +1907,7 @@ function renderChatAvatar(role) {
 
   if (role === "agent") {
     const image = document.createElement("img");
-    image.src = "/static/assets/omiryn-logo-glyph.svg";
+    image.src = agentAvatarUrl();
     image.alt = "";
     avatar.appendChild(image);
     return avatar;

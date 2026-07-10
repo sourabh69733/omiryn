@@ -2549,9 +2549,10 @@ p {
 
 .terminal-mark img {
   display: block;
-  width: 82%;
-  height: 82%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
 }
 
 .card-heading h2,
@@ -2680,9 +2681,10 @@ p {
 }
 
 .chat-avatar.agent img {
-  width: 82%;
-  height: 82%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
 }
 
 .chat-avatar.user {
