@@ -46,8 +46,20 @@ class TopicState:
 
 
 @dataclass(frozen=True)
+class EmotionState:
+    emotion: str = "neutral"
+    intensity: str = "low"
+    confidence: float = 0.0
+    need: str = "normal_chat"
+    strategy: str = "continue_naturally"
+    response_mode: str = "normal_chat"
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ConversationPlan:
     current_move: str
+    response_mode: str = "normal_chat"
     active_topic: str | None = None
     avoid_topics: tuple[str, ...] = ()
     suggested_topics: tuple[str, ...] = ()
