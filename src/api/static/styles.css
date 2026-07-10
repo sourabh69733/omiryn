@@ -1,25 +1,26 @@
 :root {
   color-scheme: light;
-  --ink: #183432;
-  --muted: #657d78;
-  --soft: #eef8f5;
-  --surface: #f4fbf8;
+  --ink: #252035;
+  --muted: #77718d;
+  --soft: #f4f0ff;
+  --surface: #fbf8ff;
   --panel: #ffffff;
-  --line: #d7e9e4;
-  --primary: #287a73;
-  --primary-dark: #1b5f5a;
-  --accent: #d76f61;
-  --success: #2d8061;
-  --warning: #c28a28;
-  --mist: #e5f6f1;
-  --mint: #6ed9c7;
-  --rose: #e8797a;
-  --lavender: #9f8fe8;
-  --shadow: 0 18px 50px rgba(22, 52, 50, 0.08);
+  --line: #e7e1f4;
+  --primary: #7f67d8;
+  --primary-dark: #624cb7;
+  --accent: #d95f91;
+  --success: #2f8f78;
+  --warning: #c88a1d;
+  --mist: #f2edff;
+  --mint: #5eead4;
+  --rose: #ff7eb3;
+  --lavender: #b49aff;
+  --amber: #fbbf24;
+  --shadow: 0 18px 50px rgba(64, 45, 118, 0.08);
   --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.46));
   --glass-border: rgba(255, 255, 255, 0.58);
   --glass-highlight: rgba(255, 255, 255, 0.72);
-  --glass-shadow: 0 22px 70px rgba(22, 52, 50, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --glass-shadow: 0 22px 70px rgba(64, 45, 118, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --font-ui: Inter, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-terminal: "JetBrains Mono", "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, ui-monospace, monospace;
 }
@@ -37,9 +38,10 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at 16% 8%, rgba(110, 217, 199, 0.2), transparent 28%),
-    radial-gradient(circle at 86% 4%, rgba(232, 121, 122, 0.11), transparent 28%),
-    linear-gradient(180deg, #f7fffb 0%, var(--surface) 44%, #ffffff 100%);
+    radial-gradient(circle at 16% 8%, rgba(180, 154, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 84% 4%, rgba(255, 126, 179, 0.11), transparent 30%),
+    radial-gradient(circle at 76% 82%, rgba(94, 234, 212, 0.1), transparent 30%),
+    linear-gradient(180deg, #fffbff 0%, var(--surface) 44%, #ffffff 100%);
   font-family: var(--font-ui);
 }
 
@@ -1152,8 +1154,8 @@ p {
   z-index: -1;
   border-radius: inherit;
   background:
-    linear-gradient(115deg, rgba(255, 255, 255, 0.62), transparent 28%, rgba(110, 217, 199, 0.12) 58%, transparent 78%),
-    radial-gradient(circle at 94% 24%, rgba(232, 121, 122, 0.16), transparent 28%);
+    linear-gradient(115deg, rgba(255, 255, 255, 0.62), transparent 28%, rgba(94, 234, 212, 0.12) 58%, transparent 78%),
+    radial-gradient(circle at 94% 24%, rgba(255, 126, 179, 0.16), transparent 28%);
   content: "";
   pointer-events: none;
 }
@@ -1182,7 +1184,7 @@ p {
   color: #ffffff;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent),
-    linear-gradient(135deg, var(--primary), #71d9c8);
+    linear-gradient(135deg, var(--primary), #5eead4);
   font-weight: 650;
 }
 
@@ -1252,14 +1254,14 @@ p {
 }
 
 .app-nav a.active {
-  color: #123b38;
+  color: #2f294a;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.34)),
-    linear-gradient(135deg, rgba(110, 217, 199, 0.38), rgba(232, 121, 122, 0.18));
+    linear-gradient(135deg, rgba(180, 154, 255, 0.36), rgba(255, 126, 179, 0.2));
   box-shadow:
-    0 10px 22px rgba(40, 122, 115, 0.14),
+    0 10px 22px rgba(180, 154, 255, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    inset 0 0 0 1px rgba(40, 122, 115, 0.1);
+    inset 0 0 0 1px rgba(180, 154, 255, 0.1);
 }
 
 .app-nav a::before {
@@ -1425,7 +1427,7 @@ p {
   z-index: 0;
   border-radius: inherit;
   background:
-    linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(110, 217, 199, 0.08) 54%, transparent 76%);
+    linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(94, 234, 212, 0.08) 54%, transparent 76%);
   content: "";
   pointer-events: none;
 }
@@ -1513,12 +1515,12 @@ p {
 
 .side-tabs button.active {
   border-color: rgba(255, 255, 255, 0.62);
-  color: #123b38;
+  color: #2f294a;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.36)),
-    rgba(110, 217, 199, 0.18);
+    rgba(94, 234, 212, 0.18);
   box-shadow:
-    0 8px 18px rgba(40, 122, 115, 0.1),
+    0 8px 18px rgba(180, 154, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
@@ -2324,12 +2326,13 @@ p {
 }
 
 .agentic-chat {
-  border-color: rgba(40, 122, 115, 0.16);
+  border-color: rgba(180, 154, 255, 0.16);
   color: var(--ink);
   background:
-    radial-gradient(circle at 8% 0%, rgba(110, 217, 199, 0.18), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(238, 248, 245, 0.96)),
-    #f6fffb;
+    radial-gradient(circle at 8% 0%, rgba(180, 154, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 96% 4%, rgba(255, 126, 179, 0.09), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 243, 255, 0.96)),
+    #fffbff;
   font-family: var(--font-ui);
   font-variant-ligatures: none;
   box-shadow: 0 26px 70px rgba(22, 52, 50, 0.12);
@@ -2346,7 +2349,7 @@ p {
 
 .agentic-chat .card-heading {
   padding: 16px 18px;
-  border-bottom-color: rgba(40, 122, 115, 0.12);
+  border-bottom-color: rgba(180, 154, 255, 0.12);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.28)),
     rgba(255, 255, 255, 0.46);
@@ -2380,7 +2383,7 @@ p {
 .model-picker input {
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(40, 122, 115, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.16);
   border-radius: 8px;
   color: var(--ink);
   background:
@@ -2403,7 +2406,7 @@ p {
 .model-picker select:focus,
 .model-picker input:focus {
   border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(110, 217, 199, 0.18);
+  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18);
 }
 
 .context-multiselect {
@@ -2414,7 +2417,7 @@ p {
 .context-picker-button {
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(40, 122, 115, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.16);
   border-radius: 8px;
   color: var(--ink);
   background:
@@ -2436,7 +2439,7 @@ p {
   width: min(340px, 88vw);
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 60px rgba(22, 52, 50, 0.16);
@@ -2454,7 +2457,7 @@ p {
 }
 
 .context-picker-option:hover {
-  background: rgba(110, 217, 199, 0.12);
+  background: rgba(94, 234, 212, 0.12);
 }
 
 .context-picker-option input {
@@ -2493,7 +2496,7 @@ p {
   height: 9px;
   border-radius: 999px;
   background: var(--rose);
-  box-shadow: 0 0 0 5px rgba(232, 121, 122, 0.13);
+  box-shadow: 0 0 0 5px rgba(255, 126, 179, 0.13);
 }
 
 .card-heading h2,
@@ -2532,7 +2535,7 @@ p {
 
 .agentic-chat .secondary-button {
   min-height: 34px;
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   color: var(--primary);
   background: rgba(255, 255, 255, 0.72);
   font-size: 12px;
@@ -2545,8 +2548,8 @@ p {
 }
 
 .agentic-chat .secondary-button:hover {
-  color: #123b38;
-  background: rgba(110, 217, 199, 0.3);
+  color: #2f294a;
+  background: rgba(94, 234, 212, 0.3);
 }
 
 .danger-button {
@@ -2568,8 +2571,8 @@ p {
 
 .agentic-chat .chat-log {
   background:
-    radial-gradient(circle at 96% 0%, rgba(232, 121, 122, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(246, 255, 251, 0.42), rgba(255, 255, 255, 0.08));
+    radial-gradient(circle at 96% 0%, rgba(255, 126, 179, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(251, 248, 255, 0.56), rgba(255, 255, 255, 0.08));
 }
 
 .message {
@@ -2596,19 +2599,20 @@ p {
 
 .message.agent {
   align-self: flex-start;
-  border: 1px solid #d8eae4;
-  background: #ffffff;
+  border: 1px solid #e8e1f5;
+  background: #f7f2ff;
 }
 
 .agentic-chat .message.agent {
   position: relative;
-  border-color: rgba(40, 122, 115, 0.14);
-  color: #24413f;
+  border-color: rgba(180, 154, 255, 0.2);
+  color: var(--ink);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.62)),
-    rgba(255, 255, 255, 0.82);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.38)),
+    linear-gradient(135deg, rgba(180, 154, 255, 0.22), rgba(255, 126, 179, 0.08), rgba(94, 234, 212, 0.07)),
+    rgba(249, 245, 255, 0.86);
   box-shadow:
-    0 10px 24px rgba(22, 52, 50, 0.06),
+    0 12px 28px rgba(64, 45, 118, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(14px) saturate(1.1);
   -webkit-backdrop-filter: blur(14px) saturate(1.1);
@@ -2621,7 +2625,7 @@ p {
   left: -1px;
   width: 2px;
   border-radius: 999px;
-  background: var(--mint);
+  background: linear-gradient(180deg, var(--mint), var(--rose));
   content: "";
 }
 
@@ -2675,20 +2679,21 @@ p {
 
 .message.user {
   align-self: flex-end;
-  border: 1px solid #d5e3e8;
-  background: #eef6f8;
+  border: 1px solid #e8e1f5;
+  background: #ffffff;
 }
 
 .agentic-chat .message.user {
-  border-color: rgba(40, 122, 115, 0.22);
-  color: #123b38;
+  border-color: rgba(180, 154, 255, 0.16);
+  color: #2f294a;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.46), transparent 36%),
-    linear-gradient(135deg, rgba(110, 217, 199, 0.48), rgba(232, 121, 122, 0.14)),
-    #dbf6ef;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
+    rgba(255, 255, 255, 0.86);
   box-shadow:
-    0 10px 24px rgba(40, 122, 115, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+    0 10px 24px rgba(64, 45, 118, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(12px) saturate(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(1.06);
 }
 
 .agentic-chat .message.user.low-information {
@@ -2758,7 +2763,7 @@ p {
   width: 28px;
   height: 28px;
   min-height: 28px;
-  border: 1px solid rgba(40, 122, 115, 0.18);
+  border: 1px solid rgba(180, 154, 255, 0.18);
   border-radius: 999px;
   color: var(--primary);
   background: rgba(255, 255, 255, 0.92);
@@ -2780,14 +2785,14 @@ p {
 
 .message-feedback-trigger:hover,
 .message-feedback-trigger:focus-visible {
-  border-color: rgba(40, 122, 115, 0.28);
+  border-color: rgba(180, 154, 255, 0.28);
   background: #ffffff;
   outline: none;
   transform: translateY(-1px);
 }
 
 .message-feedback-trigger.saved {
-  border-color: rgba(40, 122, 115, 0.3);
+  border-color: rgba(180, 154, 255, 0.3);
   color: var(--primary);
 }
 
@@ -2803,7 +2808,7 @@ p {
   position: absolute;
   right: 34px;
   min-width: max-content;
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   border-radius: 999px;
   color: var(--primary);
   background: rgba(255, 255, 255, 0.96);
@@ -2823,7 +2828,7 @@ p {
   max-height: min(300px, calc(100vh - 140px));
   overflow-y: auto;
   gap: 10px;
-  border: 1px solid rgba(40, 122, 115, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.16);
   border-radius: 12px;
   background:
     radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.78), transparent 36%),
@@ -2858,7 +2863,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   border-radius: 999px;
   color: var(--primary);
   background: rgba(238, 248, 245, 0.9);
@@ -2876,7 +2881,7 @@ p {
   width: 100%;
   /* min-height: 72px; */
   resize: vertical;
-  border: 1px solid rgba(40, 122, 115, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.16);
   border-radius: 8px;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.9);
@@ -2893,7 +2898,7 @@ p {
 .message-feedback-comment:focus {
   border-color: var(--mint);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(110, 217, 199, 0.18);
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.18);
 }
 
 .message-feedback-loading {
@@ -2956,7 +2961,7 @@ p {
 }
 
 .message-feedback-cancel {
-  border: 1px solid rgba(40, 122, 115, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.16);
   color: var(--primary);
   background: rgba(255, 255, 255, 0.72);
 }
@@ -2969,10 +2974,10 @@ p {
 }
 
 .message-chips span {
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(110, 217, 199, 0.13);
+  background: rgba(94, 234, 212, 0.13);
   font-size: 10.5px;
   font-weight: 560;
   letter-spacing: 0;
@@ -2989,7 +2994,7 @@ p {
 
 .chat-readiness-strip span {
   min-width: 0;
-  border-top: 2px solid #cfe4df;
+  border-top: 2px solid #e4dcf5;
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 560;
@@ -3014,7 +3019,7 @@ p {
 
 .agentic-chat .composer {
   grid-template-columns: 1fr 48px;
-  border-top-color: rgba(40, 122, 115, 0.12);
+  border-top-color: rgba(180, 154, 255, 0.12);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.3)),
     rgba(255, 255, 255, 0.56);
@@ -3035,7 +3040,7 @@ p {
 
 .agentic-chat .composer input,
 .agentic-chat .composer textarea {
-  border-color: rgba(40, 122, 115, 0.16);
+  border-color: rgba(180, 154, 255, 0.16);
   color: var(--ink);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.62));
@@ -3046,20 +3051,20 @@ p {
 
 .agentic-chat .composer input::placeholder,
 .agentic-chat .composer textarea::placeholder {
-  color: #8aa09b;
+  color: #9189a6;
 }
 
 .agentic-chat .composer button {
   display: grid;
   place-items: center;
-  border: 1px solid rgba(40, 122, 115, 0.1);
+  border: 1px solid rgba(180, 154, 255, 0.1);
   border-radius: 999px;
-  color: #123b38;
+  color: #2f294a;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent),
     var(--mint);
   box-shadow:
-    0 12px 26px rgba(40, 122, 115, 0.18),
+    0 12px 26px rgba(180, 154, 255, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.64);
   font-size: 12px;
   font-weight: 650;
@@ -3070,9 +3075,9 @@ p {
 .agentic-chat .composer button:hover {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent),
-    #8ce4d6;
+    #8ff3e6;
   box-shadow:
-    0 14px 30px rgba(40, 122, 115, 0.2),
+    0 14px 30px rgba(180, 154, 255, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
@@ -3114,7 +3119,7 @@ p {
 .agentic-chat .composer input:focus,
 .agentic-chat .composer textarea:focus {
   border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(110, 217, 199, 0.18);
+  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18);
 }
 
 .signal-card,
@@ -3367,10 +3372,10 @@ p {
   display: grid;
   align-content: center;
   min-height: calc(100vh - 180px);
-  border: 1px solid rgba(40, 122, 115, 0.12);
+  border: 1px solid rgba(180, 154, 255, 0.12);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 94% 8%, rgba(232, 121, 122, 0.11), transparent 30%),
+    radial-gradient(circle at 94% 8%, rgba(255, 126, 179, 0.11), transparent 30%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(238, 248, 245, 0.92)),
     #ffffff;
   box-shadow: var(--shadow);
@@ -3401,7 +3406,7 @@ p {
 }
 
 .coming-soon-grid span {
-  border: 1px solid rgba(40, 122, 115, 0.14);
+  border: 1px solid rgba(180, 154, 255, 0.14);
   border-radius: 999px;
   color: var(--primary);
   background: rgba(255, 255, 255, 0.72);
@@ -3435,7 +3440,7 @@ p {
   display: flex;
   flex-direction: column;
   min-height: 340px;
-  border: 1px solid rgba(40, 122, 115, 0.12);
+  border: 1px solid rgba(180, 154, 255, 0.12);
   border-top: 4px solid var(--mint);
   border-radius: 16px;
   background:
@@ -3468,13 +3473,13 @@ p {
 .match-top strong {
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(110, 217, 199, 0.18);
+  background: rgba(94, 234, 212, 0.18);
   padding: 8px 10px;
 }
 
 .rejected .match-top strong {
   color: var(--accent);
-  background: rgba(232, 121, 122, 0.12);
+  background: rgba(255, 126, 179, 0.12);
 }
 
 .match-copy {
@@ -4636,7 +4641,7 @@ p {
     align-items: center;
     grid-template-columns: auto minmax(0, 1fr);
     min-height: 56px;
-    border: 1px solid rgba(40, 122, 115, 0.12);
+    border: 1px solid rgba(180, 154, 255, 0.12);
     background: rgba(255, 255, 255, 0.9);
     box-shadow: 0 12px 30px rgba(22, 52, 50, 0.08);
     padding: 4px 0 10px;
@@ -4737,7 +4742,7 @@ p {
     justify-self: stretch;
     width: 100%;
     overflow: hidden;
-    border-color: rgba(40, 122, 115, 0.12);
+    border-color: rgba(180, 154, 255, 0.12);
     border-radius: 14px;
     background:
       radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.78), transparent 34%),
@@ -4784,11 +4789,11 @@ p {
   }
 
   .app-nav a.active {
-    color: #123b38;
+    color: #2f294a;
     background:
-      linear-gradient(135deg, rgba(110, 217, 199, 0.32), rgba(232, 121, 122, 0.14)),
+      linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.16)),
       #ffffff;
-    box-shadow: inset 0 0 0 1px rgba(40, 122, 115, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(180, 154, 255, 0.12);
   }
 
   .progress-nav {
