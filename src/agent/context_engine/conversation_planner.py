@@ -27,7 +27,7 @@ def build_conversation_plan(
     )
     data_targets = _data_targets(user_text, intent)
     emotion = emotion_state or EmotionState()
-    response_mode = _response_mode(user_text, emotion)
+    response_mode = _response_mode(user_text, labels, emotion)
     move = _conversation_move(labels, active, emotion)
     return ConversationPlan(
         current_move=move,
@@ -52,6 +52,8 @@ def _conversation_move(
         return "direct_answer_from_context"
     if "adult_flirty" in labels:
         return "safe_flirty_tease"
+    if "simple_ack" in labels:
+        return "simple_acknowledgement"
     if emotion.response_mode in {"empathize_listen", "validate_then_suggest"}:
         return "empathize_first"
     if emotion.response_mode == "apologize_and_adjust":
@@ -76,9 +78,11 @@ def _data_targets(user_text: str, intent: ContextQueryIntent) -> tuple[str, ...]
     return tuple(targets[:5])
 
 
-def _response_mode(user_text: str, emotion: EmotionState) -> str:
+def _response_mode(user_text: str, labels: set[str], emotion: EmotionState) -> str:
     if emotion.response_mode and emotion.response_mode != "normal_chat":
         return emotion.response_mode
+    if "simple_ack" in labels:
+        return "simple_ack"
     normalized = user_text.casefold()
     if "what should i do" in normalized or "suggest" in normalized or "advice" in normalized:
         return "suggest_solution"
@@ -86,6 +90,8 @@ def _response_mode(user_text: str, emotion: EmotionState) -> str:
 
 
 def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
+    if "simple_ack" in labels:
+        return "Reply with a tiny acknowledgement only, like 'welcome', 'sure', 'okay', or 'no worries'. Do not add advice, a new topic, or a question."
     if emotion.response_mode == "apologize_and_adjust":
         return "Briefly acknowledge the user is not enjoying this, do not defend yourself, then change approach."
     if emotion.response_mode == "empathize_listen":

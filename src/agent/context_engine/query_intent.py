@@ -34,6 +34,19 @@ WHATSAPP_QUERY_PHRASES = {
     "whatsapp chat",
 }
 LOW_INFORMATION_TERMS = {"hmm", "hm", "ok", "okay", "yeah", "yes", "no", "haan", "ha", "nhi", "nah"}
+SIMPLE_ACKNOWLEDGEMENT_EXACT = {
+    "ok",
+    "okay",
+    "sure",
+    "thanks",
+    "thank you",
+    "thx",
+    "ty",
+}
+SIMPLE_ACKNOWLEDGEMENT_PREFIXES = {
+    "thanks",
+    "thank you",
+}
 ADULT_FLIRTY_TERMS = {"sexy", "hot", "adult", "intimate", "flirt", "flirty", "romantic"}
 STORY_TERMS = {"story", "scene", "continue", "example", "imagine", "roleplay"}
 PROFILE_RECALL_PHRASES = {"what do you know", "about me", "know me", "meri profile"}
@@ -60,6 +73,8 @@ def context_query_intent(user_text: str) -> ContextQueryIntent:
     is_low_information = normalized in LOW_INFORMATION_TERMS or (
         len(normalized.split()) <= 2 and not query_terms
     )
+    if _is_simple_acknowledgement(normalized):
+        labels.append("simple_ack")
     if any(term in query_terms for term in WHATSAPP_QUERY_TERMS) or any(
         phrase in normalized for phrase in WHATSAPP_QUERY_PHRASES
     ):
@@ -102,6 +117,18 @@ def context_query_intent(user_text: str) -> ContextQueryIntent:
         confidence=confidence if labels else 0.15,
         entities=tuple(entities),
         is_low_information=is_low_information,
+    )
+
+
+def _is_simple_acknowledgement(normalized: str) -> bool:
+    if normalized in SIMPLE_ACKNOWLEDGEMENT_EXACT:
+        return True
+    words = normalized.split()
+    if len(words) > 4:
+        return False
+    return any(
+        normalized == phrase or normalized.startswith(f"{phrase} ")
+        for phrase in SIMPLE_ACKNOWLEDGEMENT_PREFIXES
     )
 
 
