@@ -18,6 +18,7 @@ SECTION_MODES: dict[str, str] = {
     "language": "dynamic",
     "intent": "dynamic",
     "conversation_plan": "dynamic",
+    "empathy": "dynamic",
     "data_point_usage": "dynamic",
     "data_point_targets": "dynamic",
     "tone": "dynamic",
@@ -35,6 +36,7 @@ SECTION_CHAR_LIMITS: dict[str, int] = {
     "prompt_contract": 2200,
     "behavior": 2200,
     "conversation_plan": 2200,
+    "empathy": 1500,
     "context_sources": 5600,
     "boredom_recovery": 1200,
     "output_format": 1200,
@@ -52,6 +54,7 @@ class PromptStructureContext:
     has_data_points: bool
     has_whatsapp_context: bool
     is_low_information: bool
+    has_emotion_state: bool
 
 
 @dataclass(frozen=True)

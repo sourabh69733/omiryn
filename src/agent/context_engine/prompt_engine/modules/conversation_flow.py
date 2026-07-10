@@ -29,6 +29,7 @@ def conversation_plan_prompt(
     suggested_topics = "\n".join(f"- {topic}" for topic in plan.suggested_topics[:3])
     return f"""Conversation plan for this turn:
 - Move: {plan.current_move}
+- Response mode: {plan.response_mode}
 - Active topic: {plan.active_topic or "none"}
 - Reason: {plan.reason}
 - Tone instruction: {plan.tone_instruction}
@@ -44,7 +45,9 @@ Possible fresh angles:
 
 Rules:
 - Do not behave like an interviewer.
+- Choose emotional response mode before choosing a topic.
 - Prefer a playful observation, concrete recall, or specific guess before asking.
+- If response mode says listen/empathize, do not jump to suggestions.
 - Do not start generic music, movie, truth-or-dare, or how-was-your-day topics unless the user explicitly brings them up.
 - If using music/movies, connect them to a sharper dating, memory, personality, or relationship angle.
 - Ask at most one natural question, and only if it improves the flow."""

@@ -6,7 +6,7 @@ from agent.context_engine.context_budget import (
     budget_context_sources,
     truncate_for_context,
 )
-from agent.context_engine.models import ContextQueryIntent, ConversationPlan, TopicState
+from agent.context_engine.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.modules.behavior import (
     CompanionBehavior,
@@ -21,6 +21,7 @@ from agent.context_engine.prompt_engine.modules.conversation_flow import (
 from agent.context_engine.prompt_engine.modules.data_point_usage import data_point_usage_prompt
 from agent.context_engine.prompt_engine.modules.data_point_targets import data_point_targets_prompt
 from agent.context_engine.prompt_engine.modules.final_reminder import final_reminder_prompt
+from agent.context_engine.prompt_engine.modules.empathy import empathy_prompt
 from agent.context_engine.prompt_engine.modules.language import language_module_prompt
 from agent.context_engine.prompt_engine.modules.memory_usage import memory_usage_prompt
 from agent.context_engine.prompt_engine.modules.output_format import output_format_prompt
@@ -97,6 +98,7 @@ def build_companion_system_prompt_v2(
     agent_name: str | None,
     prompt_version: PromptBehaviorVersion,
     query_intent: ContextQueryIntent,
+    emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
 ) -> str:
@@ -110,6 +112,7 @@ def build_companion_system_prompt_v2(
     structure_context = _prompt_structure_context(
         context_sources=context_sources,
         query_intent=query_intent,
+        emotion_state=emotion_state,
     )
     sections = _v2_prompt_sections(
         prompt_version=prompt_version,
@@ -118,6 +121,7 @@ def build_companion_system_prompt_v2(
         context_sources=context_sources,
         context_text=context_text,
         query_intent=query_intent,
+        emotion_state=emotion_state,
         topic_states=topic_states,
         conversation_plan=conversation_plan,
     )
@@ -159,6 +163,7 @@ def _v2_prompt_sections(
     context_sources: list[dict[str, Any]] | None,
     context_text: str,
     query_intent: ContextQueryIntent,
+    emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
 ) -> list[PromptSection]:
@@ -210,6 +215,14 @@ def _v2_prompt_sections(
             position="start",
             priority=84,
             can_skip=False,
+        ),
+        PromptSection(
+            id="empathy",
+            title="Empathy",
+            content=empathy_prompt(emotion_state),
+            position="start",
+            priority=83,
+            include_when=lambda context: context.has_emotion_state,
         ),
         PromptSection(
             id="data_point_usage",
@@ -300,6 +313,7 @@ def _prompt_structure_context(
     *,
     context_sources: list[dict[str, Any]] | None,
     query_intent: ContextQueryIntent,
+    emotion_state: EmotionState,
 ) -> PromptStructureContext:
     source_types = {
         str(source.get("source_type") or "context")
@@ -314,4 +328,5 @@ def _prompt_structure_context(
             source_types & {"whatsapp_structured_context", "whatsapp_chat", "friend_style"}
         ),
         is_low_information=query_intent.is_low_information,
+        has_emotion_state=emotion_state.emotion != "neutral" and emotion_state.confidence >= 0.5,
     )
