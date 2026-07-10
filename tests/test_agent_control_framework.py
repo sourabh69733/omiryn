@@ -184,6 +184,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("Boredom recovery", package.system_prompt)
         self.assertEqual(package.snapshot["summary"]["engine_version"], "context_v2")
         self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
+        self.assertEqual(package.snapshot["summary"]["response_mode"], "normal_chat")
         self.assertIn("conversation_plan", package.snapshot["context"])
 
     def test_v2_prompt_structure_skips_dynamic_boredom_section_when_not_needed(self) -> None:
@@ -238,11 +239,53 @@ class AgentControlFrameworkTest(unittest.TestCase):
             prompt_version_id="v2",
         )
 
-        self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
+        self.assertEqual(package.snapshot["summary"]["conversation_move"], "acknowledge_then_recover")
+        self.assertEqual(package.snapshot["summary"]["response_mode"], "apologize_and_adjust")
         self.assertIn("boredom_complaint", package.system_prompt)
         self.assertIn("## Boredom Recovery", package.system_prompt)
         self.assertIn("Do not start generic music, movie, truth-or-dare", package.system_prompt)
         self.assertIn("Repeated how-was-your-day", package.system_prompt)
+
+    def test_v2_emotion_state_recovers_when_user_feels_unheard(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="you don't understand me, you keep giving suggestions",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v2",
+        )
+
+        self.assertEqual(package.snapshot["summary"]["emotion"], "frustrated")
+        self.assertEqual(package.snapshot["summary"]["response_mode"], "apologize_and_adjust")
+        self.assertIn("## Empathy", package.system_prompt)
+        self.assertIn("do not defend yourself", package.system_prompt.lower())
+        self.assertIn("Respond to the feeling before choosing a new topic", package.system_prompt)
+
+    def test_v2_sad_user_gets_listen_first_mode(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="i feel sad and very alone today",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v2",
+        )
+
+        self.assertEqual(package.snapshot["summary"]["emotion"], "lonely")
+        self.assertEqual(package.snapshot["summary"]["response_mode"], "empathize_listen")
+        self.assertIn("If response mode is empathize_listen, do not give advice", package.system_prompt)
+        self.assertIn("Listen first", package.system_prompt)
 
     def test_user_taught_agent_behavior_rule_is_saved_and_included_in_v2_context(self) -> None:
         capture_profile_facts_from_user_message(

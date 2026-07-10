@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent.context_engine.models import ContextQueryIntent, ConversationPlan, TopicState
+from agent.context_engine.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
 from agent.context_engine.topic_catalog import COMMON_STARTER_TOPIC_POLICY, relevant_topics_for_intent
 from agent.context_engine.topic_state import active_topic_state, avoid_topic_labels
 
@@ -17,6 +17,7 @@ def build_conversation_plan(
     user_text: str,
     intent: ContextQueryIntent,
     topic_states: list[TopicState],
+    emotion_state: EmotionState | None = None,
 ) -> ConversationPlan:
     labels = set(intent.labels)
     active = active_topic_state(topic_states)
@@ -25,25 +26,36 @@ def build_conversation_plan(
         topic.label for topic in relevant_topics_for_intent(user_text, intent, limit=3)
     )
     data_targets = _data_targets(user_text, intent)
-    move = _conversation_move(labels, active)
+    emotion = emotion_state or EmotionState()
+    response_mode = _response_mode(user_text, emotion)
+    move = _conversation_move(labels, active, emotion)
     return ConversationPlan(
         current_move=move,
+        response_mode=response_mode,
         active_topic=active.label if active else None,
         avoid_topics=avoid_topics,
         suggested_topics=suggested_topics,
         data_targets=data_targets,
-        tone_instruction=_tone_instruction(labels),
-        reason=_plan_reason(labels, active),
+        tone_instruction=_tone_instruction(labels, emotion),
+        reason=_plan_reason(labels, active, emotion),
     )
 
 
-def _conversation_move(labels: set[str], active: TopicState | None) -> str:
+def _conversation_move(
+    labels: set[str],
+    active: TopicState | None,
+    emotion: EmotionState,
+) -> str:
     if "whatsapp" in labels and "style" in labels:
         return "specific_context_observation"
     if "whatsapp" in labels:
         return "direct_answer_from_context"
     if "adult_flirty" in labels:
         return "safe_flirty_tease"
+    if emotion.response_mode in {"empathize_listen", "validate_then_suggest"}:
+        return "empathize_first"
+    if emotion.response_mode == "apologize_and_adjust":
+        return "acknowledge_then_recover"
     if "story_or_long_reply" in labels:
         return "mini_story"
     if {"low_information", "boredom_complaint"} & labels:
@@ -64,7 +76,24 @@ def _data_targets(user_text: str, intent: ContextQueryIntent) -> tuple[str, ...]
     return tuple(targets[:5])
 
 
-def _tone_instruction(labels: set[str]) -> str:
+def _response_mode(user_text: str, emotion: EmotionState) -> str:
+    if emotion.response_mode and emotion.response_mode != "normal_chat":
+        return emotion.response_mode
+    normalized = user_text.casefold()
+    if "what should i do" in normalized or "suggest" in normalized or "advice" in normalized:
+        return "suggest_solution"
+    return "normal_chat"
+
+
+def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
+    if emotion.response_mode == "apologize_and_adjust":
+        return "Briefly acknowledge the user is not enjoying this, do not defend yourself, then change approach."
+    if emotion.response_mode == "empathize_listen":
+        return "Listen first. Validate the feeling briefly. Do not give advice unless the user asks."
+    if emotion.response_mode == "validate_then_suggest":
+        return "Validate first, then offer one small practical suggestion."
+    if emotion.response_mode == "clarify":
+        return "Clarify gently without making the user feel wrong."
     if "adult_flirty" in labels:
         return "Keep it playful/flirty but non-graphic, consensual, and easy to back away from."
     if "boredom_complaint" in labels:
@@ -76,7 +105,9 @@ def _tone_instruction(labels: set[str]) -> str:
     return "React first, use known context, and ask at most one natural question."
 
 
-def _plan_reason(labels: set[str], active: TopicState | None) -> str:
+def _plan_reason(labels: set[str], active: TopicState | None, emotion: EmotionState) -> str:
+    if emotion.emotion != "neutral" and emotion.confidence >= 0.5:
+        return f"Emotion={emotion.emotion}; need={emotion.need}; strategy={emotion.strategy}."
     if labels:
         return f"Intent labels: {', '.join(sorted(labels))}."
     if active:

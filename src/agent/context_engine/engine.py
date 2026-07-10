@@ -4,6 +4,7 @@ from typing import Any
 
 from agent.context_engine.context_snapshot import build_context_snapshot, build_context_snapshot_v2
 from agent.context_engine.conversation_planner import build_conversation_plan
+from agent.context_engine.emotion_engine import detect_emotion_state
 from agent.context_engine.models import ModelContextPackage
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
@@ -41,11 +42,17 @@ def build_model_context_package(
     query_intent = context_query_intent(user_text)
     if prompt_version.version_id == "v2":
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
+        emotion_state = detect_emotion_state(
+            user_text=user_text,
+            messages=planning_messages,
+            intent=query_intent,
+        )
         topic_states = build_topic_state(planning_messages, user_text, query_intent)
         conversation_plan = build_conversation_plan(
             user_text=user_text,
             intent=query_intent,
             topic_states=topic_states,
+            emotion_state=emotion_state,
         )
         system_prompt = build_companion_system_prompt_v2(
             context_sources=reply_context.context_sources,
@@ -54,6 +61,7 @@ def build_model_context_package(
             agent_name=agent_name,
             prompt_version=prompt_version,
             query_intent=query_intent,
+            emotion_state=emotion_state,
             topic_states=topic_states,
             conversation_plan=conversation_plan,
         )
@@ -69,6 +77,7 @@ def build_model_context_package(
             prompt_version=prompt_version.version_id,
             prompt_version_name=prompt_version.name,
             query_intent=query_intent,
+            emotion_state=emotion_state,
             topic_states=topic_states,
             conversation_plan=conversation_plan,
         )

@@ -4,7 +4,13 @@ from collections import Counter
 from typing import Any
 
 from agent.context_engine.context_budget import budget_context_sources
-from agent.context_engine.models import ContextBlock, ContextQueryIntent, ConversationPlan, TopicState
+from agent.context_engine.models import (
+    ContextBlock,
+    ContextQueryIntent,
+    ConversationPlan,
+    EmotionState,
+    TopicState,
+)
 
 SNAPSHOT_PREVIEW_CHARS = 500
 
@@ -72,6 +78,7 @@ def build_context_snapshot_v2(
     prompt_version: str | None,
     prompt_version_name: str | None,
     query_intent: ContextQueryIntent,
+    emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
 ) -> dict[str, Any]:
@@ -118,6 +125,9 @@ def build_context_snapshot_v2(
             "intent_labels": list(query_intent.labels),
             "intent_confidence": query_intent.confidence,
             "conversation_move": conversation_plan.current_move,
+            "response_mode": conversation_plan.response_mode,
+            "emotion": emotion_state.emotion,
+            "emotion_confidence": emotion_state.confidence,
             "active_topic": conversation_plan.active_topic,
             **flags,
         },
@@ -129,6 +139,7 @@ def build_context_snapshot_v2(
                 "prefer_structured_whatsapp": query_intent.prefer_structured_whatsapp,
                 "is_low_information": query_intent.is_low_information,
             },
+            "emotion_state": _emotion_state_snapshot(emotion_state),
             "topic_state": [_topic_state_snapshot(state) for state in topic_states],
             "conversation_plan": _conversation_plan_snapshot(conversation_plan),
             "blocks": selected_blocks,
@@ -223,12 +234,25 @@ def _topic_state_snapshot(state: TopicState) -> dict[str, Any]:
 def _conversation_plan_snapshot(plan: ConversationPlan) -> dict[str, Any]:
     return {
         "current_move": plan.current_move,
+        "response_mode": plan.response_mode,
         "active_topic": plan.active_topic,
         "avoid_topics": list(plan.avoid_topics),
         "suggested_topics": list(plan.suggested_topics),
         "data_targets": list(plan.data_targets),
         "tone_instruction": plan.tone_instruction,
         "reason": plan.reason,
+    }
+
+
+def _emotion_state_snapshot(state: EmotionState) -> dict[str, Any]:
+    return {
+        "emotion": state.emotion,
+        "intensity": state.intensity,
+        "confidence": state.confidence,
+        "need": state.need,
+        "strategy": state.strategy,
+        "response_mode": state.response_mode,
+        "evidence": list(state.evidence),
     }
 
 
