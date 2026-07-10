@@ -28,6 +28,7 @@ let activeFeedbackMessageIndex = null;
 let feedbackPositionFrame = null;
 let feedbackLoadedConversationId = null;
 let feedbackLoadPromise = null;
+let revealedFeedbackMessageIndex = null;
 let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 let onboardingProfilePhotoFiles = Array(4).fill(null);
@@ -1613,6 +1614,7 @@ function prepareEmptyConversation() {
   conversationId = null;
   currentAgentName = null;
   messages = [];
+  revealedFeedbackMessageIndex = null;
   messageFeedbackState.clear();
   feedbackLoadedConversationId = null;
   feedbackLoadPromise = null;
@@ -1633,6 +1635,7 @@ function hydrateConversation(conversation, options = {}) {
   rememberConversation(conversation.id);
   currentAgentName = conversation.agent_name || defaultAgentName();
   messages = conversation.messages;
+  revealedFeedbackMessageIndex = null;
   messageFeedbackState.clear();
   feedbackLoadedConversationId = null;
   feedbackLoadPromise = null;
@@ -1819,6 +1822,14 @@ function renderMessages(options = {}) {
 
     if (message.role === "assistant") {
       bubble.classList.add("has-feedback");
+      if (revealedFeedbackMessageIndex === index) {
+        bubble.classList.add("feedback-revealed");
+      }
+      bubble.addEventListener("click", (event) => {
+        if (!isTouchFeedbackMode() || event.target.closest(".message-feedback")) return;
+        revealedFeedbackMessageIndex = revealedFeedbackMessageIndex === index ? null : index;
+        renderMessages({ preserveScroll: true });
+      });
       bubble.appendChild(renderMessageFeedback(index));
     }
 
@@ -1864,6 +1875,9 @@ function renderMessageFeedback(messageIndex) {
   wrapper.dataset.messageIndex = String(messageIndex);
   if (activeFeedbackMessageIndex === messageIndex) {
     wrapper.classList.add("active");
+  }
+  if (revealedFeedbackMessageIndex === messageIndex) {
+    wrapper.classList.add("revealed");
   }
   if (state.menuPlacement) {
     wrapper.classList.add(`placement-${state.menuPlacement}`);
@@ -1984,6 +1998,14 @@ function scheduleFeedbackPopoverPositionSync() {
       syncFeedbackPopoverPosition(activeFeedbackMessageIndex);
     }
   });
+}
+
+function isTouchFeedbackMode() {
+  return window.matchMedia?.("(hover: none), (pointer: coarse)")?.matches || false;
+}
+
+function isMobileChatInputMode() {
+  return window.matchMedia?.("(max-width: 680px), (pointer: coarse)")?.matches || false;
 }
 
 function feedbackMenuBounds() {
@@ -2123,6 +2145,7 @@ async function handleFeedbackTriggerClick(messageIndex, button) {
   const menuPosition = feedbackMenuPosition(button);
   const previous = messageFeedbackState.get(messageIndex) || {};
   activeFeedbackMessageIndex = messageIndex;
+  revealedFeedbackMessageIndex = messageIndex;
   messageFeedbackState.set(messageIndex, {
     ...previous,
     ...menuPosition,
@@ -2148,6 +2171,7 @@ async function handleFeedbackTriggerClick(messageIndex, button) {
 
 function openFeedbackEditor(messageIndex, menuPosition = {}) {
   activeFeedbackMessageIndex = messageIndex;
+  revealedFeedbackMessageIndex = messageIndex;
   const previous = messageFeedbackState.get(messageIndex) || {};
   messageFeedbackState.set(messageIndex, {
     rating: previous.rating || "good",
@@ -3918,7 +3942,7 @@ chatForm.addEventListener("submit", (event) => {
 });
 chatInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
-  if (event.shiftKey || event.isComposing) return;
+  if (event.shiftKey || event.isComposing || isMobileChatInputMode()) return;
 
   event.preventDefault();
   event.stopPropagation();
@@ -4138,6 +4162,15 @@ document.addEventListener("click", (event) => {
   }
   if (activeFeedbackMessageIndex !== null && !event.target.closest(".message-feedback")) {
     closeFeedbackPopover();
+  }
+  if (
+    activeFeedbackMessageIndex === null &&
+    revealedFeedbackMessageIndex !== null &&
+    isTouchFeedbackMode() &&
+    !event.target.closest(".message.agent")
+  ) {
+    revealedFeedbackMessageIndex = null;
+    renderMessages({ preserveScroll: true });
   }
   if (
     agentContextMenu &&

@@ -412,7 +412,11 @@
                   placeholder="Say what matters..."
                   rows="1"
                 ></textarea>
-                <button id="send-message" type="button">Send</button>
+                <button id="send-message" type="button" aria-label="Send message">
+                  <svg class="send-message-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z"></path>
+                  </svg>
+                </button>
               </form>
             </section>
           </div>

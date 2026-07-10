@@ -2906,7 +2906,7 @@ p {
 }
 
 .agentic-chat .composer {
-  grid-template-columns: 1fr 76px;
+  grid-template-columns: 1fr 48px;
   border-top-color: #24333a;
   background: #10181d;
 }
@@ -2938,16 +2938,33 @@ p {
 }
 
 .agentic-chat .composer button {
+  display: grid;
+  place-items: center;
   border: 1px solid #54bfb5;
+  border-radius: 999px;
   color: #081315;
   background: #64d8cb;
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
+  padding: 0;
 }
 
 .agentic-chat .composer button:hover {
   background: #87eee5;
+}
+
+.send-message-icon {
+  width: 21px;
+  height: 21px;
+  fill: currentColor;
+  stroke: none;
+  transform: translateX(1px);
+}
+
+.send-message-icon path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .composer input,
@@ -4907,9 +4924,10 @@ p {
   }
 
   .agentic-chat .composer button {
-    min-width: 64px;
+    width: 46px;
+    min-width: 46px;
     min-height: 46px;
-    padding: 0 13px;
+    padding: 0;
   }
 
   .style-hero,
@@ -5036,7 +5054,16 @@ p {
   }
 
   .message-feedback-actions {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(4px);
+  }
+
+  .message-feedback.revealed .message-feedback-actions,
+  .message-feedback.active .message-feedback-actions,
+  .message-feedback:has(.message-feedback-popover) .message-feedback-actions {
     opacity: 1;
+    pointer-events: auto;
     transform: none;
   }
 }
