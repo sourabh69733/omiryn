@@ -6,7 +6,7 @@
     <title>Omiryn | Your Matchmaker</title>
     <link rel="icon" href="/static/assets/omiryn-app-icon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260711-mobile-menu-visibility" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260711-account-menu-overflow" />
   </head>
   <body>
     <section class="auth-screen" id="auth-screen" hidden>
@@ -306,10 +306,14 @@
                 <span></span>
               </span>
             </button>
-            <button class="auth-user" id="auth-user" type="button" hidden aria-label="Open profile">
+            <button class="auth-user" id="auth-user" type="button" hidden aria-label="Open account menu" aria-haspopup="menu" aria-expanded="false">
               <span class="auth-avatar" id="auth-avatar" aria-hidden="true">O</span>
               <span class="auth-email" id="auth-email">Signed in</span>
             </button>
+            <div class="account-menu" id="account-menu" hidden>
+              <button id="account-menu-profile" type="button">Profile</button>
+              <button id="account-menu-signout" type="button">Sign out</button>
+            </div>
             <button class="secondary-button auth-button" id="login-google" type="button">
               Continue with Google
             </button>
@@ -1067,6 +1071,6 @@ Rules:
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/static/app.js?v=20260711-mobile-menu-fix"></script>
+    <script src="/static/app.js?v=20260711-account-menu-empty-state"></script>
   </body>
 </html>

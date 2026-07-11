@@ -4,6 +4,7 @@ let activeDraftId = null;
 let isSendingMessage = false;
 let isAwaitingAgentReply = false;
 let isAssistantTyping = false;
+let isConversationLoading = false;
 let pendingContextSourceIds = [];
 let pendingDeleteConversationId = null;
 let pendingDeleteContextSource = null;
@@ -252,6 +253,9 @@ const logoutUser = document.querySelector("#logout-user");
 const authUser = document.querySelector("#auth-user");
 const authAvatar = document.querySelector("#auth-avatar");
 const authEmail = document.querySelector("#auth-email");
+const accountMenu = document.querySelector("#account-menu");
+const accountMenuProfile = document.querySelector("#account-menu-profile");
+const accountMenuSignout = document.querySelector("#account-menu-signout");
 const menuButton = document.querySelector("#menu-button");
 const appNav = document.querySelector("#main-navigation");
 
@@ -304,6 +308,7 @@ function closeAppMenu() {
 function toggleAppMenu() {
   if (!appNav || !menuButton) return;
   const isOpen = appNav.classList.toggle("is-open");
+  if (isOpen) closeAccountMenu();
   menuButton.setAttribute("aria-expanded", String(isOpen));
   updateAppHeaderHeight();
 }
@@ -402,15 +407,13 @@ function renderAuthState() {
   if (authEmail) {
     authEmail.textContent = displayName;
   }
-  if (authAvatar) {
-    authAvatar.textContent = displayName.slice(0, 1).toUpperCase();
-  }
+  renderHeaderAvatar(displayName);
   if (loginGoogle) {
     loginGoogle.hidden = true;
     loginGoogle.disabled = false;
   }
   if (logoutUser) {
-    logoutUser.hidden = false;
+    logoutUser.hidden = true;
     logoutUser.disabled = false;
   }
   updateAppHeaderHeight();
@@ -431,6 +434,35 @@ function signedInUserPhotoUrl() {
   return metadata.avatar_url || metadata.picture || metadata.photo_url || "";
 }
 
+function renderHeaderAvatar(displayName = "") {
+  if (!authAvatar) return;
+
+  authAvatar.replaceChildren();
+  const photoUrl = accountProfilePhotoUrls.find(Boolean) || signedInUserPhotoUrl();
+  if (photoUrl) {
+    const image = document.createElement("img");
+    image.src = photoUrl;
+    image.alt = "";
+    authAvatar.appendChild(image);
+    return;
+  }
+
+  authAvatar.textContent = String(displayName || "U").trim().slice(0, 1).toUpperCase() || "U";
+}
+
+function closeAccountMenu() {
+  if (accountMenu) accountMenu.hidden = true;
+  authUser?.setAttribute("aria-expanded", "false");
+}
+
+function toggleAccountMenu() {
+  if (!accountMenu || !authUser) return;
+  const willOpen = accountMenu.hidden;
+  if (willOpen) closeAppMenu();
+  accountMenu.hidden = !willOpen;
+  authUser.setAttribute("aria-expanded", String(willOpen));
+}
+
 function appReturnUrl() {
   const path = window.location.pathname === "/" ? "/app" : window.location.pathname;
   return `${window.location.origin}${path}${window.location.search}${window.location.hash}`;
@@ -441,6 +473,7 @@ function openProfilePage() {
 }
 
 function renderSignedOutAuth(label) {
+  closeAccountMenu();
   if (authUser) {
     authUser.hidden = true;
   }
@@ -520,6 +553,7 @@ async function loadDatingBasicsStatus() {
       const profilePhotoUrls = data.profile.profile_photo_urls?.length ? data.profile.profile_photo_urls : [data.profile.profile_photo_url];
       accountProfilePhotoUrls = profilePhotoUrls.filter(Boolean).slice(0, 4);
       renderProfilePhotoGallery(profilePhotoUrls);
+      renderHeaderAvatar(data.profile.display_name || googleDisplayName(authSession?.user) || authSession?.user?.email || "");
       syncBasicsOptionButtons();
     }
     renderAuthGate();
@@ -950,6 +984,7 @@ function renderAccountPhotoGallery(urls = []) {
   accountPhotoPreviews.forEach((preview, index) => {
     renderProfilePhotoPreview(preview, urls[index] || "");
   });
+  renderHeaderAvatar(profileName?.value || googleDisplayName(authSession?.user) || authSession?.user?.email || "");
 }
 
 function previewSelectedPhotos() {
@@ -1512,9 +1547,12 @@ async function signInWithGoogle() {
 async function signOutUser() {
   if (!supabaseClient) return;
 
-  logoutUser.disabled = true;
+  if (logoutUser) logoutUser.disabled = true;
+  if (accountMenuSignout) accountMenuSignout.disabled = true;
   await supabaseClient.auth.signOut();
   authSession = null;
+  closeAccountMenu();
+  if (accountMenuSignout) accountMenuSignout.disabled = false;
   renderAuthState();
 }
 
@@ -1580,13 +1618,18 @@ async function restoreOrStartConversation() {
   await loadAgentStatus();
   const linkedTarget = linkedConversationTargetFromUrl();
   const savedConversationId = linkedTarget?.conversationId || storedConversationId();
+  isConversationLoading = true;
+  renderMessages();
   if (!savedConversationId) {
     const latestConversation = await latestRestorableConversation();
     if (latestConversation) {
       hydrateConversation(latestConversation);
     } else {
-      await startConversation();
+      prepareEmptyConversation();
+      await loadConversationHistory();
     }
+    isConversationLoading = false;
+    renderMessages({ preserveScroll: true });
     return;
   }
 
@@ -1607,6 +1650,9 @@ async function restoreOrStartConversation() {
       prepareEmptyConversation();
       await loadConversationHistory();
     }
+  } finally {
+    isConversationLoading = false;
+    renderMessages({ preserveScroll: true });
   }
 }
 
@@ -1632,6 +1678,7 @@ function prepareEmptyConversation() {
   conversationId = null;
   currentAgentName = null;
   messages = [];
+  isConversationLoading = false;
   revealedFeedbackMessageIndex = null;
   messageFeedbackState.clear();
   feedbackLoadedConversationId = null;
@@ -1651,6 +1698,7 @@ function prepareEmptyConversation() {
 
 function hydrateConversation(conversation, options = {}) {
   rememberConversation(conversation.id);
+  isConversationLoading = false;
   currentAgentName = conversation.agent_name || defaultAgentName();
   messages = conversation.messages;
   revealedFeedbackMessageIndex = null;
@@ -1851,6 +1899,9 @@ function renderMessages(options = {}) {
   const previousScrollTop = chatLog.scrollTop;
   chatLog.innerHTML = "";
   chatLog.classList.toggle("feedback-open", activeFeedbackMessageIndex !== null);
+  if (!messages.length && !isAwaitingAgentReply && !isAssistantTyping) {
+    chatLog.appendChild(renderConversationState());
+  }
   messages.forEach((message, index) => {
     const isAgent = message.role === "assistant";
     const row = document.createElement("div");
@@ -1898,6 +1949,22 @@ function renderMessages(options = {}) {
   }
   chatLog.scrollTop = preserveScroll ? previousScrollTop : chatLog.scrollHeight;
   updateSidebarMeta();
+}
+
+function renderConversationState() {
+  const state = document.createElement("div");
+  state.className = "chat-empty-state";
+
+  const title = document.createElement("strong");
+  title.textContent = isConversationLoading ? "Loading conversation..." : "No conversation selected";
+
+  const copy = document.createElement("span");
+  copy.textContent = isConversationLoading
+    ? "Fetching the latest chat and context."
+    : "Choose a conversation from History or start a new chat.";
+
+  state.append(title, copy);
+  return state;
 }
 
 function renderChatAvatar(role) {
@@ -4144,7 +4211,15 @@ document.addEventListener("keydown", (event) => {
 loginGoogle?.addEventListener("click", signInWithGoogle);
 authScreenLogin?.addEventListener("click", signInWithGoogle);
 logoutUser?.addEventListener("click", signOutUser);
-authUser?.addEventListener("click", openProfilePage);
+authUser?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleAccountMenu();
+});
+accountMenuProfile?.addEventListener("click", () => {
+  closeAccountMenu();
+  openProfilePage();
+});
+accountMenuSignout?.addEventListener("click", signOutUser);
 window.addEventListener("resize", updateAppHeaderHeight);
 window.addEventListener("resize", scheduleFeedbackPopoverPositionSync);
 chatLog?.addEventListener("scroll", scheduleFeedbackPopoverPositionSync);
@@ -4229,12 +4304,21 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     closeAppMenu();
+    closeAccountMenu();
     closeContextPicker();
     closeFeedbackPopover();
     closeDataPointFeedbackDialog();
   }
 });
 document.addEventListener("click", (event) => {
+  if (
+    accountMenu &&
+    !accountMenu.hidden &&
+    !accountMenu.contains(event.target) &&
+    !authUser?.contains(event.target)
+  ) {
+    closeAccountMenu();
+  }
   if (
     appNav?.classList.contains("is-open") &&
     !appNav.contains(event.target) &&
