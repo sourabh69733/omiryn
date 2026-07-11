@@ -3279,7 +3279,13 @@ p {
 
 .agentic-chat .composer button {
   display: grid;
+  align-self: end;
   place-items: center;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
   border: 1px solid rgba(106, 70, 255, 0.16);
   border-radius: 999px;
   color: #ffffff;
@@ -5317,7 +5323,9 @@ p {
   .agentic-chat .composer button {
     width: 46px;
     min-width: 46px;
+    height: 46px;
     min-height: 46px;
+    max-height: 46px;
     padding: 0;
   }
 
