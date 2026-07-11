@@ -6,9 +6,16 @@
     <title>Omiryn | Your Matchmaker</title>
     <link rel="icon" href="/static/assets/omiryn-app-icon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260711-fixed-send-button" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260711-boot-clean-logo" />
   </head>
   <body>
+    <div class="boot-loader" id="boot-loader" aria-label="Loading Omiryn" role="status">
+      <div class="boot-mark-card" aria-hidden="true">
+        <span class="boot-logo-glow"></span>
+        <img class="boot-logo-image" src="/static/assets/omiryn-logo-neon-light.png" alt="" />
+      </div>
+    </div>
+
     <section class="auth-screen" id="auth-screen" hidden>
       <div class="auth-panel">
         <span class="brand-mark auth-mark" aria-hidden="true">
@@ -1071,6 +1078,6 @@ Rules:
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/static/app.js?v=20260711-hide-empty-chat-header"></script>
+    <script src="/static/app.js?v=20260711-boot-clean-logo"></script>
   </body>
 </html>

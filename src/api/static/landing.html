@@ -33,9 +33,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/landing.css?v=20260709-landing">
+  <link rel="stylesheet" href="/static/landing.css?v=20260711-boot-clean-logo">
 </head>
 <body>
+  <div class="boot-loader" id="boot-loader" aria-label="Loading Omiryn" role="status">
+    <div class="boot-mark-card" aria-hidden="true">
+      <span class="boot-logo-glow"></span>
+      <img class="boot-logo-image" src="/static/assets/omiryn-logo-neon-light.png" alt="" />
+    </div>
+  </div>
 
   <!-- ═══════════ NAV ═══════════ -->
   <nav class="nav" id="nav-main">
@@ -272,6 +278,20 @@
     window.addEventListener('scroll', () => {
       nav.classList.toggle('is-scrolled', window.scrollY > 50);
     });
+
+    const bootLoaderStartedAt = Date.now();
+    const bootLoaderMinimumMs = 1650;
+    const hideBootLoader = () => {
+      const remainingMs = Math.max(0, bootLoaderMinimumMs - (Date.now() - bootLoaderStartedAt));
+      window.setTimeout(() => {
+        document.getElementById('boot-loader')?.classList.add('is-hidden');
+      }, remainingMs);
+    };
+    if (document.readyState === 'complete') {
+      hideBootLoader();
+    } else {
+      window.addEventListener('load', hideBootLoader, { once: true });
+    }
   </script>
 
 </body>

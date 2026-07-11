@@ -208,6 +208,9 @@ const usageEvents = document.querySelector("#usage-events");
 const usageTableRowLimit = 20;
 const appShell = document.querySelector("#app-shell");
 const appHeader = document.querySelector(".app-header");
+const bootLoader = document.querySelector("#boot-loader");
+const bootLoaderStartedAt = Date.now();
+const bootLoaderMinimumMs = 1650;
 const authScreen = document.querySelector("#auth-screen");
 const authScreenLogin = document.querySelector("#auth-screen-login");
 const authScreenStatus = document.querySelector("#auth-screen-status");
@@ -4382,24 +4385,38 @@ document.addEventListener("click", (event) => {
 
 bootApp();
 
-async function bootApp() {
-  await initializeAuth();
+function hideBootLoader() {
+  if (!bootLoader) {
+    return;
+  }
+  const remainingMs = Math.max(0, bootLoaderMinimumMs - (Date.now() - bootLoaderStartedAt));
+  window.setTimeout(() => {
+    bootLoader.classList.add("is-hidden");
+  }, remainingMs);
+}
 
-  const draftId = currentDraftIdFromPath();
-  if (draftId) {
-    showScreen("review");
-    loadDraft(draftId);
-  } else if (window.location.pathname === "/profile") {
-    showScreen("profile");
-  } else if (window.location.pathname === "/style") {
-    showScreen("style");
-  } else if (window.location.pathname === "/matches") {
-    showScreen("matches");
-  } else {
-    if (window.location.pathname === "/usage") {
-      window.history.replaceState({}, "", "/app");
+async function bootApp() {
+  try {
+    await initializeAuth();
+
+    const draftId = currentDraftIdFromPath();
+    if (draftId) {
+      showScreen("review");
+      loadDraft(draftId);
+    } else if (window.location.pathname === "/profile") {
+      showScreen("profile");
+    } else if (window.location.pathname === "/style") {
+      showScreen("style");
+    } else if (window.location.pathname === "/matches") {
+      showScreen("matches");
+    } else {
+      if (window.location.pathname === "/usage") {
+        window.history.replaceState({}, "", "/app");
+      }
+      showScreen("interview");
+      restoreOrStartConversation();
     }
-    showScreen("interview");
-    restoreOrStartConversation();
+  } finally {
+    hideBootLoader();
   }
 }
