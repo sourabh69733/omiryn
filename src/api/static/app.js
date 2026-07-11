@@ -116,6 +116,7 @@ const routes = {
 };
 
 const chatLog = document.querySelector("#chat-log");
+const agenticChat = document.querySelector(".agentic-chat");
 const chatTitle = document.querySelector("#chat-title");
 const chatTitleAvatar = document.querySelector(".terminal-mark img");
 const chatForm = document.querySelector("#chat-form");
@@ -1619,6 +1620,9 @@ async function restoreOrStartConversation() {
   const linkedTarget = linkedConversationTargetFromUrl();
   const savedConversationId = linkedTarget?.conversationId || storedConversationId();
   isConversationLoading = true;
+  currentAgentName = null;
+  conversationId = null;
+  updateAgentStatusModel();
   renderMessages();
   if (!savedConversationId) {
     const latestConversation = await latestRestorableConversation();
@@ -1644,12 +1648,8 @@ async function restoreOrStartConversation() {
     hydrateConversation(conversation, { highlightMessageIndex: linkedTarget?.messageIndex });
   } catch {
     forgetStoredConversation();
-    try {
-      await startConversation();
-    } catch {
-      prepareEmptyConversation();
-      await loadConversationHistory();
-    }
+    prepareEmptyConversation();
+    await loadConversationHistory();
   } finally {
     isConversationLoading = false;
     renderMessages({ preserveScroll: true });
@@ -1686,6 +1686,7 @@ function prepareEmptyConversation() {
   pendingContextSourceIds = [];
   chatInput.disabled = false;
   if (extractProfile) extractProfile.disabled = true;
+  updateAgentStatusModel();
   renderMessages();
   updateReadiness();
   updateSidebarMeta();
@@ -1822,15 +1823,37 @@ function selectedAgentTone() {
   return agentToneSelect ? agentToneSelect.value : "auto";
 }
 
+function hasHydratedConversation() {
+  return Boolean(conversationId && currentAgentName);
+}
+
+function syncConversationHeaderVisibility() {
+  agenticChat?.classList.toggle("conversation-empty", !hasHydratedConversation());
+}
+
 function updateAgentStatusModel() {
   if (!agentStatus) return;
+  syncConversationHeaderVisibility();
+
+  if (!hasHydratedConversation()) {
+    if (chatTitle) {
+      chatTitle.textContent = "";
+    }
+    if (chatTitleAvatar) {
+      chatTitleAvatar.hidden = true;
+      chatTitleAvatar.removeAttribute("src");
+    }
+    agentStatus.textContent = "";
+    return;
+  }
 
   const provider = agentStatus.dataset.provider || "Agent";
-  const agentName = selectedAgentName() || defaultAgentName();
+  const agentName = currentAgentName;
   if (chatTitle) {
     chatTitle.textContent = agentName;
   }
   if (chatTitleAvatar) {
+    chatTitleAvatar.hidden = false;
     chatTitleAvatar.src = agentAvatarUrl(agentName);
   }
   agentStatus.textContent = `${provider} · ${agentToneLabel(selectedAgentTone())} · ${selectedAgentModel() || "no model"}`;
