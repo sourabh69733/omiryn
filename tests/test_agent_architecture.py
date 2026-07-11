@@ -140,6 +140,41 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         finish_trace.assert_called_once()
         self.assertEqual(finish_trace.call_args.kwargs["summary"]["reply_part_count"], 2)
 
+    async def test_orchestrator_skips_model_for_simple_acceptance_acknowledgement(self) -> None:
+        with (
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot") as save_snapshot,
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
+            patch("agent.runtime.orchestrator.finish_agent_trace") as finish_trace,
+        ):
+            save_trace.return_value = {"id": "trace-1"}
+
+            result = await run_agent_turn(
+                conversation_id="conversation-1",
+                messages=[{"role": "assistant", "content": "Main yahaan hoon, tumhare saath."}],
+                user_text="haan baba thik h",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertTrue(result.quality_valid)
+        self.assertEqual(result.messages[-2]["quality"], "simple_acknowledgement")
+        self.assertEqual(result.messages[-1]["content"], "okay")
+        build_context.assert_not_called()
+        model_call.assert_not_awaited()
+        save_snapshot.assert_not_called()
+        self.assertEqual(save_trace_step.call_count, 3)
+        self.assertEqual(save_trace_step.call_args.args[0]["step_name"], "turn_policy")
+        finish_trace.assert_called_once()
+        self.assertEqual(finish_trace.call_args.kwargs["summary"]["direct_reply"], True)
+
     async def test_orchestrator_keeps_message_quality_valid_while_guardrail_is_disabled(self) -> None:
         with (
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),

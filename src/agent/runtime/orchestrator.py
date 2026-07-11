@@ -12,6 +12,7 @@ from agent.runtime.providers import (
     generate_agent_reply,
 )
 from agent.runtime.replies import split_assistant_reply
+from agent.runtime.turn_policy import direct_turn_reply
 from storage import (
     finish_agent_trace,
     save_agent_context_snapshot,
@@ -80,6 +81,9 @@ async def run_agent_turn(
     )
 
     updated_messages.append(user_message)
+    direct_reply = direct_turn_reply(user_text, updated_messages)
+    if direct_reply:
+        user_message["quality"] = direct_reply.quality
     capture_profile_facts_from_user_message(
         conversation_id,
         user_id,
@@ -102,6 +106,39 @@ async def run_agent_turn(
             },
         }
     )
+    if direct_reply:
+        updated_messages.append({"role": "assistant", "content": direct_reply.reply})
+        save_agent_trace_step(
+            {
+                "trace_id": trace_id,
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "step_index": 2,
+                "step_name": "turn_policy",
+                "status": "direct_reply",
+                "metadata": {
+                    "reason": direct_reply.reason,
+                    "confidence": direct_reply.confidence,
+                    "reply_chars": len(direct_reply.reply),
+                    "skipped_model_call": True,
+                    "skipped_context_pack": True,
+                },
+            }
+        )
+        finish_agent_trace(
+            trace_id,
+            status="completed",
+            summary={
+                "ending_message_count": len(updated_messages),
+                "quality_valid": quality_valid,
+                "reply_chars": len(direct_reply.reply),
+                "reply_part_count": 1,
+                "direct_reply": True,
+                "turn_policy_reason": direct_reply.reason,
+            },
+        )
+        return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
+
     context_package = build_model_context_package(
         conversation_id=conversation_id,
         user_text=user_text,

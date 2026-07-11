@@ -98,7 +98,7 @@ def pending_data_point_messages(
     for index, message in enumerate(messages):
         if message.get("role") != "user":
             continue
-        if message.get("quality") == "low_information":
+        if message.get("quality") in {"low_information", "simple_acknowledgement"}:
             continue
         if not message.get("content"):
             continue
