@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -85,7 +85,7 @@ class AgentConversation(BaseModel):
     agent_tone: AgentTone = "auto"
     agent_name: str | None = Field(default=None, max_length=40)
     agent_style_source_id: str | None = None
-    messages: list[dict[str, str]] = Field(default_factory=list)
+    messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AgentConversationCreate(BaseModel):
@@ -171,4 +171,3 @@ class UserProfilePatch(BaseModel):
     interested_in: InterestedIn
     city: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=40)
-
