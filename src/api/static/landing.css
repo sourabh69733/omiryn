@@ -282,28 +282,36 @@
       text-align: center;
       padding: 140px 24px 80px;
       overflow: hidden;
+      background:
+        url('/static/assets/landing-people-network-bg.png') center top / cover no-repeat,
+        #0e0c15;
     }
-    /* Ambient glow */
+
+    .hero::after {
+      content: none;
+    }
+
+    /* Text protection overlay */
     .hero::before {
       content: '';
       position: absolute;
-      top: -200px; left: 50%;
-      transform: translateX(-50%);
-      width: 1000px; height: 1000px;
-      background: radial-gradient(circle, rgba(180,154,255,0.18) 0%, rgba(255,126,179,0.1) 35%, rgba(251,191,36,0.04) 55%, transparent 70%);
+      inset: 0;
+      z-index: 1;
+      background:
+        radial-gradient(circle at 50% 38%, rgba(14,12,21,0.02), rgba(14,12,21,0.12) 56%, rgba(14,12,21,0.28) 100%),
+        linear-gradient(180deg, rgba(14,12,21,0.04), rgba(14,12,21,0.18) 62%, rgba(14,12,21,0.34)),
+        linear-gradient(90deg, rgba(14,12,21,0.26), rgba(14,12,21,0) 24%, rgba(14,12,21,0) 76%, rgba(14,12,21,0.26));
       pointer-events: none;
-      animation: pulseGlow 6s ease-in-out infinite;
-    }
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
-      50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
     }
 
     /* Floating orbs */
     .hero-orb {
       position: absolute;
+      z-index: 0;
       border-radius: 50%;
       filter: blur(60px);
+      display: none;
+      opacity: 0;
       pointer-events: none;
       animation: floatOrb 8s ease-in-out infinite;
     }
@@ -344,7 +352,7 @@
       color: var(--accent-1);
       margin-bottom: 32px;
       position: relative;
-      z-index: 1;
+      z-index: 2;
       box-shadow: 0 0 20px rgba(180,154,255,0.08);
     }
     .hero-badge-dot {
@@ -367,7 +375,7 @@
       letter-spacing: -2px;
       margin-bottom: 28px;
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
     .hero h1 .gradient-text {
       background: var(--gradient-main);
@@ -383,14 +391,14 @@
       line-height: 1.6;
       margin-bottom: 48px;
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     .hero-actions {
       display: flex;
       gap: 16px;
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
     .btn-primary {
       padding: 16px 40px;
@@ -443,7 +451,7 @@
     .hero-visual {
       margin-top: 64px;
       position: relative;
-      z-index: 1;
+      z-index: 2;
       width: 100%;
       max-width: 680px;
     }
@@ -544,11 +552,20 @@
     .typing-dot {
       width: 7px; height: 7px;
       border-radius: 50%;
-      background: var(--text-muted);
+      background: var(--accent-1);
+      box-shadow: 0 0 10px rgba(180,154,255,0.34);
       animation: typingBounce 1.2s ease-in-out infinite;
     }
-    .typing-dot:nth-child(2) { animation-delay: 0.15s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+    .typing-dot:nth-child(2) {
+      background: var(--accent-2);
+      box-shadow: 0 0 10px rgba(255,126,179,0.34);
+      animation-delay: 0.15s;
+    }
+    .typing-dot:nth-child(3) {
+      background: var(--accent-4);
+      box-shadow: 0 0 10px rgba(251,191,36,0.32);
+      animation-delay: 0.3s;
+    }
     @keyframes typingBounce {
       0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
       30% { transform: translateY(-5px); opacity: 1; }
@@ -890,7 +907,6 @@
         margin-left: 0;
         padding: 9px 18px !important;
       }
-      .hero::before,
       .how-it-works::before,
       .social-section::before,
       .cta-section::before {
@@ -900,6 +916,8 @@
         min-height: auto;
         justify-content: flex-start;
         padding: 122px 24px 52px;
+        background-size: cover;
+        background-position: center top;
       }
       .reveal {
         opacity: 1;
@@ -907,9 +925,12 @@
         transition-delay: 0s;
       }
       .hero::before {
-        top: -120px;
-        width: 760px;
-        height: 760px;
+        background:
+          radial-gradient(circle at 50% 34%, rgba(14,12,21,0.04), rgba(14,12,21,0.14) 60%, rgba(14,12,21,0.24) 100%),
+          linear-gradient(180deg, rgba(14,12,21,0), rgba(14,12,21,0.12));
+      }
+      .hero::after {
+        content: none;
       }
       .hero-orb {
         filter: blur(46px);

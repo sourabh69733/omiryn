@@ -2969,16 +2969,26 @@ p {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: var(--mint);
+  background: var(--lavender);
+  box-shadow: 0 0 10px rgba(180, 154, 255, 0.34);
   opacity: 0.4;
   animation: typing-dot-pulse 1.05s ease-in-out infinite;
 }
 
+.typing-dots span:nth-child(1) {
+  background: var(--lavender);
+  box-shadow: 0 0 10px rgba(180, 154, 255, 0.34);
+}
+
 .typing-dots span:nth-child(2) {
+  background: var(--rose);
+  box-shadow: 0 0 10px rgba(255, 126, 179, 0.34);
   animation-delay: 140ms;
 }
 
 .typing-dots span:nth-child(3) {
+  background: var(--amber);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.32);
   animation-delay: 280ms;
 }
 
