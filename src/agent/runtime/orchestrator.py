@@ -12,6 +12,7 @@ from agent.runtime.providers import (
     generate_agent_reply,
 )
 from agent.runtime.replies import split_assistant_reply
+from agent.context_engine.turn_state import assistant_turn_state
 from agent.runtime.turn_policy import direct_turn_reply
 from storage import (
     finish_agent_trace,
@@ -240,8 +241,16 @@ async def run_agent_turn(
             },
         }
         )
-    for reply_part in reply_parts:
-        updated_messages.append({"role": "assistant", "content": reply_part})
+    for index, reply_part in enumerate(reply_parts):
+        assistant_message = {"role": "assistant", "content": reply_part}
+        turn_state = assistant_turn_state(
+            reply_part,
+            conversation_move=(context_snapshot.get("summary") or {}).get("conversation_move"),
+            response_mode=(context_snapshot.get("summary") or {}).get("response_mode"),
+        )
+        if turn_state and index == len(reply_parts) - 1:
+            assistant_message["turn_state"] = turn_state
+        updated_messages.append(assistant_message)
     if context_snapshot:
         context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = reply
     save_agent_context_snapshot(context_snapshot)

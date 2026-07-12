@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from agent.context_engine.turn_state import active_turn_state, is_confirmation_to_pending_turn
 from agent.context_engine.utils import normalized_memory_text
 
 
@@ -75,6 +76,8 @@ def direct_turn_reply(user_text: str, messages: list[dict[str, Any]]) -> DirectT
         return None
     normalized = normalized_memory_text(user_text)
     if not normalized:
+        return None
+    if is_confirmation_to_pending_turn(user_text, active_turn_state(messages[:-1])):
         return None
     if _is_thanks(normalized):
         return DirectTurnReply(reply="welcome", reason="gratitude_acknowledgement", confidence=0.95)
