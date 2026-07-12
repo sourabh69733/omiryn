@@ -14,6 +14,7 @@ from agent.context_engine.prompt_engine.registry import get_prompt_behavior_vers
 from agent.context_engine.query_intent import context_query_intent
 from agent.context_engine.source_selection import build_reply_context
 from agent.context_engine.topic_state import build_topic_state
+from agent.context_engine.turn_state import active_turn_state
 from storage import get_conversation
 
 
@@ -39,9 +40,10 @@ def build_model_context_package(
         user_profile=user_profile,
         style_source_id=style_source_id,
     )
-    query_intent = context_query_intent(user_text)
     if prompt_version.version_id == "v2":
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
+        pending_turn_state = active_turn_state(planning_messages[:-1])
+        query_intent = context_query_intent(user_text, pending_turn_state=pending_turn_state)
         emotion_state = detect_emotion_state(
             user_text=user_text,
             messages=planning_messages,
@@ -82,6 +84,7 @@ def build_model_context_package(
             conversation_plan=conversation_plan,
         )
     else:
+        query_intent = context_query_intent(user_text)
         system_prompt = build_companion_system_prompt(
             context_sources=reply_context.context_sources,
             user_profile=reply_context.user_profile,

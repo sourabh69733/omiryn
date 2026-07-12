@@ -52,6 +52,8 @@ def _conversation_move(
         return "direct_answer_from_context"
     if "adult_flirty" in labels:
         return "safe_flirty_tease"
+    if "confirmation" in labels:
+        return "continue_prior_offer"
     if "simple_ack" in labels:
         return "simple_acknowledgement"
     if emotion.response_mode in {"empathize_listen", "validate_then_suggest"}:
@@ -81,6 +83,8 @@ def _data_targets(user_text: str, intent: ContextQueryIntent) -> tuple[str, ...]
 def _response_mode(user_text: str, labels: set[str], emotion: EmotionState) -> str:
     if emotion.response_mode and emotion.response_mode != "normal_chat":
         return emotion.response_mode
+    if "confirmation" in labels:
+        return "continue_prior_offer"
     if "simple_ack" in labels:
         return "simple_ack"
     normalized = user_text.casefold()
@@ -90,6 +94,8 @@ def _response_mode(user_text: str, labels: set[str], emotion: EmotionState) -> s
 
 
 def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
+    if "confirmation" in labels:
+        return "The user confirmed the previous assistant turn. Continue the pending offer/action; do not only acknowledge."
     if "simple_ack" in labels:
         return "Reply with a tiny acknowledgement only, like 'welcome', 'sure', 'okay', or 'no worries'. Do not add advice, a new topic, or a question."
     if emotion.response_mode == "apologize_and_adjust":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agent.context_engine.models import ContextQueryIntent
 from agent.context_engine.utils import memory_terms, normalized_memory_text
+from agent.context_engine.turn_state import is_confirmation_to_pending_turn
 
 RECENCY_QUERY_TERMS = {"last", "latest", "recent", "previous", "pichli", "pehle", "before"}
 WHATSAPP_QUERY_TERMS = {
@@ -65,7 +66,11 @@ COMMON_TOPIC_TERMS = {"movie", "movies", "music", "song", "songs"}
 COMMON_TOPIC_PHRASES = {"truth or dare", "how was your day", "hows your day"}
 
 
-def context_query_intent(user_text: str) -> ContextQueryIntent:
+def context_query_intent(
+    user_text: str,
+    *,
+    pending_turn_state: dict | None = None,
+) -> ContextQueryIntent:
     normalized = normalized_memory_text(user_text)
     query_terms = memory_terms(user_text)
     labels: list[str] = []
@@ -73,7 +78,9 @@ def context_query_intent(user_text: str) -> ContextQueryIntent:
     is_low_information = normalized in LOW_INFORMATION_TERMS or (
         len(normalized.split()) <= 2 and not query_terms
     )
-    if _is_simple_acknowledgement(normalized):
+    if is_confirmation_to_pending_turn(user_text, pending_turn_state):
+        labels.append("confirmation")
+    elif _is_simple_acknowledgement(normalized):
         labels.append("simple_ack")
     if any(term in query_terms for term in WHATSAPP_QUERY_TERMS) or any(
         phrase in normalized for phrase in WHATSAPP_QUERY_PHRASES
