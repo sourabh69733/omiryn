@@ -3,9 +3,30 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.models import ContextQueryIntent, ModelContextPackage
 from agent.runtime.orchestrator import run_agent_turn
+from api.models import AgentConversation
 
 
 class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
+    def test_agent_conversation_accepts_message_metadata(self) -> None:
+        conversation = AgentConversation.model_validate(
+            {
+                "id": "conversation-1",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": "Want a tiny mood lift?",
+                        "turn_state": {
+                            "status": "active",
+                            "expects": "confirmation",
+                            "on_confirm": {"response_mode": "continue_prior_offer"},
+                        },
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(conversation.messages[0]["turn_state"]["expects"], "confirmation")
+
     async def test_orchestrator_builds_context_before_calling_model(self) -> None:
         with (
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message") as capture_facts,
@@ -174,6 +195,100 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(save_trace_step.call_args.args[0]["step_name"], "turn_policy")
         finish_trace.assert_called_once()
         self.assertEqual(finish_trace.call_args.kwargs["summary"]["direct_reply"], True)
+
+    async def test_orchestrator_stores_turn_state_for_confirmation_prompt(self) -> None:
+        with (
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-1"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "message_index": 2,
+                    "summary": {
+                        "conversation_move": "boredom_rescue",
+                        "included_source_count": 0,
+                        "response_mode": "normal_chat",
+                        "rough_context_tokens": 0,
+                    },
+                },
+            )
+            model_call.return_value = "Want a tiny mood lift?"
+
+            result = await run_agent_turn(
+                conversation_id="conversation-1",
+                messages=[{"role": "assistant", "content": "Hmm."}],
+                user_text="bad mood",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        turn_state = result.messages[-1].get("turn_state")
+        self.assertEqual(turn_state["expects"], "confirmation")
+        self.assertEqual(turn_state["on_confirm"]["response_mode"], "continue_prior_offer")
+        self.assertEqual(turn_state["previous_move"], "boredom_rescue")
+
+    async def test_orchestrator_allows_model_when_ok_confirms_pending_turn_state(self) -> None:
+        with (
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-1"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "message_index": 2,
+                    "summary": {
+                        "included_source_count": 0,
+                        "rough_context_tokens": 0,
+                    },
+                },
+            )
+            model_call.return_value = "Chal, ek chhoti si baat sun."
+
+            result = await run_agent_turn(
+                conversation_id="conversation-1",
+                messages=[
+                    {
+                        "role": "assistant",
+                        "content": "Want a tiny mood lift?",
+                        "turn_state": {
+                            "status": "active",
+                            "expects": "confirmation",
+                            "on_confirm": {"response_mode": "continue_prior_offer"},
+                        },
+                    }
+                ],
+                user_text="ok",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(result.messages[-1]["content"], "Chal, ek chhoti si baat sun.")
+        self.assertNotEqual(result.messages[-2].get("quality"), "simple_acknowledgement")
+        build_context.assert_called_once()
+        model_call.assert_awaited_once()
 
     async def test_orchestrator_keeps_message_quality_valid_while_guardrail_is_disabled(self) -> None:
         with (

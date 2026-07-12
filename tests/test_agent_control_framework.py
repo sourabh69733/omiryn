@@ -30,7 +30,7 @@ from agent.runtime.providers import _deep_fact_extraction_text
 from agent.runtime.replies import split_assistant_reply
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
-from storage import list_agent_behavior_rules, reset_db
+from storage import list_agent_behavior_rules, reset_db, save_conversation
 
 
 class AgentControlFrameworkTest(unittest.TestCase):
@@ -245,6 +245,50 @@ class AgentControlFrameworkTest(unittest.TestCase):
             self.assertIn("simple_ack", package.system_prompt)
             self.assertIn("reply in 1-4 words and stop", package.system_prompt)
             self.assertNotIn("## Boredom Recovery", package.system_prompt)
+
+    def test_v2_confirmation_uses_pending_turn_state_not_simple_ack(self) -> None:
+        save_conversation(
+            {
+                "id": "conversation-a",
+                "status": "active",
+                "agent_provider": "mock",
+                "agent_model": "llama-70b",
+                "agent_mode": "know_me",
+                "agent_tone": "auto",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": "Want a tiny mood lift?",
+                        "turn_state": {
+                            "status": "active",
+                            "expects": "confirmation",
+                            "on_confirm": {"response_mode": "continue_prior_offer"},
+                        },
+                    }
+                ],
+            },
+            "user-a",
+        )
+
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="ok",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=1,
+            assistant_message_index=2,
+            prompt_version_id="v2",
+        )
+
+        self.assertIn("confirmation", package.query_intent.labels)
+        self.assertNotIn("simple_ack", package.query_intent.labels)
+        self.assertNotIn("## Boredom Recovery", package.system_prompt)
+        self.assertEqual(package.snapshot["summary"]["conversation_move"], "continue_prior_offer")
+        self.assertEqual(package.snapshot["summary"]["response_mode"], "continue_prior_offer")
 
     def test_v2_boredom_complaint_blocks_common_topic_starters(self) -> None:
         package = build_model_context_package(
