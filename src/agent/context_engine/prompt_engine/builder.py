@@ -288,6 +288,7 @@ def _v2_prompt_sections(
             position="middle",
             priority=60,
             include_when=lambda context: "simple_ack" not in context.intent_labels
+            and "confirmation" not in context.intent_labels
             and (context.is_low_information or "boredom_complaint" in context.intent_labels),
         ),
         PromptSection(
