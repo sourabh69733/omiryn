@@ -5,10 +5,30 @@ const themeKey = "omiryn.landing.theme";
 const localHosts = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 
 function appUrl() {
-  if (localHosts.has(window.location.hostname)) {
-    return `${window.location.origin}/app`;
+  const appOrigin = root.dataset.appOrigin || "https://app.omiryn.com";
+  const configuredLocalOrigin = root.dataset.localAppOrigin;
+  const localAppPort = root.dataset.localAppPort || window.location.port || "8001";
+  const isLoopback = localHosts.has(window.location.hostname);
+  const isLocalTunnel = !isLoopback && window.location.hostname.startsWith("local");
+
+  if (isLoopback || isLocalTunnel) {
+    const localOrigin = configuredLocalOrigin
+      || (isLocalTunnel ? window.location.origin : `${window.location.protocol}//${window.location.hostname}:${localAppPort}`);
+    return new URL("/app", localOrigin).toString();
   }
-  return "https://app.omiryn.com";
+  return new URL("/app", appOrigin).toString();
+}
+
+function isAuthCallbackHash() {
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return hashParams.has("access_token") || hashParams.has("refresh_token") || hashParams.has("error");
+}
+
+if (window.location.pathname === "/" && isAuthCallbackHash()) {
+  const target = new URL(appUrl());
+  target.search = window.location.search;
+  target.hash = window.location.hash;
+  window.location.replace(target.toString());
 }
 
 document.querySelectorAll("[data-app-link]").forEach((link) => {

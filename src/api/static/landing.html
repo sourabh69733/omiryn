@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-app-origin="https://app.omiryn.com" data-local-app-port="8021">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -51,7 +51,7 @@
     <div class="nav-links">
       <a href="#how-it-works">How it works</a>
       <a href="#why-different">Why Omiryn</a>
-      <a href="https://app.omiryn.com/" class="nav-cta">Start talking</a>
+      <a href="/app" data-app-link class="nav-cta">Start talking</a>
     </div>
   </nav>
 
@@ -75,7 +75,7 @@
     </p>
 
     <div class="hero-actions reveal reveal-delay-3">
-      <a href="https://app.omiryn.com/" class="btn-primary">
+      <a href="#" data-app-link class="btn-primary">
         Get started
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </a>
@@ -225,7 +225,7 @@
       <h2 class="section-title reveal reveal-delay-1">Your next great<br><span class="gradient-text">conversation</span> starts here.</h2>
       <p class="section-desc reveal reveal-delay-2">It takes one conversation to find someone who actually gets you.</p>
       <div class="reveal reveal-delay-3">
-        <a href="https://app.omiryn.com/" class="btn-primary btn-primary-large" id="btn-join">
+        <a href="#" data-app-link class="btn-primary btn-primary-large" id="btn-join">
           Start your first conversation
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </a>
@@ -293,6 +293,7 @@
       window.addEventListener('load', hideBootLoader, { once: true });
     }
   </script>
+  <script src="/static/landing.js?v=20260713-auth-callback"></script>
 
 </body>
 </html>
