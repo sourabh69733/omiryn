@@ -34,6 +34,8 @@ let accountProfilePhotoUrls = [];
 let pendingAccountPhotoSlot = 0;
 let onboardingProfilePhotoFiles = Array(4).fill(null);
 let pendingOnboardingPhotoSlot = 0;
+let onboardingChatStepIndex = 0;
+let onboardingChatMessages = [];
 let indiaLocations = null;
 const messageFeedbackState = new Map();
 const typingSpeedProfiles = {
@@ -252,6 +254,15 @@ const rawProfileDataTotal = document.querySelector("#raw-profile-data-total");
 const rawProfileDataList = document.querySelector("#raw-profile-data-list");
 const datingBasicsStatus = document.querySelector("#dating-basics-status");
 const saveDatingBasics = document.querySelector("#save-dating-basics");
+const onboardingChatLog = document.querySelector("#onboarding-chat-log");
+const onboardingChatControls = document.querySelector("#onboarding-chat-controls");
+const onboardingChatProgress = document.querySelector("#onboarding-chat-progress");
+const onboardingProgressDots = document.querySelector("#onboarding-progress-dots");
+const onboardingPhotoStrip = document.querySelector("#onboarding-photo-strip");
+const onboardingPreviewName = document.querySelector("#onboarding-preview-name");
+const onboardingPreviewDob = document.querySelector("#onboarding-preview-dob");
+const onboardingPreviewInterest = document.querySelector("#onboarding-preview-interest");
+const onboardingPreviewPhotos = document.querySelector("#onboarding-preview-photos");
 const loginGoogle = document.querySelector("#login-google");
 const logoutUser = document.querySelector("#logout-user");
 const authUser = document.querySelector("#auth-user");
@@ -676,21 +687,525 @@ function renderOnboardingStep(step = onboardingStep) {
     onboardingNextStep.hidden = true;
   }
   if (saveDatingBasics) {
-    saveDatingBasics.hidden = false;
+    saveDatingBasics.hidden = true;
   }
   clearDatingBasicsFieldErrors();
   if (datingBasicsStatus) {
     datingBasicsStatus.textContent = "";
   }
+  renderOnboardingChat(true);
 }
 
 function goToNextOnboardingStep() {
-  renderOnboardingStep(1);
-  basicsName?.focus();
+  advanceOnboardingChat();
 }
 
 function goToPreviousOnboardingStep() {
   renderOnboardingStep(1);
+}
+
+const onboardingChatSteps = [
+  {
+    id: "name",
+    progress: "1 of 7",
+    doodle: "question",
+    question: "First tiny question. What should I call you?",
+    mode: "text",
+    placeholder: "Type your name",
+    validate(value) {
+      const name = String(value || "").trim();
+      if (name.length < 2) {
+        return {
+          valid: false,
+          message: "Mysterious. Very spy-movie. But I need at least 2 letters for your profile."
+        };
+      }
+      basicsName.value = name;
+      renderHeaderAvatar(name);
+      return { valid: true, response: `Nice to meet you, ${name}.` };
+    }
+  },
+  {
+    id: "dob",
+    progress: "2 of 7",
+    doodle: "calendar",
+    question: "What’s your date of birth?",
+    hint: "Use YYYY-MM-DD.",
+    mode: "date",
+    validate(value) {
+      const rawValue = String(value || "").trim();
+      const ageValue = ageFromDob(rawValue);
+      if (!rawValue || !Number.isInteger(ageValue)) {
+        return {
+          valid: false,
+          message: "My calendar is squinting. Please enter your full date of birth."
+        };
+      }
+      if (ageValue < 18) {
+        return {
+          valid: false,
+          message: "Ah, the math says no. Omiryn is for 18+ only."
+        };
+      }
+      if (ageValue > 100) {
+        return {
+          valid: false,
+          message: "That date looks a little too legendary. Please check it once."
+        };
+      }
+      profileDob.value = rawValue;
+      return { valid: true, response: "Got it. Birthday math survived." };
+    }
+  },
+  {
+    id: "gender",
+    progress: "3 of 7",
+    doodle: "spark",
+    question: "How should we describe your gender?",
+    mode: "choice",
+    choices: [
+      { label: "Man", value: "man" },
+      { label: "Woman", value: "woman" },
+      { label: "Non-binary", value: "non_binary" },
+      { label: "Prefer not to say", value: "prefer_not_to_say" }
+    ],
+    validate(value, label) {
+      if (!value) {
+        return { valid: false, message: "Pick one so I do not accidentally invent lore." };
+      }
+      profileGender.value = value;
+      updateInterestedInDefault();
+      return { valid: true, response: `${label}. Noted.` };
+    }
+  },
+  {
+    id: "interested",
+    progress: "4 of 7",
+    doodle: "pin",
+    question: "Who are you interested in meeting?",
+    mode: "choice",
+    choices: [
+      { label: "Women", value: "women" },
+      { label: "Men", value: "men" },
+      { label: "Everyone", value: "everyone" }
+    ],
+    validate(value, label) {
+      if (!value) {
+        return { valid: false, message: "My matchmaking compass needs a direction." };
+      }
+      profileInterestedIn.value = value;
+      syncBasicsOptionButtons();
+      return { valid: true, response: `${label}. My matchmaking brain has coordinates now.` };
+    }
+  },
+  {
+    id: "location",
+    progress: "5 of 7",
+    doodle: "route",
+    question: "Where are you based?",
+    hint: "Type City, State. For example: Bengaluru, Karnataka.",
+    mode: "text",
+    placeholder: "City, State",
+    async validate(value) {
+      await loadIndiaLocations();
+      const parsed = parseTypedLocation(value);
+      if (!parsed) {
+        return {
+          valid: false,
+          message: "I need a city and state so matches do not accidentally live in another universe."
+        };
+      }
+      profileState.value = parsed.state.code;
+      populateCitySelect(profileState, profileCity, parsed.city.name);
+      return {
+        valid: true,
+        response: `${parsed.city.name}, ${parsed.state.name}. Pinned on the map.`
+      };
+    }
+  },
+  {
+    id: "phone",
+    progress: "6 of 7",
+    doodle: "phone",
+    question: "Want to add a phone number?",
+    hint: "Optional. You can skip this.",
+    mode: "text",
+    placeholder: "+91...",
+    optionalLabel: "Skip",
+    validate(value, label, skipped = false) {
+      const phone = String(value || "").trim();
+      if (skipped || !phone) {
+        profilePhone.value = "";
+        return { valid: true, response: "No phone for now. Very mysterious, but allowed." };
+      }
+      if (!/^\+?[0-9\s-]{7,16}$/.test(phone)) {
+        return {
+          valid: false,
+          message: "That phone number looks a little lost. Try it with country code, or skip."
+        };
+      }
+      profilePhone.value = phone;
+      return { valid: true, response: "Saved. I will not call it unless the product team makes me." };
+    }
+  },
+  {
+    id: "photos",
+    progress: "7 of 7",
+    doodle: "camera",
+    question: "Want to add a profile photo now?",
+    hint: "Totally optional, but it helps people recognize you as a real human and not a mysterious cloud.",
+    mode: "photo",
+    validate(_value, label, skipped = false) {
+      if (skipped) {
+        return { valid: true, response: "Skipping photos for now. The mysterious cloud lives another day." };
+      }
+      return { valid: true, response: "Photo added. Looking much less cloud-like already." };
+    }
+  }
+];
+
+function resetOnboardingChat() {
+  onboardingChatStepIndex = firstIncompleteOnboardingStepIndex();
+  onboardingChatMessages = [];
+  onboardingChatSteps.slice(0, onboardingChatStepIndex).forEach((step) => {
+    const summary = onboardingAnswerSummary(step);
+    if (summary) {
+      onboardingChatMessages.push({ role: "agent", text: step.question, stepId: step.id, doodle: step.doodle });
+      onboardingChatMessages.push({ role: "user", text: summary });
+    }
+  });
+  const currentStep = onboardingChatSteps[onboardingChatStepIndex] || onboardingChatSteps[0];
+  onboardingChatMessages.push({
+    role: "agent",
+    text: currentStep.question,
+    hint: currentStep.hint,
+    stepId: currentStep.id,
+    doodle: currentStep.doodle
+  });
+}
+
+function firstIncompleteOnboardingStepIndex() {
+  const checks = [
+    () => basicsName?.value.trim().length >= 2,
+    () => Number.isInteger(ageFromDob(profileDob?.value)) && ageFromDob(profileDob.value) >= 18,
+    () => Boolean(profileGender?.value),
+    () => Boolean(profileInterestedIn?.value),
+    () => Boolean(profileState?.value && profileCity?.value),
+    () => true,
+    () => true
+  ];
+  const index = checks.findIndex((check) => !check());
+  return index === -1 ? 0 : index;
+}
+
+function onboardingAnswerSummary(step) {
+  if (step.id === "name") return basicsName?.value.trim() || "";
+  if (step.id === "dob") return profileDob?.value || "";
+  if (step.id === "gender") return optionLabel(step.choices, profileGender?.value);
+  if (step.id === "interested") return optionLabel(step.choices, profileInterestedIn?.value);
+  if (step.id === "location") return composeLocationValue(profileState, profileCity);
+  return "";
+}
+
+function optionLabel(choices = [], value = "") {
+  return choices.find((choice) => choice.value === value)?.label || "";
+}
+
+function renderOnboardingChat(reset = false) {
+  if (!onboardingChatLog || !onboardingChatControls) return;
+  if (reset || !onboardingChatMessages.length) {
+    resetOnboardingChat();
+  }
+  const step = onboardingChatSteps[onboardingChatStepIndex] || onboardingChatSteps[onboardingChatSteps.length - 1];
+  if (onboardingChatProgress) {
+    onboardingChatProgress.textContent = step.progress;
+  }
+  renderOnboardingProgressDots();
+  renderOnboardingPreview();
+  onboardingPhotoStrip.hidden = step.mode !== "photo";
+
+  onboardingChatLog.replaceChildren();
+  visibleOnboardingMessages().forEach((message, index) => {
+    const row = document.createElement("div");
+    row.className = `onboarding-message ${message.role}`;
+    if (message.kind) {
+      row.classList.add(message.kind);
+    }
+    if (message.role === "agent") {
+      row.appendChild(createMascotAvatar(index, message.kind));
+    }
+    const bubble = document.createElement("div");
+    bubble.className = "onboarding-bubble";
+    const text = document.createElement("p");
+    text.textContent = message.text;
+    bubble.appendChild(text);
+    if (message.hint) {
+      const hint = document.createElement("small");
+      hint.textContent = message.hint;
+      bubble.appendChild(hint);
+    }
+    if (message.role === "agent" && message.doodle) {
+      const doodle = document.createElement("span");
+      doodle.className = `onboarding-inline-doodle ${message.doodle}`;
+      doodle.setAttribute("aria-hidden", "true");
+      bubble.appendChild(doodle);
+    }
+    row.appendChild(bubble);
+    onboardingChatLog.appendChild(row);
+  });
+  onboardingChatLog.scrollTop = onboardingChatLog.scrollHeight;
+  renderOnboardingControls(step);
+}
+
+function renderOnboardingControls(step) {
+  onboardingChatControls.replaceChildren();
+  if (datingBasicsStatus) datingBasicsStatus.textContent = "";
+
+  if (step.mode === "choice") {
+    const group = document.createElement("div");
+    group.className = "onboarding-chip-row";
+    step.choices.forEach((choice) => {
+      const button = document.createElement("button");
+      button.className = "onboarding-chip";
+      if (onboardingStoredValueForStep(step) === choice.value) {
+        button.classList.add("selected");
+      }
+      button.type = "button";
+      button.textContent = choice.label;
+      button.addEventListener("click", () => submitOnboardingAnswer(choice.value, choice.label));
+      group.appendChild(button);
+    });
+    onboardingChatControls.appendChild(group);
+    return;
+  }
+
+  if (step.mode === "photo") {
+    const group = document.createElement("div");
+    group.className = "onboarding-chip-row";
+    const addButton = document.createElement("button");
+    addButton.className = "onboarding-chip primary";
+    addButton.type = "button";
+    addButton.innerHTML = '<span class="chip-icon camera" aria-hidden="true"></span><span>Add photo</span>';
+    addButton.addEventListener("click", () => {
+      pendingOnboardingPhotoSlot = 0;
+      profilePhoto?.click();
+    });
+    const skipButton = document.createElement("button");
+    skipButton.className = "onboarding-chip";
+    skipButton.type = "button";
+    skipButton.innerHTML = '<span class="chip-icon cross" aria-hidden="true"></span><span>Skip</span>';
+    skipButton.addEventListener("click", () => submitOnboardingAnswer("", "Skip", true));
+    group.append(addButton, skipButton);
+    onboardingChatControls.appendChild(group);
+    return;
+  }
+
+  const form = document.createElement("div");
+  form.className = "onboarding-composer";
+  const smile = document.createElement("span");
+  smile.className = "onboarding-smile";
+  smile.setAttribute("aria-hidden", "true");
+  const input = document.createElement("input");
+  input.type = step.mode === "date" ? "date" : "text";
+  input.placeholder = step.placeholder || "";
+  input.autocomplete = step.id === "name" ? "name" : step.id === "phone" ? "tel" : "off";
+  if (step.id === "dob" && profileDob) {
+    input.min = profileDob.min;
+    input.max = profileDob.max;
+  }
+  const send = document.createElement("button");
+  send.className = "onboarding-send";
+  send.type = "button";
+  send.innerHTML = '<span>Send</span><span class="send-plane" aria-hidden="true"></span>';
+  const submit = () => submitOnboardingAnswer(input.value);
+  send.addEventListener("click", submit);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    }
+  });
+  form.append(smile, input, send);
+  if (step.optionalLabel) {
+    const skip = document.createElement("button");
+    skip.className = "onboarding-skip";
+    skip.type = "button";
+    skip.textContent = step.optionalLabel;
+    skip.addEventListener("click", () => submitOnboardingAnswer("", step.optionalLabel, true));
+    form.appendChild(skip);
+  }
+  onboardingChatControls.appendChild(form);
+  input.focus();
+}
+
+function visibleOnboardingMessages() {
+  const currentStep = onboardingChatSteps[onboardingChatStepIndex];
+  const mobileViewport = window.matchMedia?.("(max-width: 680px)")?.matches;
+  const maxMessages = mobileViewport
+    ? (currentStep?.mode === "photo" ? 5 : 7)
+    : (currentStep?.mode === "photo" ? 4 : 5);
+  return onboardingChatMessages.slice(-maxMessages);
+}
+
+async function submitOnboardingAnswer(value, label = "", skipped = false) {
+  const step = onboardingChatSteps[onboardingChatStepIndex];
+  if (!step) return;
+  const displayValue = skipped ? (label || "Skip") : (label || String(value || "").trim());
+  if (!displayValue) return;
+  onboardingChatMessages.push({ role: "user", text: displayValue });
+  renderOnboardingChat();
+  try {
+    const result = await step.validate(value, label || displayValue, skipped);
+    if (!result.valid) {
+      onboardingChatMessages.push({
+        role: "agent",
+        text: result.message,
+        hint: step.hint,
+        stepId: step.id,
+        doodle: "warning",
+        kind: "correction"
+      });
+      renderOnboardingChat();
+      return;
+    }
+    if (result.response) {
+      onboardingChatMessages.push({
+        role: "agent",
+        text: result.response,
+        stepId: step.id,
+        doodle: step.doodle,
+        kind: "success"
+      });
+    }
+    onboardingChatStepIndex += 1;
+    if (onboardingChatStepIndex >= onboardingChatSteps.length) {
+      onboardingChatMessages.push({
+        role: "agent",
+        text: "Tiny setup complete. I am saving this and opening your matchmaker chat.",
+        doodle: "spark",
+        kind: "success"
+      });
+      renderOnboardingChat();
+      datingBasicsForm?.requestSubmit(saveDatingBasics);
+      return;
+    }
+    const nextStep = onboardingChatSteps[onboardingChatStepIndex];
+    onboardingChatMessages.push({
+      role: "agent",
+      text: nextStep.question,
+      hint: nextStep.hint,
+      stepId: nextStep.id,
+      doodle: nextStep.doodle
+    });
+    renderOnboardingChat();
+  } catch (error) {
+    onboardingChatMessages.push({
+      role: "agent",
+      text: error.message || "That did not land. Try once more?",
+      doodle: "warning",
+      kind: "correction"
+    });
+    renderOnboardingChat();
+  }
+}
+
+function parseTypedLocation(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || !indiaLocations) return null;
+  const parts = normalized.split(",").map((part) => part.trim()).filter(Boolean);
+  const stateText = parts.length > 1 ? parts[parts.length - 1] : "";
+  const cityText = parts.length > 1 ? parts.slice(0, -1).join(", ") : normalized;
+  const states = indiaLocations.states || [];
+  const matchedState = stateText
+    ? states.find((state) => state.name.toLowerCase() === stateText || state.code.toLowerCase() === stateText)
+    : states.find((state) => (indiaLocations.citiesByState?.[state.code] || []).some((city) => city.name.toLowerCase() === cityText));
+  if (!matchedState) return null;
+  const cities = indiaLocations.citiesByState?.[matchedState.code] || [];
+  const matchedCity = cities.find((city) => city.name.toLowerCase() === cityText);
+  if (!matchedCity) return null;
+  return { state: matchedState, city: matchedCity };
+}
+
+function advanceOnboardingChat() {
+  renderOnboardingChat();
+}
+
+function createMascotAvatar(index = 0, kind = "") {
+  const avatar = document.createElement("span");
+  avatar.className = "mascot-head";
+  if (kind) {
+    avatar.classList.add(kind);
+  } else if (index % 4 === 1) {
+    avatar.classList.add("curious");
+  } else if (index % 4 === 2) {
+    avatar.classList.add("wink");
+  } else if (index % 4 === 3) {
+    avatar.classList.add("happy");
+  }
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.innerHTML = mascotSvgMarkup(kind || avatar.className);
+  return avatar;
+}
+
+function mascotSvgMarkup(kind = "") {
+  const showHat = String(kind).includes("correction") || String(kind).includes("curious");
+  const wink = String(kind).includes("wink") || String(kind).includes("success");
+  const rightEye = wink
+    ? '<path class="mascot-eye-svg wink" d="M56 42h8"></path>'
+    : '<circle class="mascot-eye-svg" cx="60" cy="42" r="3.5"></circle>';
+  const hat = showHat
+    ? '<path class="mascot-hat-svg" d="M48 17l26 8-5 12-29-9Z"></path><path class="mascot-hat-band-svg" d="M43 27l27 8"></path>'
+    : "";
+  return `
+    <svg viewBox="0 0 96 96" focusable="false">
+      <circle class="mascot-bg" cx="48" cy="48" r="44"></circle>
+      <path class="mascot-body" d="M23 72c5-13 15-19 25-19s20 6 25 19"></path>
+      <path class="mascot-face-shape" d="M29 43c0-14 9-24 21-24 11 0 19 9 19 22 0 16-10 28-22 28-10 0-18-11-18-26Z"></path>
+      <path class="mascot-tuft-line" d="M43 21c3-8 9-9 13-9-4 4-5 8-4 13"></path>
+      ${hat}
+      <circle class="mascot-eye-svg" cx="40" cy="42" r="3.5"></circle>
+      ${rightEye}
+      <path class="mascot-beak-svg" d="M46 49h13l-6 7Z"></path>
+      <circle class="mascot-cheek-svg" cx="35" cy="51" r="3"></circle>
+      <circle class="mascot-cheek-svg" cx="65" cy="51" r="3"></circle>
+      <circle class="mascot-glass-svg" cx="62" cy="38" r="12"></circle>
+      <path class="mascot-glass-svg" d="M70 47l12 12"></path>
+      <path class="mascot-bow-svg" d="M34 73l13-8v16Zm28 0-13-8v16Z"></path>
+    </svg>
+  `;
+}
+
+function renderOnboardingProgressDots() {
+  if (!onboardingProgressDots) return;
+  onboardingProgressDots.replaceChildren();
+  onboardingChatSteps.forEach((_step, index) => {
+    const dot = document.createElement("span");
+    dot.className = index <= onboardingChatStepIndex ? "active" : "";
+    onboardingProgressDots.appendChild(dot);
+  });
+}
+
+function renderOnboardingPreview() {
+  if (onboardingPreviewName) {
+    onboardingPreviewName.textContent = basicsName?.value.trim() || "—";
+  }
+  if (onboardingPreviewDob) {
+    onboardingPreviewDob.textContent = profileDob?.value || "—";
+  }
+  if (onboardingPreviewInterest) {
+    onboardingPreviewInterest.textContent =
+      optionLabel(onboardingChatSteps.find((step) => step.id === "interested")?.choices, profileInterestedIn?.value) || "—";
+  }
+  if (onboardingPreviewPhotos) {
+    const photoCount = onboardingProfilePhotoFiles.filter(Boolean).length + accountProfilePhotoUrls.filter(Boolean).length;
+    onboardingPreviewPhotos.textContent = photoCount ? `${Math.min(photoCount, 4)} added` : "—";
+  }
+}
+
+function onboardingStoredValueForStep(step) {
+  if (step.id === "gender") return profileGender?.value || "";
+  if (step.id === "interested") return profileInterestedIn?.value || "";
+  return "";
 }
 
 function syncBasicsOptionButtons() {
@@ -998,12 +1513,23 @@ function previewSelectedPhotos() {
     onboardingProfilePhotoFiles[pendingOnboardingPhotoSlot] = null;
     renderProfilePhotoGallery(onboardingProfilePhotoFiles.map((photoFile) => photoFile ? URL.createObjectURL(photoFile) : ""));
     profilePhoto.value = "";
+    if (onboardingChatSteps[onboardingChatStepIndex]?.id === "photos") {
+      onboardingChatMessages.push({
+        role: "agent",
+        text: "That file is not an image. My tiny camera refuses politely."
+      });
+      renderOnboardingChat();
+    }
     return;
   }
   onboardingProfilePhotoFiles[pendingOnboardingPhotoSlot] = file;
   const urls = onboardingProfilePhotoFiles.map((photoFile) => photoFile ? URL.createObjectURL(photoFile) : "");
   renderProfilePhotoGallery(urls);
+  renderOnboardingPreview();
   profilePhoto.value = "";
+  if (onboardingChatSteps[onboardingChatStepIndex]?.id === "photos") {
+    submitOnboardingAnswer("photo", "Add photo");
+  }
 }
 
 async function uploadSelectedAccountPhoto() {

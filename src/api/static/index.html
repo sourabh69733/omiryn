@@ -6,7 +6,7 @@
     <title>Omiryn | Your Matchmaker</title>
     <link rel="icon" href="/static/assets/omiryn-app-icon-light.png" type="image/png" />
     <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon-light.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=20260711-boot-clean-logo" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260713-mobile-onboarding-safe" />
   </head>
   <body>
     <div class="boot-loader" id="boot-loader" aria-label="Loading Omiryn" role="status">
@@ -35,17 +35,39 @@
 
     <section class="auth-screen onboarding-screen" id="dating-basics-screen" hidden>
       <form class="basics-experience" id="dating-basics-form">
-        <aside class="basics-intro">
+        <header class="onboarding-shell-header">
           <div class="basics-brand">
             <span class="brand-mark" aria-hidden="true">
               <img src="/static/assets/omiryn-logo-neon.png" alt="" />
             </span>
             <strong>Omiryn</strong>
           </div>
-          <p class="eyebrow">Talk first. Match better.</p>
-          <h1>Build your match profile</h1>
+          <div class="onboarding-shell-doodles" aria-hidden="true">
+            <span class="doodle doodle-heart"></span>
+            <span class="doodle doodle-loop"></span>
+            <span class="mascot-head mini wink" aria-hidden="true">
+              <svg viewBox="0 0 96 96" focusable="false">
+                <circle class="mascot-bg" cx="48" cy="48" r="44"></circle>
+                <path class="mascot-body" d="M23 72c5-13 15-19 25-19s20 6 25 19"></path>
+                <path class="mascot-face-shape" d="M29 43c0-14 9-24 21-24 11 0 19 9 19 22 0 16-10 28-22 28-10 0-18-11-18-26Z"></path>
+                <path class="mascot-tuft-line" d="M43 21c3-8 9-9 13-9-4 4-5 8-4 13"></path>
+                <circle class="mascot-eye-svg" cx="40" cy="42" r="3.5"></circle>
+                <path class="mascot-eye-svg wink" d="M56 42h8"></path>
+                <path class="mascot-beak-svg" d="M46 49h13l-6 7Z"></path>
+                <circle class="mascot-cheek-svg" cx="35" cy="51" r="3"></circle>
+                <circle class="mascot-cheek-svg" cx="65" cy="51" r="3"></circle>
+                <circle class="mascot-glass-svg" cx="62" cy="38" r="12"></circle>
+                <path class="mascot-glass-svg" d="M70 47l12 12"></path>
+                <path class="mascot-bow-svg" d="M34 73l13-8v16Zm28 0-13-8v16Z"></path>
+              </svg>
+            </span>
+          </div>
+        </header>
+        <aside class="basics-intro">
+          <p class="eyebrow">Onboarding chat</p>
+          <h1>Talk first. <span>Match better.</span></h1>
           <p class="basics-copy">
-            Start with the signals that help Omiryn focus on the right people and conversations.
+            Tiny setup, one question at a time. No long forms hiding in a trench coat.
           </p>
 
           <div class="basics-trust">
@@ -168,58 +190,61 @@
           </div>
           -->
 
-          <div class="about-you-step" data-onboarding-step="1">
-            <div>
-              <p class="eyebrow">About you</p>
-              <h2>Tell Omiryn where to start</h2>
-              <p>These details stay private and help anchor your profile before conversation takes over.</p>
-            </div>
-            <div class="about-you-fields">
-              <div class="basics-field compact photo-upload-field">
-                Profile photos
-                <span class="photo-upload-card">
-                  <span class="photo-gallery-grid">
-                    <button class="photo-slot photo-slot-main" type="button" data-profile-photo-trigger="0" aria-label="Upload main profile photo">
-                      <img class="profile-photo-preview" data-photo-preview="0" id="profile-photo-preview" alt="" hidden />
-                      <span class="photo-avatar-placeholder">O</span>
-                      <span class="photo-camera-mark"></span>
-                      <small>Main photo</small>
-                    </button>
-                    <button class="photo-slot" type="button" data-profile-photo-trigger="1" aria-label="Upload profile photo 2">
-                      <img class="profile-photo-preview" data-photo-preview="1" alt="" hidden />
-                      <span class="photo-plus-mark"></span>
-                    </button>
-                    <button class="photo-slot" type="button" data-profile-photo-trigger="2" aria-label="Upload profile photo 3">
-                      <img class="profile-photo-preview" data-photo-preview="2" alt="" hidden />
-                      <span class="photo-plus-mark"></span>
-                    </button>
-                    <button class="photo-slot" type="button" data-profile-photo-trigger="3" aria-label="Upload profile photo 4">
-                      <img class="profile-photo-preview" data-photo-preview="3" alt="" hidden />
-                      <span class="photo-plus-mark"></span>
-                    </button>
+          <div class="onboarding-chat-step" data-onboarding-step="1">
+            <div class="onboarding-chat-shell">
+              <header class="onboarding-chat-header">
+                <div class="onboarding-agent">
+                  <span>
+                    <strong>Onboarding chat</strong>
+                    <small id="onboarding-chat-status">A tiny setup, then we match smarter.</small>
                   </span>
-                  <span class="photo-upload-copy">
-                    <strong>Add your photos</strong>
-                    <small>Choose up to 4 clear photos. Your first photo becomes the main profile image.</small>
-                    <button class="photo-upload-action" type="button" data-profile-photo-trigger="0">Choose photos</button>
-                  </span>
-                  <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-                </span>
+                </div>
+                <div class="onboarding-progress-wrap">
+                  <span class="onboarding-progress" id="onboarding-chat-progress">1 of 7</span>
+                  <span class="onboarding-progress-dots" id="onboarding-progress-dots" aria-hidden="true"></span>
+                </div>
+              </header>
+
+              <div class="onboarding-chat-body" id="onboarding-chat-log" aria-live="polite"></div>
+
+              <div class="onboarding-photo-strip" id="onboarding-photo-strip" hidden>
+                <button class="photo-slot photo-slot-main" type="button" data-profile-photo-trigger="0" aria-label="Upload main profile photo">
+                  <img class="profile-photo-preview" data-photo-preview="0" id="profile-photo-preview" alt="" hidden />
+                  <span class="photo-avatar-placeholder">O</span>
+                  <span class="photo-camera-mark"></span>
+                  <small>Main photo</small>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="1" aria-label="Upload profile photo 2">
+                  <img class="profile-photo-preview" data-photo-preview="1" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="2" aria-label="Upload profile photo 3">
+                  <img class="profile-photo-preview" data-photo-preview="2" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="3" aria-label="Upload profile photo 4">
+                  <img class="profile-photo-preview" data-photo-preview="3" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
               </div>
-              <div class="about-you-inputs">
+
+              <div class="onboarding-chat-controls" id="onboarding-chat-controls"></div>
+
+              <div class="onboarding-hidden-fields" aria-hidden="true">
+                <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" />
                 <label class="basics-field compact">
                   Name
-                  <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" />
+                  <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" tabindex="-1" />
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
                   Date of birth
-                  <input id="profile-dob" type="date" autocomplete="bday" />
+                  <input id="profile-dob" type="date" autocomplete="bday" tabindex="-1" />
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
                   Gender
-                  <select id="profile-gender" autocomplete="sex" required>
+                  <select id="profile-gender" autocomplete="sex" required tabindex="-1">
                     <option value="">Choose gender</option>
                     <option value="man">Man</option>
                     <option value="woman">Woman</option>
@@ -230,7 +255,7 @@
                 </label>
                 <label class="basics-field compact">
                   Interested in
-                  <select id="profile-interested-in" required>
+                  <select id="profile-interested-in" required tabindex="-1">
                     <option value="">Choose preference</option>
                     <option value="women">Women</option>
                     <option value="men">Men</option>
@@ -240,28 +265,57 @@
                 </label>
                 <label class="basics-field compact">
                   State
-                  <select id="profile-state" autocomplete="address-level1">
+                  <select id="profile-state" autocomplete="address-level1" tabindex="-1">
                     <option value="">Choose state</option>
                   </select>
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
                   City
-                  <select id="profile-city" autocomplete="address-level2" disabled>
+                  <select id="profile-city" autocomplete="address-level2" disabled tabindex="-1">
                     <option value="">Choose city</option>
                   </select>
                   <small class="field-error" aria-live="polite"></small>
                 </label>
                 <label class="basics-field compact">
                   Phone (optional)
-                  <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+                  <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" tabindex="-1" />
                   <small class="field-error" aria-live="polite"></small>
                 </label>
               </div>
             </div>
+            <aside class="onboarding-profile-preview" aria-label="Profile so far">
+              <div class="onboarding-preview-card">
+                <header>
+                  <strong>Profile so far</strong>
+                  <span class="doodle doodle-spark"></span>
+                </header>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon person" aria-hidden="true"></span>
+                  <span>Name</span>
+                  <strong id="onboarding-preview-name">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon calendar" aria-hidden="true"></span>
+                  <span>Date of birth</span>
+                  <strong id="onboarding-preview-dob">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon heart" aria-hidden="true"></span>
+                  <span>Interested in</span>
+                  <strong id="onboarding-preview-interest">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon camera" aria-hidden="true"></span>
+                  <span>Photos</span>
+                  <strong id="onboarding-preview-photos">—</strong>
+                </div>
+                <span class="doodle doodle-route"></span>
+              </div>
+            </aside>
           </div>
 
-          <div class="builder-footer">
+          <div class="builder-footer onboarding-builder-footer">
             <!-- Multi-step onboarding disabled while only About you is shown.
             <div class="builder-stepper" aria-label="Profile setup progress">
               <span class="active" data-step-indicator="1"><b>1</b><em>Basics</em><small>Set your direction</small></span>
@@ -277,10 +331,11 @@
                 Continue
               </button>
               -->
-              <button class="auth-primary" id="save-dating-basics" type="submit">
+              <button class="auth-primary" id="save-dating-basics" type="submit" hidden>
                 Submit
               </button>
             </div>
+            <p class="auth-status" id="dating-basics-status" aria-live="polite"></p>
           </div>
         </div>
       </form>
@@ -1078,6 +1133,6 @@ Rules:
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/static/app.js?v=20260711-boot-clean-logo"></script>
+    <script src="/static/app.js?v=20260713-mobile-onboarding"></script>
   </body>
 </html>
