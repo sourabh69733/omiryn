@@ -28,8 +28,19 @@ export const onboardingSteps: OnboardingStep[] = [
     type: "date"
   },
   {
-    id: "gender",
+    id: "interested",
     progress: "3 of 7",
+    question: "Who are you interested in meeting?",
+    type: "choice",
+    choices: [
+      { label: "Women", value: "women" },
+      { label: "Men", value: "men" },
+      { label: "Everyone", value: "everyone" }
+    ]
+  },
+  {
+    id: "gender",
+    progress: "4 of 7",
     question: "How should we describe your gender?",
     type: "choice",
     choices: [
@@ -40,27 +51,22 @@ export const onboardingSteps: OnboardingStep[] = [
     ]
   },
   {
-    id: "interested",
-    progress: "4 of 7",
-    question: "Who are you interested in meeting?",
-    type: "choice",
-    choices: [
-      { label: "Women", value: "women" },
-      { label: "Men", value: "men" },
-      { label: "Everyone", value: "everyone" }
-    ]
+    id: "state",
+    progress: "5 of 7",
+    question: "Which state are you in?",
+    placeholder: "Karnataka",
+    type: "text"
   },
   {
-    id: "location",
-    progress: "5 of 7",
-    question: "Where are you based?",
-    hint: "City, State",
-    placeholder: "Bengaluru, Karnataka",
+    id: "city",
+    progress: "6 of 7",
+    question: "And which city?",
+    placeholder: "Bengaluru",
     type: "text"
   },
   {
     id: "phone",
-    progress: "6 of 7",
+    progress: "7 of 7",
     question: "Want to add a phone number?",
     hint: "Optional. You can skip this.",
     placeholder: "+91...",
@@ -69,7 +75,7 @@ export const onboardingSteps: OnboardingStep[] = [
   },
   {
     id: "photos",
-    progress: "7 of 7",
+    progress: "8 of 8",
     question: "Want to add a profile photo now?",
     hint: "Totally optional, but it helps people recognize you.",
     optional: true,

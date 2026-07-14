@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OmirynLogo } from "../brand/OmirynLogo";
 import { ChatBubble } from "./ChatBubble";
 import { ChatComposer } from "./ChatComposer";
 import { ProfilePreview, type ProfilePreviewValues } from "./ProfilePreview";
-import { ProgressPill } from "./ProgressPill";
 import { onboardingSteps } from "./onboardingSteps";
 
 type Message = {
@@ -11,6 +10,7 @@ type Message = {
   role: "agent" | "user";
   text: string;
   hint?: string;
+  timestamp: string;
 };
 
 type Answers = {
@@ -27,8 +27,35 @@ type ValidationResult =
       message: string;
     };
 
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+function formatChatTime(date = new Date()) {
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function createMessage(role: "agent" | "user", text: string, hint?: string): Message {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role,
+    text,
+    hint,
+    timestamp: formatChatTime()
+  };
+}
+
+function normalizeDob(value: string) {
+  const trimmed = value.trim();
+  const slashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  return trimmed;
+}
+
 function ageFromDob(value: string) {
-  const birthDate = new Date(`${value}T00:00:00`);
+  const normalized = normalizeDob(value);
+  const birthDate = new Date(`${normalized}T00:00:00`);
   if (Number.isNaN(birthDate.getTime())) return null;
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -48,11 +75,12 @@ function validateAnswer(stepId: string, value: string, skipped = false): Validat
         message: "Mysterious. Very spy-movie. But I need at least 2 letters for your profile."
       };
     }
-    return { valid: true, response: `Nice to meet you, ${trimmed}.` };
+    return { valid: true, response: "Nice. Officially less mysterious." };
   }
 
   if (stepId === "dob") {
-    const age = ageFromDob(trimmed);
+    const normalized = normalizeDob(trimmed);
+    const age = ageFromDob(normalized);
     if (!trimmed || age === null) {
       return { valid: false, message: "My calendar is squinting. Please enter your full date of birth." };
     }
@@ -62,9 +90,16 @@ function validateAnswer(stepId: string, value: string, skipped = false): Validat
     return { valid: true, response: "Got it. Birthday math survived." };
   }
 
-  if (stepId === "location") {
-    if (!trimmed.includes(",") || trimmed.length < 5) {
-      return { valid: false, message: "I need city and state. Tiny map brain, very strict." };
+  if (stepId === "state") {
+    if (trimmed.length < 2) {
+      return { valid: false, message: "Give me the state first. Tiny map brain, very orderly." };
+    }
+    return { valid: true, response: "Noted." };
+  }
+
+  if (stepId === "city") {
+    if (trimmed.length < 2) {
+      return { valid: false, message: "City needs at least 2 letters so I can place you properly." };
     }
     return { valid: true, response: `${trimmed}. Pinned on the map.` };
   }
@@ -88,114 +123,103 @@ export function OnboardingChat() {
   const [stepIndex, setStepIndex] = useState(0);
   const [inputValue, setInputValue] = useState("");
   const [answers, setAnswers] = useState<Answers>({});
+  const [isBotTyping, setIsBotTyping] = useState(false);
+  const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "intro",
-      role: "agent",
-      text: onboardingSteps[0].question,
-      hint: onboardingSteps[0].hint
-    }
+    createMessage("agent", onboardingSteps[0].question, onboardingSteps[0].hint)
   ]);
   const step = onboardingSteps[stepIndex];
-  const current = stepIndex + 1;
-  const visibleMessages = messages.slice(-5);
+  const visibleMessages = messages;
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, isBotTyping, step.type]);
+
+  useEffect(() => {
+    const updateKeyboardOffset = () => {
+      const viewport = window.visualViewport;
+      const offset = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+      document.documentElement.style.setProperty("--keyboard-offset", `${Math.round(offset)}px`);
+    };
+
+    updateKeyboardOffset();
+    window.visualViewport?.addEventListener("resize", updateKeyboardOffset);
+    window.visualViewport?.addEventListener("scroll", updateKeyboardOffset);
+    window.addEventListener("resize", updateKeyboardOffset);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateKeyboardOffset);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardOffset);
+      window.removeEventListener("resize", updateKeyboardOffset);
+      document.documentElement.style.removeProperty("--keyboard-offset");
+    };
+  }, []);
 
   const profilePreview = useMemo<ProfilePreviewValues>(
     () => ({
       name: answers.name,
       dob: answers.dob,
       interested: answers.interested,
-      location: answers.location,
+      location: [answers.city, answers.state].filter(Boolean).join(", "),
       photos: answers.photos
     }),
     [answers]
   );
 
-  function moveToNext(nextAnswers: Answers, extraMessages: Message[]) {
-    const nextIndex = stepIndex + 1;
-    if (nextIndex >= onboardingSteps.length) {
-      setMessages([
-        ...extraMessages,
-        {
-          id: `done-${Date.now()}`,
-          role: "agent",
-          text: "That’s the tiny setup done. We can start matching smarter now."
-        }
-      ]);
-      setAnswers(nextAnswers);
-      setInputValue("");
-      return;
-    }
+  async function submitAnswer(value = inputValue, label = value, skipped = false) {
+    if (isBotTyping) return;
 
-    const nextStep = onboardingSteps[nextIndex];
-    setStepIndex(nextIndex);
-    setAnswers(nextAnswers);
-    setInputValue("");
-    setMessages([
-      ...extraMessages,
-      {
-        id: `${nextStep.id}-${Date.now()}`,
-        role: "agent",
-        text: nextStep.question,
-        hint: nextStep.hint
-      }
-    ]);
-  }
-
-  function submitAnswer(value = inputValue, label = value, skipped = false) {
     const displayValue = skipped ? "Skip" : label.trim();
     if (!displayValue) return;
 
-    const baseMessages = [
-      ...messages,
-      {
-        id: `user-${Date.now()}`,
-        role: "user" as const,
-        text: displayValue
-      }
-    ];
+    setMessages((currentMessages) => [...currentMessages, createMessage("user", displayValue)]);
+    setInputValue("");
+
     const result = validateAnswer(step.id, value, skipped);
+    setIsBotTyping(true);
+    await wait(650);
 
     if (!result.valid) {
-      setMessages([
-        ...baseMessages,
-        {
-          id: `error-${Date.now()}`,
-          role: "agent",
-          text: result.message,
-          hint: step.hint
-        }
-      ]);
-      setInputValue("");
+      setMessages((currentMessages) => [...currentMessages, createMessage("agent", result.message, step.hint)]);
+      setIsBotTyping(false);
       return;
     }
 
     const nextAnswers = {
       ...answers,
-      [step.id]: skipped ? "" : displayValue
+      [step.id]: skipped ? "" : step.id === "dob" ? normalizeDob(value) : displayValue
     };
-    const successMessages = [
-      ...baseMessages,
-      {
-        id: `success-${Date.now()}`,
-        role: "agent" as const,
-        text: result.response
-      }
-    ];
-    moveToNext(nextAnswers, successMessages);
+    setAnswers(nextAnswers);
+    setMessages((currentMessages) => [...currentMessages, createMessage("agent", result.response)]);
+
+    await wait(760);
+
+    const nextIndex = stepIndex + 1;
+    if (nextIndex >= onboardingSteps.length) {
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        createMessage("agent", "That’s the tiny setup done. We can start matching smarter now.")
+      ]);
+      setIsBotTyping(false);
+      return;
+    }
+
+    const nextStep = onboardingSteps[nextIndex];
+    setStepIndex(nextIndex);
+    setMessages((currentMessages) => [...currentMessages, createMessage("agent", nextStep.question, nextStep.hint)]);
+    setIsBotTyping(false);
   }
 
   return (
     <main className="onboarding-page">
       <header className="onboarding-topbar">
         <OmirynLogo />
-        <ProgressPill current={current} total={onboardingSteps.length} />
       </header>
 
       <section className="onboarding-layout">
         <aside className="onboarding-copy">
           <h1>
-            Talk first. <span>Match better.</span>
+            {/* Talk first. <span>Match better.</span> */}
           </h1>
           <p>Tiny setup, one question at a time.</p>
         </aside>
@@ -206,7 +230,7 @@ export function OnboardingChat() {
             <p>A tiny setup, then we match smarter.</p>
           </div>
 
-          <div className="chat-canvas">
+          <div className={`chat-canvas ${visibleMessages.length <= 2 ? "is-intro" : "is-active"}`}>
             <span className="doodle question" aria-hidden="true">
               ?
             </span>
@@ -215,32 +239,47 @@ export function OnboardingChat() {
             </span>
             <span className="doodle check" aria-hidden="true" />
             {visibleMessages.map((message) => (
-              <ChatBubble key={message.id} role={message.role} hint={message.hint}>
+              <ChatBubble key={message.id} role={message.role} hint={message.hint} timestamp={message.timestamp}>
                 {message.text}
               </ChatBubble>
             ))}
+
+            {isBotTyping ? <ChatBubble role="agent" typing /> : null}
+
+            {step.type === "choice" ? (
+              <div className="choice-composer">
+                {step.choices?.map((choice) => (
+                  <button
+                    key={choice.value}
+                    className={`choice-option choice-${choice.value}`}
+                    type="button"
+                    disabled={isBotTyping}
+                    onClick={() => submitAnswer(choice.value, choice.label)}
+                  >
+                    <span aria-hidden="true" />
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {step.type === "photo" ? (
+              <div className="choice-composer photo-actions">
+                <button type="button" disabled={isBotTyping} onClick={() => submitAnswer("photo", "Add photo")}>
+                  Add photo
+                </button>
+                <button type="button" disabled={isBotTyping} onClick={() => submitAnswer("", "Skip", true)}>
+                  Skip
+                </button>
+              </div>
+            ) : null}
+            <div className="conversation-end-spacer" ref={conversationEndRef} aria-hidden="true" />
           </div>
 
-          {step.type === "choice" ? (
-            <div className="choice-composer">
-              {step.choices?.map((choice) => (
-                <button
-                  key={choice.value}
-                  type="button"
-                  onClick={() => submitAnswer(choice.value, choice.label)}
-                >
-                  {choice.label}
-                </button>
-              ))}
-            </div>
-          ) : step.type === "photo" ? (
-            <div className="choice-composer photo-actions">
-              <button type="button" onClick={() => submitAnswer("photo", "Add photo")}>
-                Add photo
-              </button>
-              <button type="button" onClick={() => submitAnswer("", "Skip", true)}>
-                Skip
-              </button>
+          {step.type === "choice" || step.type === "photo" ? (
+            <div className="chat-composer chat-composer-disabled" aria-hidden="true">
+              <span>Type a message...</span>
+              <span>☺</span>
             </div>
           ) : (
             <ChatComposer
@@ -248,6 +287,7 @@ export function OnboardingChat() {
               placeholder={step.placeholder}
               value={inputValue}
               optional={step.optional}
+              disabled={isBotTyping}
               onChange={setInputValue}
               onSubmit={() => submitAnswer()}
               onSkip={() => submitAnswer("", "Skip", true)}

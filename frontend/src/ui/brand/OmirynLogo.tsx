@@ -4,7 +4,6 @@ export function OmirynLogo() {
   return (
     <a className="brand-lockup" href="/app" aria-label="Omiryn home">
       <img src={logoSrc} alt="" />
-      <span>Omiryn</span>
     </a>
   );
 }
