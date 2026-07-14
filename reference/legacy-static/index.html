@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omiryn | Your Matchmaker</title>
+    <link rel="icon" href="/static/assets/omiryn-app-icon-light.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon-light.png" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260714-onboarding-composer-fixed" />
+  </head>
+  <body>
+    <div class="boot-loader" id="boot-loader" aria-label="Loading Omiryn" role="status">
+      <div class="boot-mark-card" aria-hidden="true">
+        <span class="boot-logo-glow"></span>
+        <img class="boot-logo-image" src="/static/assets/omiryn-logo-neon-light.png" alt="" />
+      </div>
+    </div>
+
+    <section class="auth-screen" id="auth-screen" hidden>
+      <div class="auth-panel">
+        <span class="brand-mark auth-mark" aria-hidden="true">
+          <img src="/static/assets/omiryn-logo-neon.png" alt="" />
+        </span>
+        <p class="eyebrow">Talk first. Match better.</p>
+        <h1>Sign in to Omiryn</h1>
+        <p>
+          Your chats, imported context, and matchmaking signals stay attached to your account.
+        </p>
+        <button class="auth-primary" id="auth-screen-login" type="button">
+          Continue with Google
+        </button>
+        <p class="auth-status" id="auth-screen-status">Checking sign-in...</p>
+      </div>
+    </section>
+
+    <section class="auth-screen onboarding-screen" id="dating-basics-screen" hidden>
+      <form class="basics-experience" id="dating-basics-form">
+        <header class="onboarding-shell-header">
+          <div class="basics-brand">
+            <span class="brand-mark" aria-hidden="true">
+              <img src="/static/assets/omiryn-logo-neon.png" alt="" />
+            </span>
+            <strong>Omiryn</strong>
+          </div>
+          <div class="onboarding-shell-doodles" aria-hidden="true">
+            <span class="doodle doodle-heart"></span>
+            <span class="doodle doodle-loop"></span>
+            <span class="mascot-head mini wink" aria-hidden="true">
+              <svg viewBox="0 0 96 96" focusable="false">
+                <circle class="mascot-bg" cx="48" cy="48" r="44"></circle>
+                <path class="mascot-body" d="M23 72c5-13 15-19 25-19s20 6 25 19"></path>
+                <path class="mascot-face-shape" d="M29 43c0-14 9-24 21-24 11 0 19 9 19 22 0 16-10 28-22 28-10 0-18-11-18-26Z"></path>
+                <path class="mascot-tuft-line" d="M43 21c3-8 9-9 13-9-4 4-5 8-4 13"></path>
+                <circle class="mascot-eye-svg" cx="40" cy="42" r="3.5"></circle>
+                <path class="mascot-eye-svg wink" d="M56 42h8"></path>
+                <path class="mascot-beak-svg" d="M46 49h13l-6 7Z"></path>
+                <circle class="mascot-cheek-svg" cx="35" cy="51" r="3"></circle>
+                <circle class="mascot-cheek-svg" cx="65" cy="51" r="3"></circle>
+                <circle class="mascot-glass-svg" cx="62" cy="38" r="12"></circle>
+                <path class="mascot-glass-svg" d="M70 47l12 12"></path>
+                <path class="mascot-bow-svg" d="M34 73l13-8v16Zm28 0-13-8v16Z"></path>
+              </svg>
+            </span>
+          </div>
+        </header>
+        <aside class="basics-intro">
+          <p class="eyebrow">Onboarding chat</p>
+          <h1>Talk first. <span>Match better.</span></h1>
+          <p class="basics-copy">
+            Tiny setup, one question at a time.
+          </p>
+
+          <div class="basics-trust">
+            <div>
+              <span class="trust-icon" aria-hidden="true"></span>
+              <strong>Smarter matches</strong>
+              <small>Signals shape better conversations.</small>
+            </div>
+            <div>
+              <span class="trust-icon shield" aria-hidden="true"></span>
+              <strong>Private by design</strong>
+              <small>You can adjust your profile anytime.</small>
+            </div>
+            <div>
+              <span class="trust-icon chat" aria-hidden="true"></span>
+              <strong>Built from conversation</strong>
+              <small>Omiryn keeps learning as you chat.</small>
+            </div>
+          </div>
+          <p class="basics-control-note">
+            You are in control. You can adjust anything anytime.
+          </p>
+        </aside>
+
+        <div class="basics-builder">
+          <input class="sr-only" id="profile-intent" type="hidden" value="meaningful" />
+          <input class="sr-only" id="profile-conversation-style" type="hidden" value="balanced" />
+
+          <!-- Preference canvas disabled for first onboarding pass.
+          <div class="profile-canvas" data-onboarding-step="1">
+            <div class="canvas-rings" aria-hidden="true"></div>
+            <span class="orbit-icon orbit-spark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3.5c.8 4.3 3.2 6.7 7.5 7.5-4.3.8-6.7 3.2-7.5 7.5-.8-4.3-3.2-6.7-7.5-7.5 4.3-.8 6.7-3.2 7.5-7.5Z"></path>
+                <path d="M18.5 2.8c.35 1.9 1.4 2.95 3.3 3.3-1.9.35-2.95 1.4-3.3 3.3-.35-1.9-1.4-2.95-3.3-3.3 1.9-.35 2.95-1.4 3.3-3.3Z"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-book" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M4.5 5.5h5.2c1.15 0 2.3.62 2.3 1.72v11.25c0-1.1-1.15-1.72-2.3-1.72H4.5V5.5Z"></path>
+                <path d="M19.5 5.5h-5.2c-1.15 0-2.3.62-2.3 1.72v11.25c0-1.1 1.15-1.72 2.3-1.72h5.2V5.5Z"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-group" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M9.2 11.1a3.15 3.15 0 1 0 0-6.3 3.15 3.15 0 0 0 0 6.3Z"></path>
+                <path d="M3.7 19.2c.45-3.05 2.35-4.85 5.5-4.85s5.05 1.8 5.5 4.85"></path>
+                <path d="M15.8 11.2a2.55 2.55 0 1 0 0-5.1"></path>
+                <path d="M16.4 14.45c2.35.28 3.75 1.88 4.05 4.52"></path>
+              </svg>
+            </span>
+            <span class="orbit-icon orbit-heart" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 19.25 5.55 12.8a4 4 0 0 1 0-5.65 4 4 0 0 1 5.65 0l.8.8.8-.8a4 4 0 0 1 5.65 5.65L12 19.25Z"></path>
+              </svg>
+            </span>
+
+            <fieldset class="choice-cluster gender-cluster">
+              <legend>I am</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="man">
+                <span class="choice-icon male" aria-hidden="true"></span> Man
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="woman">
+                <span class="choice-icon female" aria-hidden="true"></span> Woman
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-gender" data-value="non_binary">
+                <span class="choice-icon person" aria-hidden="true"></span> Non-binary
+              </button>
+            </fieldset>
+
+            <fieldset class="choice-cluster interest-cluster">
+              <legend>Interested in</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="women">
+                <span class="choice-icon female" aria-hidden="true"></span> Women
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="men">
+                <span class="choice-icon male" aria-hidden="true"></span> Men
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-interested-in" data-value="everyone">
+                <span class="choice-icon group" aria-hidden="true"></span> Everyone
+              </button>
+            </fieldset>
+
+            <fieldset class="choice-cluster intent-cluster">
+              <legend>Looking for</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="meaningful">
+                <span class="choice-icon target" aria-hidden="true"></span> Meaningful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="casual">
+                <span class="choice-icon heart" aria-hidden="true"></span> Something casual
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-intent" data-value="not_sure">
+                <span class="choice-icon calendar" aria-hidden="true"></span> Not sure yet
+              </button>
+            </fieldset>
+
+            <fieldset class="choice-cluster style-cluster">
+              <legend>Conversation style</legend>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="balanced">
+                <span class="choice-icon bubble" aria-hidden="true"></span> Balanced
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="playful">
+                <span class="choice-icon leaf" aria-hidden="true"></span> Light &amp; playful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="thoughtful">
+                <span class="choice-icon heart" aria-hidden="true"></span> Deep &amp; thoughtful
+              </button>
+              <button class="choice-pill" type="button" data-profile-option="profile-conversation-style" data-value="direct">
+                <span class="choice-icon target" aria-hidden="true"></span> Direct &amp; clear
+              </button>
+            </fieldset>
+
+            <div class="profile-core" aria-hidden="true">
+              <span class="profile-node node-top-left"></span>
+              <span class="profile-node node-top-right"></span>
+              <span class="profile-node node-bottom-left"></span>
+              <span class="profile-node node-bottom-right"></span>
+              <span class="profile-core-letter" aria-hidden="true">O</span>
+            </div>
+          </div>
+          -->
+
+          <div class="onboarding-chat-step" data-onboarding-step="1">
+            <div class="onboarding-chat-shell">
+              <header class="onboarding-chat-header">
+                <div class="onboarding-agent">
+                  <span>
+                    <strong>Onboarding chat</strong>
+                    <small id="onboarding-chat-status">A tiny setup, then we match smarter.</small>
+                  </span>
+                </div>
+                <!-- <div class="onboarding-progress-wrap">
+                  <span class="onboarding-progress" id="onboarding-chat-progress">1 of 7</span>
+                  <span class="onboarding-progress-dots" id="onboarding-progress-dots" aria-hidden="true"></span>
+                </div> -->
+              </header>
+
+              <div class="onboarding-chat-body" id="onboarding-chat-log" aria-live="polite"></div>
+
+              <div class="onboarding-photo-strip" id="onboarding-photo-strip" hidden>
+                <button class="photo-slot photo-slot-main" type="button" data-profile-photo-trigger="0" aria-label="Upload main profile photo">
+                  <img class="profile-photo-preview" data-photo-preview="0" id="profile-photo-preview" alt="" hidden />
+                  <span class="photo-avatar-placeholder">O</span>
+                  <span class="photo-camera-mark"></span>
+                  <small>Main photo</small>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="1" aria-label="Upload profile photo 2">
+                  <img class="profile-photo-preview" data-photo-preview="1" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="2" aria-label="Upload profile photo 3">
+                  <img class="profile-photo-preview" data-photo-preview="2" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
+                <button class="photo-slot" type="button" data-profile-photo-trigger="3" aria-label="Upload profile photo 4">
+                  <img class="profile-photo-preview" data-photo-preview="3" alt="" hidden />
+                  <span class="photo-plus-mark"></span>
+                </button>
+              </div>
+
+              <div class="onboarding-chat-controls" id="onboarding-chat-controls"></div>
+
+              <div class="onboarding-hidden-fields" aria-hidden="true">
+                <input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" />
+                <label class="basics-field compact">
+                  Name
+                  <input id="basics-name" type="text" placeholder="Your name" autocomplete="name" tabindex="-1" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Date of birth
+                  <input id="profile-dob" type="date" autocomplete="bday" tabindex="-1" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Gender
+                  <select id="profile-gender" autocomplete="sex" required tabindex="-1">
+                    <option value="">Choose gender</option>
+                    <option value="man">Man</option>
+                    <option value="woman">Woman</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Interested in
+                  <select id="profile-interested-in" required tabindex="-1">
+                    <option value="">Choose preference</option>
+                    <option value="women">Women</option>
+                    <option value="men">Men</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  State
+                  <select id="profile-state" autocomplete="address-level1" tabindex="-1">
+                    <option value="">Choose state</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  City
+                  <select id="profile-city" autocomplete="address-level2" disabled tabindex="-1">
+                    <option value="">Choose city</option>
+                  </select>
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+                <label class="basics-field compact">
+                  Phone (optional)
+                  <input id="profile-phone" type="tel" placeholder="+91..." autocomplete="tel" tabindex="-1" />
+                  <small class="field-error" aria-live="polite"></small>
+                </label>
+              </div>
+            </div>
+            <aside class="onboarding-profile-preview" aria-label="Profile so far">
+              <div class="onboarding-preview-card">
+                <header>
+                  <strong>Profile so far</strong>
+                  <span class="doodle doodle-spark"></span>
+                </header>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon person" aria-hidden="true"></span>
+                  <span>Name</span>
+                  <strong id="onboarding-preview-name">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon calendar" aria-hidden="true"></span>
+                  <span>Date of birth</span>
+                  <strong id="onboarding-preview-dob">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon heart" aria-hidden="true"></span>
+                  <span>Interested in</span>
+                  <strong id="onboarding-preview-interest">—</strong>
+                </div>
+                <div class="onboarding-preview-row">
+                  <span class="preview-icon camera" aria-hidden="true"></span>
+                  <span>Photos</span>
+                  <strong id="onboarding-preview-photos">—</strong>
+                </div>
+                <span class="doodle doodle-route"></span>
+              </div>
+            </aside>
+          </div>
+
+          <div class="builder-footer onboarding-builder-footer">
+            <!-- Multi-step onboarding disabled while only About you is shown.
+            <div class="builder-stepper" aria-label="Profile setup progress">
+              <span class="active" data-step-indicator="1"><b>1</b><em>Basics</em><small>Set your direction</small></span>
+              <span data-step-indicator="2"><b>2</b><em>About you</em><small>Share more about you</small></span>
+            </div>
+            -->
+            <div class="builder-actions">
+              <!-- Preference step navigation disabled for first onboarding pass.
+              <button class="secondary-button" id="onboarding-back-step" type="button" hidden>
+                Back
+              </button>
+              <button class="auth-primary" id="onboarding-next-step" type="button">
+                Continue
+              </button>
+              -->
+              <button class="auth-primary" id="save-dating-basics" type="submit" hidden>
+                Submit
+              </button>
+            </div>
+            <p class="auth-status" id="dating-basics-status" aria-live="polite"></p>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <div class="app-shell" id="app-shell" hidden>
+      <header class="app-header">
+        <a class="brand" href="/app" aria-label="Omiryn home">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="/static/assets/omiryn-logo-neon.png" alt="" />
+          </span>
+          <span class="brand-copy">
+            <strong>Omiryn</strong>
+            <small>Talk first. Match better.</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" id="main-navigation" aria-label="Main navigation">
+          <a class="active" href="/app" data-nav="interview">Chat</a>
+          <a href="/style" data-nav="style">Style</a>
+          <a href="/matches" data-nav="matches">Matches</a>
+        </nav>
+
+        <div class="header-actions">
+          <div class="auth-control" id="auth-control">
+            <button class="secondary-button menu-button" id="menu-button" type="button" aria-label="Open menu" aria-controls="main-navigation" aria-expanded="false">
+              <span class="menu-icon" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </button>
+            <button class="auth-user" id="auth-user" type="button" hidden aria-label="Open account menu" aria-haspopup="menu" aria-expanded="false">
+              <span class="auth-avatar" id="auth-avatar" aria-hidden="true">O</span>
+              <span class="auth-email" id="auth-email">Signed in</span>
+            </button>
+            <div class="account-menu" id="account-menu" hidden>
+              <button id="account-menu-profile" type="button">Profile</button>
+              <button id="account-menu-signout" type="button">Sign out</button>
+            </div>
+            <button class="secondary-button auth-button" id="login-google" type="button">
+              Continue with Google
+            </button>
+            <button class="secondary-button auth-button" id="logout-user" type="button" hidden>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section class="screen interview-screen" id="interview-screen" hidden>
+          <div class="chat-workspace">
+            <aside class="chat-sidebar" aria-label="Chat workspace details">
+              <div class="mobile-sheet-heading">
+                <div>
+                  <p class="eyebrow">Chat</p>
+                  <h2>History</h2>
+                </div>
+                <button class="sheet-close-button" id="close-history-sheet" type="button" aria-label="Close chat history">
+                  Close
+                </button>
+              </div>
+              <div class="side-tabs" role="tablist" aria-label="Chat details">
+                <button class="active" data-side-tab="history" type="button">History</button>
+                <button data-side-tab="usage" type="button">Usage</button>
+              </div>
+
+              <section class="side-panel active" data-side-panel="history">
+                <p class="eyebrow">Chat History</p>
+                <h2>Conversations</h2>
+                <div class="history-list" id="history-list">
+                  <div class="history-item active" role="button" tabindex="0">
+                    <strong>Current chat</strong>
+                    <span id="sidebar-message-count">0 messages</span>
+                  </div>
+                </div>
+                <button class="secondary-button primary-wide" id="sidebar-reset-chat" type="button">
+                  New conversation
+                </button>
+                <!-- <button class="primary-wide" id="extract-profile" type="button" disabled>
+                  Extract review draft
+                </button>
+                <p class="quiet-note">
+                  Creates a draft you can edit and approve before matching.
+                </p> -->
+                <p class="quiet-note" id="sidebar-conversation-id">No conversation started.</p>
+              </section>
+
+              <section class="side-panel" data-side-panel="usage" hidden>
+                <p class="eyebrow">Agent Usage</p>
+                <h2>Runtime cost</h2>
+                <div class="usage-summary" id="usage-summary">
+                  Usage will appear after the first agent reply.
+                </div>
+                <div class="sidebar-usage-list" id="sidebar-usage-list"></div>
+              </section>
+
+            </aside>
+
+            <section class="chat-card agentic-chat" aria-labelledby="chat-title">
+              <div class="card-heading">
+                <div class="chat-title-lockup">
+                  <span class="terminal-mark" aria-hidden="true">
+                    <img src="/static/assets/agent_avatar/saree_female.png" alt="" />
+                  </span>
+                  <h2 id="chat-title">Omiryn</h2>
+                  <p class="agent-status" id="agent-status">Checking agent...</p>
+                </div>
+                <div class="chat-controls">
+                  <button class="secondary-button mobile-history-button" id="open-history-sheet" type="button">
+                    History
+                  </button>
+                  <!-- <label class="model-picker">
+                    <span>Tone</span>
+                    <select id="agent-tone-select" aria-label="Choose agent tone">
+                      <option value="auto">Auto</option>
+                      <option value="casual">Casual</option>
+                      <option value="warm">Warm</option>
+                      <option value="formal">Formal</option>
+                      <option value="direct">Direct</option>
+                      <option value="playful">Playful</option>
+                    </select>
+                  </label> -->
+                  <div class="model-picker context-multiselect chat-context-control" id="agent-context-picker">
+                    <span>Context</span>
+                    <button class="context-picker-button" id="agent-context-button" type="button" aria-haspopup="true" aria-expanded="false">
+                      No context
+                    </button>
+                    <div class="context-picker-menu" id="agent-context-menu" hidden></div>
+                  </div>
+                  <label class="model-picker">
+                    <span>Model</span>
+                    <select id="agent-model-select" aria-label="Choose agent model"></select>
+                  </label>
+                  <!-- Later: re-enable manual new conversation control. -->
+                  <button class="secondary-button" id="reset-chat" type="button" hidden>New</button>
+                </div>
+              </div>
+
+              <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+              <!-- Later: show extracted mini-signals here: intent, values, lifestyle, dealbreakers. -->
+
+              <form class="composer" id="chat-form">
+                <textarea
+                  id="chat-input"
+                  name="message"
+                  autocomplete="off"
+                  placeholder="Say what matters..."
+                  rows="1"
+                ></textarea>
+                <button id="send-message" type="button" aria-label="Send message">
+                  <svg class="send-message-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z"></path>
+                  </svg>
+                </button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen review-screen" id="review-screen" hidden>
+          <div class="screen-copy compact">
+            <p class="eyebrow">Step 2</p>
+            <h1>Review what your agent understood.</h1>
+            <p>Edit anything before approving. This is the consent gate.</p>
+          </div>
+
+          <div class="review-layout">
+            <section class="review-card">
+              <div class="draft-status" id="draft-status">Loading draft...</div>
+              <div class="warning-list" id="warning-list" hidden></div>
+
+              <form class="draft-form" id="draft-form">
+                <label>
+                  Name
+                  <input id="draft-name" type="text" placeholder="Display name" />
+                </label>
+                <label>
+                  Gender
+                  <select id="draft-gender">
+                    <option value="unknown">Unknown</option>
+                    <option value="man">Man</option>
+                    <option value="woman">Woman</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+                <label>
+                  Interested in
+                  <select id="draft-interested-in">
+                    <option value="unknown">Unknown</option>
+                    <option value="women">Women</option>
+                    <option value="men">Men</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
+                </label>
+                <label>
+                  City
+                  <input id="draft-city" type="text" placeholder="City" />
+                </label>
+                <label>
+                  Intent
+                  <input id="draft-intent" type="text" placeholder="long_term, marriage" />
+                </label>
+                <label>
+                  Communication
+                  <input id="draft-communication" type="text" placeholder="Direct, reflective..." />
+                </label>
+                <label>
+                  Family expectations
+                  <input id="draft-family" type="text" placeholder="Balanced, high involvement..." />
+                </label>
+                <label>
+                  Children preference
+                  <input id="draft-children" type="text" placeholder="wants_children, open..." />
+                </label>
+                <label>
+                  Values
+                  <input id="draft-values" type="text" placeholder="family, ambition, kindness" />
+                </label>
+                <label>
+                  Lifestyle
+                  <input id="draft-lifestyle" type="text" placeholder="fitness, travel" />
+                </label>
+                <label>
+                  Dealbreakers
+                  <input id="draft-dealbreakers" type="text" placeholder="smoking, casual intent" />
+                </label>
+                <label class="wide-field">
+                  Summary
+                  <textarea id="draft-summary" rows="4" placeholder="Short relationship summary"></textarea>
+                </label>
+              </form>
+            </section>
+
+            <aside class="approval-card">
+              <p class="eyebrow">Consent</p>
+              <h2>Approve for matching</h2>
+              <p>
+                Approved profiles can be used by Omiryn's matching engine. You can
+                save edits, approve the draft, or delete it.
+              </p>
+              <div class="action-stack">
+                <button id="save-draft" class="secondary-button" type="button" disabled>Save edits</button>
+                <button id="approve-draft" type="button" disabled>Approve profile</button>
+                <button id="delete-draft" class="danger-button" type="button" disabled>Delete draft</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="screen profile-screen" id="profile-screen" hidden>
+          <div class="usage-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Profile</p>
+              <h1>Your profile.</h1>
+              <p>Keep photos, basics, and match direction clean before conversation takes over.</p>
+            </div>
+          </div>
+
+          <div class="profile-layout">
+            <section class="profile-panel profile-photo-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Photos</p>
+                  <h2>Profile gallery</h2>
+                </div>
+                <input class="profile-photo-input" id="account-photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              </div>
+              <div class="profile-photo-gallery">
+                <button class="profile-main-photo" type="button" data-account-photo-trigger="0" aria-label="Upload main profile photo">
+                  <img class="profile-gallery-img" id="account-photo-preview" data-account-photo-preview="0" alt="" hidden />
+                  <span class="profile-photo-empty">O</span>
+                  <span class="profile-main-badge">Main photo</span>
+                </button>
+                <div class="profile-thumb-stack">
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="1" aria-label="Upload profile photo 2">
+                    <img class="profile-gallery-img" data-account-photo-preview="1" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="2" aria-label="Upload profile photo 3">
+                    <img class="profile-gallery-img" data-account-photo-preview="2" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                  <button class="profile-thumb" type="button" data-account-photo-trigger="3" aria-label="Upload profile photo 4">
+                    <img class="profile-gallery-img" data-account-photo-preview="3" alt="" hidden />
+                    <span class="profile-photo-empty">+</span>
+                  </button>
+                </div>
+              </div>
+              <div class="profile-photo-copy">
+                <strong>Show the real you.</strong>
+                <span>Upload up to 4 clear photos. Your first photo becomes the main profile image.</span>
+              </div>
+            </section>
+
+            <section class="profile-panel profile-info-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Account</p>
+                  <h2>Basic info</h2>
+                </div>
+              </div>
+              <form class="profile-form" id="profile-form">
+                <label>
+                  Name
+                  <input id="profile-name" type="text" placeholder="Your name" />
+                </label>
+                <label>
+                  Age
+                  <input id="account-age" type="number" min="18" max="100" inputmode="numeric" placeholder="Your age" />
+                </label>
+                <label>
+                  Email
+                  <input id="profile-email" type="email" readonly />
+                </label>
+                <label>
+                  Gender
+                  <select id="account-gender" required>
+                    <option value="man">Man</option>
+                    <option value="woman">Woman</option>
+                    <option value="non_binary">Non-binary</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+                <label>
+                  Interested in
+                  <select id="account-interested-in" required>
+                    <option value="women">Women</option>
+                    <option value="men">Men</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
+                </label>
+                <label>
+                  State
+                  <select id="account-state" autocomplete="address-level1" required>
+                    <option value="">Choose state</option>
+                  </select>
+                </label>
+                <label>
+                  City
+                  <select id="account-city" autocomplete="address-level2" required disabled>
+                    <option value="">Choose city</option>
+                  </select>
+                </label>
+                <label>
+                  Mobile (optional)
+                  <input id="account-phone" type="tel" placeholder="+91..." autocomplete="tel" />
+                </label>
+                <button type="submit">Save profile</button>
+                <p class="quiet-note" id="profile-status">Profile details will appear after login.</p>
+              </form>
+            </section>
+
+          </div>
+        </section>
+
+        <section class="screen style-screen" id="style-screen" hidden>
+          <div class="style-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Style</p>
+              <h1>Saved memories.</h1>
+              <p>Keep useful context and imported chat references in one simple library.</p>
+            </div>
+          </div>
+
+          <div class="style-layout">
+            <section class="profile-panel profile-panel-wide style-context-panel">
+              <div class="context-intro">
+                <span class="context-visual" aria-hidden="true">M</span>
+                <div>
+                  <p class="eyebrow">Library</p>
+                  <h2>Saved memories</h2>
+                  <p>Use WhatsApp exports or pasted GPT summaries to give Omiryn better context.</p>
+                </div>
+              </div>
+
+              <div class="context-card context-card-muted">
+                <div class="context-card-heading">
+                  <span class="context-card-icon" aria-hidden="true">✓</span>
+                  <div>
+                    <h3>Saved memories</h3>
+                    <p>These sources can shape chat and matching signals when useful.</p>
+                  </div>
+                </div>
+                <div class="context-source-list" id="context-source-list"></div>
+              </div>
+
+              <div class="context-action-grid">
+                <button class="context-action-button" id="open-whatsapp-style" type="button">
+                  <span class="context-card-icon" aria-hidden="true">Aa</span>
+                  <strong>Upload WhatsApp chat</strong>
+                  <small>Learn tone from a WhatsApp export.</small>
+                </button>
+                <button class="context-action-button" id="open-context-memory" type="button">
+                  <span class="context-card-icon" aria-hidden="true">+</span>
+                  <strong>Paste GPT content</strong>
+                  <small>Paste a profile summary, chat export, or manual notes.</small>
+                </button>
+              </div>
+              <p class="quiet-note" id="context-status">No imported context yet.</p>
+              <p class="quiet-note" id="whatsapp-status"></p>
+              <div class="whatsapp-import-log" id="whatsapp-import-log"></div>
+            </section>
+
+            <section class="profile-panel profile-panel-wide style-learning-panel">
+              <div class="panel-heading profile-facts-heading">
+                <div>
+                  <p class="eyebrow">Learned About You</p>
+                  <h2>Internal matching signals</h2>
+                </div>
+                <span class="profile-fact-total" id="profile-fact-total">0 facts</span>
+              </div>
+              <div class="profile-fact-groups" id="profile-fact-groups">
+                <div class="profile-facts-empty">
+                  <strong>No learned signals yet.</strong>
+                  <span>Chat naturally with Omiryn and this section will fill with internal matching signals.</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="profile-panel profile-panel-wide raw-data-panel style-learning-panel" id="raw-profile-data-panel" hidden>
+              <div class="panel-heading profile-facts-heading">
+                <div>
+                  <p class="eyebrow">Debug Memory</p>
+                  <h2>Raw internal data points</h2>
+                </div>
+                <span class="profile-fact-total" id="raw-profile-data-total">0 points</span>
+              </div>
+              <div class="raw-data-list" id="raw-profile-data-list">
+                <div class="table-empty">Raw profile data is disabled.</div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen matches-screen" id="matches-screen" hidden>
+          <div class="coming-soon-panel">
+            <p class="eyebrow">Matches</p>
+            <h1>Matching engine coming soon.</h1>
+            <p>
+              This space will show candidates, score reasoning, conflicts, and conversation starters once matching is ready.
+            </p>
+            <div class="coming-soon-grid">
+              <span>Candidate profiles</span>
+              <span>Match score</span>
+              <span>Why it matched</span>
+              <span>Conflict checks</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen usage-screen" id="usage-screen" hidden>
+          <div class="usage-hero">
+            <div class="screen-copy compact">
+              <p class="eyebrow">Agent Ops</p>
+              <h1>Token and cost control.</h1>
+              <p>Track every agent call, model choice, latency, token volume, and estimated spend.</p>
+            </div>
+            <button id="refresh-usage" type="button">Refresh</button>
+          </div>
+
+          <div class="usage-grid" id="usage-grid">
+            <article class="metric-card">
+              <span>Requests</span>
+              <strong id="usage-requests">0</strong>
+              <small id="usage-request-detail">0 successful</small>
+            </article>
+            <article class="metric-card">
+              <span>Total tokens</span>
+              <strong id="usage-total-tokens">0</strong>
+              <small id="usage-token-detail">0 input / 0 output</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg input / msg</span>
+              <strong id="usage-average-input-tokens">0</strong>
+              <small>Prompt tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg output / msg</span>
+              <strong id="usage-average-output-tokens">0</strong>
+              <small>Reply tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Estimated cost</span>
+              <strong id="usage-cost">$0.000000</strong>
+              <small id="usage-cost-detail">Set pricing env for estimates</small>
+            </article>
+            <article class="metric-card">
+              <span>Failures</span>
+              <strong id="usage-failures">0</strong>
+              <small>Provider/network errors</small>
+            </article>
+            <article class="metric-card">
+              <span>Groq 429s</span>
+              <strong id="usage-rate-limits">0</strong>
+              <small id="usage-rate-limit-detail">No recent throttling</small>
+            </article>
+          </div>
+
+          <div class="usage-panels">
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Groq Limits</p>
+                  <h2>Rate-limit health</h2>
+                </div>
+              </div>
+              <div class="rate-limit-grid" id="rate-limit-grid">
+                <div class="table-empty">Rate-limit headers will appear after new Groq calls.</div>
+              </div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Model Mix</p>
+                  <h2>Tokens by provider</h2>
+                </div>
+              </div>
+              <div class="provider-list" id="provider-list"></div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Rate</p>
+                  <h2>Tokens by minute</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="provider-table">
+                  <thead>
+                    <tr>
+                      <th>Minute</th>
+                      <th>Calls</th>
+                      <th>Tokens</th>
+                      <th>Input / Output</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-minute-buckets">
+                    <tr>
+                      <td colspan="4">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Ledger</p>
+                  <h2>Recent agent calls</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Model</th>
+                      <th>Tokens</th>
+                      <th>Prompt size</th>
+                      <th>Latency</th>
+                      <th>Cost</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-events">
+                    <tr>
+                      <td colspan="7">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="confirm-overlay" id="delete-session-dialog" hidden>
+      <section
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-session-title"
+        aria-describedby="delete-session-copy"
+      >
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+            <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <p class="eyebrow">Delete Conversation</p>
+          <h2 id="delete-session-title">Remove this chat history?</h2>
+          <p id="delete-session-copy">
+            This will remove the chat, imported context, and usage log for this conversation.
+          </p>
+          <p class="confirm-session" id="delete-session-id">Conversation</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="secondary-button" id="cancel-delete-session" type="button">Cancel</button>
+          <button class="danger-button" id="confirm-delete-session" type="button">
+            Delete session
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="fact-evidence-dialog" hidden>
+      <section
+        class="evidence-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fact-evidence-title"
+        aria-describedby="fact-evidence-copy"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Evidence</p>
+            <h2 id="fact-evidence-title">Why Omiryn believes this</h2>
+            <p id="fact-evidence-copy">
+              These are the chat snippets connected to this internal matching signal.
+            </p>
+          </div>
+          <button
+            class="evidence-close"
+            id="close-fact-evidence"
+            type="button"
+            aria-label="Close evidence"
+          >
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="evidence-summary" id="fact-evidence-summary"></div>
+        <div class="evidence-list" id="fact-evidence-list"></div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="delete-memory-dialog" hidden>
+      <section
+        class="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-memory-title"
+        aria-describedby="delete-memory-copy"
+      >
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+            <path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"></path>
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <p class="eyebrow">Delete Memory</p>
+          <h2 id="delete-memory-title">Remove this saved memory?</h2>
+          <p id="delete-memory-copy">
+            This source will be removed from your saved memories and future context.
+          </p>
+          <p class="confirm-session" id="delete-memory-name">Memory</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="secondary-button" id="cancel-delete-memory" type="button">Cancel</button>
+          <button class="danger-button" id="confirm-delete-memory" type="button">
+            Delete memory
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="context-memory-dialog" hidden>
+      <section
+        class="context-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="context-memory-title"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Add Memory</p>
+            <h2 id="context-memory-title">Import external context</h2>
+            <p>Use this for a compact profile summary, exported chat notes, or manual memory.</p>
+          </div>
+          <button class="evidence-close" id="close-context-memory" type="button" aria-label="Close memory import">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="context-modal-body">
+          <label class="context-field">
+            Prompt to copy
+            <textarea id="context-prompt" rows="5" readonly>I am using Omiryn to build a private personal profile about myself.
+
+Please create a concise, privacy-safe self-profile about me based only on what you know from our past chats.
+Focus on me as a person, not on my dating life. Include relationship details only if I clearly discussed them before.
+
+Return sections:
+1. Basic background and life context, only if known
+2. Personality traits and temperament
+3. Core values, priorities, and beliefs
+4. Interests, hobbies, routines, and lifestyle patterns
+5. Communication style and thinking style
+6. Goals, ambitions, and current focus areas
+7. Strengths, recurring challenges, and stress patterns
+8. Preferences, dislikes, boundaries, and sensitivities
+9. Important unknowns Omiryn should ask me
+
+Rules:
+- Do not invent facts.
+- Mark uncertain points as uncertain.
+- Do not infer romantic status, past relationships, sexual preferences, attraction patterns, or ideal partner unless explicitly known.
+- Avoid exposing names, phone numbers, addresses, or private third-party details.
+- Keep it under 1000 words.</textarea>
+          </label>
+          <button class="secondary-button primary-wide" id="copy-context-prompt" type="button">
+            Copy prompt
+          </button>
+
+          <div class="context-form-grid">
+            <label class="context-field">
+              Source type
+              <select id="context-source-type">
+                <option value="llm_profile">ChatGPT / Claude / Gemini summary</option>
+                <option value="chat_export">Short chat summary</option>
+                <option value="manual_notes">Manual notes</option>
+              </select>
+            </label>
+            <label class="context-field">
+              Title
+              <input id="context-title" type="text" value="Imported context" />
+            </label>
+          </div>
+          <label class="context-field">
+            Paste result
+            <textarea id="context-content" rows="6" placeholder="Paste the summary or chat context here..."></textarea>
+          </label>
+          <div class="context-modal-actions">
+            <button class="secondary-button" id="cancel-context-memory" type="button">Cancel</button>
+            <button id="save-context-source" type="button">Save memory</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-overlay" id="whatsapp-style-dialog" hidden>
+      <section
+        class="context-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="whatsapp-style-title"
+      >
+        <div class="evidence-dialog-header">
+          <div>
+            <p class="eyebrow">Text Style</p>
+            <h2 id="whatsapp-style-title">Import WhatsApp style</h2>
+            <p>Import a normal 1:1 WhatsApp export. Omiryn stores a compact style summary.</p>
+          </div>
+          <button class="evidence-close" id="close-whatsapp-style" type="button" aria-label="Close text style import">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="context-modal-body">
+          <label class="context-field">
+            Sender to learn (optional)
+            <input id="whatsapp-sender" type="text" placeholder="Exact name from export, or leave blank to infer" />
+          </label>
+          <label class="context-field">
+            Style name
+            <input id="whatsapp-style-name" type="text" placeholder="Sanjay-style, Nikhil-style..." />
+          </label>
+          <label class="context-field">
+            WhatsApp .txt files
+            <input id="whatsapp-files" type="file" accept=".txt,text/plain" multiple />
+          </label>
+          <label class="context-field">
+            Or paste export
+            <textarea id="whatsapp-content" rows="6" placeholder="Paste WhatsApp exported text here..."></textarea>
+          </label>
+          <p class="quiet-note">
+            V1 limit: text-only exports up to 1,000,000 characters per file. Raw chat is not saved as context.
+          </p>
+          <div class="context-modal-actions">
+            <button class="secondary-button" id="cancel-whatsapp-style" type="button">Cancel</button>
+            <button class="secondary-button" id="save-whatsapp-import" type="button">
+              Upload WhatsApp chat
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/static/app.js?v=20260713-mobile-onboarding-phone"></script>
+  </body>
+</html>
