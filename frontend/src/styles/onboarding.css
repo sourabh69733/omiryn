@@ -286,6 +286,41 @@
   box-shadow: var(--shadow-sm);
 }
 
+.choice-composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: min(760px, 100%);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-sm);
+}
+
+.choice-composer button,
+.skip-button {
+  min-height: 44px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  padding: 0 20px;
+  color: var(--ink);
+  background: white;
+  font-weight: 720;
+}
+
+.choice-composer button:hover,
+.skip-button:hover {
+  border-color: var(--purple-2);
+  color: var(--purple);
+}
+
+.photo-actions button:first-child {
+  border-color: transparent;
+  color: white;
+  background: linear-gradient(145deg, var(--purple-2), var(--purple));
+}
+
 .emoji-button,
 .send-button {
   display: grid;
@@ -321,6 +356,12 @@
   color: white;
   background: linear-gradient(145deg, var(--purple-2), var(--purple));
   box-shadow: 0 12px 28px rgba(118, 87, 220, 0.26);
+}
+
+.skip-button {
+  padding-inline: 14px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .profile-preview {
@@ -511,6 +552,23 @@
     width: auto;
     padding: 8px;
     border-radius: var(--radius-pill);
+  }
+
+  .choice-composer {
+    position: fixed;
+    right: 16px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 16px;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr;
+    width: auto;
+    padding: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .choice-composer button {
+    min-height: 46px;
   }
 
   .emoji-button {
