@@ -1,13 +1,26 @@
-import { Calendar, Camera, Heart, UserRound } from "lucide-react";
+import { Calendar, Camera, Heart, MapPin, UserRound } from "lucide-react";
 
-const rows = [
-  { icon: UserRound, label: "Name", value: "—" },
-  { icon: Calendar, label: "Date of birth", value: "—" },
-  { icon: Heart, label: "Interested in", value: "—" },
-  { icon: Camera, label: "Photos", value: "—" }
-];
+export type ProfilePreviewValues = {
+  name?: string;
+  dob?: string;
+  interested?: string;
+  location?: string;
+  photos?: string;
+};
 
-export function ProfilePreview() {
+type ProfilePreviewProps = {
+  values: ProfilePreviewValues;
+};
+
+export function ProfilePreview({ values }: ProfilePreviewProps) {
+  const rows = [
+    { icon: UserRound, label: "Name", value: values.name || "—" },
+    { icon: Calendar, label: "Date of birth", value: values.dob || "—" },
+    { icon: Heart, label: "Interested in", value: values.interested || "—" },
+    { icon: MapPin, label: "Location", value: values.location || "—" },
+    { icon: Camera, label: "Photos", value: values.photos || "—" }
+  ];
+
   return (
     <aside className="profile-preview" aria-label="Profile so far">
       <header>

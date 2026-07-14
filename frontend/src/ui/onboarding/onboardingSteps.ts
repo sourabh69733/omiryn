@@ -5,7 +5,11 @@ export type OnboardingStep = {
   hint?: string;
   placeholder?: string;
   type: "text" | "date" | "choice" | "photo";
-  choices?: string[];
+  optional?: boolean;
+  choices?: Array<{
+    label: string;
+    value: string;
+  }>;
 };
 
 export const onboardingSteps: OnboardingStep[] = [
@@ -28,14 +32,23 @@ export const onboardingSteps: OnboardingStep[] = [
     progress: "3 of 7",
     question: "How should we describe your gender?",
     type: "choice",
-    choices: ["Man", "Woman", "Non-binary", "Prefer not to say"]
+    choices: [
+      { label: "Man", value: "man" },
+      { label: "Woman", value: "woman" },
+      { label: "Non-binary", value: "non_binary" },
+      { label: "Prefer not to say", value: "prefer_not_to_say" }
+    ]
   },
   {
     id: "interested",
     progress: "4 of 7",
     question: "Who are you interested in meeting?",
     type: "choice",
-    choices: ["Women", "Men", "Everyone"]
+    choices: [
+      { label: "Women", value: "women" },
+      { label: "Men", value: "men" },
+      { label: "Everyone", value: "everyone" }
+    ]
   },
   {
     id: "location",
@@ -51,6 +64,7 @@ export const onboardingSteps: OnboardingStep[] = [
     question: "Want to add a phone number?",
     hint: "Optional. You can skip this.",
     placeholder: "+91...",
+    optional: true,
     type: "text"
   },
   {
@@ -58,6 +72,7 @@ export const onboardingSteps: OnboardingStep[] = [
     progress: "7 of 7",
     question: "Want to add a profile photo now?",
     hint: "Totally optional, but it helps people recognize you.",
+    optional: true,
     type: "photo"
   }
 ];
