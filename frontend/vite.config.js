@@ -4,9 +4,9 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   root: "frontend",
-  base: "/static/react/",
+  base: "/app-static/",
   build: {
-    outDir: "../src/api/static/react",
+    outDir: "dist",
     emptyOutDir: true,
     assetsDir: "assets"
   },
@@ -15,7 +15,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": "http://127.0.0.1:8021",
-      "/static": "http://127.0.0.1:8021",
       "/uploads": "http://127.0.0.1:8021"
     }
   }
