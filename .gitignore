@@ -15,8 +15,8 @@ __pycache__/
 .coverage
 htmlcov/
 dist/
-!frontend/dist/
-!frontend/dist/**
+frontend/dist/
+frontend/dist/**
 build/
 *.egg-info/
 .DS_Store

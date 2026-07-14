@@ -10,8 +10,8 @@ __pycache__/
 data/
 backups/
 dist/
-!frontend/dist/
-!frontend/dist/**
+frontend/dist/
+frontend/dist/**
 build/
 *.egg-info/
 docs/
