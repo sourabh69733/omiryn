@@ -1963,6 +1963,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn('href="/app"', response.text)
         self.assertIn("/static/app.js", response.text)
 
+    def test_react_app_preview_serves_built_shell(self) -> None:
+        response = self.client.get("/app-react")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="root"></div>', response.text)
+        self.assertIn("/static/react/assets/index-", response.text)
+
     def test_app_auth_redirect_returns_to_app_route(self) -> None:
         script = (STATIC_DIR / "app.js").read_text()
 

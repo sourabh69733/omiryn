@@ -22,6 +22,11 @@ def app_shell() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
+@router.get("/app-react")
+def react_app_preview() -> FileResponse:
+    return FileResponse(STATIC_DIR / "react" / "index.html", headers=APP_SHELL_HEADERS)
+
+
 @router.get("/drafts/{draft_id}")
 def draft_review_page(draft_id: str) -> FileResponse:
     _get_existing_draft(draft_id)
@@ -46,4 +51,3 @@ def profile_page() -> FileResponse:
 @router.get("/usage")
 def usage_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers=APP_SHELL_HEADERS)
-
