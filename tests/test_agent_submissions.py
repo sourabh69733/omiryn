@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from fastapi.testclient import TestClient
 
-from api.main import STATIC_DIR, _agent_user_context, _smart_reply_context_sources, app, current_user
+from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
 from agent.memory_engine.memory import (
     pending_data_point_messages,
     should_run_conversation_data_point_extraction,
@@ -1960,22 +1960,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.get("/app")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('href="/app"', response.text)
-        self.assertIn("/static/app.js", response.text)
+        self.assertIn('<div id="root"></div>', response.text)
+        self.assertIn("/app-static/assets/index-", response.text)
 
     def test_react_app_preview_serves_built_shell(self) -> None:
         response = self.client.get("/app-react")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="root"></div>', response.text)
-        self.assertIn("/static/react/assets/index-", response.text)
-
-    def test_app_auth_redirect_returns_to_app_route(self) -> None:
-        script = (STATIC_DIR / "app.js").read_text()
-
-        self.assertIn("function appReturnUrl()", script)
-        self.assertIn("redirectTo: appReturnUrl()", script)
-        self.assertNotIn("redirectTo: window.location.origin", script)
+        self.assertIn("/app-static/assets/index-", response.text)
 
     def test_admin_dev_bypass_serves_shell_when_auth_required(self) -> None:
         with patch.dict(
@@ -2987,7 +2980,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.get("/usage")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Token and cost control", response.text)
+        self.assertIn('<div id="root"></div>', response.text)
+        self.assertIn("/app-static/assets/index-", response.text)
 
     def _create_draft(self) -> str:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())

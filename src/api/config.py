@@ -18,7 +18,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional outside GCP/photo uploads
     gcs_storage = None
 
-STATIC_DIR = Path(__file__).parent / "static"
+FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
 PROFILE_PHOTO_MAX_BYTES = int(float(os.getenv("PROFILE_PHOTO_MAX_MB", "10")) * 1024 * 1024)

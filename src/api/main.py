@@ -9,11 +9,11 @@ from storage import init_db
 
 from .config import (
     APP_SHELL_HEADERS,
+    FRONTEND_DIST_DIR,
     PROFILE_PHOTO_GCS_BUCKET,
     PROFILE_PHOTO_GCS_PREFIX,
     PROFILE_PHOTO_GCS_PUBLIC_BASE_URL,
     PROFILE_UPLOAD_DIR,
-    STATIC_DIR,
 )
 from .helpers import _agent_user_context, _smart_reply_context_sources
 from .routes import run_agent_turn
@@ -33,7 +33,7 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
-app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/app-static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app-static")
 PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     "/uploads/profile_photos",
@@ -56,12 +56,12 @@ def startup() -> None:
 
 __all__ = [
     "APP_SHELL_HEADERS",
+    "FRONTEND_DIST_DIR",
     "NoCacheStaticFiles",
     "PROFILE_PHOTO_GCS_BUCKET",
     "PROFILE_PHOTO_GCS_PREFIX",
     "PROFILE_PHOTO_GCS_PUBLIC_BASE_URL",
     "PROFILE_UPLOAD_DIR",
-    "STATIC_DIR",
     "_agent_user_context",
     "_smart_reply_context_sources",
     "app",
