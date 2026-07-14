@@ -925,15 +925,32 @@ function renderOnboardingChat(reset = false) {
   onboardingPhotoStrip.hidden = step.mode !== "photo";
 
   onboardingChatLog.replaceChildren();
-  visibleOnboardingMessages().forEach((message, index) => {
+  const visibleMessages = visibleOnboardingMessages();
+  visibleMessages.forEach((message, index) => {
     const row = document.createElement("div");
+    
+    if (message.role === "typing") {
+      row.className = "onboarding-typing";
+      row.appendChild(createMascotAvatar(index, "typing"));
+      const bubble = document.createElement("div");
+      bubble.className = "onboarding-typing-bubble";
+      bubble.innerHTML = '<span class="onboarding-typing-dot"></span><span class="onboarding-typing-dot"></span><span class="onboarding-typing-dot"></span>';
+      row.appendChild(bubble);
+      onboardingChatLog.appendChild(row);
+      return;
+    }
+
     row.className = `onboarding-message ${message.role}`;
+    
     if (message.kind) {
       row.classList.add(message.kind);
     }
     if (message.role === "agent") {
       row.appendChild(createMascotAvatar(index, message.kind));
+      const stagger = Math.max(0, index - (visibleMessages.length - 2)) * 0.15;
+      row.style.animationDelay = `${stagger}s`;
     }
+    
     const bubble = document.createElement("div");
     bubble.className = "onboarding-bubble";
     const text = document.createElement("p");
@@ -951,6 +968,14 @@ function renderOnboardingChat(reset = false) {
       bubble.appendChild(doodle);
     }
     row.appendChild(bubble);
+    
+    if (message.role === "user") {
+      const tick = document.createElement("span");
+      tick.className = "onboarding-message-tick";
+      tick.textContent = "Sent";
+      row.appendChild(tick);
+    }
+    
     onboardingChatLog.appendChild(row);
   });
   onboardingChatLog.scrollTop = onboardingChatLog.scrollHeight;
@@ -1042,7 +1067,7 @@ function visibleOnboardingMessages() {
   const currentStep = onboardingChatSteps[onboardingChatStepIndex];
   const mobileViewport = window.matchMedia?.("(max-width: 680px)")?.matches;
   const maxMessages = mobileViewport
-    ? (currentStep?.mode === "photo" ? 5 : 7)
+    ? (currentStep?.mode === "photo" ? 4 : 5)
     : (currentStep?.mode === "photo" ? 4 : 5);
   return onboardingChatMessages.slice(-maxMessages);
 }
@@ -1054,8 +1079,18 @@ async function submitOnboardingAnswer(value, label = "", skipped = false) {
   if (!displayValue) return;
   onboardingChatMessages.push({ role: "user", text: displayValue });
   renderOnboardingChat();
+  
+  onboardingChatControls.replaceChildren();
+  const typingMsg = { role: "typing" };
+  onboardingChatMessages.push(typingMsg);
+  renderOnboardingChat();
+
   try {
     const result = await step.validate(value, label || displayValue, skipped);
+    await new Promise((resolve) => setTimeout(resolve, 550));
+    const tIndex = onboardingChatMessages.indexOf(typingMsg);
+    if (tIndex > -1) onboardingChatMessages.splice(tIndex, 1);
+
     if (!result.valid) {
       onboardingChatMessages.push({
         role: "agent",
@@ -1099,6 +1134,9 @@ async function submitOnboardingAnswer(value, label = "", skipped = false) {
     });
     renderOnboardingChat();
   } catch (error) {
+    const tIndex = onboardingChatMessages.indexOf(typingMsg);
+    if (tIndex > -1) onboardingChatMessages.splice(tIndex, 1);
+    
     onboardingChatMessages.push({
       role: "agent",
       text: error.message || "That did not land. Try once more?",

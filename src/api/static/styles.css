@@ -937,6 +937,24 @@ p {
   font-weight: 620;
 }
 
+/* ── Onboarding chat entrance animations ── */
+@keyframes ob-msg-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ob-mascot-bounce {
+  0%   { transform: scale(0.72) translateY(6px); opacity: 0; }
+  55%  { transform: scale(1.06) translateY(-3px); opacity: 1; }
+  80%  { transform: scale(0.97) translateY(1px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes ob-typing-bounce {
+  0%, 80%, 100% { transform: scaleY(0.5); opacity: 0.38; }
+  40%           { transform: scaleY(1);   opacity: 1; }
+}
+
 .onboarding-chat-step {
   align-self: stretch;
   display: grid;
@@ -1042,6 +1060,7 @@ p {
   align-items: flex-end;
   gap: 10px;
   max-width: 88%;
+  animation: ob-msg-in 0.38s cubic-bezier(0.34, 1.32, 0.64, 1) both;
 }
 
 .onboarding-message.user {
@@ -1102,6 +1121,63 @@ p {
   display: none;
 }
 
+/* ── Typing indicator ── */
+.onboarding-typing {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 88%;
+  align-self: flex-start;
+}
+
+.onboarding-typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(180, 154, 255, 0.22);
+  border-radius: 8px 8px 8px 2px;
+  padding: 14px 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(37, 32, 53, 0.07);
+}
+
+.onboarding-typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9c8bec;
+  animation: ob-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.onboarding-typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.onboarding-typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* ── Checkmark tick under user message ── */
+.onboarding-message-tick {
+  position: absolute;
+  right: 6px;
+  bottom: -22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #9c8bec;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  animation: ob-msg-in 0.3s 0.25s ease both;
+}
+
+.onboarding-message-tick::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 7px;
+  border-left: 2.5px solid #7f67d8;
+  border-bottom: 2.5px solid #7f67d8;
+  transform: rotate(-48deg) translateY(-2px);
+}
+
 .onboarding-chat-controls {
   border-top: 1px solid var(--line);
   padding: 14px 18px 18px;
@@ -1136,16 +1212,16 @@ p {
 .onboarding-skip,
 .onboarding-chip {
   min-height: 44px;
-  border: 1px solid rgba(127, 103, 216, 0.26);
-  border-radius: 8px;
-  padding: 0 16px;
+  border: 2px solid rgba(127, 103, 216, 0.28);
+  border-radius: 999px;
+  padding: 0 22px;
   color: var(--ink);
   background: #ffffff;
   font: inherit;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition: transform 180ms cubic-bezier(0.34, 1.4, 0.64, 1), border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .onboarding-send,
@@ -1157,6 +1233,7 @@ p {
 
 .onboarding-skip {
   color: var(--muted);
+  border-color: rgba(127, 103, 216, 0.18);
 }
 
 .onboarding-chip-row {
@@ -1168,8 +1245,9 @@ p {
 .onboarding-chip:hover,
 .onboarding-send:hover,
 .onboarding-skip:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.03);
   border-color: var(--primary);
+  box-shadow: 0 4px 16px rgba(127, 103, 216, 0.16);
 }
 
 .onboarding-hidden-fields {
@@ -1193,9 +1271,10 @@ p {
 
 .onboarding-screen {
   background:
-    radial-gradient(circle at 18% 10%, rgba(180, 154, 255, 0.22), transparent 28%),
-    radial-gradient(circle at 88% 24%, rgba(94, 234, 212, 0.14), transparent 24%),
-    linear-gradient(180deg, #fbfaff 0%, #ffffff 58%, #fbf8ff 100%);
+    radial-gradient(circle at 14% 8%,  rgba(180, 154, 255, 0.28), transparent 30%),
+    radial-gradient(circle at 88% 22%, rgba(94, 234, 212, 0.18), transparent 26%),
+    radial-gradient(circle at 56% 72%, rgba(255, 126, 179, 0.08), transparent 28%),
+    linear-gradient(180deg, #faf7ff 0%, #ffffff 50%, #fdf9ff 100%);
 }
 
 .basics-experience {
@@ -1393,6 +1472,7 @@ p {
   height: 10px;
   border-radius: 999px;
   background: #e5e0ef;
+  transition: width 0.35s cubic-bezier(0.34, 1.3, 0.64, 1), background 0.3s ease;
 }
 
 .onboarding-progress-dots span.active {
@@ -1725,7 +1805,7 @@ p {
 
 .onboarding-chip-row {
   justify-content: center;
-  gap: clamp(12px, 2vw, 26px);
+  gap: clamp(12px, 2vw, 22px);
 }
 
 .onboarding-chip {
@@ -1733,19 +1813,26 @@ p {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  min-width: clamp(150px, 12vw, 220px);
-  min-height: 74px;
+  min-width: clamp(140px, 11vw, 210px);
+  min-height: 68px;
   border: 2px solid #ddd4f8;
   color: #151632;
-  border-radius: 8px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
-  font-size: clamp(20px, 1.8vw, 30px);
+  font-size: clamp(18px, 1.6vw, 26px);
   font-weight: 620;
-  box-shadow: 0 14px 30px rgba(37, 32, 53, 0.06);
+  box-shadow: 0 10px 24px rgba(37, 32, 53, 0.06);
+  transition: transform 200ms cubic-bezier(0.34, 1.4, 0.64, 1), border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
-.onboarding-chip.selected,
-.onboarding-chip:hover {
+.onboarding-chip.selected {
+  border-color: #6f50d8;
+  color: #ffffff;
+  background: linear-gradient(145deg, #8a6fff, #6842d9);
+  box-shadow: 0 8px 24px rgba(104, 66, 217, 0.34);
+}
+
+.onboarding-chip:hover:not(.selected) {
   border-color: #6f50d8;
   color: #5d3fc9;
   background: linear-gradient(180deg, #fbf8ff, #f1ebff);
@@ -1756,6 +1843,7 @@ p {
   border-color: #bdafff;
   color: #6f50d8;
   background: linear-gradient(180deg, #fbf8ff, #f4efff);
+  border-radius: 999px;
 }
 
 .chip-icon {
@@ -1973,6 +2061,7 @@ p {
   border-radius: 50%;
   background: radial-gradient(circle at 28% 20%, #ffffff 0 18%, #ece5ff 60%, #d9ccff 100%);
   box-shadow: 0 16px 30px rgba(127, 103, 216, 0.14);
+  animation: ob-mascot-bounce 0.52s cubic-bezier(0.34, 1.32, 0.64, 1) both;
 }
 
 .mascot-head svg {
@@ -7635,6 +7724,397 @@ p {
 
   .onboarding-chat-step {
     padding-inline: 12px;
+  }
+}
+
+@media (max-width: 680px) {
+  #dating-basics-screen.onboarding-screen:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #dating-basics-screen .basics-experience {
+    display: grid;
+    grid-template-rows: 116px minmax(0, 1fr);
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  #dating-basics-screen .onboarding-shell-doodles {
+    display: none;
+  }
+
+  #dating-basics-screen .onboarding-shell-header {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    min-height: 116px;
+    padding: 18px 18px 16px;
+    border-bottom: 2px solid #c9baf7;
+  }
+
+  #dating-basics-screen .onboarding-shell-header .basics-brand {
+    max-width: calc(100vw - 154px);
+  }
+
+  #dating-basics-screen .onboarding-shell-header .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  #dating-basics-screen .onboarding-shell-header .basics-brand strong {
+    font-size: clamp(26px, 7vw, 30px);
+    line-height: 1;
+  }
+
+  #dating-basics-screen .onboarding-shell-header .basics-brand::after {
+    left: 18px;
+    top: 70px;
+    font-size: clamp(14px, 4vw, 17px);
+  }
+
+  #dating-basics-screen .onboarding-chat-step {
+    display: block;
+    min-height: 0;
+    padding: 0 16px 12px;
+    overflow: hidden;
+  }
+
+  #dating-basics-screen .onboarding-chat-shell {
+    position: relative;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #dating-basics-screen .onboarding-chat-header {
+    position: absolute;
+    top: -96px;
+    right: 0;
+    z-index: 4;
+  }
+
+  #dating-basics-screen .onboarding-progress-wrap {
+    min-width: 112px;
+    max-width: 124px;
+    padding: 9px 10px 11px;
+    border-radius: 8px;
+  }
+
+  #dating-basics-screen .onboarding-progress {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  #dating-basics-screen .onboarding-progress-dots {
+    gap: 4px;
+  }
+
+  #dating-basics-screen .onboarding-progress-dots span {
+    width: 11px;
+    height: 5px;
+  }
+
+  #dating-basics-screen .onboarding-progress-dots span.active {
+    width: 20px;
+  }
+
+  #dating-basics-screen .onboarding-chat-body {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: clamp(12px, 1.8dvh, 18px);
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+    padding: clamp(18px, 2.6dvh, 24px) 0 10px;
+  }
+
+  #dating-basics-screen .onboarding-chat-body::before {
+    content: "?";
+    position: absolute;
+    left: 36%;
+    top: 34%;
+    color: #5edbc7;
+    font-size: 34px;
+    font-weight: 500;
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  #dating-basics-screen .onboarding-chat-body::after {
+    content: "♡";
+    position: absolute;
+    right: 11%;
+    bottom: 12%;
+    color: #ff5f9a;
+    font-size: 34px;
+    font-weight: 700;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  #dating-basics-screen .onboarding-chat-shell::before {
+    left: 4px;
+    bottom: 92px;
+    width: 86px;
+    height: 104px;
+    opacity: 0.22;
+  }
+
+  #dating-basics-screen .onboarding-chat-shell::after {
+    right: 26px;
+    top: 30%;
+    width: 28px;
+    height: 28px;
+    opacity: 0.5;
+  }
+
+  #dating-basics-screen .onboarding-message {
+    width: 100%;
+    max-width: 100%;
+    gap: 8px;
+  }
+
+  #dating-basics-screen .onboarding-message.agent {
+    align-items: flex-start;
+  }
+
+  #dating-basics-screen .mascot-head {
+    flex: 0 0 58px;
+    width: 58px;
+    height: 58px;
+  }
+
+  #dating-basics-screen .onboarding-bubble {
+    max-width: min(68vw, 260px);
+    padding: clamp(13px, 2dvh, 17px) 18px;
+  }
+
+  #dating-basics-screen .onboarding-message.agent .onboarding-bubble::before {
+    left: -12px;
+    bottom: 14px;
+    width: 20px;
+    height: 18px;
+  }
+
+  #dating-basics-screen .onboarding-bubble p {
+    font-size: clamp(16px, 4.8vw, 20px);
+    line-height: 1.32;
+  }
+
+  #dating-basics-screen .onboarding-bubble small {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  #dating-basics-screen .onboarding-message.user {
+    justify-content: flex-end;
+    padding-right: 16px;
+  }
+
+  #dating-basics-screen .onboarding-message.user .onboarding-bubble {
+    min-width: 76px;
+    max-width: min(52vw, 200px);
+    padding: 14px 21px;
+  }
+
+  #dating-basics-screen .onboarding-message.user .onboarding-bubble::after {
+    right: -10px;
+    width: 18px;
+    height: 16px;
+  }
+
+  #dating-basics-screen .onboarding-message.user::after {
+    right: 0;
+    bottom: -15px;
+    width: 16px;
+    height: 16px;
+    border-width: 3px;
+  }
+
+  #dating-basics-screen .onboarding-inline-doodle {
+    display: none;
+  }
+
+  #dating-basics-screen .onboarding-chat-controls {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 max(4px, env(safe-area-inset-bottom));
+    padding: 7px;
+    border-radius: 999px;
+  }
+
+  #dating-basics-screen .onboarding-composer {
+    grid-template-columns: 34px minmax(0, 1fr) 46px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  #dating-basics-screen .onboarding-smile {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+  }
+
+  #dating-basics-screen .onboarding-smile::before,
+  #dating-basics-screen .onboarding-smile::after {
+    top: 10px;
+    width: 4px;
+    height: 4px;
+  }
+
+  #dating-basics-screen .onboarding-smile::before {
+    left: 8px;
+  }
+
+  #dating-basics-screen .onboarding-smile::after {
+    right: 8px;
+  }
+
+  #dating-basics-screen .onboarding-composer input {
+    min-height: 42px;
+    font-size: 15px;
+  }
+
+  #dating-basics-screen .onboarding-send {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  #dating-basics-screen .send-plane {
+    width: 22px;
+    height: 22px;
+  }
+
+  #dating-basics-screen .send-plane::before {
+    inset: 0;
+    border: 0;
+    background: #ffffff;
+    clip-path: polygon(6% 44%, 94% 6%, 60% 94%, 47% 58%);
+    transform: none;
+  }
+
+  #dating-basics-screen .onboarding-chip-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-left: 66px;
+  }
+
+  #dating-basics-screen .onboarding-chip {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  #dating-basics-screen .onboarding-photo-strip {
+    margin: 0 0 8px;
+    padding: 7px;
+  }
+}
+
+/* Final onboarding surface polish: the page is the canvas, not a card inside a card. */
+#dating-basics-screen.onboarding-screen {
+  background:
+    radial-gradient(circle at 20% 16%, rgba(180, 154, 255, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 24%, rgba(94, 234, 212, 0.12), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, #fffbff 100%);
+}
+
+#dating-basics-screen .basics-experience {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+#dating-basics-screen .onboarding-shell-header {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+#dating-basics-screen .onboarding-smile {
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: #8f7ae6;
+  font-size: 24px;
+  line-height: 1;
+}
+
+#dating-basics-screen .onboarding-smile::before {
+  content: "☺";
+  position: static;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+}
+
+#dating-basics-screen .onboarding-smile::after {
+  content: none;
+}
+
+@media (max-width: 680px) {
+  #dating-basics-screen.onboarding-screen:not([hidden]) {
+    background:
+      radial-gradient(circle at 18% 22%, rgba(180, 154, 255, 0.13), transparent 24%),
+      radial-gradient(circle at 84% 46%, rgba(94, 234, 212, 0.08), transparent 22%),
+      linear-gradient(180deg, #ffffff 0%, #fffbff 100%);
+  }
+
+  #dating-basics-screen .basics-experience {
+    min-height: 0;
+  }
+
+  #dating-basics-screen .onboarding-chat-step {
+    padding-bottom: 0;
+    height: calc(100dvh - 116px);
+  }
+
+  #dating-basics-screen .onboarding-chat-shell {
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    height: 100%;
+    padding-bottom: 74px;
+  }
+
+  #dating-basics-screen .onboarding-chat-controls {
+    position: fixed;
+    right: 16px;
+    bottom: max(12px, env(safe-area-inset-bottom));;
+    left: 16px;
+    z-index: 20;
+    align-self: end;
+    width: auto;
+    background: rgba(255, 255, 255, 0.9);
+    margin-bottom: 0;
+    padding-bottom: max(7px, env(safe-area-inset-bottom));
+  }
+
+  #dating-basics-screen .onboarding-smile {
+    width: 30px;
+    height: 30px;
+    font-size: 23px;
   }
 }
 
