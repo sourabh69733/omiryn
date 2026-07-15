@@ -12,6 +12,18 @@ function conversationIdFromUrl() {
   return new URLSearchParams(window.location.search).get("conversation_id");
 }
 
+function AppLoader() {
+  const loaderLogo = `${import.meta.env.BASE_URL}assets/omiryn-logo-neon-light.png`;
+  return (
+    <main className="boot-loader" aria-label="Loading Omiryn" role="status">
+      <div className="boot-mark-card" aria-hidden="true">
+        <span className="boot-logo-glow" />
+        <img className="boot-logo-image" src={loaderLogo} alt="" />
+      </div>
+    </main>
+  );
+}
+
 export function App() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [profileState, setProfileState] = useState<ProfileState>("checking");
@@ -68,7 +80,7 @@ export function App() {
   }
 
   if (authState === "checking" || (authState === "signed_in" && profileState === "checking")) {
-    return <main className="auth-redirect-screen" aria-live="polite"><OmirynLogo /><div className="auth-redirect-spinner" /><p>Opening Omiryn…</p></main>;
+    return <AppLoader />;
   }
 
   if (authState === "signed_out") {
