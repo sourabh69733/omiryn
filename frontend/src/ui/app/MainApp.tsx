@@ -345,7 +345,7 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
             <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p>
           </section>
         </aside>
-        <section className="chat-card agentic-chat">
+        <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
             <div className="chat-title-lockup"><span className="terminal-mark"><img src={avatar} alt="" /></span><div><h2>{agentName}</h2><p className="agent-status">{runtime.provider || "Agent"} · {conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
@@ -355,9 +355,9 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
             </div>
           </div>
           <div className="chat-log" ref={logRef} aria-live="polite">
-            {loading ? <div className="chat-empty-state chat-loading-state"><span className="chat-state-spinner" aria-hidden="true" /><strong>Loading conversation…</strong><span>Fetching the latest chat and context.</span></div> : null}
-            {!loading && !conversation ? <div className="chat-empty-state"><span className="chat-state-mark" aria-hidden="true">✦</span><strong>{summaries.length ? "No conversation selected" : "No conversations yet"}</strong><span>{summaries.length ? "Choose a conversation from History or start a new chat." : "Start a new conversation when you’re ready to talk."}</span><button type="button" onClick={() => void createConversation()}>Start a conversation</button></div> : null}
-            {conversation?.messages.map((message, index) => {
+            {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
+            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
+            {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
               return <div className={`message-row ${agent ? "agent" : "user"}`} key={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div></div>{!agent ? <span className="chat-avatar user">You</span> : null}</div>;
             })}
