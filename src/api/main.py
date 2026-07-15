@@ -33,7 +33,7 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
-app.mount("/app-static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app-static")
+app.mount("/app", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app")
 PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     "/uploads/profile_photos",
