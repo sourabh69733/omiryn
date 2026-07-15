@@ -1414,3 +1414,79 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* React bindings for the migrated legacy application shell. */
+.legacy-react-shell .brand {
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.legacy-react-shell .auth-user {
+  cursor: pointer;
+}
+
+.legacy-react-shell .history-delete {
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.legacy-inline-error {
+  margin: 0;
+  padding: 8px 18px;
+  color: #b83b62;
+  font-size: 12px;
+  text-align: center;
+}
+
+.react-memory-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid rgba(180, 154, 255, 0.16);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.react-memory-form input,
+.react-memory-form textarea {
+  width: 100%;
+  outline: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.react-memory-form textarea {
+  resize: vertical;
+}
+
+.react-memory-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mobile-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .mobile-sheet-backdrop {
+    position: fixed;
+    z-index: 55;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(23, 32, 38, 0.3);
+    backdrop-filter: blur(4px);
+  }
+}
