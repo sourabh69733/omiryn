@@ -1956,12 +1956,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Omiryn Admin", response.text)
         self.assertIn("/admin/static/app.js", response.text)
 
+    def test_root_serves_landing_page(self) -> None:
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Stop swiping.", response.text)
+        self.assertIn("/static/landing.css", response.text)
+        self.assertIn("/app", response.text)
+
     def test_app_shell_links_brand_to_app_route(self) -> None:
         response = self.client.get("/app")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="root"></div>', response.text)
         self.assertIn("/app-static/assets/index-", response.text)
+
+    def test_landing_static_assets_are_served(self) -> None:
+        response = self.client.get("/static/landing.css")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(".hero", response.text)
 
     def test_react_app_preview_serves_built_shell(self) -> None:
         response = self.client.get("/app-react")

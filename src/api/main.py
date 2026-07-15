@@ -10,6 +10,7 @@ from storage import init_db
 from .config import (
     APP_SHELL_HEADERS,
     FRONTEND_DIST_DIR,
+    LANDING_PAGE_FILE,
     PROFILE_PHOTO_GCS_BUCKET,
     PROFILE_PHOTO_GCS_PREFIX,
     PROFILE_PHOTO_GCS_PUBLIC_BASE_URL,
@@ -34,6 +35,7 @@ class NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/app-static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app-static")
+app.mount("/static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="landing-static")
 PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     "/uploads/profile_photos",
@@ -57,6 +59,7 @@ def startup() -> None:
 __all__ = [
     "APP_SHELL_HEADERS",
     "FRONTEND_DIST_DIR",
+    "LANDING_PAGE_FILE",
     "NoCacheStaticFiles",
     "PROFILE_PHOTO_GCS_BUCKET",
     "PROFILE_PHOTO_GCS_PREFIX",
