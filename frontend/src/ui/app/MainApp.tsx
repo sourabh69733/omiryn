@@ -155,6 +155,9 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const initializedRef = useRef(false);
 
@@ -223,7 +226,8 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
       const saved = window.localStorage.getItem("omiryn.activeConversationId");
       const preferred = initialConversationId || saved || rows[0]?.id;
       if (preferred) return openConversation(preferred);
-      return createConversation();
+      setConversation(null);
+      setLoading(false);
     }).catch((caught) => {
       setError(caught instanceof Error ? caught.message : "Could not open chat.");
       setLoading(false);
@@ -287,15 +291,34 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
     await fetchSummaries();
   }
 
+  useEffect(() => {
+    if (!pendingDelete) return;
+    cancelDeleteRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !deleting) setPendingDelete(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [pendingDelete, deleting]);
+
   async function deleteConversation(id: string) {
-    if (!window.confirm("Delete this conversation?")) return;
+    setDeleting(true);
     const response = await apiFetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setError(await apiErrorMessage(response, "Could not delete this conversation."));
+      setDeleting(false);
+      return;
+    }
     const rows = await fetchSummaries();
     if (conversation?.id === id) {
-      if (rows[0]) await openConversation(rows[0].id);
-      else await createConversation();
+      window.localStorage.removeItem("omiryn.activeConversationId");
+      window.history.replaceState({}, "", "/app");
+      setConversation(null);
+      setContextSources([]);
+      setLoading(false);
     }
+    setPendingDelete(null);
+    setDeleting(false);
   }
 
   const agentName = conversation?.agent_name || "Omiryn";
@@ -314,7 +337,7 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
               {summaries.map((item) => (
                 <div className={`history-item ${item.id === conversation?.id ? "active" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
                   <div className="history-item-copy"><strong>{item.agent_name || "Omiryn"}</strong><span>{item.message_count || 0} messages · {item.context_source_count || 0} signals</span><small>{item.updated_at ? new Date(item.updated_at).toLocaleString() : "New chat"}</small></div>
-                  <button className="history-delete" type="button" onClick={(event) => { event.stopPropagation(); void deleteConversation(item.id); }} aria-label="Delete conversation">×</button>
+                  <button className="history-delete" type="button" onClick={(event) => { event.stopPropagation(); setPendingDelete(item); }} aria-label={`Delete conversation ${item.agent_name || "Omiryn"}`}><span aria-hidden="true">×</span></button>
                 </div>
               ))}
             </div>
@@ -332,7 +355,8 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
             </div>
           </div>
           <div className="chat-log" ref={logRef} aria-live="polite">
-            {loading ? <div className="chat-empty-state"><strong>Loading conversation…</strong><span>Fetching your latest chat.</span></div> : null}
+            {loading ? <div className="chat-empty-state chat-loading-state"><span className="chat-state-spinner" aria-hidden="true" /><strong>Loading conversation…</strong><span>Fetching the latest chat and context.</span></div> : null}
+            {!loading && !conversation ? <div className="chat-empty-state"><span className="chat-state-mark" aria-hidden="true">✦</span><strong>{summaries.length ? "No conversation selected" : "No conversations yet"}</strong><span>{summaries.length ? "Choose a conversation from History or start a new chat." : "Start a new conversation when you’re ready to talk."}</span><button type="button" onClick={() => void createConversation()}>Start a conversation</button></div> : null}
             {conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
               return <div className={`message-row ${agent ? "agent" : "user"}`} key={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div></div>{!agent ? <span className="chat-avatar user">You</span> : null}</div>;
@@ -346,6 +370,7 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
           </form>
         </section>
       </div>
+      {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This will permanently remove the chat, attached context, and usage log for this conversation.</p><p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
   );
 }
