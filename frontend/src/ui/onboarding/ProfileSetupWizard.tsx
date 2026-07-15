@@ -200,6 +200,36 @@ export function ProfileSetupWizard() {
     setSubmitError(null);
     setIsSubmitting(true);
     try {
+      const age = ageFromDob(values.dob);
+      const profileResponse = await apiFetch("/api/me/dating-basics", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: values.displayName.trim(),
+          age,
+          gender: values.gender,
+          interested_in: values.interestedIn,
+          city: values.city.trim(),
+          phone: values.phone.trim() || null
+        })
+      });
+      if (!profileResponse.ok) {
+        throw new Error(await apiErrorMessage(profileResponse, "Could not save your profile."));
+      }
+
+      for (let slot = 0; slot < photos.length; slot += 1) {
+        const photo = photos[slot];
+        if (!photo) continue;
+        const uploadResponse = await apiFetch(`/api/me/profile-photo?slot=${slot}`, {
+          method: "PUT",
+          headers: { "Content-Type": photo.file.type },
+          body: await photo.file.arrayBuffer()
+        });
+        if (!uploadResponse.ok) {
+          throw new Error(await apiErrorMessage(uploadResponse, `Could not upload photo ${slot + 1}.`));
+        }
+      }
+
       const response = await apiFetch("/api/agent/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
