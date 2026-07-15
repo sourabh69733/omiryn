@@ -236,6 +236,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
       const data = (await response.json()) as Conversation;
       setConversation(data);
+      syncChatToBottomAfterRender();
       void loadConversationUsage(data.id);
       const contextResponse = await apiFetch(`/api/agent/conversations/${data.id}/context-sources`);
       if (contextResponse.ok) {
@@ -311,10 +312,17 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     log.scrollTop = log.scrollHeight;
   }
 
+  function syncChatToBottomAfterRender() {
+    syncChatToBottom();
+    window.requestAnimationFrame(() => {
+      syncChatToBottom();
+    });
+  }
+
   useLayoutEffect(() => {
     if (!shouldStickToBottomRef.current) return;
-    syncChatToBottom();
-  }, [conversation?.messages.length, sending]);
+    syncChatToBottomAfterRender();
+  }, [conversation?.id, conversation?.messages.length, loading, sending]);
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
