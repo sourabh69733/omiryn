@@ -79,6 +79,12 @@ export async function signInWithGoogle() {
   if (error) throw new Error("Could not start Google sign-in. Please try again.");
 }
 
+export async function signOut() {
+  const authClient = await getAuthClient();
+  if (authClient) await authClient.auth.signOut();
+  window.dispatchEvent(new Event("omiryn:auth-required"));
+}
+
 export async function apiErrorMessage(response: Response, fallback: string) {
   try {
     const body = (await response.json()) as { detail?: string };
