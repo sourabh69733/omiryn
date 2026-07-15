@@ -5429,6 +5429,16 @@ p {
   box-shadow: 0 22px 52px rgba(15, 37, 35, 0.11);
 }
 
+.profile-main-photo:disabled,
+.profile-thumb:disabled {
+  cursor: progress;
+}
+
+.profile-main-photo:disabled:hover,
+.profile-thumb:disabled:hover {
+  transform: none;
+}
+
 .profile-main-photo:focus-visible,
 .profile-thumb:focus-visible {
   outline: 3px solid rgba(93, 220, 206, 0.32);
@@ -5483,10 +5493,43 @@ p {
   display: none;
 }
 
+.profile-main-photo.is-uploading .profile-main-badge {
+  opacity: 0;
+}
+
+.profile-upload-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(18, 28, 35, 0.2), rgba(18, 28, 35, 0.46));
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.profile-upload-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.42);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: profile-upload-spin 800ms linear infinite;
+}
+
+@keyframes profile-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .profile-main-badge {
   position: absolute;
   left: 18px;
   bottom: 18px;
+  z-index: 3;
   display: inline-flex;
   min-height: 34px;
   align-items: center;
