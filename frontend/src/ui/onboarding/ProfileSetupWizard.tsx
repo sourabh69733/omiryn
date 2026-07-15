@@ -8,9 +8,9 @@ import {
   ImagePlus,
   LockKeyhole,
   MapPin,
-  ShieldCheck,
   Smartphone,
   Sparkles,
+  ShieldCheck,
   UserRound,
   X
 } from "lucide-react";
@@ -107,7 +107,6 @@ export function ProfileSetupWizard() {
   const [activePhotoSlot, setActivePhotoSlot] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cityOptions, setCityOptions] = useState<string[]>([]);
-  const [complete, setComplete] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -173,11 +172,7 @@ export function ProfileSetupWizard() {
 
   function goForward() {
     if (!validateStep()) return;
-    if (stepIndex === steps.length - 1) {
-      setComplete(true);
-      return;
-    }
-    setStepIndex((current) => current + 1);
+    setStepIndex((current) => Math.min(steps.length - 1, current + 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -189,7 +184,6 @@ export function ProfileSetupWizard() {
 
   function skipOptionalStep() {
     if (stepIndex === 2) setStepIndex(3);
-    if (stepIndex === 3) setComplete(true);
   }
 
   function choosePhoto(slot: number) {
@@ -214,31 +208,6 @@ export function ProfileSetupWizard() {
       next[slot] = null;
       return next;
     });
-  }
-
-  if (complete) {
-    return (
-      <main className="setup-page setup-complete-page">
-        <header className="setup-header">
-          <OmirynLogo />
-        </header>
-        <section className="complete-card" aria-labelledby="complete-title">
-          <span className="complete-icon" aria-hidden="true">
-            <CheckCircle2 />
-          </span>
-          <p className="eyebrow">Setup complete</p>
-          <h1 id="complete-title">You’re ready to meet Omiryn.</h1>
-          <p>Your essentials are in place. You can add or change anything later from your profile.</p>
-          <div className="complete-summary">
-            <span><ShieldCheck /> Private by default</span>
-            <span><Sparkles /> Ready for a more personal conversation</span>
-          </div>
-          <button className="primary-button" type="button">
-            Start talking with Omiryn <ArrowRight />
-          </button>
-        </section>
-      </main>
-    );
   }
 
   return (
