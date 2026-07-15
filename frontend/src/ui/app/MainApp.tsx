@@ -76,11 +76,16 @@ const assetUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`;
 export function MainApp({ initialConversationId }: { initialConversationId?: string | null }) {
   const [page, setPage] = useState<Page>(pageFromPath);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/auth/me").then((response) => response.ok ? response.json() : null).then(setUser).catch(() => undefined);
+    apiFetch("/api/me/profile")
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: ProfileResponse | null) => setProfile(data?.profile || null))
+      .catch(() => undefined);
     const sync = () => setPage(pageFromPath());
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -95,6 +100,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
 
   const displayName = user?.display_name || user?.email || "Account";
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
+  const profileAvatar = profile?.profile_photo_urls?.find(Boolean) || profile?.profile_photo_url || user?.avatar_url || null;
 
   return (
     <div className="app-shell legacy-react-shell">
@@ -120,7 +126,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
           </button>
           <div className="auth-control">
             <button className="auth-user" type="button" onClick={() => setAccountOpen((value) => !value)} aria-expanded={accountOpen}>
-              <span className="auth-avatar">{user?.avatar_url ? <img src={user.avatar_url} alt="" /> : initial}</span>
+              <span className="auth-avatar">{profileAvatar ? <img src={profileAvatar} alt="" /> : initial}</span>
               <span className="auth-email">{displayName}</span>
             </button>
             {accountOpen ? (
@@ -134,7 +140,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </header>
       <main>
-        {page === "chat" ? <ChatPage initialConversationId={initialConversationId} /> : null}
+        {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} /> : null}
         {page === "style" ? <StylePage /> : null}
         {page === "matches" ? <MatchesPage /> : null}
         {page === "profile" ? <ProfilePage /> : null}
@@ -144,7 +150,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   );
 }
 
-function ChatPage({ initialConversationId }: { initialConversationId?: string | null }) {
+function ChatPage({ initialConversationId, userAvatar }: { initialConversationId?: string | null; userAvatar?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -359,7 +365,7 @@ function ChatPage({ initialConversationId }: { initialConversationId?: string | 
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
             {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
-              return <div className={`message-row ${agent ? "agent" : "user"}`} key={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div></div>{!agent ? <span className="chat-avatar user">You</span> : null}</div>;
+              return <div className={`message-row ${agent ? "agent" : "user"}`} key={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div>;
             })}
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
