@@ -1,7 +1,7 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
 
-type Page = "chat" | "style" | "matches" | "profile" | "usage";
+type Page = "chat" | "style" | "matches" | "profile";
 type Message = { role?: string; content?: string; quality?: string };
 type Conversation = {
   id: string;
@@ -54,12 +54,38 @@ type ProfileResponse = {
   learned_facts?: ProfileFact[];
   learned_fact_groups?: Record<string, ProfileFact[]>;
 };
+type UsageSummary = {
+  request_count?: number;
+  successful_request_count?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  estimated_cost_usd?: number;
+  estimated_cost_inr?: number;
+  average_tokens_per_message?: number;
+  average_prompt_tokens_per_message?: number;
+  average_completion_tokens_per_message?: number;
+};
+type UsageEvent = {
+  request_kind?: string;
+  provider?: string;
+  model?: string;
+  created_at?: string;
+  success?: boolean;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+};
+type ConversationUsage = {
+  summary?: UsageSummary;
+  events?: UsageEvent[];
+};
+const canShowUsage = import.meta.env.DEV;
 
 const pageFromPath = (): Page => {
   if (window.location.pathname.startsWith("/style")) return "style";
   if (window.location.pathname.startsWith("/matches")) return "matches";
   if (window.location.pathname.startsWith("/profile")) return "profile";
-  if (window.location.pathname.startsWith("/usage")) return "usage";
   return "chat";
 };
 
@@ -67,8 +93,7 @@ const pathForPage: Record<Page, string> = {
   chat: "/app",
   style: "/style",
   matches: "/matches",
-  profile: "/profile",
-  usage: "/usage"
+  profile: "/profile"
 };
 
 const assetUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`;
@@ -81,6 +106,9 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    if (!canShowUsage && window.location.pathname.startsWith("/usage")) {
+      window.history.replaceState({}, "", "/app");
+    }
     apiFetch("/api/auth/me").then((response) => response.ok ? response.json() : null).then(setUser).catch(() => undefined);
     apiFetch("/api/me/profile")
       .then((response) => response.ok ? response.json() : null)
@@ -132,7 +160,6 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
             {accountOpen ? (
               <div className="account-menu">
                 <button type="button" onClick={() => navigate("profile")}>Profile</button>
-                <button type="button" onClick={() => navigate("usage")}>Usage</button>
                 <button type="button" onClick={() => void signOut()}>Sign out</button>
               </div>
             ) : null}
@@ -144,7 +171,6 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         {page === "style" ? <StylePage /> : null}
         {page === "matches" ? <MatchesPage /> : null}
         {page === "profile" ? <ProfilePage /> : null}
-        {page === "usage" ? <UsagePage /> : null}
       </main>
     </div>
   );
@@ -158,9 +184,13 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidePanel, setSidePanel] = useState<"history" | "usage">("history");
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [usage, setUsage] = useState<ConversationUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
@@ -176,14 +206,33 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     return rows;
   }
 
+  async function loadConversationUsage(id: string) {
+    if (!canShowUsage) return;
+    setUsageLoading(true);
+    setUsageError("");
+    try {
+      const response = await apiFetch(`/api/agent/conversations/${id}/usage`);
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Usage unavailable."));
+      setUsage((await response.json()) as ConversationUsage);
+    } catch (caught) {
+      setUsage(null);
+      setUsageError(caught instanceof Error ? caught.message : "Usage unavailable.");
+    } finally {
+      setUsageLoading(false);
+    }
+  }
+
   async function openConversation(id: string) {
     setLoading(true);
     setError("");
+    setUsage(null);
+    setUsageError("");
     try {
       const response = await apiFetch(`/api/agent/conversations/${id}`);
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
       const data = (await response.json()) as Conversation;
       setConversation(data);
+      void loadConversationUsage(data.id);
       const contextResponse = await apiFetch(`/api/agent/conversations/${data.id}/context-sources`);
       if (contextResponse.ok) {
         const contextData = await contextResponse.json();
@@ -259,8 +308,10 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
         body: JSON.stringify({ message })
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Omiryn could not reply."));
-      setConversation((await response.json()) as Conversation);
+      const nextConversation = (await response.json()) as Conversation;
+      setConversation(nextConversation);
       await fetchSummaries();
+      void loadConversationUsage(nextConversation.id);
     } catch (caught) {
       setDraft(message);
       setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
@@ -321,6 +372,9 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       window.history.replaceState({}, "", "/app");
       setConversation(null);
       setContextSources([]);
+      setUsage(null);
+      setUsageError("");
+      setSidePanel("history");
       setLoading(false);
     }
     setPendingDelete(null);
@@ -329,6 +383,11 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
 
   const agentName = conversation?.agent_name || "Omiryn";
   const avatar = assetUrl("agent_avatar/saree_female.png");
+  const usageSummary = usage?.summary || {};
+  const usageEvents = usage?.events || [];
+  const averageUsage = averageChatUsage(usageEvents, usageSummary);
+  const usageCost = usageSummary.estimated_cost_usd ? ` · $${usageSummary.estimated_cost_usd.toFixed(6)}` : "";
+  const usageInrCost = usageSummary.estimated_cost_inr ? ` / Rs ${usageSummary.estimated_cost_inr.toFixed(4)}` : "";
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
@@ -336,8 +395,11 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
         {historyOpen ? <button className="mobile-sheet-backdrop" type="button" onClick={() => setHistoryOpen(false)} aria-label="Close history" /> : null}
         <aside className={`chat-sidebar ${historyOpen ? "is-open" : ""}`}>
           <div className="mobile-sheet-heading"><div><p className="eyebrow">Chat</p><h2>History</h2></div><button className="sheet-close-button" type="button" onClick={() => setHistoryOpen(false)}>Close</button></div>
-          <div className="side-tabs"><button className="active" type="button">History</button><button type="button">Usage</button></div>
-          <section className="side-panel active">
+          <div className="side-tabs" role="tablist" aria-label="Chat details">
+            <button className={sidePanel === "history" ? "active" : ""} type="button" onClick={() => setSidePanel("history")}>History</button>
+            {canShowUsage ? <button className={sidePanel === "usage" ? "active" : ""} type="button" onClick={() => { setSidePanel("usage"); if (conversation) void loadConversationUsage(conversation.id); }}>Usage</button> : null}
+          </div>
+          <section className={`side-panel ${sidePanel === "history" ? "active" : ""}`} hidden={sidePanel !== "history"}>
             <p className="eyebrow">Chat History</p><h2>Conversations</h2>
             <div className="history-list">
               {summaries.map((item) => (
@@ -350,6 +412,34 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
             <button className="secondary-button primary-wide" type="button" onClick={() => void createConversation()}>New conversation</button>
             <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p>
           </section>
+          {canShowUsage ? (
+            <section className={`side-panel ${sidePanel === "usage" ? "active" : ""}`} hidden={sidePanel !== "usage"}>
+              <p className="eyebrow">Agent Usage</p><h2>Runtime cost</h2>
+              <div className="usage-summary">
+                {!conversation ? "Usage will appear after you select a conversation." : null}
+                {conversation && usageLoading ? "Loading usage..." : null}
+                {conversation && !usageLoading && usageError ? usageError : null}
+                {conversation && !usageLoading && !usageError ? (
+                  <>
+                    <div className="sidebar-usage-total"><strong>{formatNumber(usageSummary.total_tokens || 0)}</strong><span>total tokens</span></div>
+                    <div className="sidebar-usage-total"><strong>{formatNumber(averageUsage.prompt)}</strong><span>avg input / msg</span></div>
+                    <div className="sidebar-usage-total"><strong>{formatNumber(averageUsage.completion)}</strong><span>avg output / msg</span></div>
+                    <div>{formatNumber(usageSummary.request_count || 0)} requests · {formatNumber(usageSummary.successful_request_count || 0)} successful</div>
+                    <div>{formatNumber(usageSummary.prompt_tokens || 0)} input / {formatNumber(usageSummary.completion_tokens || 0)} output{usageCost}{usageInrCost}</div>
+                  </>
+                ) : null}
+              </div>
+              <div className="sidebar-usage-list">
+                {conversation && !usageLoading && !usageEvents.length ? <div className="sidebar-usage-empty">No calls yet.</div> : null}
+                {usageEvents.slice(0, 6).map((event, index) => {
+                  const createdAt = event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+                  const tokenText = event.total_tokens ? `${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out` : "tokens unavailable";
+                  const totalText = event.total_tokens ? formatNumber(event.total_tokens) : "-";
+                  return <div className={`sidebar-usage-item ${event.success ? "ok" : "failed"}`} key={`${event.created_at || "event"}-${index}`}><div><strong>#{usageEvents.length - index} {usageRequestKindLabel(event.request_kind)}</strong><span>{createdAt} · {event.model || event.provider || "-"}</span></div><div className="sidebar-usage-tokens"><strong>{totalText}</strong><span>{tokenText}</span></div></div>;
+                })}
+              </div>
+            </section>
+          ) : null}
         </aside>
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
@@ -379,6 +469,49 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This will permanently remove the chat, attached context, and usage log for this conversation.</p><p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
   );
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function titleize(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function usageRequestKindLabel(kind?: string) {
+  const labels: Record<string, string> = {
+    chat_reply: "Chat reply",
+    input_guardrail: "Input guardrail",
+    profile_extract: "Profile draft extraction",
+    profile_extract_repair: "Profile extraction repair",
+    data_point_extract: "Data point extraction",
+    profile_signal_extract: "Profile signal extraction",
+    profile_signal_backfill: "Profile signal backfill",
+    profile_fact_aggregate: "Profile fact aggregation",
+    match_snapshot_generate: "Match snapshot generation"
+  };
+  if (!kind) return "Agent call";
+  return labels[kind] || titleize(String(kind).replaceAll("_", " "));
+}
+
+function averageChatUsage(events: UsageEvent[], summary: UsageSummary = {}) {
+  if (summary.average_tokens_per_message || summary.average_prompt_tokens_per_message || summary.average_completion_tokens_per_message) {
+    return {
+      total: summary.average_tokens_per_message || 0,
+      prompt: summary.average_prompt_tokens_per_message || 0,
+      completion: summary.average_completion_tokens_per_message || 0
+    };
+  }
+
+  const chatEvents = events.filter((event) => event.success && event.request_kind === "chat_reply" && event.total_tokens);
+  if (!chatEvents.length) return { total: 0, prompt: 0, completion: 0 };
+
+  return {
+    total: Math.round(chatEvents.reduce((total, event) => total + (event.total_tokens || 0), 0) / chatEvents.length),
+    prompt: Math.round(chatEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0) / chatEvents.length),
+    completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
+  };
 }
 
 function StylePage() {
@@ -465,14 +598,4 @@ function ProfilePage() {
     <section className="profile-panel profile-photo-panel"><div className="panel-heading"><div><p className="eyebrow">Photos</p><h2>Profile gallery</h2></div><input ref={photoInput} className="profile-photo-input" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} /></div><div className="profile-photo-gallery"><button className={`profile-main-photo ${photos[0] ? "has-photo" : ""}`} type="button" onClick={() => { setPhotoSlot(0); photoInput.current?.click(); }}>{photos[0] ? <img className="profile-gallery-img" src={photos[0]} alt="Profile" /> : <span className="profile-photo-empty">{form.display_name?.slice(0, 1) || "O"}</span>}<span className="profile-main-badge">Main photo</span></button><div className="profile-thumb-stack">{[1,2,3].map((slot) => <button className={`profile-thumb ${photos[slot] ? "has-photo" : ""}`} type="button" key={slot} onClick={() => { setPhotoSlot(slot); photoInput.current?.click(); }}>{photos[slot] ? <img className="profile-gallery-img" src={photos[slot]} alt={`Profile ${slot + 1}`} /> : <span className="profile-photo-empty">+</span>}</button>)}</div></div><div className="profile-photo-copy"><strong>Show the real you.</strong><span>Upload up to 4 clear photos.</span></div></section>
     <section className="profile-panel profile-info-panel"><div className="panel-heading"><div><p className="eyebrow">Account</p><h2>Basic info</h2></div></div><form className="profile-form" onSubmit={save}><label>Name<input value={form.display_name || ""} onChange={(e) => setForm({...form, display_name:e.target.value})} /></label><label>Age<input type="number" min="18" max="100" value={form.age || ""} onChange={(e) => setForm({...form, age:Number(e.target.value)})} /></label><label>Email<input value={data?.user?.email || ""} readOnly /></label><label>Gender<select value={form.gender || "prefer_not_to_say"} onChange={(e) => setForm({...form, gender:e.target.value})}><option value="man">Man</option><option value="woman">Woman</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label>Interested in<select value={form.interested_in || "everyone"} onChange={(e) => setForm({...form, interested_in:e.target.value})}><option value="women">Women</option><option value="men">Men</option><option value="everyone">Everyone</option></select></label><label className="wide-field">Location<input value={form.city || ""} onChange={(e) => setForm({...form, city:e.target.value})} /></label><label className="wide-field">Mobile (optional)<input type="tel" value={form.phone || ""} onChange={(e) => setForm({...form, phone:e.target.value})} /></label><button type="submit">Save profile</button><p className="quiet-note">{status}</p></form></section>
   </div></section>;
-}
-
-function UsagePage() {
-  const [data, setData] = useState<{ summary?: Record<string, number>; events?: Array<Record<string, unknown>> } | null>(null);
-  const [error, setError] = useState("");
-  const load = () => apiFetch("/api/agent/usage").then(async (response) => { if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load usage.")); return response.json(); }).then(setData).catch((caught) => setError(caught.message));
-  useEffect(() => { void load(); }, []);
-  const summary = data?.summary || {};
-  const metrics = useMemo(() => [["Requests", summary.request_count || 0], ["Total tokens", summary.total_tokens || 0], ["Avg input / msg", summary.average_prompt_tokens_per_message || 0], ["Avg output / msg", summary.average_completion_tokens_per_message || 0], ["Failures", summary.failure_count || 0]], [data]);
-  return <section className="screen usage-screen"><div className="usage-hero"><div className="screen-copy compact"><p className="eyebrow">Agent Ops</p><h1>Token and cost control.</h1><p>Track every agent call, model choice, latency, and token volume.</p></div><button type="button" onClick={load}>Refresh</button></div>{error ? <p className="legacy-inline-error">{error}</p> : null}<div className="usage-grid">{metrics.map(([label,value]) => <article className="metric-card" key={label}><span>{label}</span><strong>{Number(value).toLocaleString()}</strong></article>)}</div><div className="usage-panels"><section className="usage-panel usage-panel-wide"><div className="panel-heading"><div><p className="eyebrow">Ledger</p><h2>Recent agent calls</h2></div></div><div className="usage-table-wrap"><table className="usage-table"><thead><tr><th>Kind</th><th>Model</th><th>Tokens</th><th>Latency</th><th>Status</th></tr></thead><tbody>{(data?.events || []).map((event, index) => <tr key={index}><td>{String(event.request_kind || "agent")}</td><td>{String(event.model || "—")}</td><td>{Number(event.total_tokens || 0).toLocaleString()}</td><td>{String(event.latency_ms || 0)} ms</td><td>{event.success ? "Success" : "Failed"}</td></tr>)}</tbody></table></div></section></div></section>;
 }
