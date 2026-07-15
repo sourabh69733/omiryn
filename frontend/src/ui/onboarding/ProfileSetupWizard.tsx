@@ -15,6 +15,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { OmirynLogo } from "../brand/OmirynLogo";
 
 type Gender = "man" | "woman" | "non_binary" | "prefer_not_to_say" | "";
@@ -107,6 +108,8 @@ export function ProfileSetupWizard() {
   const [activePhotoSlot, setActivePhotoSlot] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -183,7 +186,41 @@ export function ProfileSetupWizard() {
   }
 
   function skipOptionalStep() {
-    if (stepIndex === 2) setStepIndex(3);
+    if (stepIndex === 2) {
+      setStepIndex(3);
+      return;
+    }
+    if (stepIndex === 3) {
+      void finishSetup();
+    }
+  }
+
+  async function finishSetup() {
+    if (isSubmitting) return;
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await apiFetch("/api/agent/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_mode: "know_me",
+          agent_tone: "warm"
+        })
+      });
+      if (!response.ok) {
+        throw new Error(await apiErrorMessage(response, "Could not create your first conversation."));
+      }
+      const conversation = await response.json();
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem("omiryn-first-conversation");
+      const nextUrl = new URL("/app", window.location.origin);
+      nextUrl.searchParams.set("conversation_id", conversation.id);
+      window.location.replace(nextUrl.toString());
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not open the app. Please retry.");
+      setIsSubmitting(false);
+    }
   }
 
   function choosePhoto(slot: number) {
@@ -262,8 +299,12 @@ export function ProfileSetupWizard() {
 
           <form
             className="setup-card"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
+              if (stepIndex === steps.length - 1) {
+                await finishSetup();
+                return;
+              }
               goForward();
             }}
           >
@@ -450,10 +491,15 @@ export function ProfileSetupWizard() {
               {currentStep.optional ? (
                 <button className="skip-link" type="button" onClick={skipOptionalStep}>Skip for now</button>
               ) : <span />}
-              <button className="primary-button" type="submit">
-                {stepIndex === steps.length - 1 ? "Finish setup" : "Continue"} <ArrowRight />
+              <button className="primary-button" type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? "Opening app..."
+                  : stepIndex === steps.length - 1
+                    ? "Finish setup"
+                    : "Continue"} <ArrowRight />
               </button>
             </footer>
+            {submitError ? <p className="submit-error" role="alert">{submitError}</p> : null}
           </form>
         </section>
       </div>
