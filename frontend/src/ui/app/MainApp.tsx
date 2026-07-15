@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
 
 type Page = "chat" | "style" | "matches" | "profile";
@@ -195,7 +195,10 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const [deleting, setDeleting] = useState(false);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const initializedRef = useRef(false);
+  const shouldStickToBottomRef = useRef(true);
+  const shouldRestoreInputFocusRef = useRef(false);
 
   async function fetchSummaries() {
     const response = await apiFetch("/api/agent/conversations");
@@ -225,6 +228,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   async function openConversation(id: string) {
     setLoading(true);
     setError("");
+    shouldStickToBottomRef.current = true;
     setUsage(null);
     setUsageError("");
     try {
@@ -289,18 +293,42 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     });
   }, []);
 
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  function isLogNearBottom() {
+    const log = logRef.current;
+    if (!log) return true;
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+  }
+
+  function focusComposer() {
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    });
+  }
+
+  function syncChatToBottom() {
+    const log = logRef.current;
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  useLayoutEffect(() => {
+    if (!shouldStickToBottomRef.current) return;
+    syncChatToBottom();
   }, [conversation?.messages.length, sending]);
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
     if (!message || !conversation || sending) return;
+    shouldStickToBottomRef.current = true;
+    const activeElement = document.activeElement;
+    shouldRestoreInputFocusRef.current = activeElement instanceof HTMLElement && Boolean(activeElement.closest(".composer"));
     setDraft("");
     setSending(true);
     setError("");
     setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message }] });
+    syncChatToBottom();
+    if (shouldRestoreInputFocusRef.current) focusComposer();
     try {
       const response = await apiFetch(`/api/agent/conversations/${conversation.id}/messages`, {
         method: "POST",
@@ -309,6 +337,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Omiryn could not reply."));
       const nextConversation = (await response.json()) as Conversation;
+      setSending(false);
       setConversation(nextConversation);
       await fetchSummaries();
       void loadConversationUsage(nextConversation.id);
@@ -317,6 +346,8 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
     } finally {
       setSending(false);
+      if (shouldRestoreInputFocusRef.current) focusComposer();
+      shouldRestoreInputFocusRef.current = false;
     }
   }
 
@@ -450,7 +481,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
               <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
             </div>
           </div>
-          <div className="chat-log" ref={logRef} aria-live="polite">
+          <div className="chat-log" ref={logRef} onScroll={() => { shouldStickToBottomRef.current = isLogNearBottom(); }} aria-live="polite">
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
             {!loading && conversation?.messages.map((message, index) => {
@@ -461,7 +492,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           <form className="composer" onSubmit={sendMessage}>
-            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Say what matters..." rows={1} disabled={!conversation || sending} />
+            <textarea ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Say what matters..." rows={1} disabled={!conversation} readOnly={sending} />
             <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
         </section>

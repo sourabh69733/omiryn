@@ -4172,6 +4172,13 @@ p {
   gap: 12px;
   padding: 18px;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-log::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .agentic-chat .chat-log {
