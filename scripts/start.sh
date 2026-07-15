@@ -16,6 +16,11 @@ export PYTHONPATH="${PYTHONPATH:-src}"
 HOST="${APP_HOST:-127.0.0.1}"
 PORT="${APP_PORT:-8001}"
 RELOAD="${APP_RELOAD:-false}"
+BUILD_FRONTEND="${BUILD_FRONTEND:-true}"
+
+if [ "$BUILD_FRONTEND" = "true" ]; then
+  npm run frontend:dev
+fi
 
 if [ "$RELOAD" = "true" ]; then
   python -m uvicorn api.main:app --reload --host "$HOST" --port "$PORT"
