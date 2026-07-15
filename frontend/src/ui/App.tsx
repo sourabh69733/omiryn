@@ -1,5 +1,5 @@
-import { OnboardingChat } from "./onboarding/OnboardingChat";
+import { ProfileSetupWizard } from "./onboarding/ProfileSetupWizard";
 
 export function App() {
-  return <OnboardingChat />;
+  return <ProfileSetupWizard />;
 }
