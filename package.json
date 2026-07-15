@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "bash scripts/start.sh",
+    "start:prod": "START_MODE=production bash scripts/start.sh",
     "frontend:dev": "vite --config frontend/vite.config.js",
     "frontend:build": "vite build --config frontend/vite.config.js",
     "frontend:preview": "vite preview --config frontend/vite.config.js",
     "frontend:check": "tsc -p frontend/tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "@vitejs/plugin-react": "^4.3.4",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
