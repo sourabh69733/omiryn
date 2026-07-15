@@ -577,10 +577,7 @@ function StylePage() {
 }
 
 function MatchesPage() {
-  const [matches, setMatches] = useState<Array<{ id: string; name: string; age: number; city?: string; result: { score: number; decision?: string; explanation?: string; breakdown?: Record<string, number> } }>>([]);
-  const [error, setError] = useState("");
-  useEffect(() => { apiFetch("/api/demo/matches").then(async (response) => { if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load matches.")); return response.json(); }).then((data) => setMatches(data.matches || [])).catch((caught) => setError(caught.message)); }, []);
-  return <section className="screen matches-screen"><div className="screen-copy compact"><p className="eyebrow">Matches</p><h1>Thoughtful introductions.</h1><p>Compatibility signals with clear reasoning, not endless swiping.</p></div><div className="match-list">{error ? <div className="table-empty">{error}</div> : matches.map((match) => <article className={`match-item ${match.result.decision === "reject" ? "rejected" : ""}`} key={match.id}><div className="match-top"><div><h2>{match.name}</h2><p>{match.age} · {match.city || "Location open"}</p></div><strong>{match.result.score}</strong></div><p className="match-copy">{match.result.explanation}</p><div className="breakdown">{Object.entries(match.result.breakdown || {}).map(([key, value]) => <span key={key}>{key.replaceAll("_", " ")}: {value}</span>)}</div><div className="match-actions"><button type="button">Accept</button><button className="secondary-button" type="button">Pass</button></div></article>)}</div></section>;
+  return <section className="screen matches-screen"><div className="matches-coming-soon"><div className="coming-soon-mark" aria-hidden="true"><span /></div><p className="eyebrow">Matches</p><h1>Coming soon.</h1><p>Omiryn is still learning how to turn your conversations, memories, and preferences into thoughtful introductions.</p><div className="coming-soon-notes"><span>Private by default</span><span>Compatibility-first</span><span>No swipe noise</span></div></div></section>;
 }
 
 function ProfilePage() {
