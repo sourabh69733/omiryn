@@ -84,7 +84,7 @@ export function App() {
   }
 
   if (authState === "signed_out") {
-    return <main className="auth-screen-page"><section className="auth-card"><OmirynLogo /><h1>Welcome to Omiryn</h1><p className="auth-copy">Sign in to meet Omiryn and start talking.</p><button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}><span className="google-mark">G</span>{isSigningIn ? "Opening Google…" : "Continue with Google"}</button>{authError ? <p className="auth-error">{authError}</p> : null}<small>By continuing, you agree to Omiryn’s Terms and Privacy Policy.</small></section></main>;
+    return <main className="auth-screen-page"><section className="auth-card"><OmirynLogo /><h1>Welcome to Omiryn</h1><p className="auth-copy">Sign in to meet Omiryn and start talking.</p><button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}><span className="google-mark">G</span>{isSigningIn ? "Opening Google..." : "Continue with Google"}</button>{authError ? <p className="auth-error">{authError}</p> : null}<small>By continuing, you agree to Omiryn's <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</small></section></main>;
   }
 
   if (profileState === "incomplete") return <ProfileSetupWizard />;
