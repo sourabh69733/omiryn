@@ -76,6 +76,24 @@ class DraftPatch(BaseModel):
     summary: str | None = None
 
 
+class PublicEventCreate(BaseModel):
+    session_id: str | None = Field(default=None, max_length=120)
+    event_name: str = Field(max_length=80)
+    path: str = Field(default="/", max_length=300)
+    referrer: str | None = Field(default=None, max_length=500)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PublicLeadCreate(BaseModel):
+    session_id: str | None = Field(default=None, max_length=120)
+    name: str | None = Field(default=None, max_length=120)
+    contact: str = Field(max_length=240)
+    channel: Literal["whatsapp", "discord", "email", "phone", "other"] = "email"
+    intent: Literal["join_community", "early_access", "feedback", "support", "partnership"] = "feedback"
+    message: str | None = Field(default=None, max_length=1000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class AgentConversation(BaseModel):
     id: str
     status: Literal["active", "extracted"] = "active"
