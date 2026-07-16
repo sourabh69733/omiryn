@@ -9,6 +9,7 @@ from .agent_behavior import *
 from .agent_runtime import *
 from .users import *
 from .context_sources import *
+from .public import *
 from .utils import (
     _conversation_user_id,
     _isoformat_utc,

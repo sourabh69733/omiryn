@@ -61,6 +61,32 @@ agent_usage_events = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+public_events = Table(
+    "public_events",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("session_id", String, nullable=False),
+    Column("event_name", String, nullable=False),
+    Column("path", String, nullable=False),
+    Column("referrer", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+public_leads = Table(
+    "public_leads",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("session_id", String, nullable=True),
+    Column("name", String, nullable=True),
+    Column("contact", String, nullable=False),
+    Column("channel", String, nullable=False),
+    Column("intent", String, nullable=False),
+    Column("message", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 agent_context_snapshots = Table(
     "agent_context_snapshots",
     metadata,
