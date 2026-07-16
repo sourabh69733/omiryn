@@ -1045,6 +1045,12 @@
   line-height: 1.5;
 }
 
+.auth-card > small a {
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .auth-error {
   margin: 12px 0 0;
   color: #bd284b;
