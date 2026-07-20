@@ -49,9 +49,11 @@
       <img src="/static/assets/omiryn-logo-neon-light.png" alt="Omiryn">
     </a>
     <div class="nav-links">
-      <a href="#how-it-works">How it works</a>
-      <a href="#why-different">Why Omiryn</a>
-      <a href="/app" data-app-link class="nav-cta">Start talking</a>
+      <a href="/about">About</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/contact">Contact</a>
+      <a href="/app" data-app-link data-track="nav_start_talking" class="nav-cta">Start talking</a>
     </div>
   </nav>
 
@@ -79,7 +81,7 @@
         Get started
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </a>
-      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+      <a href="/contact" class="btn-secondary" data-track="hero_contact">Contact us</a>
     </div>
 
     <!-- Chat demo -->
@@ -197,6 +199,32 @@
     </div>
   </section>
 
+  <!-- ═══════════ TRUST ═══════════ -->
+  <section class="trust-section" id="trust">
+    <div class="trust-header">
+      <p class="section-label reveal">Built for real people</p>
+      <h2 class="section-title reveal reveal-delay-1">Trust before growth.</h2>
+      <p class="section-desc section-desc-centered reveal reveal-delay-2">Dating products need clear boundaries, plain policies, and fast ways to reach a human. Omiryn puts those signals up front.</p>
+    </div>
+    <div class="trust-grid">
+      <a class="trust-card reveal" href="/safety" data-track="trust_safety">
+        <span>Safety</span>
+        <strong>Safety Center</strong>
+        <p>How we handle consent, respectful behavior, profile quality, reporting, and safer introductions.</p>
+      </a>
+      <a class="trust-card reveal reveal-delay-1" href="/privacy" data-track="trust_privacy">
+        <span>Privacy</span>
+        <strong>Privacy Policy</strong>
+        <p>What we collect, how conversation data is used, and the choices users have over their profile.</p>
+      </a>
+      <a class="trust-card reveal reveal-delay-2" href="/terms" data-track="trust_terms">
+        <span>Terms</span>
+        <strong>Terms of Service</strong>
+        <p>Clear expectations for eligibility, acceptable use, AI limitations, and user standards.</p>
+      </a>
+    </div>
+  </section>
+
   <!-- ═══════════ SOCIAL PROOF ═══════════ -->
   <section class="social-section" id="social-proof">
     <p class="section-label reveal">Early traction</p>
@@ -215,6 +243,36 @@
         <div class="stat-number">0</div>
         <div class="stat-label">swipes required. Ever.</div>
       </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CONTACT / FEEDBACK ═══════════ -->
+  <section class="contact-section" id="contact">
+    <div class="contact-grid">
+      <div>
+        <p class="section-label reveal">Contact</p>
+        <h2 class="section-title reveal reveal-delay-1">Want to talk or give feedback?</h2>
+        <p class="section-desc reveal reveal-delay-2">Leave your email and we will follow up. If you sign in, we can already use your account email for more personal product updates and early access notes.</p>
+        <div class="contact-actions reveal reveal-delay-3">
+          <a class="btn-primary" href="/contact" data-track="contact_page">Contact Omiryn</a>
+          <a class="btn-secondary" href="mailto:sourabhsahu69733@gmail.com" data-track="contact_email">Email directly</a>
+        </div>
+      </div>
+      <form class="lead-form reveal reveal-delay-2" id="landing-lead-form" data-form="lead">
+        <h3>Leave your email</h3>
+        <label>
+          <span>Email</span>
+          <input name="contact" type="email" autocomplete="email" required placeholder="you@example.com">
+        </label>
+        <label>
+          <span>Message</span>
+          <textarea name="message" rows="4" required placeholder="Write your question or feedback..."></textarea>
+        </label>
+        <input type="hidden" name="channel" value="email">
+        <input type="hidden" name="intent" value="feedback">
+        <button class="btn-primary" type="submit">Send email</button>
+        <p class="form-status" role="status" aria-live="polite"></p>
+      </form>
     </div>
   </section>
 
@@ -240,9 +298,11 @@
     </div>
     <span class="footer-copy">© 2026 Omiryn. Talk first. Match better.</span>
     <div class="footer-links">
-      <a href="#">Privacy</a>
-      <a href="#">Terms</a>
-      <a href="#">Contact</a>
+      <a href="/about">About</a>
+      <a href="/safety">Safety</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/contact">Contact</a>
     </div>
   </footer>
 
