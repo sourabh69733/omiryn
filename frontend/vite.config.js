@@ -18,6 +18,7 @@ function serveFile(response, filePath, contentType) {
 }
 
 function landingDevPlugin() {
+  const publicPages = new Set(["about", "how-it-works", "safety", "privacy", "terms", "contact"]);
   return {
     name: "omiryn-landing-dev",
     configureServer(server) {
@@ -25,6 +26,11 @@ function landingDevPlugin() {
         const pathname = new URL(request.url || "/", "http://127.0.0.1").pathname;
         if (pathname === "/") {
           serveFile(response, path.join(publicDir, "landing.html"), "text/html; charset=utf-8");
+          return;
+        }
+        const pageName = pathname.slice(1);
+        if (publicPages.has(pageName)) {
+          serveFile(response, path.join(publicDir, `${pageName}.html`), "text/html; charset=utf-8");
           return;
         }
         if (pathname === "/static/landing.css") {
