@@ -111,6 +111,40 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertTrue(_reset_db_allowed("sqlite:///./data/omiryn_test.db"))
         self.assertFalse(_reset_db_allowed("sqlite:///./data/omiryn.db"))
 
+    def test_public_event_and_lead_capture(self) -> None:
+        event_response = self.client.post(
+            "/api/public/events",
+            json={
+                "session_id": "visitor-1",
+                "event_name": "section_view",
+                "path": "/",
+                "referrer": "https://example.com",
+                "metadata": {"section": "community"},
+            },
+        )
+        self.assertEqual(event_response.status_code, 201)
+        event = event_response.json()["event"]
+        self.assertEqual(event["session_id"], "visitor-1")
+        self.assertEqual(event["event_name"], "section_view")
+        self.assertEqual(event["metadata"]["section"], "community")
+
+        lead_response = self.client.post(
+            "/api/public/leads",
+            json={
+                "session_id": "visitor-1",
+                "name": "Aarav",
+                "contact": "aarav@example.com",
+                "channel": "whatsapp",
+                "intent": "join_community",
+                "message": "Please add me to the early group.",
+            },
+        )
+        self.assertEqual(lead_response.status_code, 201)
+        lead = lead_response.json()["lead"]
+        self.assertEqual(lead["contact"], "aarav@example.com")
+        self.assertEqual(lead["channel"], "whatsapp")
+        self.assertEqual(lead["intent"], "join_community")
+
     def test_user_can_edit_then_approve_draft(self) -> None:
         draft_id = self._create_draft()
 
