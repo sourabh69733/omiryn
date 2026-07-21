@@ -1,8 +1,8 @@
-import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
 
 type Page = "chat" | "style" | "matches" | "profile";
-type Message = { role?: string; content?: string; quality?: string };
+type Message = { role?: string; content?: string; quality?: string; created_at?: string; delivery_status?: string };
 type Conversation = {
   id: string;
   status?: string;
@@ -334,7 +334,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     setDraft("");
     setSending(true);
     setError("");
-    setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message }] });
+    setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sent" }] });
     syncChatToBottom();
     if (shouldRestoreInputFocusRef.current) focusComposer();
     try {
@@ -494,7 +494,9 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
             {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
-              return <div className={`message-row ${agent ? "agent" : "user"}`} key={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div>;
+              const currentDate = messageDateKey(message, index);
+              const previousDate = index > 0 ? messageDateKey(conversation.messages[index - 1], index - 1) : "";
+              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator"><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
             })}
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
@@ -512,6 +514,33 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function messageDate(message: Message, index: number) {
+  const parsed = message.created_at ? new Date(message.created_at) : null;
+  if (parsed && !Number.isNaN(parsed.getTime())) return parsed;
+  const fallback = new Date();
+  fallback.setMinutes(fallback.getMinutes() - Math.max(0, 12 - index));
+  return fallback;
+}
+
+function messageDateKey(message: Message, index: number) {
+  const date = messageDate(message, index);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function messageDayLabel(message: Message, index: number) {
+  const date = messageDate(message, index);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
+function messageTimeLabel(message: Message, index: number) {
+  return messageDate(message, index).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function titleize(value: string) {

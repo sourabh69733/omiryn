@@ -424,6 +424,24 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertIn("Hey Sourabh, I'm Annie", response.json()["messages"][0]["content"])
 
+    def test_agent_messages_include_chat_timestamps(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation = conversation_response.json()
+        self.assertTrue(conversation["messages"][0]["created_at"])
+
+        message_response = self.client.post(
+            f"/api/agent/conversations/{conversation['id']}/messages",
+            json={"message": "I value kindness and steady communication."},
+        )
+
+        self.assertEqual(message_response.status_code, 200)
+        messages = message_response.json()["messages"]
+        self.assertTrue(messages[-2]["created_at"])
+        self.assertTrue(messages[-1]["created_at"])
+        self.assertEqual(messages[-2]["delivery_status"], "read")
+
     def test_agent_prompt_includes_user_identity_location_and_time_context(self) -> None:
         prompt = _system_prompt_with_context(
             "System",

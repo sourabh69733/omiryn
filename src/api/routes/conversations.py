@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -53,6 +54,18 @@ from ..models import (
 router = APIRouter()
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _stamp_new_messages(messages: list[dict[str, object]], start_index: int = 0) -> None:
+    timestamp = _utc_now_iso()
+    for message in messages[start_index:]:
+        message.setdefault("created_at", timestamp)
+        if message.get("role") == "user":
+            message.setdefault("delivery_status", "read")
+
+
 def _run_agent_turn_callable():
     main_module = sys.modules.get("api.main")
     if main_module is None:
@@ -86,6 +99,7 @@ async def create_agent_conversation(
             {
                 "role": "assistant",
                 "content": _initial_agent_message({**persona, "name": agent_name}, user_profile),
+                "created_at": _utc_now_iso(),
             }
         ],
     )
@@ -205,7 +219,9 @@ async def send_agent_message(
     except (AgentProviderError, Exception) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
+    previous_message_count = len(conversation.messages)
     conversation.messages = turn.messages
+    _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     if should_run_conversation_data_point_extraction(
         conversation.id,
@@ -295,4 +311,3 @@ async def extract_agent_conversation(
         "status": "draft",
         "review_url": f"/drafts/{draft_id}",
     }
-
