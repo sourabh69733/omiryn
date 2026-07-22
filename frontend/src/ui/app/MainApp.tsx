@@ -496,7 +496,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);
               const previousDate = index > 0 ? messageDateKey(conversation.messages[index - 1], index - 1) : "";
-              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator"><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
+              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator" role="separator" aria-label={messageDayLabel(message, index)}><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
             })}
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
@@ -536,7 +536,12 @@ function messageDayLabel(message: Message, index: number) {
   yesterday.setDate(today.getDate() - 1);
   if (date.toDateString() === today.toDateString()) return "Today";
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString([], { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+  return date.toLocaleDateString("en-IN", {
+    weekday: date.getFullYear() === today.getFullYear() ? "short" : undefined,
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
 }
 
 function messageTimeLabel(message: Message, index: number) {

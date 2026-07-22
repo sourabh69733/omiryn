@@ -4242,25 +4242,31 @@ p {
 }
 
 .chat-day-separator {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
   display: flex;
   justify-content: center;
   width: 100%;
-  margin: 12px 0 8px;
+  margin: 16px 0 10px;
   pointer-events: none;
 }
 
 .chat-day-separator span {
-  border: 1px solid rgba(180, 154, 255, 0.16);
+  border: 1px solid rgba(180, 154, 255, 0.18);
   border-radius: 999px;
-  padding: 5px 12px;
-  color: #7b728f;
+  padding: 6px 13px;
+  color: #6f6685;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58)),
-    rgba(251, 248, 255, 0.94);
-  box-shadow: 0 8px 24px rgba(64, 45, 118, 0.06);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.76)),
+    rgba(251, 248, 255, 0.96);
+  box-shadow:
+    0 10px 26px rgba(64, 45, 118, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 760;
   line-height: 1;
+  letter-spacing: 0;
 }
 
 .chat-avatar {
