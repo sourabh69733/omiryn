@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="1240" viewBox="0 0 430 1240" role="img" aria-labelledby="title desc">
+  <title id="title">Better Omiryn Style page mobile concept</title>
+  <desc id="desc">A polished mobile two section Style page concept with learned signals and memories.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fbfaf7"/>
+      <stop offset=".58" stop-color="#f6fbf8"/>
+      <stop offset="1" stop-color="#edf7f2"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1f7a67"/>
+      <stop offset="1" stop-color="#6aab8d"/>
+    </linearGradient>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="136%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#244a42" flood-opacity=".13"/>
+    </filter>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17231f; }
+      .muted { fill: #62736e; }
+      .softText { fill: #83908c; }
+      .eyebrow { fill: #247965; font-size: 11px; font-weight: 820; letter-spacing: 1px; }
+      .h1 { font-size: 38px; font-weight: 850; letter-spacing: 0; }
+      .h2 { font-size: 22px; font-weight: 820; letter-spacing: 0; }
+      .h3 { font-size: 15px; font-weight: 800; letter-spacing: 0; }
+      .body { font-size: 14px; font-weight: 470; }
+      .small { font-size: 12px; font-weight: 590; }
+      .tiny { font-size: 10px; font-weight: 780; }
+      .panel { fill: #ffffff; stroke: #dce8e2; stroke-width: 1.1; rx: 8; }
+      .subpanel { fill: #fbfdfb; stroke: #dfebe6; stroke-width: 1; rx: 8; }
+      .line { stroke: #e5eee9; stroke-width: 1.1; }
+      .pill { fill: #f4f8f6; stroke: #dce8e2; stroke-width: 1; rx: 999; }
+      .high { fill: #e8f7f0; stroke: #bfe1d3; stroke-width: 1; rx: 999; }
+      .mid { fill: #fff7db; stroke: #edd897; stroke-width: 1; rx: 999; }
+      .btn { fill: #ffffff; stroke: #d8e5df; stroke-width: 1; rx: 8; }
+    </style>
+  </defs>
+
+  <rect width="430" height="1240" fill="url(#bg)"/>
+
+  <g transform="translate(18 18)" filter="url(#shadow)">
+    <rect width="394" height="72" rx="26" fill="#ffffff" stroke="#e3ede8"/>
+    <g transform="translate(22 18)">
+      <rect width="36" height="36" rx="12" fill="url(#accent)"/>
+      <path d="M12 22c6-11 14-11 22 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <text x="50" y="25" font-size="21" font-weight="850">Omiryn</text>
+    </g>
+    <rect x="314" y="21" width="58" height="30" rx="999" fill="#f5faf7" stroke="#d8e5df"/>
+    <text class="tiny muted" x="331" y="40">Style</text>
+  </g>
+
+  <g transform="translate(24 136)">
+    <text class="eyebrow" x="0" y="0">STYLE MEMORY</text>
+    <text class="h1" x="0" y="50">What Omiryn</text>
+    <text class="h1" x="0" y="92">knows.</text>
+    <text class="body muted" x="0" y="128">Review learned signals and add memories</text>
+    <text class="body muted" x="0" y="150">that help Omiryn understand you.</text>
+    <g transform="translate(0 184)">
+      <rect width="382" height="72" rx="8" fill="#ffffff" stroke="#dce8e2"/>
+      <text x="22" y="44" font-size="28" font-weight="850">18</text>
+      <text class="small muted" x="68" y="42">learned signals</text>
+      <line class="line" x1="198" y1="16" x2="198" y2="56"/>
+      <text x="224" y="44" font-size="28" font-weight="850">3</text>
+      <text class="small muted" x="258" y="42">memories</text>
+    </g>
+  </g>
+
+  <g transform="translate(18 430)" filter="url(#shadow)">
+    <rect class="panel" width="394" height="490"/>
+    <g transform="translate(18 28)">
+      <text class="eyebrow" x="0" y="0">LEARNED SIGNALS</text>
+      <text class="h2" x="0" y="34">Signals learned from chats</text>
+      <text class="small muted" x="0" y="60">Grouped into stable topics for quick review.</text>
+    </g>
+    <line class="line" x1="0" y1="116" x2="394" y2="116"/>
+
+    <g transform="translate(16 140)">
+      <rect class="subpanel" width="362" height="134"/>
+      <text class="h3" x="16" y="32">Values</text>
+      <text class="tiny softText" x="314" y="31">5</text>
+      <g transform="translate(14 50)">
+        <rect width="334" height="38" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+        <text class="small" x="12" y="24" font-weight="760">Honesty matters more than polish</text>
+        <rect class="high" x="286" y="9" width="38" height="20"/>
+        <text class="tiny" x="294" y="23" fill="#176049">91%</text>
+      </g>
+      <g transform="translate(14 96)">
+        <rect width="334" height="24" rx="999" fill="#f4f8f6" stroke="#dce8e2"/>
+        <text class="tiny muted" x="12" y="17">Trust, consistency, real examples</text>
+      </g>
+    </g>
+
+    <g transform="translate(16 292)">
+      <rect class="subpanel" width="362" height="134"/>
+      <text class="h3" x="16" y="32">Communication</text>
+      <text class="tiny softText" x="314" y="31">7</text>
+      <g transform="translate(14 50)">
+        <rect width="334" height="38" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+        <text class="small" x="12" y="24" font-weight="760">Direct and warm works best</text>
+        <rect class="high" x="286" y="9" width="38" height="20"/>
+        <text class="tiny" x="294" y="23" fill="#176049">88%</text>
+      </g>
+      <g transform="translate(14 96)">
+        <rect width="334" height="24" rx="999" fill="#f4f8f6" stroke="#dce8e2"/>
+        <text class="tiny muted" x="12" y="17">Examples before advice</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(18 952)" filter="url(#shadow)">
+    <rect class="panel" width="394" height="238"/>
+    <g transform="translate(18 28)">
+      <text class="eyebrow" x="0" y="0">MEMORIES</text>
+      <text class="h2" x="0" y="34">Saved context about you</text>
+      <text class="small muted" x="0" y="60">WhatsApp exports, profile notes, bigger context.</text>
+    </g>
+
+    <g transform="translate(16 104)">
+      <rect class="btn" width="174" height="58"/>
+      <rect x="12" y="12" width="34" height="34" rx="8" fill="#eef8f3" stroke="#cfe1dc"/>
+      <text class="tiny" x="22" y="34" fill="#1f7664">Aa</text>
+      <text class="small" x="56" y="26" font-weight="800">WhatsApp</text>
+      <text class="tiny muted" x="56" y="43">Import chat</text>
+
+      <rect class="btn" x="188" width="174" height="58"/>
+      <rect x="200" y="12" width="34" height="34" rx="8" fill="#eef8f3" stroke="#cfe1dc"/>
+      <text class="tiny" x="212" y="34" fill="#1f7664">+</text>
+      <text class="small" x="244" y="26" font-weight="800">Memory</text>
+      <text class="tiny muted" x="244" y="43">Add notes</text>
+    </g>
+
+    <g transform="translate(16 174)">
+      <rect class="subpanel" width="362" height="42"/>
+      <text class="small" x="14" y="18" font-weight="800">My communication style</text>
+      <text class="tiny muted" x="14" y="33">whatsapp style - 18,420 chars</text>
+      <text class="tiny muted" x="310" y="27">Remove</text>
+    </g>
+  </g>
+</svg>

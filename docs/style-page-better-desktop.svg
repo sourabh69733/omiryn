@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1080" viewBox="0 0 1440 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Better Omiryn Style page desktop concept</title>
+  <desc id="desc">A polished two section Style page concept with learned signals and memories.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fbfaf7"/>
+      <stop offset=".55" stop-color="#f6fbf8"/>
+      <stop offset="1" stop-color="#edf7f2"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1f7a67"/>
+      <stop offset="1" stop-color="#6aab8d"/>
+    </linearGradient>
+    <filter id="softShadow" x="-12%" y="-14%" width="124%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="34" flood-color="#244a42" flood-opacity=".13"/>
+    </filter>
+    <filter id="tinyShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#244a42" flood-opacity=".08"/>
+    </filter>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17231f; }
+      .muted { fill: #62736e; }
+      .softText { fill: #83908c; }
+      .eyebrow { fill: #247965; font-size: 13px; font-weight: 820; letter-spacing: 1.2px; }
+      .nav { fill: #71807b; font-size: 14px; font-weight: 690; }
+      .h1 { font-size: 60px; font-weight: 850; letter-spacing: 0; }
+      .h2 { font-size: 29px; font-weight: 820; letter-spacing: 0; }
+      .h3 { font-size: 17px; font-weight: 800; letter-spacing: 0; }
+      .body { font-size: 17px; font-weight: 460; }
+      .small { font-size: 13px; font-weight: 560; }
+      .tiny { font-size: 11px; font-weight: 780; }
+      .panel { fill: #ffffff; stroke: #dce8e2; stroke-width: 1.2; rx: 8; }
+      .subpanel { fill: #fbfdfb; stroke: #dfebe6; stroke-width: 1.1; rx: 8; }
+      .line { stroke: #e5eee9; stroke-width: 1.2; }
+      .pill { fill: #f4f8f6; stroke: #dce8e2; stroke-width: 1.1; rx: 999; }
+      .high { fill: #e8f7f0; stroke: #bfe1d3; stroke-width: 1; rx: 999; }
+      .mid { fill: #fff7db; stroke: #edd897; stroke-width: 1; rx: 999; }
+      .btn { fill: #ffffff; stroke: #d8e5df; stroke-width: 1.1; rx: 8; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1080" fill="url(#bg)"/>
+
+  <g transform="translate(72 36)" filter="url(#softShadow)">
+    <rect width="1296" height="80" rx="28" fill="#ffffff" stroke="#e3ede8"/>
+    <g transform="translate(30 22)">
+      <rect width="36" height="36" rx="12" fill="url(#accent)"/>
+      <path d="M12 22c6-11 14-11 22 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <text x="52" y="26" font-size="22" font-weight="850">Omiryn</text>
+    </g>
+    <g transform="translate(548 31)">
+      <text class="nav" x="0" y="17">Chat</text>
+      <text class="nav" x="82" y="17" fill="#17231f">Style</text>
+      <text class="nav" x="166" y="17">Matches</text>
+      <text class="nav" x="278" y="17">Profile</text>
+    </g>
+    <g transform="translate(1170 21)">
+      <rect width="92" height="38" rx="999" fill="#f5faf7" stroke="#d8e5df"/>
+      <text class="small" x="21" y="24" font-weight="760">Account</text>
+    </g>
+  </g>
+
+  <g transform="translate(116 166)">
+    <text class="eyebrow" x="0" y="0">STYLE MEMORY</text>
+    <text class="h1" x="0" y="72">What Omiryn knows.</text>
+    <text class="body muted" x="0" y="112">Review learned signals, then add memories that give your assistant long-term context.</text>
+    <g transform="translate(880 -10)">
+      <rect width="310" height="132" rx="8" fill="#ffffff" stroke="#dce8e2" filter="url(#tinyShadow)"/>
+      <text class="tiny muted" x="22" y="34">TODAY'S STATE</text>
+      <text x="22" y="72" font-size="30" font-weight="850">18</text>
+      <text class="small muted" x="72" y="70">learned signals</text>
+      <text x="22" y="108" font-size="30" font-weight="850">3</text>
+      <text class="small muted" x="72" y="106">saved memories</text>
+    </g>
+  </g>
+
+  <g transform="translate(116 326)" filter="url(#softShadow)">
+    <rect class="panel" width="1208" height="430"/>
+    <g transform="translate(28 30)">
+      <text class="eyebrow" x="0" y="0">LEARNED SIGNALS</text>
+      <text class="h2" x="0" y="42">Signals learned from your chats</text>
+      <text class="small muted" x="0" y="72">Grouped into stable topics so the user can scan, trust, and correct what Omiryn understands.</text>
+      <rect class="pill" x="1044" y="-8" width="108" height="34"/>
+      <text class="tiny muted" x="1070" y="14">18 SIGNALS</text>
+    </g>
+    <line class="line" x1="0" y1="126" x2="1208" y2="126"/>
+
+    <g transform="translate(26 154)">
+      <g>
+        <rect class="subpanel" width="370" height="236"/>
+        <text class="h3" x="18" y="36">Values</text>
+        <text class="tiny softText" x="318" y="35">5 ITEMS</text>
+        <g transform="translate(18 62)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Honesty matters more than polish</text>
+          <rect class="high" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#176049">91%</text>
+        </g>
+        <g transform="translate(18 120)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Trust grows through consistency</text>
+          <rect class="high" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#176049">84%</text>
+        </g>
+        <g transform="translate(18 184)">
+          <rect width="150" height="26" rx="999" fill="#f4f8f6" stroke="#dce8e2"/>
+          <text class="tiny muted" x="14" y="18">3 MORE SIGNALS</text>
+        </g>
+      </g>
+
+      <g transform="translate(390 0)">
+        <rect class="subpanel" width="370" height="236"/>
+        <text class="h3" x="18" y="36">Communication</text>
+        <text class="tiny softText" x="318" y="35">7 ITEMS</text>
+        <g transform="translate(18 62)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Direct and warm works best</text>
+          <rect class="high" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#176049">88%</text>
+        </g>
+        <g transform="translate(18 120)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Examples before advice</text>
+          <rect class="mid" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#715410">62%</text>
+        </g>
+        <g transform="translate(18 184)">
+          <rect width="150" height="26" rx="999" fill="#f4f8f6" stroke="#dce8e2"/>
+          <text class="tiny muted" x="14" y="18">5 MORE SIGNALS</text>
+        </g>
+      </g>
+
+      <g transform="translate(780 0)">
+        <rect class="subpanel" width="370" height="236"/>
+        <text class="h3" x="18" y="36">Lifestyle</text>
+        <text class="tiny softText" x="318" y="35">6 ITEMS</text>
+        <g transform="translate(18 62)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Late replies can be normal</text>
+          <rect class="high" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#176049">82%</text>
+        </g>
+        <g transform="translate(18 120)">
+          <rect width="334" height="48" rx="8" fill="#ffffff" stroke="#e2ebe7"/>
+          <text class="small" x="14" y="29" font-weight="760">Calm pacing feels safer</text>
+          <rect class="mid" x="276" y="12" width="44" height="24"/>
+          <text class="tiny" x="288" y="29" fill="#715410">57%</text>
+        </g>
+        <g transform="translate(18 184)">
+          <rect width="150" height="26" rx="999" fill="#f4f8f6" stroke="#dce8e2"/>
+          <text class="tiny muted" x="14" y="18">4 MORE SIGNALS</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(116 794)" filter="url(#softShadow)">
+    <rect class="panel" width="1208" height="224"/>
+    <g transform="translate(28 32)">
+      <text class="eyebrow" x="0" y="0">MEMORIES</text>
+      <text class="h2" x="0" y="40">Saved context about you</text>
+      <text class="small muted" x="0" y="70">WhatsApp exports, profile notes, and bigger personal context that should stay available.</text>
+      <rect class="pill" x="1048" y="-8" width="104" height="34"/>
+      <text class="tiny muted" x="1072" y="14">3 SAVED</text>
+    </g>
+    <g transform="translate(28 126)">
+      <rect class="btn" width="250" height="66"/>
+      <rect x="15" y="15" width="36" height="36" rx="8" fill="#eef8f3" stroke="#cfe1dc"/>
+      <text class="tiny" x="25" y="38" fill="#1f7664">Aa</text>
+      <text class="small" x="66" y="28" font-weight="800">Import WhatsApp</text>
+      <text class="tiny muted" x="66" y="48">Learn natural tone</text>
+
+      <rect class="btn" x="270" width="250" height="66"/>
+      <rect x="285" y="15" width="36" height="36" rx="8" fill="#eef8f3" stroke="#cfe1dc"/>
+      <text class="tiny" x="298" y="38" fill="#1f7664">+</text>
+      <text class="small" x="336" y="28" font-weight="800">Add memory</text>
+      <text class="tiny muted" x="336" y="48">Paste notes or context</text>
+
+      <rect class="subpanel" x="550" width="602" height="66"/>
+      <text class="small" x="570" y="27" font-weight="800">My communication style</text>
+      <text class="tiny muted" x="570" y="48">whatsapp style - 18,420 chars</text>
+      <rect x="1064" y="16" width="70" height="34" rx="999" fill="#ffffff" stroke="#dce8e2"/>
+      <text class="tiny muted" x="1081" y="37">Remove</text>
+    </g>
+  </g>
+</svg>

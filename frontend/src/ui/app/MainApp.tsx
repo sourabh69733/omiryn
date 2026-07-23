@@ -606,6 +606,7 @@ function StylePage() {
 
   const sources = [...(data?.memory_sources || []), ...(data?.style_sources || [])];
   const facts = data?.learned_facts || [];
+  const factGroups = Object.entries(data?.learned_fact_groups || {}).filter(([, rows]) => rows.length);
 
   async function importContext(event: FormEvent) {
     event.preventDefault();
@@ -638,15 +639,98 @@ function StylePage() {
     if (response.ok) await load();
   }
 
-  return <section className="screen style-screen"><div className="style-hero"><div className="screen-copy compact"><p className="eyebrow">Style</p><h1>Saved memories.</h1><p>Keep useful context and imported chat references in one simple library.</p></div></div><div className="style-layout">
-    <section className="profile-panel profile-panel-wide style-context-panel"><div className="context-intro"><span className="context-visual">M</span><div><p className="eyebrow">Library</p><h2>Saved memories</h2><p>Use WhatsApp exports or pasted GPT summaries to give Omiryn better context.</p></div></div>
-      <div className="context-card context-card-muted"><div className="context-card-heading"><span className="context-card-icon">✓</span><div><h3>Saved memories</h3><p>These sources can shape chat and matching signals when useful.</p></div></div><div className="context-source-list">{sources.length ? sources.map((source) => <article className="profile-source-item" key={source.id}><div><strong>{source.title}</strong><span>{source.source_type} · {source.content_length || 0} chars</span></div><p>{source.preview}</p><button className="secondary-button" type="button" onClick={() => void removeSource(source.id)}>Remove</button></article>) : <div className="table-empty">No saved memories yet.</div>}</div></div>
-      <div className="context-action-grid"><button className="context-action-button" type="button" onClick={() => { setImportMode("whatsapp"); setTitle("My WhatsApp style"); setShowImport(true); }}><span className="context-card-icon">Aa</span><strong>Upload WhatsApp chat</strong><small>Learn tone from a WhatsApp export.</small></button><button className="context-action-button" type="button" onClick={() => { setImportMode("memory"); setTitle("Imported context"); setShowImport(true); }}><span className="context-card-icon">+</span><strong>Paste GPT content</strong><small>Paste a profile summary, chat export, or notes.</small></button></div>
-      {showImport ? <form className="react-memory-form" onSubmit={importContext}><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Memory title" />{importMode === "whatsapp" ? <><input type="file" accept=".txt,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) void file.text().then(setContent); }} /><input value={userSender} onChange={(event) => setUserSender(event.target.value)} placeholder="Your sender name (optional)" /></> : null}<textarea value={content} onChange={(event) => setContent(event.target.value)} rows={7} placeholder={importMode === "whatsapp" ? "Choose a WhatsApp .txt export or paste it here…" : "Paste at least 20 characters…"} /><div><button className="secondary-button" type="button" onClick={() => setShowImport(false)}>Cancel</button><button type="submit" disabled={saving || content.trim().length < (importMode === "whatsapp" ? 50 : 20)}>{saving ? "Saving…" : importMode === "whatsapp" ? "Import chat" : "Save memory"}</button></div></form> : null}
-      {error ? <p className="legacy-inline-error">{error}</p> : null}
+  return (
+    <section className="screen style-screen">
+      <div className="style-hero">
+        <div className="screen-copy compact">
+          <p className="eyebrow">Style</p>
+          <h1>What Omiryn knows.</h1>
+          <p>A clean place to review learned signals and add memories that help Omiryn understand you better.</p>
+        </div>
+      </div>
+      <div className="style-layout">
+        <section className="profile-panel profile-panel-wide style-learning-panel">
+          <div className="panel-heading profile-facts-heading">
+            <div>
+              <p className="eyebrow">Learned signals</p>
+              <h2>Signals learned from your chats</h2>
+              <p>Grouped by topic so you can quickly check what feels right, what changed, and what still needs context.</p>
+            </div>
+            <span className="profile-fact-total">{facts.length} signals</span>
+          </div>
+          <div className="profile-fact-groups">
+            {facts.length ? factGroups.map(([category, rows]) => (
+              <section className="profile-fact-group" key={category}>
+                <div className="profile-fact-group-heading">
+                  <h3>{humanizeLabel(category)}</h3>
+                  <span>{rows.length}</span>
+                </div>
+                <div className="profile-fact-list">
+                  {rows.map((fact) => (
+                    <article className="profile-fact-card" key={fact.id}>
+                      <div className="profile-fact-card-top">
+                        <strong>{fact.label || fact.key}</strong>
+                        <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{Math.round((fact.confidence || 0) * 100)}%</span>
+                      </div>
+                      {fact.status && fact.status !== "active" ? <p>{humanizeLabel(fact.status)}</p> : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )) : <div className="profile-facts-empty"><strong>No learned signals yet.</strong><span>Chat naturally with Omiryn and this section will fill up.</span></div>}
+          </div>
+        </section>
+
+        <section className="profile-panel profile-panel-wide style-context-panel">
+          <div className="style-section-heading">
+            <div>
+              <p className="eyebrow">Memories</p>
+              <h2>Saved context about you</h2>
+              <p>Add WhatsApp exports, profile notes, or any bigger context that should stay available across conversations.</p>
+            </div>
+            <span className="profile-fact-total">{sources.length} memories</span>
+          </div>
+          <div className="context-action-grid">
+            <button className="context-action-button" type="button" onClick={() => { setImportMode("whatsapp"); setTitle("My WhatsApp style"); setShowImport(true); }}>
+              <span className="context-card-icon">Aa</span>
+              <strong>Import WhatsApp</strong>
+              <small>Use a chat export to learn your natural tone.</small>
+            </button>
+            <button className="context-action-button" type="button" onClick={() => { setImportMode("memory"); setTitle("Imported context"); setShowImport(true); }}>
+              <span className="context-card-icon">+</span>
+              <strong>Add memory</strong>
+              <small>Paste a profile summary, notes, or important details.</small>
+            </button>
+          </div>
+          {showImport ? <form className="react-memory-form" onSubmit={importContext}><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Memory title" />{importMode === "whatsapp" ? <><input type="file" accept=".txt,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) void file.text().then(setContent); }} /><input value={userSender} onChange={(event) => setUserSender(event.target.value)} placeholder="Your sender name (optional)" /></> : null}<textarea value={content} onChange={(event) => setContent(event.target.value)} rows={7} placeholder={importMode === "whatsapp" ? "Choose a WhatsApp .txt export or paste it here..." : "Paste at least 20 characters..."} /><div><button className="secondary-button" type="button" onClick={() => setShowImport(false)}>Cancel</button><button type="submit" disabled={saving || content.trim().length < (importMode === "whatsapp" ? 50 : 20)}>{saving ? "Saving..." : importMode === "whatsapp" ? "Import chat" : "Save memory"}</button></div></form> : null}
+          <div className="context-source-list">
+            {sources.length ? sources.map((source) => (
+              <article className="profile-source-item" key={source.id}>
+                <div className="profile-source-body">
+                  <strong>{source.title || "Saved memory"}</strong>
+                  <span>{humanizeLabel(source.source_type || "memory")} · {(source.content_length || 0).toLocaleString()} chars</span>
+                  <p>{source.preview}</p>
+                </div>
+                <button className="secondary-button" type="button" onClick={() => void removeSource(source.id)}>Remove</button>
+              </article>
+            )) : <div className="table-empty">No saved memories yet.</div>}
+          </div>
+          {error ? <p className="legacy-inline-error">{error}</p> : null}
+        </section>
+      </div>
     </section>
-    <section className="profile-panel profile-panel-wide style-learning-panel"><div className="panel-heading profile-facts-heading"><div><p className="eyebrow">Learned About You</p><h2>Internal matching signals</h2></div><span className="profile-fact-total">{facts.length} facts</span></div><div className="profile-fact-groups">{facts.length ? Object.entries(data?.learned_fact_groups || {}).map(([category, rows]) => <section className="profile-fact-group" key={category}><div className="profile-fact-group-heading"><h3>{category.replaceAll("_", " ")}</h3><span>{rows.length} signals</span></div><div className="profile-fact-list">{rows.map((fact) => <article className="profile-fact-card" key={fact.id}><div className="profile-fact-card-top"><strong>{fact.label || fact.key}</strong><span className="confidence-pill">{Math.round((fact.confidence || 0) * 100)}%</span></div><div className="profile-fact-meta"><span className="fact-tag fact-tag-key">{fact.key}</span><span className="fact-tag fact-tag-status">{fact.status || "active"}</span></div></article>)}</div></section>) : <div className="profile-facts-empty"><strong>No learned signals yet.</strong><span>Chat naturally with Omiryn and this section will fill up.</span></div>}</div></section>
-  </div></section>;
+  );
+}
+
+function confidenceLevel(confidence?: number) {
+  const value = confidence || 0;
+  if (value >= 0.75) return "high";
+  if (value >= 0.45) return "medium";
+  return "low";
+}
+
+function humanizeLabel(value?: string) {
+  return (value || "").replaceAll("_", " ");
 }
 
 function MatchesPage() {

@@ -3604,21 +3604,21 @@ p {
 .context-action-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
   margin-top: 0;
 }
 
 .context-action-button {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
   background: #ffffff;
-  padding: 18px;
+  padding: 15px;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -3638,8 +3638,8 @@ p {
 
 .context-action-button .context-card-icon {
   grid-row: 1 / span 2;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
 }
 
 .context-action-button strong {
@@ -3782,7 +3782,7 @@ p {
 
 .context-source-list {
   display: grid;
-  gap: 7px;
+  gap: 10px;
   margin-top: 0;
 }
 
@@ -5108,6 +5108,7 @@ p {
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
+  max-width: 760px;
   margin-bottom: 18px;
 }
 
@@ -5118,7 +5119,7 @@ p {
 .style-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -5128,14 +5129,37 @@ p {
 
 .style-context-panel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   width: 100%;
   overflow: hidden;
-  padding: clamp(12px, 1.0vw, 30px);
+  padding: clamp(16px, 2vw, 24px);
 }
 
 .style-learning-panel {
+  display: grid;
   grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.style-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 2px;
+}
+
+.style-section-heading h2 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.style-section-heading p:not(.eyebrow) {
+  max-width: 660px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .coming-soon-panel {
@@ -5686,19 +5710,29 @@ p {
 }
 
 .profile-source-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--soft);
-  padding: 13px;
+  background: #ffffff;
+  padding: 13px 14px;
 }
 
+.profile-source-body,
 .profile-source-item strong,
 .profile-source-item span {
   display: block;
 }
 
+.profile-source-body {
+  min-width: 0;
+}
+
 .profile-source-item strong {
   font-size: 14px;
+  line-height: 1.35;
 }
 
 .profile-source-item span,
@@ -5709,7 +5743,59 @@ p {
 }
 
 .profile-source-item p {
-  margin-top: 8px;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+
+.profile-source-item .secondary-button {
+  min-height: 34px;
+  padding: 8px 12px;
+}
+
+.react-memory-form {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+  padding: 14px;
+}
+
+.react-memory-form input,
+.react-memory-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  padding: 11px 12px;
+}
+
+.react-memory-form textarea {
+  min-height: 150px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.react-memory-form input:focus,
+.react-memory-form textarea:focus {
+  border-color: #9fd0c1;
+  box-shadow: 0 0 0 3px rgba(93, 177, 151, 0.16);
+}
+
+.react-memory-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.react-memory-form button {
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 18px;
 }
 
 .panel-heading {
@@ -5724,9 +5810,19 @@ p {
 
 .profile-facts-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 22px 24px 18px;
+}
+
+.profile-facts-heading p:not(.eyebrow) {
+  max-width: 680px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .profile-fact-total {
@@ -5742,13 +5838,19 @@ p {
 
 .profile-fact-groups {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  padding: 16px;
 }
 
 .profile-fact-group {
   display: grid;
+  align-content: start;
   gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
 }
 
 .profile-fact-group-heading {
@@ -5759,34 +5861,44 @@ p {
 }
 
 .profile-fact-group-heading h3 {
-  font-size: 15px;
+  text-transform: capitalize;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 760;
 }
 
 .profile-fact-group-heading span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .profile-fact-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .profile-fact-card,
 .profile-facts-empty {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--soft);
+  background: #fbfdfc;
 }
 
 .profile-fact-card {
   display: grid;
   position: relative;
-  gap: 12px;
-  min-height: 112px;
-  padding: 14px;
+  gap: 7px;
+  min-height: 72px;
+  padding: 12px;
 }
 
 .profile-fact-card-top {
@@ -5798,8 +5910,16 @@ p {
 
 .profile-fact-card-top strong {
   color: var(--ink);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.35;
+}
+
+.profile-fact-card p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.4;
+  text-transform: capitalize;
 }
 
 .confidence-pill {
@@ -5809,7 +5929,7 @@ p {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0;
-  padding: 6px 9px;
+  padding: 5px 8px;
 }
 
 .confidence-pill.high {
@@ -6767,8 +6887,29 @@ p {
     flex-direction: column;
   }
 
+  .profile-fact-groups {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
   .profile-fact-list {
     grid-template-columns: 1fr;
+  }
+
+  .profile-source-item {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-source-item .secondary-button {
+    justify-self: start;
+  }
+
+  .react-memory-form > div {
+    justify-content: stretch;
+  }
+
+  .react-memory-form > div button {
+    flex: 1;
   }
 
   .interview-screen {
