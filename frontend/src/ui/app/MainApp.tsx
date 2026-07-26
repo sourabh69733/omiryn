@@ -1,5 +1,5 @@
 import { Fragment, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
 
 type Page = "chat" | "style" | "matches" | "profile";
@@ -599,6 +599,11 @@ function StylePage() {
   const [userSender, setUserSender] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingFactId, setDeletingFactId] = useState<string | null>(null);
+  const [editingFactId, setEditingFactId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editStatus, setEditStatus] = useState<"active" | "rejected">("active");
+  const [editComment, setEditComment] = useState("");
+  const [savingFactId, setSavingFactId] = useState<string | null>(null);
 
   async function load() {
     const response = await apiFetch("/api/me/profile");
@@ -656,6 +661,35 @@ function StylePage() {
     }
   }
 
+  function startEditFact(fact: ProfileFact) {
+    setEditingFactId(fact.id);
+    setEditLabel(fact.label || fact.key || "");
+    setEditStatus(fact.status === "rejected" ? "rejected" : "active");
+    setEditComment("");
+    setError("");
+  }
+
+  async function saveFactEdit(event: FormEvent, id: string) {
+    event.preventDefault();
+    if (!editLabel.trim()) return;
+    setSavingFactId(id);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/me/profile-facts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: editLabel.trim(), status: editStatus, comment: editComment.trim() || null })
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update that signal."));
+      setEditingFactId(null);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update that signal.");
+    } finally {
+      setSavingFactId(null);
+    }
+  }
+
   return (
     <section className="screen style-screen">
       <div className="style-hero">
@@ -691,10 +725,30 @@ function StylePage() {
                         <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{Math.round((fact.confidence || 0) * 100)}%</span>
                       </div>
                       {fact.status && fact.status !== "active" ? <p>{humanizeLabel(fact.status)}</p> : null}
-                      <button className="fact-remove-button" type="button" onClick={() => void removeFact(fact.id)} disabled={deletingFactId === fact.id} aria-label={`Remove signal: ${fact.label || fact.key}`} title="Remove signal">
-                        <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
-                        <span className="sr-only">{deletingFactId === fact.id ? "Removing signal" : "Remove signal"}</span>
-                      </button>
+                      {editingFactId === fact.id ? (
+                        <form className="fact-edit-form" onSubmit={(event) => void saveFactEdit(event, fact.id)}>
+                          <input value={editLabel} onChange={(event) => setEditLabel(event.target.value)} aria-label="Signal label" />
+                          <select value={editStatus} onChange={(event) => setEditStatus(event.target.value === "rejected" ? "rejected" : "active")} aria-label="Signal status">
+                            <option value="active">Use this signal</option>
+                            <option value="rejected">Mark as wrong</option>
+                          </select>
+                          <textarea value={editComment} onChange={(event) => setEditComment(event.target.value)} rows={2} placeholder="Optional note..." />
+                          <div>
+                            <button className="secondary-button" type="button" onClick={() => setEditingFactId(null)} disabled={savingFactId === fact.id}>Cancel</button>
+                            <button type="submit" disabled={savingFactId === fact.id || !editLabel.trim()}>{savingFactId === fact.id ? "Saving..." : "Save"}</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="fact-card-actions">
+                          <button className="fact-icon-button edit" type="button" onClick={() => startEditFact(fact)} aria-label={`Edit signal: ${fact.label || fact.key}`} title="Edit signal">
+                            <Pencil aria-hidden="true" size={15} strokeWidth={2.2} />
+                          </button>
+                          <button className="fact-icon-button remove" type="button" onClick={() => void removeFact(fact.id)} disabled={deletingFactId === fact.id} aria-label={`Remove signal: ${fact.label || fact.key}`} title="Remove signal">
+                            <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
+                            <span className="sr-only">{deletingFactId === fact.id ? "Removing signal" : "Remove signal"}</span>
+                          </button>
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>

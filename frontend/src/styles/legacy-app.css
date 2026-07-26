@@ -5968,23 +5968,43 @@ p {
   text-transform: capitalize;
 }
 
-.fact-remove-button {
+.fact-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fact-icon-button {
   display: inline-grid;
   place-items: center;
-  justify-self: end;
   width: 32px;
   height: 32px;
-  border: 1px solid #f0d6d6;
+  border: 1px solid #dbe9e4;
   border-radius: 999px;
-  color: #b35b5b;
-  background: #fff8f8;
+  color: #60746f;
+  background: #ffffff;
   cursor: pointer;
   padding: 0;
   transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.fact-remove-button:hover,
-.fact-remove-button:focus-visible {
+.fact-icon-button.edit:hover,
+.fact-icon-button.edit:focus-visible {
+  border-color: #b8d8cf;
+  color: #227764;
+  background: #eef8f3;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 119, 100, 0.1);
+}
+
+.fact-icon-button.remove {
+  border-color: #f0d6d6;
+  color: #b35b5b;
+  background: #fff8f8;
+}
+
+.fact-icon-button.remove:hover,
+.fact-icon-button.remove:focus-visible {
   border-color: #efb9b9;
   color: #c94f4f;
   background: #fff0f0;
@@ -5992,10 +6012,53 @@ p {
   box-shadow: 0 0 0 3px rgba(201, 79, 79, 0.1);
 }
 
-.fact-remove-button:disabled {
+.fact-icon-button:disabled {
   cursor: default;
   opacity: 0.6;
   box-shadow: none;
+}
+
+.fact-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.fact-edit-form input,
+.fact-edit-form select,
+.fact-edit-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  padding: 9px 10px;
+}
+
+.fact-edit-form textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.fact-edit-form input:focus,
+.fact-edit-form select:focus,
+.fact-edit-form textarea:focus {
+  border-color: #9fd0c1;
+  box-shadow: 0 0 0 3px rgba(93, 177, 151, 0.16);
+}
+
+.fact-edit-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fact-edit-form button {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 14px;
 }
 
 .confidence-pill {
