@@ -18,7 +18,7 @@ function serveFile(response, filePath, contentType) {
 }
 
 function landingDevPlugin() {
-  const publicPages = new Set(["about", "how-it-works", "safety", "privacy", "terms", "contact"]);
+  const publicPages = new Set(["about", "how-it-works", "safety", "ai-disclosure", "privacy", "terms", "contact"]);
   return {
     name: "omiryn-landing-dev",
     configureServer(server) {
