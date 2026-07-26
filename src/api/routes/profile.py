@@ -6,6 +6,7 @@ from agent.context_engine.context import STYLE_CONTEXT_SOURCE_TYPES
 from agent.memory_engine.data_point_feedback import normalize_data_point_feedback
 from security.auth import CurrentUser, current_user
 from storage import (
+    delete_profile_fact,
     get_profile_fact,
     get_user_profile,
     list_data_point_feedback,
@@ -270,6 +271,18 @@ async def get_me_profile_facts(
     return {"facts": facts, "groups": _group_profile_facts(facts)}
 
 
+@router.delete("/api/me/profile-facts/{fact_id}")
+async def delete_me_profile_fact(
+    fact_id: str,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, str]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    if not delete_profile_fact(fact_id, user.id):
+        raise HTTPException(status_code=404, detail="Data point not found.")
+    return {"fact_id": fact_id, "status": "deleted"}
+
+
 @router.post("/api/me/profile-facts/{fact_id}/feedback")
 async def create_data_point_feedback(
     fact_id: str,
@@ -310,4 +323,3 @@ async def create_data_point_feedback(
             else None
         ),
     }
-
