@@ -107,6 +107,31 @@ def get_profile_fact(fact_id: str, user_id: str | None = None) -> dict[str, Any]
     return _profile_fact_from_row(row) if row else None
 
 
+def delete_profile_fact(fact_id: str, user_id: str) -> bool:
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(profile_facts.c.id).where(
+                profile_facts.c.id == fact_id,
+                profile_facts.c.user_id == user_id,
+            )
+        ).first()
+        if not existing:
+            return False
+        connection.execute(
+            data_point_feedback.delete().where(
+                data_point_feedback.c.profile_fact_id == fact_id,
+                data_point_feedback.c.user_id == user_id,
+            )
+        )
+        result = connection.execute(
+            profile_facts.delete().where(
+                profile_facts.c.id == fact_id,
+                profile_facts.c.user_id == user_id,
+            )
+        )
+    return bool(result.rowcount)
+
+
 def save_data_point_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
     payload = {
         "id": feedback.get("id") or str(uuid4()),
@@ -538,4 +563,3 @@ def _data_point_extraction_debug_from_row(row: Any) -> dict[str, Any]:
         "metadata": decrypt_json(row["user_id"], row["metadata_json"]),
         "created_at": _isoformat_utc(row["created_at"]),
     }
-
