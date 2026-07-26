@@ -1,4 +1,5 @@
 import { Fragment, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
 
 type Page = "chat" | "style" | "matches" | "profile";
@@ -597,6 +598,7 @@ function StylePage() {
   const [title, setTitle] = useState("Imported context");
   const [userSender, setUserSender] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingFactId, setDeletingFactId] = useState<string | null>(null);
 
   async function load() {
     const response = await apiFetch("/api/me/profile");
@@ -640,6 +642,20 @@ function StylePage() {
     if (response.ok) await load();
   }
 
+  async function removeFact(id: string) {
+    setDeletingFactId(id);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/me/profile-facts/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not remove that signal."));
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove that signal.");
+    } finally {
+      setDeletingFactId(null);
+    }
+  }
+
   return (
     <section className="screen style-screen">
       <div className="style-hero">
@@ -675,6 +691,10 @@ function StylePage() {
                         <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{Math.round((fact.confidence || 0) * 100)}%</span>
                       </div>
                       {fact.status && fact.status !== "active" ? <p>{humanizeLabel(fact.status)}</p> : null}
+                      <button className="fact-remove-button" type="button" onClick={() => void removeFact(fact.id)} disabled={deletingFactId === fact.id} aria-label={`Remove signal: ${fact.label || fact.key}`} title="Remove signal">
+                        <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
+                        <span className="sr-only">{deletingFactId === fact.id ? "Removing signal" : "Remove signal"}</span>
+                      </button>
                     </article>
                   ))}
                 </div>
@@ -771,6 +791,6 @@ function ProfilePage() {
   const photos = form.profile_photo_urls?.length ? form.profile_photo_urls : form.profile_photo_url ? [form.profile_photo_url] : [];
   return <section className="screen profile-screen"><div className="usage-hero"><div className="screen-copy compact"><p className="eyebrow">Profile</p><h1>Your profile.</h1><p>Keep photos, basics, and match direction clean before conversation takes over.</p></div></div><div className="profile-layout">
     <section className="profile-panel profile-photo-panel"><div className="panel-heading"><div><p className="eyebrow">Photos</p><h2>Profile gallery</h2></div><input ref={photoInput} className="profile-photo-input" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} /></div><div className="profile-photo-gallery"><button className={`profile-main-photo ${photos[0] ? "has-photo" : ""} ${uploadingPhotoSlot === 0 ? "is-uploading" : ""}`} type="button" disabled={uploadingPhotoSlot !== null} onClick={() => { setPhotoSlot(0); photoInput.current?.click(); }}>{photos[0] ? <img className="profile-gallery-img" src={photos[0]} alt="Profile" /> : <span className="profile-photo-empty">{form.display_name?.slice(0, 1) || "O"}</span>}{uploadingPhotoSlot === 0 ? <span className="profile-upload-overlay"><span className="profile-upload-spinner" />Uploading...</span> : null}<span className="profile-main-badge">Main photo</span></button><div className="profile-thumb-stack">{[1,2,3].map((slot) => <button className={`profile-thumb ${photos[slot] ? "has-photo" : ""} ${uploadingPhotoSlot === slot ? "is-uploading" : ""}`} type="button" key={slot} disabled={uploadingPhotoSlot !== null} onClick={() => { setPhotoSlot(slot); photoInput.current?.click(); }}>{photos[slot] ? <img className="profile-gallery-img" src={photos[slot]} alt={`Profile ${slot + 1}`} /> : <span className="profile-photo-empty">+</span>}{uploadingPhotoSlot === slot ? <span className="profile-upload-overlay"><span className="profile-upload-spinner" />Uploading...</span> : null}</button>)}</div></div><div className="profile-photo-copy"><strong>Show the real you.</strong><span>Upload up to 4 clear photos.</span></div></section>
-    <section className="profile-panel profile-info-panel"><div className="panel-heading"><div><p className="eyebrow">Account</p><h2>Basic info</h2></div></div><form className="profile-form" onSubmit={save}><p className="privacy-note">Profile details help personalize chat and future matching. Keep them accurate, and only add optional contact details you are comfortable storing.</p><label>Name<input value={form.display_name || ""} onChange={(e) => setForm({...form, display_name:e.target.value})} /></label><label>Age<input type="number" min="18" max="100" value={form.age || ""} onChange={(e) => setForm({...form, age:Number(e.target.value)})} /></label><label>Email<input value={data?.user?.email || ""} readOnly /></label><label>Gender<select value={form.gender || "prefer_not_to_say"} onChange={(e) => setForm({...form, gender:e.target.value})}><option value="man">Man</option><option value="woman">Woman</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label>Interested in<select value={form.interested_in || "everyone"} onChange={(e) => setForm({...form, interested_in:e.target.value})}><option value="women">Women</option><option value="men">Men</option><option value="everyone">Everyone</option></select></label><label className="wide-field">Location<input value={form.city || ""} onChange={(e) => setForm({...form, city:e.target.value})} /></label><label className="wide-field">Mobile (optional)<input type="tel" value={form.phone || ""} onChange={(e) => setForm({...form, phone:e.target.value})} /></label><button type="submit">Save profile</button><p className="quiet-note">{status}</p></form></section>
+    <section className="profile-panel profile-info-panel"><div className="panel-heading"><div><p className="eyebrow">Account</p><h2>Basic info</h2></div></div><form className="profile-form" onSubmit={save}><p className="privacy-note">Profile details help personalize chat and future matching. Keep them accurate, and only add optional contact details you are comfortable storing.</p><label>Name<input value={form.display_name || ""} onChange={(e) => setForm({...form, display_name:e.target.value})} /></label><label>Age<input type="number" min="18" max="100" value={form.age || ""} onChange={(e) => setForm({...form, age:Number(e.target.value)})} /></label><label>Email<input value={data?.user?.email || ""} readOnly /></label><label>Gender<select value={form.gender || "prefer_not_to_say"} onChange={(e) => setForm({...form, gender:e.target.value})}><option value="man">Man</option><option value="woman">Woman</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label>Interested in<select value={form.interested_in || "everyone"} onChange={(e) => setForm({...form, interested_in:e.target.value})}><option value="women">Women</option><option value="men">Men</option><option value="everyone">Everyone</option></select></label><label className="wide-field">Location<input value={form.city || ""} onChange={(e) => setForm({...form, city:e.target.value})} /></label><label className="wide-field">Mobile (optional)<input type="tel" value={form.phone || ""} onChange={(e) => setForm({...form, phone:e.target.value})} /></label><div className="data-control-box"><div><strong>Data requests</strong><span>Ask for correction, export, or full account/data deletion.</span></div><a className="secondary-button" href="/contact?intent=support">Contact support</a></div><button type="submit">Save profile</button><p className="quiet-note">{status}</p></form></section>
   </div></section>;
 }

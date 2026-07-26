@@ -5711,13 +5711,42 @@ p {
 .profile-form label:nth-child(3),
 .profile-form button,
 .profile-form .quiet-note,
-.profile-form .privacy-note {
+.profile-form .privacy-note,
+.profile-form .data-control-box {
   grid-column: 1 / -1;
 }
 
 .profile-form button {
   min-height: 48px;
   border-radius: 999px;
+}
+
+.data-control-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #dbe9e4;
+  border-radius: 8px;
+  background: #f7fbf9;
+  padding: 12px;
+}
+
+.data-control-box strong,
+.data-control-box span {
+  display: block;
+}
+
+.data-control-box strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.data-control-box span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .profile-source-list {
@@ -5937,6 +5966,36 @@ p {
   font-weight: 680;
   line-height: 1.4;
   text-transform: capitalize;
+}
+
+.fact-remove-button {
+  display: inline-grid;
+  place-items: center;
+  justify-self: end;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #f0d6d6;
+  border-radius: 999px;
+  color: #b35b5b;
+  background: #fff8f8;
+  cursor: pointer;
+  padding: 0;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.fact-remove-button:hover,
+.fact-remove-button:focus-visible {
+  border-color: #efb9b9;
+  color: #c94f4f;
+  background: #fff0f0;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(201, 79, 79, 0.1);
+}
+
+.fact-remove-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+  box-shadow: none;
 }
 
 .confidence-pill {
@@ -6918,6 +6977,14 @@ p {
   }
 
   .profile-source-item .secondary-button {
+    justify-self: start;
+  }
+
+  .data-control-box {
+    grid-template-columns: 1fr;
+  }
+
+  .data-control-box .secondary-button {
     justify-self: start;
   }
 

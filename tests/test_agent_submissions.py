@@ -663,6 +663,54 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(len(data["groups"]["communication"]), 1)
         self.assertNotIn("values", data["groups"])
 
+    def test_user_can_delete_own_profile_fact(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "prefers_direct_replies",
+                "value": {"kind": "direct"},
+                "label": "Prefers direct replies",
+                "confidence": 0.8,
+            }
+        )
+        self.client.post(
+            f"/api/me/profile-facts/{fact['id']}/feedback",
+            json={"rating": "agree"},
+        )
+
+        response = self.client.delete(f"/api/me/profile-facts/{fact['id']}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"fact_id": fact["id"], "status": "deleted"})
+        self.assertIsNone(get_profile_fact(fact["id"], "user-a"))
+        self.assertEqual(list_data_point_feedback(user_id="user-a"), [])
+
+    def test_user_cannot_delete_another_users_profile_fact(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-b",
+                "category": "values",
+                "key": "family_orientation",
+                "value": {"kind": "high"},
+                "label": "Values family involvement",
+                "confidence": 0.8,
+            }
+        )
+
+        response = self.client.delete(f"/api/me/profile-facts/{fact['id']}")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNotNone(get_profile_fact(fact["id"], "user-b"))
+
     def test_data_point_feedback_is_saved_and_returned_with_raw_points(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
