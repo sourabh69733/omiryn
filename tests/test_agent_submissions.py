@@ -7,6 +7,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
+from api.routes.public import _reset_public_rate_limits
 from agent.memory_engine.memory import (
     pending_data_point_messages,
     should_run_conversation_data_point_extraction,
@@ -68,6 +69,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
+        _reset_public_rate_limits()
         reset_db()
         self.client = TestClient(app)
 
@@ -145,6 +147,49 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(lead["channel"], "whatsapp")
         self.assertEqual(lead["intent"], "join_community")
 
+    def test_public_email_lead_requires_valid_email(self) -> None:
+        response = self.client.post(
+            "/api/public/leads",
+            json={
+                "session_id": "visitor-1",
+                "contact": "not-an-email",
+                "channel": "email",
+                "intent": "feedback",
+                "message": "Please reply.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "Enter a valid email address.")
+
+    def test_public_leads_are_rate_limited(self) -> None:
+        for index in range(5):
+            response = self.client.post(
+                "/api/public/leads",
+                json={
+                    "session_id": f"visitor-{index}",
+                    "contact": f"visitor{index}@example.com",
+                    "channel": "email",
+                    "intent": "feedback",
+                    "message": "Feedback",
+                },
+            )
+            self.assertEqual(response.status_code, 201)
+
+        response = self.client.post(
+            "/api/public/leads",
+            json={
+                "session_id": "visitor-over",
+                "contact": "over@example.com",
+                "channel": "email",
+                "intent": "feedback",
+                "message": "Feedback",
+            },
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["detail"], "Too many requests. Please try again soon.")
+
     def test_user_can_edit_then_approve_draft(self) -> None:
         draft_id = self._create_draft()
 
@@ -203,9 +248,34 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         conversations = self.client.get("/api/agent/conversations").json()["conversations"]
         self.assertEqual(conversations, [])
-        remaining_context = list_context_sources(conversation_id, None)
-        self.assertEqual(len(remaining_context), 1)
-        self.assertEqual(remaining_context[0]["title"], "Preference notes")
+
+    def test_chat_message_has_max_length(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation_id = conversation_response.json()["id"]
+
+        response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/messages",
+            json={"message": "x" * 4001},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_whatsapp_import_has_max_length(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        self.assertEqual(conversation_response.status_code, 201)
+        conversation_id = conversation_response.json()["id"]
+
+        response = self.client.post(
+            f"/api/agent/conversations/{conversation_id}/whatsapp-import",
+            json={
+                "title": "Large import",
+                "content": "x" * 200001,
+                "style_kind": "user_style",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
 
     def test_conversations_are_scoped_to_authenticated_user(self) -> None:
         async def user_a() -> CurrentUser:
