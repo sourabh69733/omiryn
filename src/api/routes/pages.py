@@ -29,6 +29,11 @@ def safety_page() -> FileResponse:
     return FileResponse(FRONTEND_DIST_DIR / "safety.html", headers=APP_SHELL_HEADERS)
 
 
+@router.get("/ai-disclosure")
+def ai_disclosure_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIST_DIR / "ai-disclosure.html", headers=APP_SHELL_HEADERS)
+
+
 @router.get("/privacy")
 def privacy_page() -> FileResponse:
     return FileResponse(FRONTEND_DIST_DIR / "privacy.html", headers=APP_SHELL_HEADERS)
