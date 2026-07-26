@@ -139,7 +139,7 @@ class AgentConversationSummary(BaseModel):
 
 
 class UserMessage(BaseModel):
-    message: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=4000)
 
 
 class AgentMessageFeedbackCreate(BaseModel):
@@ -170,7 +170,7 @@ class WhatsappChatImportCreate(BaseModel):
     user_sender: str | None = Field(default=None, max_length=120)
     style_name: str | None = Field(default=None, max_length=120)
     style_kind: WhatsappStyleKind = "user_style"
-    content: str = Field(min_length=50)
+    content: str = Field(min_length=50, max_length=200000)
 
 
 class DatingBasics(BaseModel):
