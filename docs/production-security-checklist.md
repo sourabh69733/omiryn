@@ -21,8 +21,9 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Memory import explains long-term context use.
 - [x] WhatsApp import requires user permission and states Omiryn will not message contacts.
 - [x] Profile form explains how profile details are used.
-- [ ] Add direct "Request data deletion" action in account settings.
-- [ ] Add learned-signal delete/correction controls.
+- [x] Add direct "Request data deletion" action in account settings.
+- [x] Add learned-signal delete control.
+- [ ] Add learned-signal correction/edit controls.
 
 ## Auth And Access Control
 
