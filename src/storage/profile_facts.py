@@ -132,6 +132,55 @@ def delete_profile_fact(fact_id: str, user_id: str) -> bool:
     return bool(result.rowcount)
 
 
+def update_profile_fact_user_correction(
+    fact_id: str,
+    user_id: str,
+    *,
+    label: str,
+    status: str,
+) -> dict[str, Any] | None:
+    clean_label = str(label or "").strip()
+    clean_status = str(status or "active").strip().lower()
+    if clean_status not in {"active", "rejected"}:
+        clean_status = "active"
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(profile_facts).where(
+                profile_facts.c.id == fact_id,
+                profile_facts.c.user_id == user_id,
+            )
+        ).mappings().first()
+        if not existing:
+            return None
+        update_values = {
+            "label": clean_label or existing["label"],
+            "status": clean_status,
+            "confidence": (
+                min(_bounded_confidence(existing["confidence"]), 0.2)
+                if clean_status == "rejected"
+                else max(_bounded_confidence(existing["confidence"]), 0.9)
+            ),
+            "used_for_matching": clean_status == "active",
+            "used_for_chat_context": clean_status == "active",
+            "updated_at": func.now(),
+        }
+        connection.execute(
+            profile_facts.update()
+            .where(
+                profile_facts.c.id == fact_id,
+                profile_facts.c.user_id == user_id,
+            )
+            .values(**update_values)
+        )
+        row = connection.execute(
+            select(profile_facts).where(
+                profile_facts.c.id == fact_id,
+                profile_facts.c.user_id == user_id,
+            )
+        ).mappings().first()
+    return _profile_fact_from_row(row) if row else None
+
+
 def save_data_point_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
     payload = {
         "id": feedback.get("id") or str(uuid4()),

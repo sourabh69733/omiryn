@@ -711,6 +711,66 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIsNotNone(get_profile_fact(fact["id"], "user-b"))
 
+    def test_user_can_correct_own_profile_fact(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "communication",
+                "key": "tone_preference",
+                "value": {"kind": "direct"},
+                "label": "Likes blunt replies",
+                "confidence": 0.55,
+            }
+        )
+
+        response = self.client.patch(
+            f"/api/me/profile-facts/{fact['id']}",
+            json={
+                "label": "Likes direct but warm replies",
+                "status": "active",
+                "comment": "Blunt sounds too harsh.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["fact"]["label"], "Likes direct but warm replies")
+        self.assertEqual(response.json()["fact"]["status"], "active")
+        self.assertGreaterEqual(response.json()["fact"]["confidence"], 0.9)
+        stored = get_profile_fact(fact["id"], "user-a")
+        self.assertEqual(stored["label"], "Likes direct but warm replies")
+        feedback = list_data_point_feedback(user_id="user-a")
+        self.assertEqual(len(feedback), 1)
+        self.assertEqual(feedback[0]["rating"], "agree")
+        self.assertEqual(feedback[0]["reason"], "user_corrected")
+
+    def test_user_cannot_correct_another_users_profile_fact(self) -> None:
+        async def user_a() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = user_a
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-b",
+                "category": "values",
+                "key": "family_orientation",
+                "value": {"kind": "high"},
+                "label": "Values family involvement",
+                "confidence": 0.8,
+            }
+        )
+
+        response = self.client.patch(
+            f"/api/me/profile-facts/{fact['id']}",
+            json={"label": "Changed by wrong user", "status": "active"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(get_profile_fact(fact["id"], "user-b")["label"], "Values family involvement")
+
     def test_data_point_feedback_is_saved_and_returned_with_raw_points(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")

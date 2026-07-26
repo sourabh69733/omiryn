@@ -14,6 +14,7 @@ from storage import (
     list_user_context_sources,
     save_data_point_feedback,
     save_user_profile,
+    update_profile_fact_user_correction,
 )
 
 from ..config import PROFILE_PHOTO_CONTENT_TYPES, PROFILE_PHOTO_MAX_BYTES
@@ -35,7 +36,7 @@ from ..helpers import (
     _summarize_data_point_feedback,
     logger,
 )
-from ..models import DataPointFeedbackCreate, DatingBasics, UserProfilePatch
+from ..models import DataPointFeedbackCreate, DatingBasics, ProfileFactPatch, UserProfilePatch
 
 router = APIRouter()
 
@@ -281,6 +282,54 @@ async def delete_me_profile_fact(
     if not delete_profile_fact(fact_id, user.id):
         raise HTTPException(status_code=404, detail="Data point not found.")
     return {"fact_id": fact_id, "status": "deleted"}
+
+
+@router.patch("/api/me/profile-facts/{fact_id}")
+async def patch_me_profile_fact(
+    fact_id: str,
+    payload: ProfileFactPatch,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    fact = get_profile_fact(fact_id, user.id)
+    if not fact:
+        raise HTTPException(status_code=404, detail="Data point not found.")
+
+    updated_fact = update_profile_fact_user_correction(
+        fact_id,
+        user.id,
+        label=payload.label,
+        status=payload.status,
+    )
+    if not updated_fact:
+        raise HTTPException(status_code=404, detail="Data point not found.")
+
+    feedback = normalize_data_point_feedback(
+        {
+            "user_id": user.id,
+            "profile_fact_id": fact_id,
+            "rating": "disagree" if payload.status == "rejected" else "agree",
+            "reason": "user_corrected",
+            "comment": payload.comment,
+            "metadata": {
+                "category": fact.get("category"),
+                "key": fact.get("key"),
+                "source_kind": fact.get("source_kind"),
+                "source_id": fact.get("source_id"),
+                "corrected_label": payload.label,
+                "corrected_status": payload.status,
+            },
+        }
+    )
+    saved_feedback = save_data_point_feedback(feedback)
+    return {
+        "fact": {
+            **updated_fact,
+            "feedback": _data_point_feedback_summary_for_fact(saved_feedback),
+        },
+        "feedback": saved_feedback,
+    }
 
 
 @router.post("/api/me/profile-facts/{fact_id}/feedback")

@@ -155,6 +155,12 @@ class DataPointFeedbackCreate(BaseModel):
     comment: str | None = Field(default=None, max_length=1000)
 
 
+class ProfileFactPatch(BaseModel):
+    label: str = Field(min_length=2, max_length=240)
+    status: Literal["active", "rejected"] = "active"
+    comment: str | None = Field(default=None, max_length=1000)
+
+
 class ContextSourceCreate(BaseModel):
     source_type: ContextSourceType = "llm_profile"
     title: str = Field(default="Imported context", min_length=1, max_length=120)
