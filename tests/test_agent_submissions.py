@@ -2401,6 +2401,55 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "Sign in to continue.")
 
+    def test_auth_required_blocks_anonymous_data_requests(self) -> None:
+        with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
+            response = self.client.post(
+                "/api/me/data-requests",
+                json={"request_type": "deletion", "message": "Please delete my account data."},
+            )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Sign in to continue.")
+
+    def test_user_can_create_and_list_data_requests(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com", display_name="Aarav")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        create_response = self.client.post(
+            "/api/me/data-requests",
+            json={
+                "request_type": "deletion",
+                "message": "Please delete my account and all personal data.",
+            },
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        request = create_response.json()["request"]
+        self.assertEqual(request["user_id"], "user-a")
+        self.assertEqual(request["email"], "a@example.com")
+        self.assertEqual(request["request_type"], "deletion")
+        self.assertEqual(request["status"], "open")
+        self.assertEqual(request["metadata"]["source"], "account_profile")
+
+        list_response = self.client.get("/api/me/data-requests")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["requests"][0]["id"], request["id"])
+
+    def test_data_requests_only_allow_export_or_deletion(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.post(
+            "/api/me/data-requests",
+            json={"request_type": "privacy", "message": "I have a privacy question."},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
             "/api/agent/conversations",
