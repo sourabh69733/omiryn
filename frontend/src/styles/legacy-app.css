@@ -4242,9 +4242,6 @@ p {
 }
 
 .chat-day-separator {
-  position: sticky;
-  top: 8px;
-  z-index: 2;
   display: flex;
   justify-content: center;
   width: 100%;
@@ -4253,9 +4250,14 @@ p {
 }
 
 .chat-day-separator span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  box-sizing: border-box;
   border: 1px solid rgba(180, 154, 255, 0.18);
   border-radius: 999px;
-  padding: 6px 13px;
+  padding: 0 13px 1px;
   color: #6f6685;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.76)),
@@ -4267,6 +4269,46 @@ p {
   font-weight: 760;
   line-height: 1;
   letter-spacing: 0;
+}
+
+.floating-chat-date {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.floating-chat-date.is-visible {
+  opacity: 1;
+  transform: translateY(8px);
+}
+
+.floating-chat-date span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  box-sizing: border-box;
+  border: 1px solid rgba(180, 154, 255, 0.18);
+  border-radius: 999px;
+  color: #6f6685;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.82)),
+    rgba(251, 248, 255, 0.96);
+  box-shadow:
+    0 10px 26px rgba(64, 45, 118, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 0 13px 1px;
 }
 
 .chat-avatar {

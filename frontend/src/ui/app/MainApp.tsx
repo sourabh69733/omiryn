@@ -202,9 +202,12 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const [usageError, setUsageError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [floatingDayLabel, setFloatingDayLabel] = useState("");
+  const [floatingDayVisible, setFloatingDayVisible] = useState(false);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const floatingDayTimerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const shouldRestoreInputFocusRef = useRef(false);
@@ -332,6 +335,44 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     if (!shouldStickToBottomRef.current) return;
     syncChatToBottomAfterRender();
   }, [conversation?.id, conversation?.messages.length, loading, sending]);
+
+  useEffect(() => {
+    return () => {
+      if (floatingDayTimerRef.current !== null) window.clearTimeout(floatingDayTimerRef.current);
+    };
+  }, []);
+
+  function updateFloatingDayOnScroll() {
+    const log = logRef.current;
+    if (!log || !conversation?.messages.length) return;
+    const logRect = log.getBoundingClientRect();
+    const rows = Array.from(log.querySelectorAll<HTMLElement>("[data-message-index]"));
+    const visibleRow = rows.find((row) => row.getBoundingClientRect().bottom > logRect.top + 24) || rows[0];
+    const index = Number(visibleRow?.dataset.messageIndex);
+    const message = Number.isFinite(index) ? conversation.messages[index] : null;
+    if (!message) return;
+    const dayKey = messageDateKey(message, index);
+    const visibleSeparator = log.querySelector<HTMLElement>(`[data-day-separator="${dayKey}"]`);
+    if (visibleSeparator) {
+      const separatorRect = visibleSeparator.getBoundingClientRect();
+      if (separatorRect.bottom > logRect.top && separatorRect.top < logRect.top + 64) {
+        setFloatingDayVisible(false);
+        return;
+      }
+    }
+    setFloatingDayLabel(messageDayLabel(message, index));
+    setFloatingDayVisible(true);
+    if (floatingDayTimerRef.current !== null) window.clearTimeout(floatingDayTimerRef.current);
+    floatingDayTimerRef.current = window.setTimeout(() => {
+      setFloatingDayVisible(false);
+      floatingDayTimerRef.current = null;
+    }, 2400);
+  }
+
+  function handleChatScroll() {
+    shouldStickToBottomRef.current = isLogNearBottom();
+    updateFloatingDayOnScroll();
+  }
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -498,7 +539,8 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
               <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
             </div>
           </div>
-          <div className="chat-log" ref={logRef} onScroll={() => { shouldStickToBottomRef.current = isLogNearBottom(); }} aria-live="polite">
+          <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
+            <div className={`floating-chat-date ${floatingDayVisible && floatingDayLabel ? "is-visible" : ""}`} aria-hidden="true"><span>{floatingDayLabel}</span></div>
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
@@ -506,7 +548,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);
               const previousDate = index > 0 ? messageDateKey(conversation.messages[index - 1], index - 1) : "";
-              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator" role="separator" aria-label={messageDayLabel(message, index)}><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
+              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator" role="separator" aria-label={messageDayLabel(message, index)} data-day-separator={currentDate}><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`} data-message-index={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
             })}
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
