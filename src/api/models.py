@@ -8,6 +8,7 @@ AgentMode = Literal["know_me", "coach_me", "match_me", "talk_like_me"]
 AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
 AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
 DataPointFeedbackRating = Literal["agree", "disagree"]
+DataRequestType = Literal["export", "deletion"]
 ContextSourceType = Literal[
     "llm_profile",
     "chat_export",
@@ -159,6 +160,11 @@ class ProfileFactPatch(BaseModel):
     label: str = Field(min_length=2, max_length=240)
     status: Literal["active", "rejected"] = "active"
     comment: str | None = Field(default=None, max_length=1000)
+
+
+class DataRequestCreate(BaseModel):
+    request_type: DataRequestType
+    message: str = Field(min_length=10, max_length=2000)
 
 
 class ContextSourceCreate(BaseModel):

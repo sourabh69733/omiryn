@@ -87,6 +87,20 @@ public_leads = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+data_requests = Table(
+    "data_requests",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("email", String, nullable=True),
+    Column("request_type", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("message", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 agent_context_snapshots = Table(
     "agent_context_snapshots",
     metadata,
