@@ -101,6 +101,21 @@ data_requests = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+app_events = Table(
+    "app_events",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("session_id", String, nullable=True),
+    Column("event_name", String, nullable=False),
+    Column("page", String, nullable=True),
+    Column("target_type", String, nullable=True),
+    Column("target_id", String, nullable=True),
+    Column("metadata_json", JSON, nullable=False),
+    Column("client_created_at", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 agent_context_snapshots = Table(
     "agent_context_snapshots",
     metadata,

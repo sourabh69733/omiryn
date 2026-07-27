@@ -11,6 +11,7 @@ from .users import *
 from .context_sources import *
 from .public import *
 from .data_requests import *
+from .app_events import *
 from .utils import (
     _conversation_user_id,
     _isoformat_utc,

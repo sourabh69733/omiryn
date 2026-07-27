@@ -9,6 +9,19 @@ AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
 AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
 DataPointFeedbackRating = Literal["agree", "disagree"]
 DataRequestType = Literal["export", "deletion"]
+AppEventName = Literal[
+    "app_opened",
+    "page_viewed",
+    "chat_opened",
+    "chat_started",
+    "profile_saved",
+    "memory_import_completed",
+    "learned_signal_edited",
+    "learned_signal_deleted",
+    "data_export_requested",
+    "data_deletion_requested",
+    "client_error",
+]
 ContextSourceType = Literal[
     "llm_profile",
     "chat_export",
@@ -93,6 +106,20 @@ class PublicLeadCreate(BaseModel):
     intent: Literal["feedback", "support", "privacy", "safety", "partnership"] = "feedback"
     message: str = Field(min_length=10, max_length=1000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AppEventCreate(BaseModel):
+    session_id: str | None = Field(default=None, max_length=120)
+    event_name: AppEventName
+    page: str | None = Field(default=None, max_length=80)
+    target_type: str | None = Field(default=None, max_length=80)
+    target_id: str | None = Field(default=None, max_length=160)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    client_created_at: str | None = Field(default=None, max_length=80)
+
+
+class AppEventsBatchCreate(BaseModel):
+    events: list[AppEventCreate] = Field(min_length=1, max_length=25)
 
 
 class AgentConversation(BaseModel):
