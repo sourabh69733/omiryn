@@ -9,6 +9,7 @@ from storage import (
     delete_profile_fact,
     get_profile_fact,
     get_user_profile,
+    save_app_events,
     list_user_data_requests,
     list_data_point_feedback,
     list_profile_facts,
@@ -38,9 +39,26 @@ from ..helpers import (
     _summarize_data_point_feedback,
     logger,
 )
-from ..models import DataPointFeedbackCreate, DataRequestCreate, DatingBasics, ProfileFactPatch, UserProfilePatch
+from ..models import (
+    AppEventsBatchCreate,
+    DataPointFeedbackCreate,
+    DataRequestCreate,
+    DatingBasics,
+    ProfileFactPatch,
+    UserProfilePatch,
+)
 
 router = APIRouter()
+
+_APP_EVENT_METADATA_ALLOWLIST = {
+    "conversation_id",
+    "fact_category",
+    "source_type",
+    "request_type",
+    "area",
+    "message_code",
+    "page",
+}
 
 
 @router.get("/api/me/dating-basics")
@@ -181,6 +199,35 @@ async def create_me_data_request(
         }
     )
     return {"request": request}
+
+
+@router.post("/api/me/events", status_code=201)
+async def create_me_app_events(
+    payload: AppEventsBatchCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    events = [
+        {
+            **event.model_dump(),
+            "metadata": _safe_app_event_metadata(event.metadata),
+        }
+        for event in payload.events
+    ]
+    saved_events = save_app_events(user.id, events)
+    return {"accepted": len(saved_events)}
+
+
+def _safe_app_event_metadata(metadata: dict[str, object]) -> dict[str, object]:
+    safe: dict[str, object] = {}
+    for key in _APP_EVENT_METADATA_ALLOWLIST:
+        value = metadata.get(key)
+        if isinstance(value, str):
+            safe[key] = value[:160]
+        elif isinstance(value, (bool, int, float)):
+            safe[key] = value
+    return safe
 
 
 @router.put("/api/me/profile-photo")
