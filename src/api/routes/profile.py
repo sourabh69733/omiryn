@@ -9,9 +9,11 @@ from storage import (
     delete_profile_fact,
     get_profile_fact,
     get_user_profile,
+    list_user_data_requests,
     list_data_point_feedback,
     list_profile_facts,
     list_user_context_sources,
+    save_data_request,
     save_data_point_feedback,
     save_user_profile,
     update_profile_fact_user_correction,
@@ -36,7 +38,7 @@ from ..helpers import (
     _summarize_data_point_feedback,
     logger,
 )
-from ..models import DataPointFeedbackCreate, DatingBasics, ProfileFactPatch, UserProfilePatch
+from ..models import DataPointFeedbackCreate, DataRequestCreate, DatingBasics, ProfileFactPatch, UserProfilePatch
 
 router = APIRouter()
 
@@ -147,6 +149,38 @@ async def put_me_profile(
         existing_profile.get("profile_photo_file_names") or [],
     )
     return {"profile": profile}
+
+
+@router.get("/api/me/data-requests")
+async def get_me_data_requests(
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return {"requests": list_user_data_requests(user.id)}
+
+
+@router.post("/api/me/data-requests", status_code=201)
+async def create_me_data_request(
+    payload: DataRequestCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    request = save_data_request(
+        {
+            "user_id": user.id,
+            "email": user.email,
+            "request_type": payload.request_type,
+            "status": "open",
+            "message": payload.message,
+            "metadata": {
+                "source": "account_profile",
+                "display_name": user.display_name,
+            },
+        }
+    )
+    return {"request": request}
 
 
 @router.put("/api/me/profile-photo")
