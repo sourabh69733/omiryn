@@ -937,6 +937,11 @@
       justify-content: center;
       min-height: 50px;
     }
+    .form-helper {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
     .form-status {
       min-height: 20px;
       color: var(--accent-3);

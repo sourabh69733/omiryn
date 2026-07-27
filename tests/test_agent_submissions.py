@@ -134,18 +134,18 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/api/public/leads",
             json={
                 "session_id": "visitor-1",
-                "name": "Aarav",
-                "contact": "aarav@example.com",
-                "channel": "whatsapp",
-                "intent": "join_community",
-                "message": "Please add me to the early group.",
+                "contact": "AARAV@example.com",
+                "channel": "email",
+                "intent": "feedback",
+                "message": "I have feedback about the onboarding flow.",
             },
         )
         self.assertEqual(lead_response.status_code, 201)
         lead = lead_response.json()["lead"]
         self.assertEqual(lead["contact"], "aarav@example.com")
-        self.assertEqual(lead["channel"], "whatsapp")
-        self.assertEqual(lead["intent"], "join_community")
+        self.assertEqual(lead["channel"], "email")
+        self.assertEqual(lead["intent"], "feedback")
+        self.assertEqual(lead["message"], "I have feedback about the onboarding flow.")
 
     def test_public_email_lead_requires_valid_email(self) -> None:
         response = self.client.post(
@@ -162,6 +162,34 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["detail"], "Enter a valid email address.")
 
+    def test_public_contact_requires_message(self) -> None:
+        response = self.client.post(
+            "/api/public/leads",
+            json={
+                "session_id": "visitor-1",
+                "contact": "visitor@example.com",
+                "channel": "email",
+                "intent": "feedback",
+                "message": "Too short",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_public_contact_rejects_group_join_payloads(self) -> None:
+        response = self.client.post(
+            "/api/public/leads",
+            json={
+                "session_id": "visitor-1",
+                "contact": "visitor@example.com",
+                "channel": "whatsapp",
+                "intent": "join_community",
+                "message": "Please add me to the community group.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
     def test_public_leads_are_rate_limited(self) -> None:
         for index in range(5):
             response = self.client.post(
@@ -171,7 +199,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                     "contact": f"visitor{index}@example.com",
                     "channel": "email",
                     "intent": "feedback",
-                    "message": "Feedback",
+                    "message": "Feedback about the product flow.",
                 },
             )
             self.assertEqual(response.status_code, 201)
@@ -183,7 +211,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "contact": "over@example.com",
                 "channel": "email",
                 "intent": "feedback",
-                "message": "Feedback",
+                "message": "Feedback about the product flow.",
             },
         )
 

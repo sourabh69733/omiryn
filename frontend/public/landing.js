@@ -141,12 +141,16 @@ document.querySelectorAll("form[data-form='lead']").forEach((form) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error("Could not send.");
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || "Could not send.");
+      }
       form.reset();
       if (status) status.textContent = "Got it. I will follow up soon.";
       track("lead_submitted", { channel: payload.channel, intent: payload.intent });
-    } catch {
-      if (status) status.textContent = "Could not send right now. Please try again or email sourabhsahu69733@gmail.com.";
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Could not send right now.";
+      if (status) status.textContent = `${message} You can also email sourabhsahu69733@gmail.com.`;
     }
   });
 });

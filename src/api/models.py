@@ -89,9 +89,9 @@ class PublicLeadCreate(BaseModel):
     session_id: str | None = Field(default=None, max_length=120)
     name: str | None = Field(default=None, max_length=120)
     contact: str = Field(max_length=240)
-    channel: Literal["whatsapp", "discord", "email", "phone", "other"] = "email"
-    intent: Literal["join_community", "early_access", "feedback", "support", "partnership"] = "feedback"
-    message: str | None = Field(default=None, max_length=1000)
+    channel: Literal["email"] = "email"
+    intent: Literal["feedback", "support", "privacy", "safety", "partnership"] = "feedback"
+    message: str = Field(min_length=10, max_length=1000)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
