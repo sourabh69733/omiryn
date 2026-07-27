@@ -1,6 +1,7 @@
 import { Fragment, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiFetch, signOut } from "../../lib/api";
+import { initAppLogger, trackAppEvent, trackPageView } from "../../lib/appLogger";
 
 type Page = "chat" | "style" | "matches" | "profile";
 type Message = { role?: string; content?: string; quality?: string; created_at?: string; delivery_status?: string };
@@ -115,6 +116,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    initAppLogger();
     if (!canShowUsage && window.location.pathname.startsWith("/usage")) {
       window.history.replaceState({}, "", "/app");
     }
@@ -127,6 +129,10 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
+
+  useEffect(() => {
+    trackPageView(page);
+  }, [page]);
 
   function navigate(next: Page) {
     window.history.pushState({}, "", pathForPage[next]);
@@ -248,6 +254,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
       const data = (await response.json()) as Conversation;
       setConversation(data);
+      trackAppEvent("chat_opened", { conversation_id: data.id }, { page: "chat", target_type: "conversation", target_id: data.id });
       syncChatToBottomAfterRender();
       void loadConversationUsage(data.id);
       const contextResponse = await apiFetch(`/api/agent/conversations/${data.id}/context-sources`);
@@ -279,6 +286,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not start a conversation."));
       const created = (await response.json()) as Conversation;
       setConversation(created);
+      trackAppEvent("chat_started", { conversation_id: created.id }, { page: "chat", target_type: "conversation", target_id: created.id });
       await fetchSummaries();
       await openConversation(created.id);
     } catch (caught) {
@@ -687,6 +695,7 @@ function StylePage() {
         : { source_type: "llm_profile", title: title.trim(), content: content.trim() };
       const response = await apiFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save memory."));
+      trackAppEvent("memory_import_completed", { source_type: importMode === "whatsapp" ? "whatsapp_chat" : "manual_notes" }, { page: "style" });
       setContent(""); setShowImport(false); await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save memory."); }
     finally { setSaving(false); }
@@ -703,6 +712,8 @@ function StylePage() {
     try {
       const response = await apiFetch(`/api/me/profile-facts/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not remove that signal."));
+      const fact = facts.find((row) => row.id === id);
+      trackAppEvent("learned_signal_deleted", { fact_category: fact?.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: id });
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not remove that signal.");
@@ -731,6 +742,8 @@ function StylePage() {
         body: JSON.stringify({ label: editLabel.trim(), status: editStatus, comment: editComment.trim() || null })
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update that signal."));
+      const fact = facts.find((row) => row.id === id);
+      trackAppEvent("learned_signal_edited", { fact_category: fact?.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: id });
       setEditingFactId(null);
       await load();
     } catch (caught) {
@@ -877,8 +890,8 @@ function ProfilePage() {
   const [uploadingPhotoSlot, setUploadingPhotoSlot] = useState<number | null>(null);
   async function load() { const response = await apiFetch("/api/me/profile"); if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load profile.")); const next = await response.json() as ProfileResponse; setData(next); setForm(next.profile || {}); setStatus(""); const requestResponse = await apiFetch("/api/me/data-requests"); if (requestResponse.ok) setDataRequests(((await requestResponse.json()).requests || []) as DataRequest[]); }
   useEffect(() => { load().catch((caught) => setStatus(caught.message)); }, []);
-  async function save(event: FormEvent) { event.preventDefault(); setStatus("Saving profile…"); const response = await apiFetch("/api/me/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.display_name || null, age: Number(form.age), gender: form.gender, interested_in: form.interested_in, city: form.city || null, phone: form.phone || null }) }); if (!response.ok) { setStatus(await apiErrorMessage(response, "Could not save profile.")); return; } setStatus("Profile saved."); await load(); }
-  async function submitDataRequest(requestType: "export" | "deletion") { setSendingRequest(true); setRequestStatus(""); const response = await apiFetch("/api/me/data-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_type: requestType, message: requestType === "deletion" ? "Please delete my account and personal data." : "Please export my account and personal data." }) }); if (!response.ok) { setRequestStatus(await apiErrorMessage(response, "Could not send request.")); setSendingRequest(false); return; } setPendingDataRequest(null); setRequestStatus("Request sent."); setSendingRequest(false); await load(); }
+  async function save(event: FormEvent) { event.preventDefault(); setStatus("Saving profile…"); const response = await apiFetch("/api/me/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.display_name || null, age: Number(form.age), gender: form.gender, interested_in: form.interested_in, city: form.city || null, phone: form.phone || null }) }); if (!response.ok) { setStatus(await apiErrorMessage(response, "Could not save profile.")); return; } trackAppEvent("profile_saved", {}, { page: "profile" }); setStatus("Profile saved."); await load(); }
+  async function submitDataRequest(requestType: "export" | "deletion") { setSendingRequest(true); setRequestStatus(""); const response = await apiFetch("/api/me/data-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_type: requestType, message: requestType === "deletion" ? "Please delete my account and personal data." : "Please export my account and personal data." }) }); if (!response.ok) { setRequestStatus(await apiErrorMessage(response, "Could not send request.")); setSendingRequest(false); return; } trackAppEvent(requestType === "deletion" ? "data_deletion_requested" : "data_export_requested", { request_type: requestType }, { page: "profile" }); setPendingDataRequest(null); setRequestStatus("Request sent."); setSendingRequest(false); await load(); }
   async function upload(file?: File) {
     if (!file) return;
     const slot = photoSlot;

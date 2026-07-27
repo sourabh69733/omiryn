@@ -45,6 +45,7 @@ from storage import (
     list_agent_context_snapshots,
     list_agent_trace_steps,
     list_agent_traces,
+    list_user_app_events,
     list_context_sources,
     list_profile_facts,
     list_whatsapp_chunks,
@@ -2474,6 +2475,66 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.post(
             "/api/me/data-requests",
             json={"request_type": "privacy", "message": "I have a privacy question."},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_auth_required_blocks_anonymous_app_events(self) -> None:
+        with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
+            response = self.client.post(
+                "/api/me/events",
+                json={"events": [{"event_name": "app_opened", "page": "chat"}]},
+            )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Sign in to continue.")
+
+    def test_user_can_batch_create_app_events(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.post(
+            "/api/me/events",
+            json={
+                "events": [
+                    {
+                        "session_id": "session-a",
+                        "event_name": "page_viewed",
+                        "page": "style",
+                        "metadata": {
+                            "page": "style",
+                            "message": "private text should not be stored",
+                        },
+                        "client_created_at": "2026-07-27T10:00:00.000Z",
+                    },
+                    {
+                        "session_id": "session-a",
+                        "event_name": "memory_import_completed",
+                        "page": "style",
+                        "metadata": {"source_type": "manual_notes"},
+                    },
+                ]
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["accepted"], 2)
+        events = list_user_app_events("user-a")
+        self.assertEqual([event["event_name"] for event in events], ["page_viewed", "memory_import_completed"])
+        self.assertEqual(events[0]["metadata"], {"page": "style"})
+        self.assertEqual(events[1]["metadata"], {"source_type": "manual_notes"})
+
+    def test_app_events_only_allow_known_event_names(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.post(
+            "/api/me/events",
+            json={"events": [{"event_name": "message_sent", "page": "chat"}]},
         )
 
         self.assertEqual(response.status_code, 422)
