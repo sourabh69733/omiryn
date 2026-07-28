@@ -2220,7 +2220,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Stop swiping.", response.text)
+        self.assertIn("Find people who fit the way you connect.", response.text)
         self.assertIn("/static/landing.css", response.text)
         self.assertIn("/app", response.text)
 
@@ -2230,6 +2230,29 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="root"></div>', response.text)
         self.assertIn("/app-static/assets/index-", response.text)
+
+    def test_app_contact_route_serves_app_shell(self) -> None:
+        response = self.client.get("/app/contact")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="root"></div>', response.text)
+        self.assertIn("/app-static/assets/index-", response.text)
+
+    def test_public_contact_route_stays_public_contact_page(self) -> None:
+        response = self.client.get("/contact")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Contact Omiryn", response.text)
+        self.assertIn("Write your question or feedback", response.text)
+        self.assertNotIn('<div id="root"></div>', response.text)
+
+    def test_privacy_page_mentions_activity_events_and_feedback(self) -> None:
+        response = self.client.get("/privacy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("in-app activity events", response.text)
+        self.assertIn("community invite requests", response.text)
+        self.assertIn("We do not store full chat message text", response.text)
 
     def test_landing_static_assets_are_served(self) -> None:
         response = self.client.get("/static/landing.css")
@@ -2424,6 +2447,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertFalse(response.json()["auth_required"])
         self.assertTrue(response.json()["auth_gate_required"])
 
+    def test_api_responses_include_request_id(self) -> None:
+        response = self.client.get("/api/auth/config", headers={"X-Request-ID": "request-test-1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["X-Request-ID"], "request-test-1")
+
     def test_auth_required_blocks_anonymous_user_data_routes(self) -> None:
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
             response = self.client.get("/api/agent/conversations")
@@ -2516,16 +2545,27 @@ class AgentSubmissionApiTest(unittest.TestCase):
                         "page": "style",
                         "metadata": {"source_type": "manual_notes"},
                     },
+                    {
+                        "session_id": "session-a",
+                        "event_name": "client_error",
+                        "page": "contact",
+                        "metadata": {
+                            "area": "unhandled_rejection",
+                            "message_code": "failed_to_fetch",
+                            "raw_error": "private stack should not be stored",
+                        },
+                    },
                 ]
             },
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["accepted"], 2)
+        self.assertEqual(response.json()["accepted"], 3)
         events = list_user_app_events("user-a")
-        self.assertEqual([event["event_name"] for event in events], ["page_viewed", "memory_import_completed"])
+        self.assertEqual([event["event_name"] for event in events], ["page_viewed", "memory_import_completed", "client_error"])
         self.assertEqual(events[0]["metadata"], {"page": "style"})
         self.assertEqual(events[1]["metadata"], {"source_type": "manual_notes"})
+        self.assertEqual(events[2]["metadata"], {"area": "unhandled_rejection", "message_code": "failed_to_fetch"})
 
     def test_app_events_only_allow_known_event_names(self) -> None:
         async def signed_in_user() -> CurrentUser:

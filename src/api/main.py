@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+from uuid import uuid4
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.routes import ADMIN_STATIC_DIR, router as admin_router
@@ -26,12 +30,34 @@ app = FastAPI(
     description="AI-assisted matchmaking platform API.",
 )
 
+logger = logging.getLogger(__name__)
+
 
 class NoCacheStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope: dict[str, object]):
         response = await super().get_response(path, scope)
         response.headers["Cache-Control"] = "no-store"
         return response
+
+
+@app.middleware("http")
+async def request_monitoring_middleware(request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "api.unhandled_error request_id=%s method=%s path=%s",
+            request_id,
+            request.method,
+            request.url.path,
+        )
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Something went wrong.", "request_id": request_id},
+        )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 app.mount("/app-static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app-static")
