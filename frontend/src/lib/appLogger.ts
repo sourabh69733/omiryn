@@ -11,6 +11,9 @@ type AppEventName =
   | "learned_signal_deleted"
   | "data_export_requested"
   | "data_deletion_requested"
+  | "feedback_opened"
+  | "feedback_submitted"
+  | "community_invite_requested"
   | "client_error";
 
 type AppEventMetadata = Record<string, string | number | boolean | null | undefined>;
@@ -133,6 +136,7 @@ function sessionId() {
 
 function currentPage() {
   const path = window.location.pathname;
+  if (path.startsWith("/app/contact")) return "contact";
   if (path.startsWith("/style")) return "style";
   if (path.startsWith("/matches")) return "matches";
   if (path.startsWith("/profile")) return "profile";
@@ -148,6 +152,8 @@ function safeMetadata(metadata: AppEventMetadata) {
     "area",
     "message_code",
     "page",
+    "category",
+    "channel",
   ]);
   return Object.fromEntries(
     Object.entries(metadata)

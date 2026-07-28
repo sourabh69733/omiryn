@@ -46,6 +46,7 @@ from storage import (
     list_agent_trace_steps,
     list_agent_traces,
     list_user_app_events,
+    list_user_feedback_submissions,
     list_context_sources,
     list_profile_facts,
     list_whatsapp_chunks,
@@ -2538,6 +2539,76 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 422)
+
+    def test_auth_required_blocks_anonymous_feedback(self) -> None:
+        with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
+            response = self.client.post(
+                "/api/me/feedback",
+                json={"category": "feedback", "message": "This is useful feedback."},
+            )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Sign in to continue.")
+
+    def test_user_can_submit_feedback(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.post(
+            "/api/me/feedback",
+            json={
+                "category": "bug",
+                "message": "The contact page button alignment looks off on mobile.",
+                "allow_contact": True,
+                "metadata": {"page": "contact", "source": "app_contact_page", "message": "drop me"},
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        submission = response.json()["submission"]
+        self.assertEqual(submission["user_id"], "user-a")
+        self.assertEqual(submission["email"], "a@example.com")
+        self.assertEqual(submission["category"], "bug")
+        self.assertEqual(submission["status"], "open")
+        self.assertEqual(submission["metadata"], {"page": "contact", "source": "app_contact_page"})
+        self.assertEqual(list_user_feedback_submissions("user-a")[0]["id"], submission["id"])
+
+    def test_feedback_rejects_invalid_category_and_short_message(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        invalid_category = self.client.post(
+            "/api/me/feedback",
+            json={"category": "community", "message": "This message is long enough."},
+        )
+        short_message = self.client.post(
+            "/api/me/feedback",
+            json={"category": "feedback", "message": "Too short"},
+        )
+
+        self.assertEqual(invalid_category.status_code, 422)
+        self.assertEqual(short_message.status_code, 422)
+
+    def test_user_can_request_community_invite(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
+
+        response = self.client.post(
+            "/api/me/community-invites",
+            json={"channel": "whatsapp", "metadata": {"page": "contact"}},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        invite = response.json()["request"]
+        self.assertEqual(invite["category"], "support")
+        self.assertEqual(invite["metadata"]["request_type"], "community_invite")
+        self.assertEqual(invite["metadata"]["channel"], "whatsapp")
 
     def test_conversation_can_store_selected_model(self) -> None:
         response = self.client.post(
