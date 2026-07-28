@@ -45,11 +45,26 @@ export function initAppLogger() {
   initialized = true;
   loadQueue();
   trackAppEvent("app_opened", { page: currentPage() });
+  initClientErrorMonitoring();
   scheduleFlush();
   window.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") void flushAppEvents();
   });
   window.addEventListener("pagehide", () => void flushAppEvents());
+}
+
+function initClientErrorMonitoring() {
+  window.addEventListener("error", (event) => {
+    trackClientError("window_error", errorCode(event.message || "unknown_error"));
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    trackClientError("unhandled_rejection", errorCode(rejectionReason(event.reason)));
+  });
+}
+
+function trackClientError(area: string, messageCode: string) {
+  trackAppEvent("client_error", { area, message_code: messageCode }, { page: currentPage() });
+  void flushAppEvents();
 }
 
 export function trackPageView(page: string) {
@@ -160,4 +175,21 @@ function safeMetadata(metadata: AppEventMetadata) {
       .filter(([key]) => allowedKeys.has(key))
       .map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 160) : value ?? null]),
   );
+}
+
+function rejectionReason(reason: unknown) {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "string") return reason;
+  return "unhandled_rejection";
+}
+
+function errorCode(message: string) {
+  const normalized = message
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, "url")
+    .replace(/['"`].*?['"`]/g, "value")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+  return normalized || "unknown_error";
 }
