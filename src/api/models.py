@@ -9,6 +9,8 @@ AgentTone = Literal["auto", "casual", "warm", "formal", "direct", "playful"]
 AgentMessageFeedbackRating = Literal["good", "off", "bad", "harmful"]
 DataPointFeedbackRating = Literal["agree", "disagree"]
 DataRequestType = Literal["export", "deletion"]
+FeedbackCategory = Literal["feedback", "bug", "support", "privacy", "safety"]
+CommunityChannel = Literal["whatsapp", "discord"]
 AppEventName = Literal[
     "app_opened",
     "page_viewed",
@@ -20,6 +22,9 @@ AppEventName = Literal[
     "learned_signal_deleted",
     "data_export_requested",
     "data_deletion_requested",
+    "feedback_opened",
+    "feedback_submitted",
+    "community_invite_requested",
     "client_error",
 ]
 ContextSourceType = Literal[
@@ -120,6 +125,20 @@ class AppEventCreate(BaseModel):
 
 class AppEventsBatchCreate(BaseModel):
     events: list[AppEventCreate] = Field(min_length=1, max_length=25)
+
+
+class FeedbackSubmissionCreate(BaseModel):
+    category: FeedbackCategory = "feedback"
+    message: str = Field(min_length=10, max_length=4000)
+    allow_contact: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CommunityInviteRequestCreate(BaseModel):
+    channel: CommunityChannel
+    message: str | None = Field(default=None, max_length=500)
+    allow_contact: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentConversation(BaseModel):

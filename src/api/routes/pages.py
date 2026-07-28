@@ -54,6 +54,11 @@ def app_shell() -> FileResponse:
     return FileResponse(FRONTEND_DIST_DIR / "index.html", headers=APP_SHELL_HEADERS)
 
 
+@router.get("/app/contact")
+def app_contact_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIST_DIR / "index.html", headers=APP_SHELL_HEADERS)
+
+
 @router.get("/app-react")
 def react_app_preview() -> FileResponse:
     return FileResponse(FRONTEND_DIST_DIR / "index.html", headers=APP_SHELL_HEADERS)

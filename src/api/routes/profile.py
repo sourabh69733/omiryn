@@ -16,6 +16,7 @@ from storage import (
     list_user_context_sources,
     save_data_request,
     save_data_point_feedback,
+    save_feedback_submission,
     save_user_profile,
     update_profile_fact_user_correction,
 )
@@ -41,9 +42,11 @@ from ..helpers import (
 )
 from ..models import (
     AppEventsBatchCreate,
+    CommunityInviteRequestCreate,
     DataPointFeedbackCreate,
     DataRequestCreate,
     DatingBasics,
+    FeedbackSubmissionCreate,
     ProfileFactPatch,
     UserProfilePatch,
 )
@@ -58,6 +61,8 @@ _APP_EVENT_METADATA_ALLOWLIST = {
     "area",
     "message_code",
     "page",
+    "category",
+    "channel",
 }
 
 
@@ -227,6 +232,62 @@ def _safe_app_event_metadata(metadata: dict[str, object]) -> dict[str, object]:
             safe[key] = value[:160]
         elif isinstance(value, (bool, int, float)):
             safe[key] = value
+    return safe
+
+
+@router.post("/api/me/feedback", status_code=201)
+async def create_me_feedback(
+    payload: FeedbackSubmissionCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    submission = save_feedback_submission(
+        {
+            "user_id": user.id,
+            "email": user.email,
+            "category": payload.category,
+            "message": payload.message,
+            "allow_contact": payload.allow_contact,
+            "status": "open",
+            "metadata": _safe_feedback_metadata(payload.metadata),
+        }
+    )
+    return {"submission": submission}
+
+
+@router.post("/api/me/community-invites", status_code=201)
+async def create_me_community_invite(
+    payload: CommunityInviteRequestCreate,
+    user: CurrentUser | None = Depends(current_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    message = payload.message or f"Please review me for a {payload.channel} community invite."
+    submission = save_feedback_submission(
+        {
+            "user_id": user.id,
+            "email": user.email,
+            "category": "support",
+            "message": message,
+            "allow_contact": payload.allow_contact,
+            "status": "open",
+            "metadata": {
+                **_safe_feedback_metadata(payload.metadata),
+                "request_type": "community_invite",
+                "channel": payload.channel,
+            },
+        }
+    )
+    return {"request": submission}
+
+
+def _safe_feedback_metadata(metadata: dict[str, object]) -> dict[str, object]:
+    safe: dict[str, object] = {}
+    for key in ("page", "source", "channel"):
+        value = metadata.get(key)
+        if isinstance(value, str):
+            safe[key] = value[:160]
     return safe
 
 
