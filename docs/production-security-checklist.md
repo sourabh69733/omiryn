@@ -1,6 +1,6 @@
 # Omiryn Production Security Checklist
 
-Last updated: July 26, 2026
+Last updated: July 28, 2026
 
 This checklist tracks the privacy and security layer required before a real public launch.
 
@@ -22,8 +22,10 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] WhatsApp import requires user permission and states Omiryn will not message contacts.
 - [x] Profile form explains how profile details are used.
 - [x] Add direct "Request data deletion" action in account settings.
+- [x] Store signed-in export/deletion requests in the database.
 - [x] Add learned-signal delete control.
-- [ ] Add learned-signal correction/edit controls.
+- [x] Add learned-signal correction/edit controls.
+- [x] Add signed-in Contact page for feedback, support, privacy, safety, and community invite requests.
 
 ## Auth And Access Control
 
@@ -39,6 +41,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Daily backups are enabled.
 - [ ] Restore process is tested.
 - [ ] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, and public leads where applicable.
+- [ ] Add admin/internal view for deletion and export requests.
 - [ ] Raw sensitive content is not written to application logs.
 
 ## Abuse Protection
@@ -54,15 +57,15 @@ This checklist tracks the privacy and security layer required before a real publ
 
 ## Monitoring
 
-- [ ] Add error tracking.
-- [ ] Add request IDs.
+- [x] Add first-party client error event capture.
+- [x] Add request IDs.
 - [ ] Monitor auth failures, chat failures, lead capture failures, and import failures.
 - [ ] Monitor LLM provider rate limits and costs.
 
 ## Launch Gate
 
-- [ ] `npm run frontend:check` passes.
-- [ ] `npm run frontend:build` passes.
-- [ ] Backend tests pass.
+- [x] `npm run frontend:check` passes.
+- [x] `npm run frontend:build` passes.
+- [x] Backend tests pass.
 - [ ] Public pages render on mobile and desktop.
 - [ ] Sign-in, chat, memory import, deletion request, and contact flows are manually tested.
