@@ -110,6 +110,7 @@ variable "runtime_env" {
   description = "Non-secret Cloud Run environment variables."
   type        = map(string)
   default = {
+    APP_ENV                    = "production"
     AUTH_PROVIDER              = "supabase"
     AUTH_REQUIRED              = "true"
     DB_DISABLE_POOL            = "true"
