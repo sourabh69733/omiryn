@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.routes import ADMIN_STATIC_DIR, router as admin_router
-from security.auth import current_user
+from security.auth import current_user, validate_production_security_config
 from storage import init_db
 
 from .config import (
@@ -79,6 +79,7 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 def startup() -> None:
+    validate_production_security_config()
     init_db()
 
 
