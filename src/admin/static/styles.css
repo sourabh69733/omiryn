@@ -917,6 +917,105 @@ td small {
   white-space: nowrap;
 }
 
+.request-metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+}
+
+.request-list {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.request-public-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.request-public-grid .request-list {
+  align-content: start;
+  padding: 0;
+}
+
+.request-public-grid .table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.request-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.request-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.request-card-head div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.request-card-head strong {
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.request-card-head small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.request-message {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.request-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.request-meta-row span:not(.status-pill) {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #f8faf9;
+  font-size: 11px;
+  font-weight: 560;
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+}
+
+.metadata-line {
+  max-width: 360px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .table-empty {
   padding: 22px;
   color: var(--muted);
@@ -971,6 +1070,22 @@ td small {
   background: #e9f7f1;
 }
 
+.status-pill.feedback,
+.status-pill.invite,
+.status-pill.contact_form_submit,
+.status-pill.contact_form_focus,
+.status-pill.contact_form_success {
+  border-color: #c6d8e6;
+  color: #376178;
+  background: #eef7fb;
+}
+
+.status-pill.client_error {
+  border-color: #e5b8b4;
+  color: var(--danger);
+  background: #fff4f1;
+}
+
 .status-pill.rating-off {
   border-color: #d9ca8f;
   color: #756223;
@@ -1016,6 +1131,15 @@ td small {
   .dashboard-insights,
   .usage-panels {
     grid-template-columns: 1fr;
+  }
+
+  .request-public-grid {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .request-list {
+    padding: 14px;
   }
 
   .bar-chart {

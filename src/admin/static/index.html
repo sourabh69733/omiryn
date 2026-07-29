@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Omiryn Admin</title>
-    <link rel="stylesheet" href="/admin/static/styles.css?v=20260703-model-usage" />
+    <link rel="stylesheet" href="/admin/static/styles.css?v=20260729-admin-requests" />
   </head>
   <body>
     <div class="admin-shell">
@@ -19,6 +19,7 @@
         <nav class="admin-nav" aria-label="Admin sections">
           <a href="/admin" data-route="dashboard">Dashboard</a>
           <a href="/admin/users" data-route="users">Users</a>
+          <a href="/admin/requests" data-route="requests">Requests</a>
           <a href="/admin/usage" data-route="usage">Usage</a>
         </nav>
         <button id="refresh-admin" type="button">Refresh</button>
@@ -298,8 +299,134 @@
             </section>
           </div>
         </section>
+
+        <section class="admin-requests-dashboard" data-section="requests">
+          <div class="usage-grid request-metric-grid" id="request-grid">
+            <article class="metric-card">
+              <span>Feedback</span>
+              <strong id="request-feedback-count">0</strong>
+              <small>Signed-in feedback and support messages</small>
+            </article>
+            <article class="metric-card">
+              <span>Invite Requests</span>
+              <strong id="request-invite-count">0</strong>
+              <small>WhatsApp and Discord review queue</small>
+            </article>
+            <article class="metric-card">
+              <span>Data Requests</span>
+              <strong id="request-data-count">0</strong>
+              <small id="request-data-detail">0 open</small>
+            </article>
+            <article class="metric-card">
+              <span>Client Errors</span>
+              <strong id="request-error-count">0</strong>
+              <small>App-side error events</small>
+            </article>
+            <article class="metric-card">
+              <span>Public Leads</span>
+              <strong id="request-public-lead-count">0</strong>
+              <small>Public contact form submissions</small>
+            </article>
+            <article class="metric-card">
+              <span>App Events</span>
+              <strong id="request-app-event-count">0</strong>
+              <small>Signed-in activity events</small>
+            </article>
+          </div>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Contact</p>
+                <h2>Feedback and community requests</h2>
+              </div>
+            </div>
+            <div class="request-list" id="admin-feedback-submissions">
+              <div class="table-empty">Loading feedback...</div>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Account Data</p>
+                <h2>Export and deletion requests</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Message</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-data-requests">
+                  <tr><td colspan="5">Loading data requests...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">App Activity</p>
+                <h2>Recent signed-in events</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Event</th>
+                    <th>User</th>
+                    <th>Page</th>
+                    <th>Metadata</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-app-events">
+                  <tr><td colspan="5">Loading app events...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Public Site</p>
+                <h2>Public contacts and page events</h2>
+              </div>
+            </div>
+            <div class="request-public-grid">
+              <div class="request-list" id="admin-public-leads">
+                <div class="table-empty">Loading public contacts...</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Event</th>
+                      <th>Path</th>
+                      <th>Metadata</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-public-events">
+                    <tr><td colspan="4">Loading public events...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </section>
       </main>
     </div>
-    <script src="/admin/static/app.js?v=20260703-model-usage"></script>
+    <script src="/admin/static/app.js?v=20260729-admin-requests"></script>
   </body>
 </html>

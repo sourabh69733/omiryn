@@ -18,10 +18,15 @@ from storage import (
     agent_eval_runs,
     agent_message_feedback,
     agent_usage_events,
+    app_events,
     conversation_context_sources,
+    data_requests,
     data_point_extraction_debug,
     draft_profiles,
+    feedback_submissions,
     profile_facts,
+    public_events,
+    public_leads,
     summarize_agent_usage,
     user_profiles,
 )
@@ -85,10 +90,87 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
         ],
         "recent_drafts": [_draft_summary(row) for row in snapshot["draft_rows"][:limit]],
         "recent_usage_events": usage_events[:limit],
+        "recent_feedback_submissions": [
+            _feedback_submission_detail(row)
+            for row in snapshot["feedback_submission_rows"][:limit]
+        ],
+        "recent_data_requests": [
+            _data_request_detail(row)
+            for row in snapshot["data_request_rows"][:limit]
+        ],
+        "recent_app_events": [
+            _app_event_detail(row)
+            for row in snapshot["app_event_rows"][:limit]
+        ],
+        "recent_public_leads": [
+            _public_lead_detail(row)
+            for row in snapshot["public_lead_rows"][:limit]
+        ],
+        "recent_public_events": [
+            _public_event_detail(row)
+            for row in snapshot["public_event_rows"][:limit]
+        ],
         "recent_eval_runs": [
             _eval_run_detail(row, snapshot["eval_case_rows"])
             for row in snapshot["eval_run_rows"][:limit]
         ],
+    }
+
+
+def admin_requests(limit: int = 100) -> dict[str, Any]:
+    limit = max(1, min(limit, 200))
+    snapshot = _load_admin_snapshot()
+    feedback = [
+        _feedback_submission_detail(row)
+        for row in snapshot["feedback_submission_rows"][:limit]
+    ]
+    data = [_data_request_detail(row) for row in snapshot["data_request_rows"][:limit]]
+    app_activity = [_app_event_detail(row) for row in snapshot["app_event_rows"][:limit]]
+    public_leads = [_public_lead_detail(row) for row in snapshot["public_lead_rows"][:limit]]
+    public_activity = [_public_event_detail(row) for row in snapshot["public_event_rows"][:limit]]
+    invite_requests = [
+        row
+        for row in feedback
+        if (row.get("metadata") or {}).get("request_type") == "community_invite"
+    ]
+    feedback_messages = [
+        row
+        for row in feedback
+        if (row.get("metadata") or {}).get("request_type") != "community_invite"
+    ]
+    client_errors = [row for row in app_activity if row.get("event_name") == "client_error"]
+    return {
+        "summary": {
+            "feedback_submission_count": len(snapshot["feedback_submission_rows"]),
+            "feedback_message_count": sum(
+                1
+                for row in snapshot["feedback_submission_rows"]
+                if (row["metadata_json"] or {}).get("request_type") != "community_invite"
+            ),
+            "community_invite_count": sum(
+                1
+                for row in snapshot["feedback_submission_rows"]
+                if (row["metadata_json"] or {}).get("request_type") == "community_invite"
+            ),
+            "data_request_count": len(snapshot["data_request_rows"]),
+            "open_data_request_count": sum(
+                1 for row in snapshot["data_request_rows"] if row["status"] == "open"
+            ),
+            "app_event_count": len(snapshot["app_event_rows"]),
+            "client_error_count": sum(
+                1 for row in snapshot["app_event_rows"] if row["event_name"] == "client_error"
+            ),
+            "public_lead_count": len(snapshot["public_lead_rows"]),
+            "public_event_count": len(snapshot["public_event_rows"]),
+        },
+        "feedback": feedback,
+        "feedback_messages": feedback_messages,
+        "community_invites": invite_requests,
+        "data_requests": data,
+        "app_events": app_activity,
+        "client_errors": client_errors,
+        "public_leads": public_leads,
+        "public_events": public_activity,
     }
 
 
@@ -323,6 +405,21 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
             ).mappings().all(),
             "usage_rows": connection.execute(
                 select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
+            ).mappings().all(),
+            "feedback_submission_rows": connection.execute(
+                select(feedback_submissions).order_by(feedback_submissions.c.created_at.desc())
+            ).mappings().all(),
+            "data_request_rows": connection.execute(
+                select(data_requests).order_by(data_requests.c.created_at.desc())
+            ).mappings().all(),
+            "app_event_rows": connection.execute(
+                select(app_events).order_by(app_events.c.created_at.desc())
+            ).mappings().all(),
+            "public_lead_rows": connection.execute(
+                select(public_leads).order_by(public_leads.c.created_at.desc())
+            ).mappings().all(),
+            "public_event_rows": connection.execute(
+                select(public_events).order_by(public_events.c.created_at.desc())
             ).mappings().all(),
         }
 
@@ -938,6 +1035,90 @@ def _feedback_message_preview(conversation: Any | None, message_index: int) -> s
     if not content:
         return None
     return content[:180] + ("..." if len(content) > 180 else "")
+
+
+def _feedback_submission_detail(row: Any) -> dict[str, Any]:
+    metadata = row["metadata_json"] or {}
+    message = str(row["message"] or "").strip()
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "email": row["email"],
+        "category": row["category"],
+        "message": message,
+        "message_preview": _clip_text(message, 220),
+        "allow_contact": row["allow_contact"],
+        "status": row["status"],
+        "metadata": metadata,
+        "request_type": metadata.get("request_type") if isinstance(metadata, dict) else None,
+        "channel": metadata.get("channel") if isinstance(metadata, dict) else None,
+        "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _data_request_detail(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "email": row["email"],
+        "request_type": row["request_type"],
+        "status": row["status"],
+        "message": row["message"],
+        "metadata": row["metadata_json"] or {},
+        "created_at": _isoformat_utc(row["created_at"]),
+        "updated_at": _isoformat_utc(row["updated_at"]),
+    }
+
+
+def _app_event_detail(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "session_id": row["session_id"],
+        "event_name": row["event_name"],
+        "page": row["page"],
+        "target_type": row["target_type"],
+        "target_id": row["target_id"],
+        "metadata": row["metadata_json"] or {},
+        "client_created_at": row["client_created_at"],
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _public_lead_detail(row: Any) -> dict[str, Any]:
+    message = str(row["message"] or "").strip()
+    return {
+        "id": row["id"],
+        "session_id": row["session_id"],
+        "name": row["name"],
+        "contact": row["contact"],
+        "channel": row["channel"],
+        "intent": row["intent"],
+        "message": message,
+        "message_preview": _clip_text(message, 220),
+        "metadata": row["metadata_json"] or {},
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _public_event_detail(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "session_id": row["session_id"],
+        "event_name": row["event_name"],
+        "path": row["path"],
+        "referrer": row["referrer"],
+        "metadata": row["metadata_json"] or {},
+        "created_at": _isoformat_utc(row["created_at"]),
+    }
+
+
+def _clip_text(value: str, limit: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
 
 
 def _conversation_messages(row: Any) -> list[dict[str, Any]]:

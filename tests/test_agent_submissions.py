@@ -55,10 +55,15 @@ from storage import (
     list_whatsapp_people,
     list_whatsapp_style_profiles,
     reset_db,
+    save_app_events,
     save_data_point_extraction_debug,
     save_data_point_feedback,
+    save_data_request,
     save_agent_message_feedback,
     save_agent_usage_event,
+    save_feedback_submission,
+    save_public_event,
+    save_public_lead,
     upsert_profile_fact,
 )
 
@@ -2070,6 +2075,91 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["limits"]["groq_rpm"], 30)
         self.assertEqual(data["limits"]["groq_tpm"], 6000)
 
+    def test_admin_requests_dashboard_shows_collected_requests_and_activity(self) -> None:
+        save_feedback_submission(
+            {
+                "user_id": "user-a",
+                "email": "a@example.com",
+                "category": "feedback",
+                "message": "The contact page is clear, but onboarding needs one more hint.",
+                "allow_contact": True,
+                "metadata": {"page": "/app/contact"},
+            }
+        )
+        save_feedback_submission(
+            {
+                "user_id": "user-a",
+                "email": "a@example.com",
+                "category": "community",
+                "message": "Please review me for the Discord group.",
+                "allow_contact": True,
+                "metadata": {"request_type": "community_invite", "channel": "discord"},
+            }
+        )
+        save_data_request(
+            {
+                "user_id": "user-a",
+                "email": "a@example.com",
+                "request_type": "export",
+                "message": "Send me my account export.",
+            }
+        )
+        save_app_events(
+            "user-a",
+            [
+                {
+                    "session_id": "session-a",
+                    "event_name": "page_view",
+                    "page": "/app/contact",
+                    "metadata": {"source": "nav"},
+                },
+                {
+                    "session_id": "session-a",
+                    "event_name": "client_error",
+                    "page": "/app/contact",
+                    "metadata": {"area": "feedback_submit", "message_code": "network_error"},
+                },
+            ],
+        )
+        save_public_lead(
+            {
+                "session_id": "visitor-a",
+                "name": "Visitor",
+                "contact": "visitor@example.com",
+                "channel": "email",
+                "intent": "feedback",
+                "message": "I want to share feedback before signing in.",
+            }
+        )
+        save_public_event(
+            {
+                "session_id": "visitor-a",
+                "event_name": "contact_form_submit",
+                "path": "/contact",
+                "metadata": {"intent": "feedback"},
+            }
+        )
+
+        response = self.client.get("/api/admin/requests?limit=20")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["summary"]["feedback_submission_count"], 2)
+        self.assertEqual(data["summary"]["feedback_message_count"], 1)
+        self.assertEqual(data["summary"]["community_invite_count"], 1)
+        self.assertEqual(data["summary"]["data_request_count"], 1)
+        self.assertEqual(data["summary"]["open_data_request_count"], 1)
+        self.assertEqual(data["summary"]["app_event_count"], 2)
+        self.assertEqual(data["summary"]["client_error_count"], 1)
+        self.assertEqual(data["summary"]["public_lead_count"], 1)
+        self.assertEqual(data["summary"]["public_event_count"], 1)
+        self.assertEqual(data["feedback_messages"][0]["metadata"]["page"], "/app/contact")
+        self.assertEqual(data["community_invites"][0]["channel"], "discord")
+        self.assertEqual(data["data_requests"][0]["request_type"], "export")
+        self.assertEqual(data["client_errors"][0]["metadata"]["message_code"], "network_error")
+        self.assertEqual(data["public_leads"][0]["contact"], "visitor@example.com")
+        self.assertEqual(data["public_events"][0]["path"], "/contact")
+
     def test_admin_user_detail_filters_user_report_data(self) -> None:
         async def user_a() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -2214,7 +2304,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Omiryn Admin", response.text)
+        self.assertIn('/admin/requests" data-route="requests"', response.text)
         self.assertIn("/admin/static/app.js", response.text)
+
+        requests_response = self.client.get("/admin/requests")
+        self.assertEqual(requests_response.status_code, 200)
+        self.assertIn("Omiryn Admin", requests_response.text)
+        self.assertIn("admin-requests-dashboard", requests_response.text)
 
     def test_root_serves_landing_page(self) -> None:
         response = self.client.get("/")

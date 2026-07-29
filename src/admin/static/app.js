@@ -9,7 +9,8 @@ const state = {
   feedbackPage: 1,
   feedbackPerPage: 5,
   dataPointReviewPage: 1,
-  dataPointReviewPerPage: 5
+  dataPointReviewPerPage: 5,
+  requests: null
 };
 
 const statusEl = document.querySelector("#admin-status");
@@ -43,6 +44,20 @@ const rateLimitGrid = document.querySelector("#rate-limit-grid");
 const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
 const usageEvents = document.querySelector("#usage-events");
 const usageTableRowLimit = 20;
+const requestMetrics = {
+  feedback: document.querySelector("#request-feedback-count"),
+  invites: document.querySelector("#request-invite-count"),
+  data: document.querySelector("#request-data-count"),
+  dataDetail: document.querySelector("#request-data-detail"),
+  errors: document.querySelector("#request-error-count"),
+  publicLeads: document.querySelector("#request-public-lead-count"),
+  appEvents: document.querySelector("#request-app-event-count")
+};
+const requestFeedbackSubmissions = document.querySelector("#admin-feedback-submissions");
+const requestDataRequests = document.querySelector("#admin-data-requests");
+const requestAppEvents = document.querySelector("#admin-app-events");
+const requestPublicLeads = document.querySelector("#admin-public-leads");
+const requestPublicEvents = document.querySelector("#admin-public-events");
 
 const metrics = {
   users: document.querySelector("#metric-users"),
@@ -65,6 +80,7 @@ const tables = {
 
 function routeName() {
   if (window.location.pathname === "/admin/users") return "users";
+  if (window.location.pathname === "/admin/requests") return "requests";
   if (window.location.pathname === "/admin/usage") return "usage";
   return "dashboard";
 }
@@ -84,6 +100,7 @@ function configureRoute() {
   const titles = {
     dashboard: ["Dashboard", "Live view of users and product health."],
     users: ["Users", "Track every user profile, onboarding session, and learned signal."],
+    requests: ["Requests", "Review feedback, contacts, invite requests, data requests, and app events."],
     usage: ["Usage", "Track agent model calls, tokens, failures, and cost."]
   };
   const [title, subtitle] = titles[state.route] || titles.dashboard;
@@ -103,6 +120,9 @@ async function loadAdminOverview() {
     }
     state.data = data;
     renderDashboard(data);
+    if (state.route === "requests") {
+      await loadRequestsDashboard();
+    }
     if (state.route === "usage") {
       await loadUsageDashboard();
     }
@@ -1231,6 +1251,194 @@ function renderUsageEvents(events) {
     .join("");
 }
 
+async function loadRequestsDashboard() {
+  if (!requestFeedbackSubmissions) return;
+
+  requestFeedbackSubmissions.innerHTML = '<div class="table-empty">Loading feedback...</div>';
+  if (requestDataRequests) {
+    requestDataRequests.innerHTML = '<tr><td colspan="5">Loading data requests...</td></tr>';
+  }
+  if (requestAppEvents) {
+    requestAppEvents.innerHTML = '<tr><td colspan="5">Loading app events...</td></tr>';
+  }
+  if (requestPublicLeads) {
+    requestPublicLeads.innerHTML = '<div class="table-empty">Loading public contacts...</div>';
+  }
+  if (requestPublicEvents) {
+    requestPublicEvents.innerHTML = '<tr><td colspan="4">Loading public events...</td></tr>';
+  }
+
+  try {
+    const response = await fetch("/api/admin/requests?limit=100", {
+      headers: { Accept: "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load requests."));
+    }
+    state.requests = data;
+    renderRequestsDashboard(data);
+  } catch (error) {
+    renderRequestsError(error.message);
+    setStatus(error.message);
+  }
+}
+
+function renderRequestsDashboard(data) {
+  const summary = data.summary || {};
+  const feedbackAndInvites = [
+    ...(data.feedback_messages || []),
+    ...(data.community_invites || [])
+  ].sort((first, second) => new Date(second.created_at || 0) - new Date(first.created_at || 0));
+
+  renderRequestMetrics(summary);
+  renderFeedbackSubmissions(feedbackAndInvites);
+  renderDataRequests(data.data_requests || []);
+  renderAppEvents(data.app_events || []);
+  renderPublicLeads(data.public_leads || []);
+  renderPublicEvents(data.public_events || []);
+}
+
+function renderRequestMetrics(summary) {
+  setText(requestMetrics.feedback, formatNumber(summary.feedback_message_count || 0));
+  setText(requestMetrics.invites, formatNumber(summary.community_invite_count || 0));
+  setText(requestMetrics.data, formatNumber(summary.data_request_count || 0));
+  setText(requestMetrics.dataDetail, `${formatNumber(summary.open_data_request_count || 0)} open`);
+  setText(requestMetrics.errors, formatNumber(summary.client_error_count || 0));
+  setText(requestMetrics.publicLeads, formatNumber(summary.public_lead_count || 0));
+  setText(requestMetrics.appEvents, formatNumber(summary.app_event_count || 0));
+}
+
+function renderFeedbackSubmissions(rows) {
+  if (!requestFeedbackSubmissions) return;
+  if (!rows.length) {
+    requestFeedbackSubmissions.innerHTML = '<div class="table-empty">No feedback or invite requests yet.</div>';
+    return;
+  }
+  requestFeedbackSubmissions.innerHTML = rows.map(renderRequestCard).join("");
+}
+
+function renderRequestCard(item) {
+  const metadata = item.metadata || {};
+  const requestType = metadata.request_type === "community_invite" ? "invite" : "feedback";
+  const channel = metadata.channel || item.category || "feedback";
+  const allowContact = item.allow_contact ? "Contact allowed" : "No contact permission";
+  const userLine = [
+    item.email || "No email",
+    item.user_id ? `user ${shortId(item.user_id)}` : ""
+  ].filter(Boolean).join(" · ");
+  const message = item.message_preview || item.message || "";
+  return `
+    <article class="request-card">
+      <div class="request-card-head">
+        <div>
+          <span class="status-pill ${escapeHtml(requestType)}">${escapeHtml(requestTypeLabel(item))}</span>
+          <strong>${escapeHtml(titleize(channel))}</strong>
+        </div>
+        <small>${formatDate(item.created_at)}</small>
+      </div>
+      <p class="request-message">${escapeHtml(message || "No message provided.")}</p>
+      <div class="request-meta-row">
+        <span>${escapeHtml(userLine || "-")}</span>
+        <span>${escapeHtml(allowContact)}</span>
+        <span>${statusPill(item.status)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderDataRequests(rows) {
+  if (!requestDataRequests) return;
+  if (!rows.length) {
+    requestDataRequests.innerHTML = emptyRow(5, "No export or deletion requests yet.");
+    return;
+  }
+  requestDataRequests.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${statusPill(row.request_type)}</td>
+      <td>${escapeHtml(row.email || "-")}<small class="mono">${escapeHtml(row.user_id || "-")}</small></td>
+      <td>${statusPill(row.status)}</td>
+      <td>${escapeHtml(row.message_preview || row.message || "-")}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderAppEvents(rows) {
+  if (!requestAppEvents) return;
+  if (!rows.length) {
+    requestAppEvents.innerHTML = emptyRow(5, "No app events logged yet.");
+    return;
+  }
+  requestAppEvents.innerHTML = rows.slice(0, 40).map((row) => `
+    <tr>
+      <td>${statusPill(row.event_name)}</td>
+      <td class="mono">${escapeHtml(row.user_id || "-")}<small>${escapeHtml(row.session_id || "")}</small></td>
+      <td>${escapeHtml(row.page || "-")}<small>${escapeHtml([row.target_type, row.target_id].filter(Boolean).join(" · "))}</small></td>
+      <td class="metadata-line">${escapeHtml(metadataSummary(row.metadata))}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderPublicLeads(rows) {
+  if (!requestPublicLeads) return;
+  if (!rows.length) {
+    requestPublicLeads.innerHTML = '<div class="table-empty">No public contact submissions yet.</div>';
+    return;
+  }
+  requestPublicLeads.innerHTML = rows.slice(0, 20).map((row) => `
+    <article class="request-card public-lead-card">
+      <div class="request-card-head">
+        <div>
+          <span class="status-pill">${escapeHtml(titleize(row.intent || "lead"))}</span>
+          <strong>${escapeHtml(row.name || row.contact || "Anonymous")}</strong>
+        </div>
+        <small>${formatDate(row.created_at)}</small>
+      </div>
+      <p class="request-message">${escapeHtml(row.message_preview || row.message || "No message provided.")}</p>
+      <div class="request-meta-row">
+        <span>${escapeHtml(row.contact || "-")}</span>
+        <span>${escapeHtml(titleize(row.channel || "email"))}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPublicEvents(rows) {
+  if (!requestPublicEvents) return;
+  if (!rows.length) {
+    requestPublicEvents.innerHTML = emptyRow(4, "No public page events yet.");
+    return;
+  }
+  requestPublicEvents.innerHTML = rows.slice(0, 40).map((row) => `
+    <tr>
+      <td>${statusPill(row.event_name)}</td>
+      <td>${escapeHtml(row.path || "/")}<small>${escapeHtml(row.referrer || "")}</small></td>
+      <td class="metadata-line">${escapeHtml(metadataSummary(row.metadata))}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderRequestsError(message) {
+  if (requestFeedbackSubmissions) {
+    requestFeedbackSubmissions.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (requestDataRequests) {
+    requestDataRequests.innerHTML = emptyRow(5, message);
+  }
+  if (requestAppEvents) {
+    requestAppEvents.innerHTML = emptyRow(5, message);
+  }
+  if (requestPublicLeads) {
+    requestPublicLeads.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (requestPublicEvents) {
+    requestPublicEvents.innerHTML = emptyRow(4, message);
+  }
+}
+
 function renderError(message) {
   tables.users.innerHTML = emptyRow(9, message);
   if (providerList) {
@@ -1239,6 +1447,7 @@ function renderError(message) {
   if (usageEvents) {
     usageEvents.innerHTML = emptyRow(6, message);
   }
+  renderRequestsError(message);
 }
 
 function statusPill(value) {
@@ -1266,6 +1475,28 @@ function usageKindLabel(kind) {
     match_snapshot_generate: "Match snapshot"
   };
   return labels[kind] || titleize(String(kind || "API call").replaceAll("_", " "));
+}
+
+function requestTypeLabel(item) {
+  const metadata = item.metadata || {};
+  if (metadata.request_type === "community_invite") {
+    return `${titleize(metadata.channel || "community")} invite`;
+  }
+  return titleize(item.category || "feedback");
+}
+
+function metadataSummary(metadata) {
+  if (!metadata || typeof metadata !== "object" || !Object.keys(metadata).length) return "-";
+  return Object.entries(metadata)
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${metadataValueSummary(value)}`)
+    .join(" · ");
+}
+
+function metadataValueSummary(value) {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") return JSON.stringify(value).slice(0, 120);
+  return String(value).slice(0, 120);
 }
 
 function apiErrorMessage(detail, fallback) {

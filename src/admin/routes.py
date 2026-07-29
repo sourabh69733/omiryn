@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from admin.auth import require_admin_user
-from admin.service import admin_eval_runs, admin_overview, admin_user_detail
+from admin.service import admin_eval_runs, admin_overview, admin_requests, admin_user_detail
 from security.auth import CurrentUser
 
 ADMIN_STATIC_DIR = Path(__file__).parent / "static"
@@ -18,6 +18,7 @@ router = APIRouter()
 @router.get("/admin")
 @router.get("/admin/users")
 @router.get("/admin/usage")
+@router.get("/admin/requests")
 async def admin_shell(_: CurrentUser = Depends(require_admin_user)) -> FileResponse:
     return FileResponse(ADMIN_STATIC_DIR / "index.html", headers=ADMIN_SHELL_HEADERS)
 
@@ -80,6 +81,14 @@ async def admin_usage_endpoint(
         "events": overview["recent_usage_events"],
         "limits": overview["limits"],
     }
+
+
+@router.get("/api/admin/requests")
+async def admin_requests_endpoint(
+    limit: int = 100,
+    _: CurrentUser = Depends(require_admin_user),
+) -> dict[str, object]:
+    return admin_requests(limit=limit)
 
 
 @router.get("/api/admin/evals")
