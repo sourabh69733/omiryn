@@ -20,11 +20,12 @@ async def agent_usage(
     conversation_id: str | None = None,
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
-    # Groq limits are API-key level, so the main dashboard should be app-wide.
-    # Per-session usage remains scoped in /api/agent/conversations/{id}/usage.
+    if conversation_id:
+        _get_existing_conversation(conversation_id, user)
+    owner_id = _user_id(user)
     return {
-        "summary": summarize_agent_usage(conversation_id, None),
-        "events": list_agent_usage_events(conversation_id, None),
+        "summary": summarize_agent_usage(conversation_id, owner_id),
+        "events": list_agent_usage_events(conversation_id, owner_id),
         "limits": _configured_usage_limits(),
     }
 
