@@ -6,15 +6,32 @@ const sessionKey = "omiryn.public.session";
 const localHosts = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 
 function sessionId() {
-  let value = localStorage.getItem(sessionKey);
+  let value;
+  try {
+    value = localStorage.getItem(sessionKey);
+  } catch {
+    value = null;
+  }
   if (!value) {
     value = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    localStorage.setItem(sessionKey, value);
+    try {
+      localStorage.setItem(sessionKey, value);
+    } catch {
+      // Storage can be unavailable in restrictive browser modes. Use the
+      // ephemeral value for this page view and avoid blocking the experience.
+    }
   }
   return value;
 }
 
+function analyticsAllowed() {
+  return navigator.doNotTrack !== "1"
+    && window.doNotTrack !== "1"
+    && navigator.globalPrivacyControl !== true;
+}
+
 function track(eventName, metadata = {}) {
+  if (!analyticsAllowed()) return;
   const payload = {
     session_id: sessionId(),
     event_name: eventName,
@@ -29,8 +46,7 @@ function track(eventName, metadata = {}) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ event: eventName, ...payload });
   const body = JSON.stringify(payload);
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/public/events", new Blob([body], { type: "application/json" }));
+  if (navigator.sendBeacon && navigator.sendBeacon("/api/public/events", new Blob([body], { type: "application/json" }))) {
     return;
   }
   fetch("/api/public/events", {

@@ -503,8 +503,9 @@
       gap: 14px;
     }
     .msg {
-      max-width: 82%;
-      padding: 14px 18px;
+      width: fit-content;
+      max-width: min(82%, 520px);
+      padding: 10px 14px;
       border-radius: 18px;
       font-size: 14px;
       line-height: 1.55;
