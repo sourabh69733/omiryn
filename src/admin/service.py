@@ -36,7 +36,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
     limit = max(1, min(limit, 100))
     snapshot = _load_admin_snapshot()
     usage_events = [_usage_event_from_row(row) for row in snapshot["usage_rows"]]
-    usage_summary = summarize_agent_usage()
+    usage_summary = summarize_agent_usage(allow_app_wide=True)
     users = _admin_users(snapshot, usage_events)
     health = _dashboard_health(users, snapshot["draft_rows"], usage_events)
     activity = _dashboard_activity(
