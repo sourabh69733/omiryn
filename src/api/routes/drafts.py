@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from security.auth import CurrentUser, current_user
+from security.auth import CurrentUser, require_user
 from storage import save_draft
 
 from ..helpers import _apply_dating_basics, _get_existing_draft, _user_id
@@ -16,7 +16,7 @@ router = APIRouter()
 @router.post("/api/agent-submissions/profile", status_code=201)
 async def submit_agent_profile(
     submission: AgentProfileSubmission,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     _apply_dating_basics(submission, user)
     draft_id = str(uuid4())
@@ -35,7 +35,7 @@ async def submit_agent_profile(
 @router.get("/api/drafts/{draft_id}")
 async def get_draft(
     draft_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> DraftProfile:
     return _get_existing_draft(draft_id, user)
 
@@ -44,7 +44,7 @@ async def get_draft(
 async def update_draft(
     draft_id: str,
     patch: DraftPatch,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> DraftProfile:
     draft = _get_existing_draft(draft_id, user)
     if draft.status != "draft":
@@ -109,7 +109,7 @@ async def update_draft(
 @router.post("/api/drafts/{draft_id}/approve")
 async def approve_draft(
     draft_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> DraftProfile:
     draft = _get_existing_draft(draft_id, user)
     if draft.status != "draft":
@@ -123,7 +123,7 @@ async def approve_draft(
 @router.delete("/api/drafts/{draft_id}")
 async def delete_draft(
     draft_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     draft = _get_existing_draft(draft_id, user)
     save_draft(
@@ -133,4 +133,3 @@ async def delete_draft(
         _user_id(user),
     )
     return {"draft_id": draft_id, "status": "deleted"}
-

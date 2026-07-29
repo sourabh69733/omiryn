@@ -13,7 +13,7 @@ from agent.memory_engine.memory import (
 )
 from agent.runtime.orchestrator import run_agent_turn
 from agent.runtime.providers import AgentProviderError, agent_runtime_status, extract_profile
-from security.auth import CurrentUser, current_user
+from security.auth import CurrentUser, require_user
 from storage import (
     delete_conversation as storage_delete_conversation,
     list_agent_message_feedback,
@@ -76,7 +76,7 @@ def _run_agent_turn_callable():
 @router.post("/api/agent/conversations", status_code=201)
 async def create_agent_conversation(
     payload: AgentConversationCreate | None = None,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> AgentConversation:
     conversation_id = str(uuid4())
     runtime = agent_runtime_status()
@@ -109,7 +109,7 @@ async def create_agent_conversation(
 
 @router.get("/api/agent/conversations")
 async def list_agent_conversations(
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     conversations = storage_list_conversations(_user_id(user))
     summaries = []
@@ -144,7 +144,7 @@ async def list_agent_conversations(
 @router.get("/api/agent/conversations/{conversation_id}")
 async def get_agent_conversation(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> AgentConversation:
     return _get_existing_conversation(conversation_id, user)
 
@@ -152,7 +152,7 @@ async def get_agent_conversation(
 @router.delete("/api/agent/conversations/{conversation_id}")
 async def delete_agent_conversation(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     if not storage_delete_conversation(conversation_id, _user_id(user)):
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
@@ -163,7 +163,7 @@ async def delete_agent_conversation(
 def update_agent_conversation_settings(
     conversation_id: str,
     payload: AgentConversationSettings,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
@@ -195,7 +195,7 @@ async def send_agent_message(
     conversation_id: str,
     payload: UserMessage,
     background_tasks: BackgroundTasks,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
@@ -244,7 +244,7 @@ async def create_agent_message_feedback(
     conversation_id: str,
     message_index: int,
     payload: AgentMessageFeedbackCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     conversation = _get_existing_conversation(conversation_id, user)
     if message_index < 0 or message_index >= len(conversation.messages):
@@ -274,7 +274,7 @@ async def create_agent_message_feedback(
 @router.get("/api/agent/conversations/{conversation_id}/feedback")
 async def get_agent_message_feedback(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     feedback = list_agent_message_feedback(conversation_id, _user_id(user))
@@ -284,7 +284,7 @@ async def get_agent_message_feedback(
 @router.post("/api/agent/conversations/{conversation_id}/extract")
 async def extract_agent_conversation(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id, user)
     try:

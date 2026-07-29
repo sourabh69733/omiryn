@@ -76,6 +76,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="test-user", email="test@example.com", display_name="Test User")
+
+        app.dependency_overrides[current_user] = signed_in_user
         _reset_public_rate_limits()
         reset_db()
         self.client = TestClient(app)
@@ -1528,7 +1532,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         ]
         from storage import save_conversation
 
-        save_conversation(conversation)
+        save_conversation(conversation, "test-user")
 
         message_response = self.client.post(
             f"/api/agent/conversations/{conversation_id}/messages",
@@ -2316,7 +2320,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Find people who fit the way you connect.", response.text)
+        self.assertIn("Stop swiping.", response.text)
         self.assertIn("/static/landing.css", response.text)
         self.assertIn("/app", response.text)
 
@@ -2347,8 +2351,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("in-app activity events", response.text)
-        self.assertIn("community invite requests", response.text)
-        self.assertIn("We do not store full chat message text", response.text)
+        self.assertIn("invite requests", response.text)
+        self.assertIn("We do not intentionally store full chat message text", response.text)
 
     def test_landing_static_assets_are_served(self) -> None:
         response = self.client.get("/static/landing.css")
@@ -2550,6 +2554,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.headers["X-Request-ID"], "request-test-1")
 
     def test_auth_required_blocks_anonymous_user_data_routes(self) -> None:
+        app.dependency_overrides.clear()
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
             response = self.client.get("/api/agent/conversations")
 
@@ -2557,6 +2562,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "Sign in to continue.")
 
     def test_auth_required_blocks_anonymous_data_requests(self) -> None:
+        app.dependency_overrides.clear()
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
             response = self.client.post(
                 "/api/me/data-requests",
@@ -2606,6 +2612,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_auth_required_blocks_anonymous_app_events(self) -> None:
+        app.dependency_overrides.clear()
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
             response = self.client.post(
                 "/api/me/events",
@@ -2677,6 +2684,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_auth_required_blocks_anonymous_feedback(self) -> None:
+        app.dependency_overrides.clear()
         with patch.dict("os.environ", {"AUTH_REQUIRED": "true"}):
             response = self.client.post(
                 "/api/me/feedback",
@@ -2912,6 +2920,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             second_conversation_id,
             None,
             "what do you know about my career?",
+            "test-user",
         )
         self.assertEqual(sources[0]["title"], "Reusable profile")
 
@@ -3002,6 +3011,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             None,
             "what do you know about my career from imported memory?",
+            "test-user",
         )
 
         self.assertEqual(sources, [])
@@ -3034,6 +3044,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             None,
             "what do you know about my career from imported memory?",
+            "test-user",
         )
 
         self.assertEqual(len(sources), 1)

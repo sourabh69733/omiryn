@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from agent.context_engine.context import STYLE_CONTEXT_SOURCE_TYPES
 from agent.memory_engine.data_point_feedback import normalize_data_point_feedback
-from security.auth import CurrentUser, current_user
+from security.auth import CurrentUser, require_user
 from storage import (
     delete_profile_fact,
     get_profile_fact,
@@ -68,7 +68,7 @@ _APP_EVENT_METADATA_ALLOWLIST = {
 
 @router.get("/api/me/dating-basics")
 async def get_dating_basics(
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -82,7 +82,7 @@ async def get_dating_basics(
 @router.put("/api/me/dating-basics")
 async def put_dating_basics(
     payload: DatingBasics,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -115,7 +115,7 @@ async def put_dating_basics(
 
 @router.get("/api/me/profile")
 async def get_me_profile(
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -153,7 +153,7 @@ async def get_me_profile(
 @router.put("/api/me/profile")
 async def put_me_profile(
     payload: UserProfilePatch,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -176,7 +176,7 @@ async def put_me_profile(
 
 @router.get("/api/me/data-requests")
 async def get_me_data_requests(
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -186,7 +186,7 @@ async def get_me_data_requests(
 @router.post("/api/me/data-requests", status_code=201)
 async def create_me_data_request(
     payload: DataRequestCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -209,7 +209,7 @@ async def create_me_data_request(
 @router.post("/api/me/events", status_code=201)
 async def create_me_app_events(
     payload: AppEventsBatchCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -238,7 +238,7 @@ def _safe_app_event_metadata(metadata: dict[str, object]) -> dict[str, object]:
 @router.post("/api/me/feedback", status_code=201)
 async def create_me_feedback(
     payload: FeedbackSubmissionCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -259,7 +259,7 @@ async def create_me_feedback(
 @router.post("/api/me/community-invites", status_code=201)
 async def create_me_community_invite(
     payload: CommunityInviteRequestCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -294,7 +294,7 @@ def _safe_feedback_metadata(metadata: dict[str, object]) -> dict[str, object]:
 @router.put("/api/me/profile-photo")
 async def put_me_profile_photo(
     request: Request,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -406,7 +406,7 @@ async def put_me_profile_photo(
 
 @router.get("/api/me/profile-facts")
 async def get_me_profile_facts(
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -417,7 +417,7 @@ async def get_me_profile_facts(
 @router.delete("/api/me/profile-facts/{fact_id}")
 async def delete_me_profile_fact(
     fact_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -430,7 +430,7 @@ async def delete_me_profile_fact(
 async def patch_me_profile_fact(
     fact_id: str,
     payload: ProfileFactPatch,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
@@ -478,7 +478,7 @@ async def patch_me_profile_fact(
 async def create_data_point_feedback(
     fact_id: str,
     payload: DataPointFeedbackCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")

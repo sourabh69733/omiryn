@@ -12,7 +12,7 @@ from agent.memory_engine.data_point_extraction import (
 from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_points
 from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_style_summary
-from security.auth import CurrentUser, current_user
+from security.auth import CurrentUser, require_user
 from storage import (
     delete_context_source,
     delete_user_context_source,
@@ -48,7 +48,7 @@ def context_import_prompt() -> dict[str, str]:
 @router.get("/api/agent/conversations/{conversation_id}/context-sources")
 async def get_conversation_context_sources(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     sources = list_context_sources(conversation_id, _user_id(user))
@@ -72,7 +72,7 @@ async def get_conversation_context_sources(
 @router.get("/api/agent/conversations/{conversation_id}/tone")
 async def get_conversation_tone(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     conversation = _get_existing_conversation(conversation_id, user)
     return {
@@ -88,7 +88,7 @@ async def get_conversation_tone(
 def create_conversation_context_source(
     conversation_id: str,
     payload: ContextSourceCreate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     source = save_context_source(
@@ -108,14 +108,10 @@ def create_conversation_context_source(
 def delete_conversation_context_source(
     conversation_id: str,
     source_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     _get_existing_conversation(conversation_id, user)
-    deleted = (
-        delete_user_context_source(source_id, user.id)
-        if user
-        else delete_context_source(source_id, conversation_id, None)
-    )
+    deleted = delete_user_context_source(source_id, user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Context source not found.")
     return {"source_id": source_id, "status": "deleted"}
@@ -124,10 +120,8 @@ def delete_conversation_context_source(
 @router.delete("/api/me/context-sources/{source_id}")
 def delete_me_context_source(
     source_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
-    if not user:
-        raise HTTPException(status_code=401, detail="Sign in to continue.")
     if not delete_user_context_source(source_id, user.id):
         raise HTTPException(status_code=404, detail="Context source not found.")
     return {"source_id": source_id, "status": "deleted"}
@@ -137,7 +131,7 @@ def delete_me_context_source(
 def update_conversation_context_attachments(
     conversation_id: str,
     payload: ContextSourceAttachmentsUpdate,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     user_id = _user_id(user)
@@ -197,7 +191,7 @@ def create_whatsapp_context_source(
     conversation_id: str,
     payload: WhatsappChatImportCreate,
     background_tasks: BackgroundTasks,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     try:
@@ -317,4 +311,3 @@ def create_whatsapp_context_source(
             conversation_id=conversation_id,
         )
     return _context_source_summary(source)
-

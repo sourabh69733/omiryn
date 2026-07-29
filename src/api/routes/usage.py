@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from security.auth import CurrentUser, current_user
+from security.auth import CurrentUser, require_user
 from storage import (
     list_agent_trace_steps,
     list_agent_traces,
@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get("/api/agent/usage")
 async def agent_usage(
     conversation_id: str | None = None,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     # Groq limits are API-key level, so the main dashboard should be app-wide.
     # Per-session usage remains scoped in /api/agent/conversations/{id}/usage.
@@ -32,7 +32,7 @@ async def agent_usage(
 @router.get("/api/agent/conversations/{conversation_id}/usage")
 async def conversation_agent_usage(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     return {
@@ -45,7 +45,7 @@ async def conversation_agent_usage(
 @router.get("/api/agent/conversations/{conversation_id}/traces")
 async def conversation_agent_traces(
     conversation_id: str,
-    user: CurrentUser | None = Depends(current_user),
+    user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     traces = list_agent_traces(conversation_id, _user_id(user))
@@ -63,4 +63,3 @@ async def conversation_agent_traces(
             for trace in traces
         ],
     }
-
