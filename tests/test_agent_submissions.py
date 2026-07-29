@@ -1777,7 +1777,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(limits["groq_rpm"], 30)
         self.assertEqual(limits["groq_tpm"], 6000)
 
-    def test_main_usage_dashboard_is_app_wide(self) -> None:
+    def test_main_usage_dashboard_is_user_scoped(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-b", email="b@example.com")
 
@@ -1811,6 +1811,21 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "raw_usage": {},
             }
         )
+        save_agent_usage_event(
+            {
+                "user_id": "user-b",
+                "conversation_id": None,
+                "request_kind": "chat_reply",
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "success": True,
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+                "latency_ms": 25,
+                "raw_usage": {},
+            }
+        )
         app.dependency_overrides[current_user] = signed_in_user
 
         response = self.client.get("/api/agent/usage")
@@ -1818,13 +1833,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         summary = response.json()["summary"]
         events = response.json()["events"]
-        self.assertEqual(summary["request_count"], 2)
-        self.assertEqual(summary["total_tokens"], 600)
+        self.assertEqual(summary["request_count"], 1)
+        self.assertEqual(summary["total_tokens"], 15)
         self.assertEqual(summary["chat_message_count"], 1)
-        self.assertEqual(summary["average_tokens_per_message"], 120)
-        self.assertEqual(summary["average_prompt_tokens_per_message"], 100)
-        self.assertEqual(summary["average_completion_tokens_per_message"], 20)
-        self.assertIn(PROFILE_SIGNAL_BACKFILL, {event["request_kind"] for event in events})
+        self.assertEqual(summary["average_tokens_per_message"], 15)
+        self.assertEqual(summary["average_prompt_tokens_per_message"], 10)
+        self.assertEqual(summary["average_completion_tokens_per_message"], 5)
+        self.assertEqual({event["user_id"] for event in events}, {"user-b"})
+        self.assertNotIn(PROFILE_SIGNAL_BACKFILL, {event["request_kind"] for event in events})
 
     def test_admin_overview_aggregates_users_activity_and_usage(self) -> None:
         async def signed_in_user() -> CurrentUser:
@@ -2396,6 +2412,22 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Omiryn Admin", response.text)
+
+    def test_admin_dev_bypass_is_disabled_in_production(self) -> None:
+        app.dependency_overrides.clear()
+        with patch.dict(
+            "os.environ",
+            {
+                "APP_ENV": "production",
+                "AUTH_REQUIRED": "true",
+                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
+                "ADMIN_EMAILS": "",
+                "ADMIN_USER_IDS": "",
+            },
+        ):
+            response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 401)
 
     def test_admin_api_rejects_non_admin_when_admins_are_configured(self) -> None:
         async def non_admin_user() -> CurrentUser:
@@ -3093,7 +3125,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(create_response.status_code, 201)
         source_id = create_response.json()["id"]
-        imports = list_whatsapp_imports(conversation_id)
+        imports = list_whatsapp_imports(conversation_id, user_id="test-user")
         self.assertEqual(len(imports), 1)
         self.assertEqual(imports[0]["context_source_id"], source_id)
         self.assertEqual(imports[0]["selected_sender"], "Aarav")
@@ -3101,28 +3133,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertTrue(imports[0]["metadata"]["embedding_ready"])
         self.assertEqual(imports[0]["metadata"]["embedding_kind"], "local_hash_v1")
 
-        messages = list_whatsapp_messages(imports[0]["id"])
+        messages = list_whatsapp_messages(imports[0]["id"], user_id="test-user")
         self.assertEqual(len(messages), 6)
         self.assertEqual(messages[0]["sender"], "Aarav")
         self.assertEqual(messages[0]["timestamp_text"], "12/06/2026 10:00 AM")
         self.assertIn("running late", messages[0]["content"])
         self.assertIn("second line", messages[2]["content"])
 
-        chunks = list_whatsapp_chunks(imports[0]["id"])
+        chunks = list_whatsapp_chunks(imports[0]["id"], user_id="test-user")
         self.assertGreaterEqual(len(chunks), 1)
         self.assertEqual(chunks[0]["chunk_index"], 1)
         self.assertEqual(chunks[0]["embedding"]["kind"], "local_hash_v1")
         self.assertIn("Aarav:", chunks[0]["content"])
         self.assertIn("Riya:", chunks[0]["content"])
 
-        people = list_whatsapp_people(imports[0]["id"])
+        people = list_whatsapp_people(imports[0]["id"], user_id="test-user")
         self.assertEqual({person["sender"] for person in people}, {"Aarav", "Riya"})
         self.assertEqual(
             next(person for person in people if person["sender"] == "Aarav")["role"],
             "selected_user",
         )
 
-        style_profiles = list_whatsapp_style_profiles(imports[0]["id"])
+        style_profiles = list_whatsapp_style_profiles(imports[0]["id"], user_id="test-user")
         self.assertEqual({profile["sender"] for profile in style_profiles}, {"Aarav", "Riya"})
         aarav_style = next(profile for profile in style_profiles if profile["sender"] == "Aarav")
         self.assertIn("average_words", aarav_style["summary"])
@@ -3141,7 +3173,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(create_response.status_code, 201)
 
-        casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay")
+        casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay", "test-user")
         self.assertFalse(
             any(source["source_type"] == "whatsapp_structured_context" for source in casual_sources)
         )
@@ -3150,6 +3182,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             None,
             "what do you know from my whatsapp messages about coffee plan?",
+            "test-user",
         )
 
         self.assertGreaterEqual(len(whatsapp_sources), 1)
@@ -3180,6 +3213,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             None,
             "where did abhishek ask me to wait?",
+            "test-user",
         )
 
         structured_source = next(
@@ -3359,6 +3393,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             style_source_id,
             "haan okay",
+            "test-user",
         )
 
         self.assertEqual(sources[0]["source_type"], "friend_style")
@@ -3370,6 +3405,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             style_source_id,
             "can you talk in Aarav tone from my uploaded whatsapp chat?",
+            "test-user",
         )
         structured_source = next(
             source
@@ -3403,6 +3439,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             second_conversation_id,
             None,
             "what topics were in my uploaded whatsapp chat?",
+            "test-user",
         )
 
         self.assertTrue(
@@ -3425,6 +3462,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             conversation_id,
             None,
             "nhi",
+            "test-user",
         )
 
         self.assertFalse(
@@ -3472,7 +3510,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(create_response.status_code, 201)
         source_id = create_response.json()["id"]
-        self.assertEqual(len(list_whatsapp_imports(conversation_id)), 1)
+        self.assertEqual(len(list_whatsapp_imports(conversation_id, user_id="user-a")), 1)
         self.assertTrue(list_profile_facts("user-a"))
 
         delete_response = self.client.delete(
@@ -3480,7 +3518,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(delete_response.status_code, 200)
-        self.assertEqual(list_whatsapp_imports(conversation_id), [])
+        self.assertEqual(list_whatsapp_imports(conversation_id, user_id="user-a"), [])
         self.assertEqual(list_profile_facts("user-a"), [])
 
     def test_friend_style_import_can_be_selected_for_replies(self) -> None:
