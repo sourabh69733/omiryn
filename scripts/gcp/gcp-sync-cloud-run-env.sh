@@ -34,6 +34,7 @@ for value in "${secret_args[@]}"; do
 done
 
 env_vars=(
+  "APP_ENV=${APP_ENV:-production}"
   "AUTH_PROVIDER=${AUTH_PROVIDER:-supabase}"
   "AUTH_REQUIRED=${AUTH_REQUIRED:-true}"
   "SUPABASE_JWT_AUDIENCE=${SUPABASE_JWT_AUDIENCE:-authenticated}"
