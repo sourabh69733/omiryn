@@ -5,7 +5,7 @@ from inspect import isawaitable, signature
 
 from fastapi import HTTPException, Request
 
-from security.auth import CurrentUser, auth_required, current_user
+from security.auth import CurrentUser, auth_required, current_user, production_runtime_enabled
 
 
 def configured_admin_emails() -> set[str]:
@@ -45,6 +45,8 @@ def _configured_values(name: str) -> set[str]:
 
 
 def _allow_dev_admin_without_auth() -> bool:
+    if production_runtime_enabled():
+        return False
     configured = os.getenv("ADMIN_ALLOW_UNAUTHENTICATED_DEV", "")
     if configured:
         return configured.lower() == "true"
