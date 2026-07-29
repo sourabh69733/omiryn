@@ -14,23 +14,32 @@ from .schema import (
     agent_usage_events,
     draft_profiles,
 )
-from .utils import _isoformat_utc, _owned_update_values, _protect_messages, _unprotect_messages
+from .utils import (
+    _isoformat_utc,
+    _owned_update_values,
+    _protect_messages,
+    _require_user_id,
+    _unprotect_messages,
+)
 
 def save_draft(draft: dict[str, Any], user_id: str | None = None) -> None:
+    owner_id = _require_user_id(user_id, "draft")
     payload = {
         "id": draft["id"],
-        "user_id": user_id,
+        "user_id": owner_id,
         "status": draft["status"],
         "submission_json": draft["submission"],
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
-            select(draft_profiles.c.id).where(draft_profiles.c.id == draft["id"])
-        ).first()
+            select(draft_profiles.c.user_id).where(draft_profiles.c.id == draft["id"])
+        ).mappings().first()
         if existing:
+            if existing["user_id"] != owner_id:
+                raise ValueError("draft belongs to a different user")
             connection.execute(
                 draft_profiles.update()
-                .where(draft_profiles.c.id == draft["id"])
+                .where(draft_profiles.c.id == draft["id"], draft_profiles.c.user_id == owner_id)
                 .values(**_owned_update_values(payload, "user_id"), updated_at=func.now())
             )
         else:
@@ -38,9 +47,11 @@ def save_draft(draft: dict[str, Any], user_id: str | None = None) -> None:
 
 
 def get_draft(draft_id: str, user_id: str | None = None) -> dict[str, Any] | None:
-    statement = select(draft_profiles).where(draft_profiles.c.id == draft_id)
-    if user_id is not None:
-        statement = statement.where(draft_profiles.c.user_id == user_id)
+    owner_id = _require_user_id(user_id, "draft")
+    statement = select(draft_profiles).where(
+        draft_profiles.c.id == draft_id,
+        draft_profiles.c.user_id == owner_id,
+    )
 
     with ENGINE.begin() as connection:
         row = connection.execute(statement).mappings().first()
@@ -55,7 +66,10 @@ def get_draft(draft_id: str, user_id: str | None = None) -> dict[str, Any] | Non
 
 
 def save_conversation(conversation: dict[str, Any], user_id: str | None = None) -> None:
-    conversation_user_id = user_id or conversation.get("user_id")
+    conversation_user_id = _require_user_id(
+        user_id or conversation.get("user_id"),
+        "conversation",
+    )
     payload = {
         "id": conversation["id"],
         "user_id": conversation_user_id,
@@ -70,12 +84,19 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
     }
     with ENGINE.begin() as connection:
         existing = connection.execute(
-            select(agent_conversations.c.id).where(agent_conversations.c.id == conversation["id"])
-        ).first()
+            select(agent_conversations.c.user_id).where(
+                agent_conversations.c.id == conversation["id"]
+            )
+        ).mappings().first()
         if existing:
+            if existing["user_id"] != conversation_user_id:
+                raise ValueError("conversation belongs to a different user")
             connection.execute(
                 agent_conversations.update()
-                .where(agent_conversations.c.id == conversation["id"])
+                .where(
+                    agent_conversations.c.id == conversation["id"],
+                    agent_conversations.c.user_id == conversation_user_id,
+                )
                 .values(**_owned_update_values(payload, "user_id"), updated_at=func.now())
             )
         else:
@@ -83,9 +104,11 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
 
 
 def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[str, Any] | None:
-    statement = select(agent_conversations).where(agent_conversations.c.id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_conversations.c.user_id == user_id)
+    owner_id = _require_user_id(user_id, "conversation")
+    statement = select(agent_conversations).where(
+        agent_conversations.c.id == conversation_id,
+        agent_conversations.c.user_id == owner_id,
+    )
 
     with ENGINE.begin() as connection:
         row = connection.execute(statement).mappings().first()
@@ -106,9 +129,12 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
 
 
 def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
-    statement = select(agent_conversations).order_by(agent_conversations.c.updated_at.desc())
-    if user_id is not None:
-        statement = statement.where(agent_conversations.c.user_id == user_id)
+    owner_id = _require_user_id(user_id, "conversation list")
+    statement = (
+        select(agent_conversations)
+        .where(agent_conversations.c.user_id == owner_id)
+        .order_by(agent_conversations.c.updated_at.desc())
+    )
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -133,9 +159,11 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def delete_conversation(conversation_id: str, user_id: str | None = None) -> bool:
-    statement = select(agent_conversations.c.id).where(agent_conversations.c.id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_conversations.c.user_id == user_id)
+    owner_id = _require_user_id(user_id, "conversation")
+    statement = select(agent_conversations.c.id).where(
+        agent_conversations.c.id == conversation_id,
+        agent_conversations.c.user_id == owner_id,
+    )
 
     with ENGINE.begin() as connection:
         existing = connection.execute(statement).first()
@@ -143,28 +171,39 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             return False
 
         connection.execute(
-            agent_usage_events.delete().where(agent_usage_events.c.conversation_id == conversation_id)
+            agent_usage_events.delete().where(
+                agent_usage_events.c.conversation_id == conversation_id,
+                agent_usage_events.c.user_id == owner_id,
+            )
         )
         connection.execute(
             agent_message_feedback.delete().where(
-                agent_message_feedback.c.conversation_id == conversation_id
+                agent_message_feedback.c.conversation_id == conversation_id,
+                agent_message_feedback.c.user_id == owner_id,
             )
         )
         connection.execute(
             agent_context_snapshots.delete().where(
-                agent_context_snapshots.c.conversation_id == conversation_id
+                agent_context_snapshots.c.conversation_id == conversation_id,
+                agent_context_snapshots.c.user_id == owner_id,
             )
         )
         connection.execute(
             agent_trace_steps.delete().where(
-                agent_trace_steps.c.conversation_id == conversation_id
+                agent_trace_steps.c.conversation_id == conversation_id,
+                agent_trace_steps.c.user_id == owner_id,
             )
         )
         connection.execute(
-            agent_traces.delete().where(agent_traces.c.conversation_id == conversation_id)
+            agent_traces.delete().where(
+                agent_traces.c.conversation_id == conversation_id,
+                agent_traces.c.user_id == owner_id,
+            )
         )
         connection.execute(
-            agent_conversations.delete().where(agent_conversations.c.id == conversation_id)
+            agent_conversations.delete().where(
+                agent_conversations.c.id == conversation_id,
+                agent_conversations.c.user_id == owner_id,
+            )
         )
     return True
-

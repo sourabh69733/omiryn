@@ -18,12 +18,13 @@ from .schema import (
     agent_traces,
     agent_usage_events,
 )
-from .utils import _conversation_user_id, _isoformat_utc
+from .utils import _conversation_user_id, _isoformat_utc, _require_user_id
 
 def save_agent_message_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
+    user_id = _require_user_id(feedback.get("user_id"), "agent message feedback")
     payload = {
         "id": feedback.get("id") or str(uuid4()),
-        "user_id": feedback.get("user_id"),
+        "user_id": user_id,
         "conversation_id": feedback["conversation_id"],
         "message_index": feedback["message_index"],
         "rating": feedback["rating"],
@@ -43,11 +44,14 @@ def list_agent_message_feedback(
     conversation_id: str | None = None,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    statement = select(agent_message_feedback).order_by(agent_message_feedback.c.created_at.desc())
+    owner_id = _require_user_id(user_id, "agent message feedback list")
+    statement = (
+        select(agent_message_feedback)
+        .where(agent_message_feedback.c.user_id == owner_id)
+        .order_by(agent_message_feedback.c.created_at.desc())
+    )
     if conversation_id:
         statement = statement.where(agent_message_feedback.c.conversation_id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_message_feedback.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -69,7 +73,10 @@ def _agent_message_feedback_from_row(row: Any) -> dict[str, Any]:
 
 
 def save_agent_usage_event(event: dict[str, Any]) -> None:
-    user_id = event.get("user_id") or _conversation_user_id(event.get("conversation_id"))
+    user_id = _require_user_id(
+        event.get("user_id") or _conversation_user_id(event.get("conversation_id")),
+        "agent usage event",
+    )
     raw_usage = event.get("raw_usage") or {}
     prompt_tokens = _usage_token_value(
         event.get("prompt_tokens"),
@@ -115,7 +122,10 @@ def save_agent_usage_event(event: dict[str, Any]) -> None:
 
 
 def save_agent_trace(trace: dict[str, Any]) -> dict[str, Any]:
-    user_id = trace.get("user_id") or _conversation_user_id(trace.get("conversation_id"))
+    user_id = _require_user_id(
+        trace.get("user_id") or _conversation_user_id(trace.get("conversation_id")),
+        "agent trace",
+    )
     payload = {
         "id": trace.get("id") or str(uuid4()),
         "user_id": user_id,
@@ -169,7 +179,10 @@ def finish_agent_trace(
 
 
 def save_agent_trace_step(step: dict[str, Any]) -> dict[str, Any]:
-    user_id = step.get("user_id") or _conversation_user_id(step.get("conversation_id"))
+    user_id = _require_user_id(
+        step.get("user_id") or _conversation_user_id(step.get("conversation_id")),
+        "agent trace step",
+    )
     payload = {
         "id": step.get("id") or str(uuid4()),
         "trace_id": step["trace_id"],
@@ -193,11 +206,14 @@ def list_agent_traces(
     user_id: str | None = None,
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
-    statement = select(agent_traces).order_by(agent_traces.c.created_at.desc())
+    owner_id = _require_user_id(user_id, "agent trace list")
+    statement = (
+        select(agent_traces)
+        .where(agent_traces.c.user_id == owner_id)
+        .order_by(agent_traces.c.created_at.desc())
+    )
     if conversation_id:
         statement = statement.where(agent_traces.c.conversation_id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_traces.c.user_id == user_id)
     if limit:
         statement = statement.limit(limit)
 
@@ -211,16 +227,15 @@ def list_agent_trace_steps(
     conversation_id: str | None = None,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "agent trace step list")
     statement = select(agent_trace_steps).order_by(
         agent_trace_steps.c.step_index.asc(),
         agent_trace_steps.c.created_at.asc(),
-    )
+    ).where(agent_trace_steps.c.user_id == owner_id)
     if trace_id:
         statement = statement.where(agent_trace_steps.c.trace_id == trace_id)
     if conversation_id:
         statement = statement.where(agent_trace_steps.c.conversation_id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_trace_steps.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -383,7 +398,10 @@ def _agent_trace_step_from_row(row: Any) -> dict[str, Any]:
 
 
 def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-    user_id = snapshot.get("user_id") or _conversation_user_id(snapshot.get("conversation_id"))
+    user_id = _require_user_id(
+        snapshot.get("user_id") or _conversation_user_id(snapshot.get("conversation_id")),
+        "agent context snapshot",
+    )
     payload = {
         "id": snapshot.get("id") or str(uuid4()),
         "user_id": user_id,
@@ -404,13 +422,12 @@ def list_agent_context_snapshots(
     conversation_id: str | None = None,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "agent context snapshot list")
     statement = select(agent_context_snapshots).order_by(
         agent_context_snapshots.c.created_at.desc()
-    )
+    ).where(agent_context_snapshots.c.user_id == owner_id)
     if conversation_id:
         statement = statement.where(agent_context_snapshots.c.conversation_id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(agent_context_snapshots.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -432,12 +449,16 @@ def _agent_context_snapshot_from_row(row: Any) -> dict[str, Any]:
 def list_agent_usage_events(
     conversation_id: str | None = None,
     user_id: str | None = None,
+    *,
+    allow_app_wide: bool = False,
 ) -> list[dict[str, Any]]:
     statement = select(agent_usage_events).order_by(agent_usage_events.c.created_at.desc())
     if conversation_id:
         statement = statement.where(agent_usage_events.c.conversation_id == conversation_id)
     if user_id is not None:
         statement = statement.where(agent_usage_events.c.user_id == user_id)
+    elif not allow_app_wide:
+        _require_user_id(user_id, "agent usage event list")
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -486,8 +507,10 @@ def _agent_usage_event_from_row(row: Any) -> dict[str, Any]:
 def summarize_agent_usage(
     conversation_id: str | None = None,
     user_id: str | None = None,
+    *,
+    allow_app_wide: bool = False,
 ) -> dict[str, Any]:
-    events = list_agent_usage_events(conversation_id, user_id)
+    events = list_agent_usage_events(conversation_id, user_id, allow_app_wide=allow_app_wide)
     successful_events = [event for event in events if event["success"]]
     successful_chat_events = [
         event for event in successful_events if event["request_kind"] == "chat_reply"

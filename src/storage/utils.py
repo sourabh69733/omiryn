@@ -52,6 +52,12 @@ def _owned_update_values(payload: dict[str, Any], owner_key: str) -> dict[str, A
     return values
 
 
+def _require_user_id(user_id: str | None, entity: str) -> str:
+    if not user_id:
+        raise ValueError(f"{entity} requires a user_id")
+    return user_id
+
+
 def _conversation_user_id(conversation_id: str | None) -> str | None:
     if not conversation_id:
         return None

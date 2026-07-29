@@ -19,10 +19,19 @@ from .schema import (
     whatsapp_people,
     whatsapp_style_profiles,
 )
-from .utils import _conversation_user_id, _isoformat_utc, _protect_text, _unprotect_text
+from .utils import (
+    _conversation_user_id,
+    _isoformat_utc,
+    _protect_text,
+    _require_user_id,
+    _unprotect_text,
+)
 
 def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
-    source_user_id = source.get("user_id") or _conversation_user_id(source["conversation_id"])
+    source_user_id = _require_user_id(
+        source.get("user_id") or _conversation_user_id(source["conversation_id"]),
+        "context source",
+    )
     payload = {
         "id": source.get("id") or str(uuid4()),
         "user_id": source_user_id,
@@ -43,13 +52,13 @@ def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_context_sources(conversation_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "context source list")
     statement = (
         select(conversation_context_sources)
         .where(conversation_context_sources.c.conversation_id == conversation_id)
+        .where(conversation_context_sources.c.user_id == owner_id)
         .order_by(conversation_context_sources.c.created_at.desc())
     )
-    if user_id is not None:
-        statement = statement.where(conversation_context_sources.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
@@ -61,7 +70,10 @@ def save_whatsapp_import_bundle(
     user_id: str | None = None,
 ) -> dict[str, Any]:
     import_id = bundle.get("id") or str(uuid4())
-    import_user_id = user_id if user_id is not None else bundle.get("user_id")
+    import_user_id = _require_user_id(
+        user_id or bundle.get("user_id") or _conversation_user_id(bundle.get("conversation_id")),
+        "WhatsApp import",
+    )
     import_payload = {
         "id": import_id,
         "user_id": import_user_id,
@@ -77,14 +89,18 @@ def save_whatsapp_import_bundle(
             row[0]
             for row in connection.execute(
                 select(whatsapp_imports.c.id).where(
-                    whatsapp_imports.c.context_source_id == import_payload["context_source_id"]
+                    whatsapp_imports.c.context_source_id == import_payload["context_source_id"],
+                    whatsapp_imports.c.user_id == import_user_id,
                 )
             ).all()
         ]
         _delete_whatsapp_import_rows(connection, existing_import_ids)
         if existing_import_ids:
             connection.execute(
-                whatsapp_imports.delete().where(whatsapp_imports.c.id.in_(existing_import_ids))
+                whatsapp_imports.delete().where(
+                    whatsapp_imports.c.id.in_(existing_import_ids),
+                    whatsapp_imports.c.user_id == import_user_id,
+                )
             )
         connection.execute(whatsapp_imports.insert().values(**import_payload))
 
@@ -161,78 +177,81 @@ def list_whatsapp_imports(
     conversation_id: str | None = None,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    statement = select(whatsapp_imports).order_by(whatsapp_imports.c.created_at.desc())
+    owner_id = _require_user_id(user_id, "WhatsApp import list")
+    statement = (
+        select(whatsapp_imports)
+        .where(whatsapp_imports.c.user_id == owner_id)
+        .order_by(whatsapp_imports.c.created_at.desc())
+    )
     if conversation_id:
         statement = statement.where(whatsapp_imports.c.conversation_id == conversation_id)
-    if user_id is not None:
-        statement = statement.where(whatsapp_imports.c.user_id == user_id)
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_whatsapp_import_from_row(row) for row in rows]
 
 
 def list_whatsapp_messages(import_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "WhatsApp message list")
     statement = (
         select(whatsapp_messages)
         .where(whatsapp_messages.c.import_id == import_id)
+        .where(whatsapp_messages.c.user_id == owner_id)
         .order_by(whatsapp_messages.c.message_index.asc())
     )
-    if user_id is not None:
-        statement = statement.where(whatsapp_messages.c.user_id == user_id)
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_whatsapp_message_from_row(row) for row in rows]
 
 
 def list_whatsapp_chunks(import_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "WhatsApp chunk list")
     statement = (
         select(whatsapp_chunks)
         .where(whatsapp_chunks.c.import_id == import_id)
+        .where(whatsapp_chunks.c.user_id == owner_id)
         .order_by(whatsapp_chunks.c.chunk_index.asc())
     )
-    if user_id is not None:
-        statement = statement.where(whatsapp_chunks.c.user_id == user_id)
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_whatsapp_chunk_from_row(row) for row in rows]
 
 
 def list_whatsapp_people(import_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "WhatsApp people list")
     statement = (
         select(whatsapp_people)
         .where(whatsapp_people.c.import_id == import_id)
+        .where(whatsapp_people.c.user_id == owner_id)
         .order_by(whatsapp_people.c.message_count.desc())
     )
-    if user_id is not None:
-        statement = statement.where(whatsapp_people.c.user_id == user_id)
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_whatsapp_person_from_row(row) for row in rows]
 
 
 def list_whatsapp_style_profiles(import_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
+    owner_id = _require_user_id(user_id, "WhatsApp style profile list")
     statement = (
         select(whatsapp_style_profiles)
         .where(whatsapp_style_profiles.c.import_id == import_id)
+        .where(whatsapp_style_profiles.c.user_id == owner_id)
         .order_by(whatsapp_style_profiles.c.sender.asc())
     )
-    if user_id is not None:
-        statement = statement.where(whatsapp_style_profiles.c.user_id == user_id)
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
     return [_whatsapp_style_profile_from_row(row) for row in rows]
 
 
 def delete_context_source(source_id: str, conversation_id: str, user_id: str | None = None) -> bool:
+    owner_id = _require_user_id(user_id, "context source")
     statement = conversation_context_sources.delete().where(
         conversation_context_sources.c.id == source_id,
         conversation_context_sources.c.conversation_id == conversation_id,
+        conversation_context_sources.c.user_id == owner_id,
     )
-    if user_id is not None:
-        statement = statement.where(conversation_context_sources.c.user_id == user_id)
 
     with ENGINE.begin() as connection:
-        _delete_whatsapp_imports_for_context_sources(connection, [source_id], user_id)
+        _delete_whatsapp_imports_for_context_sources(connection, [source_id], owner_id)
         result = connection.execute(statement)
     return result.rowcount > 0
 
@@ -414,4 +433,3 @@ def _whatsapp_style_profile_from_row(row: Any) -> dict[str, Any]:
         "metadata": row["metadata_json"],
         "created_at": _isoformat_utc(row["created_at"]),
     }
-
