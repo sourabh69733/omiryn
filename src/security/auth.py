@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import os
 from dataclasses import dataclass
+from inspect import isawaitable, signature
 from typing import Any, Protocol
 
 import httpx
@@ -103,6 +104,14 @@ async def current_user(request: Request) -> CurrentUser | None:
 
 
 async def require_user(request: Request) -> CurrentUser:
+    override = request.app.dependency_overrides.get(current_user)
+    if override:
+        parameters = signature(override).parameters
+        result = override(request) if parameters else override()
+        user = await result if isawaitable(result) else result
+        if user:
+            return user
+
     token = _bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
