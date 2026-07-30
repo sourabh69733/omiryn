@@ -4,12 +4,34 @@ import os
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import NullPool
 
 from .schema import DEFAULT_DATABASE_URL, DB_DISABLE_POOL, metadata
+
+
+PRIVATE_USER_OWNED_TABLE_NAMES = (
+    "draft_profiles",
+    "agent_conversations",
+    "agent_usage_events",
+    "agent_context_snapshots",
+    "agent_traces",
+    "agent_trace_steps",
+    "conversation_context_sources",
+    "whatsapp_imports",
+    "whatsapp_messages",
+    "whatsapp_chunks",
+    "whatsapp_people",
+    "whatsapp_style_profiles",
+    "data_point_extraction_debug",
+    "agent_message_feedback",
+)
+
+
+class PrivateDataOwnershipError(RuntimeError):
+    pass
 
 def database_url() -> str:
     return _normalize_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
@@ -52,6 +74,38 @@ ENGINE = engine()
 def init_db() -> None:
     metadata.create_all(ENGINE)
     _ensure_runtime_columns()
+
+
+def validate_private_data_ownership() -> None:
+    violations = private_data_ownership_violations()
+    if not violations:
+        return
+    details = ", ".join(f"{table}={count}" for table, count in sorted(violations.items()))
+    raise PrivateDataOwnershipError(
+        "Private tables contain rows without user_id. "
+        "Backfill or delete those rows before production deployment: "
+        f"{details}"
+    )
+
+
+def private_data_ownership_violations() -> dict[str, int]:
+    inspector = inspect(ENGINE)
+    existing_tables = set(inspector.get_table_names())
+    violations: dict[str, int] = {}
+    with ENGINE.begin() as connection:
+        for table_name in PRIVATE_USER_OWNED_TABLE_NAMES:
+            if table_name not in existing_tables:
+                continue
+            table = metadata.tables[table_name]
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            if "user_id" not in existing_columns:
+                continue
+            count = connection.execute(
+                select(func.count()).select_from(table).where(table.c.user_id.is_(None))
+            ).scalar_one()
+            if count:
+                violations[table_name] = int(count)
+    return violations
 
 
 def reset_db() -> None:
@@ -120,4 +174,3 @@ def _ensure_runtime_columns() -> None:
                             f"ADD COLUMN {column_name} {column_type}{default}"
                         )
                     )
-

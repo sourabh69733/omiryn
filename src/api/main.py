@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.routes import ADMIN_STATIC_DIR, router as admin_router
-from security.auth import current_user, validate_production_security_config
-from storage import init_db
+from security.auth import current_user, production_runtime_enabled, validate_production_security_config
+from storage import init_db, validate_private_data_ownership
 
 from .config import (
     APP_SHELL_HEADERS,
@@ -81,6 +81,8 @@ app.include_router(api_router)
 def startup() -> None:
     validate_production_security_config()
     init_db()
+    if production_runtime_enabled():
+        validate_private_data_ownership()
 
 
 __all__ = [
