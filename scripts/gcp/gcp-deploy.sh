@@ -34,6 +34,12 @@ fi
 
 PROJECT_NUMBER="$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)')"
 RUNTIME_SERVICE_ACCOUNT="${GCP_RUNTIME_SERVICE_ACCOUNT:-${PROJECT_NUMBER}-compute@developer.gserviceaccount.com}"
+CLOUD_BUILD_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
+  --member "serviceAccount:${CLOUD_BUILD_SERVICE_ACCOUNT}" \
+  --role roles/logging.logWriter \
+  --quiet >/dev/null
 
 if [ -n "${PROFILE_PHOTO_GCS_BUCKET:-}" ]; then
   if ! gcloud storage buckets describe "gs://${PROFILE_PHOTO_GCS_BUCKET}" >/dev/null 2>&1; then
@@ -86,6 +92,8 @@ env_vars=(
 )
 
 optional_env_names=(
+  ADMIN_EMAILS
+  ADMIN_USER_IDS
   AGENT_RECENT_MESSAGE_LIMIT
   AGENT_CONTEXT_SOURCE_LIMIT
   AGENT_CONTEXT_SOURCE_CHAR_LIMIT
