@@ -46,7 +46,7 @@ DEEPINFRA_OUTPUT_COST_PER_1M=0.32
 FIREWORKS_MODEL=accounts/fireworks/models/gpt-oss-120b
 FIREWORKS_AVAILABLE_MODELS=accounts/fireworks/models/gpt-oss-120b,accounts/fireworks/models/llama-v3p3-70b-instruct,accounts/fireworks/models/deepseek-v3p1
 
-# Optional. If set, profile photos upload to GCS instead of local disk.
+# Required for production. Profile photos must upload to durable GCS storage.
 PROFILE_PHOTO_GCS_BUCKET=
 PROFILE_PHOTO_GCS_PREFIX=profile_photos
 # Optional custom public base URL/CDN. Without this the app uses storage.googleapis.com.
@@ -73,6 +73,7 @@ DATABASE_URL=
 ENCRYPTION_MASTER_KEY=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
+# Required. Use a random value with at least 32 characters.
 SECRET_KEY=
 GROQ_API_KEY=
 DEEPINFRA_API_KEY=

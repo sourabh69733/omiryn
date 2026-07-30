@@ -10,7 +10,16 @@ require_var GCP_REGION
 require_var GCP_SERVICE
 require_var DATABASE_URL_SECRET
 require_var ENCRYPTION_MASTER_KEY_SECRET
+require_var SUPABASE_URL_SECRET
+require_var SUPABASE_ANON_KEY_SECRET
+require_var SECRET_KEY_SECRET
+require_var PROFILE_PHOTO_GCS_BUCKET
 require_var DEEPINFRA_API_KEY
+
+if [ -z "${ADMIN_EMAILS:-}" ] && [ -z "${ADMIN_USER_IDS:-}" ]; then
+  echo "Missing required admin allowlist: set ADMIN_EMAILS or ADMIN_USER_IDS." >&2
+  exit 1
+fi
 
 gcloud config set project "$GCP_PROJECT_ID"
 

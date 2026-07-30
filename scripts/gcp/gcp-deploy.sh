@@ -12,7 +12,16 @@ require_var GCP_SERVICE
 require_var GCP_ARTIFACT_REPOSITORY
 require_var DATABASE_URL_SECRET
 require_var ENCRYPTION_MASTER_KEY_SECRET
+require_var SUPABASE_URL_SECRET
+require_var SUPABASE_ANON_KEY_SECRET
+require_var SECRET_KEY_SECRET
+require_var PROFILE_PHOTO_GCS_BUCKET
 require_artifact_repository_name
+
+if [ -z "${ADMIN_EMAILS:-}" ] && [ -z "${ADMIN_USER_IDS:-}" ]; then
+  echo "Missing required admin allowlist: set ADMIN_EMAILS or ADMIN_USER_IDS." >&2
+  exit 1
+fi
 
 IMAGE_TAG="${IMAGE_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
 IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/${GCP_SERVICE}:${IMAGE_TAG}"
