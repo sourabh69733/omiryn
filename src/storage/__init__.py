@@ -13,6 +13,7 @@ from .public import *
 from .data_requests import *
 from .app_events import *
 from .feedback import *
+from .user_deletion import *
 from .utils import (
     _conversation_user_id,
     _isoformat_utc,
