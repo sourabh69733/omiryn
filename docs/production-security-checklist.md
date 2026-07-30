@@ -30,6 +30,7 @@ This checklist tracks the privacy and security layer required before a real publ
 ## Auth And Access Control
 
 - [x] Production startup fails unless `AUTH_REQUIRED=true`.
+- [x] Production startup fails unless Supabase, admin allowlist, strong `SECRET_KEY`, encryption key, Postgres URL, and durable photo storage are configured.
 - [ ] Production env uses Supabase Auth with production redirect URLs.
 - [x] All private user-data routes require signed-in auth.
 - [x] Admin routes allow only configured admin emails or user IDs.
@@ -38,7 +39,8 @@ This checklist tracks the privacy and security layer required before a real publ
 
 ## Data And Storage
 
-- [ ] Production uses Postgres, not SQLite.
+- [x] Production startup rejects SQLite and requires Postgres.
+- [ ] Production `DATABASE_URL` is configured to the real Cloud SQL/Postgres database.
 - [x] New private tables require `user_id`.
 - [x] Production startup fails if private tables contain rows without `user_id`.
 - [ ] Run `scripts/data_ops/assign-legacy-data-to-user.sh --dry-run` and backfill/delete legacy anonymous rows before deployment.
@@ -46,7 +48,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Restore process is tested.
 - [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, and public leads where applicable.
 - [ ] Add admin/internal view for deletion and export requests.
-- [ ] Raw sensitive content is not written to application logs.
+- [x] Raw chat/import text is not written to application logs or provider error usage metadata.
+- [x] Production startup requires profile photos to use GCS instead of ephemeral local disk.
 
 ## Abuse Protection
 
@@ -55,6 +58,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Chat messages have max length.
 - [x] Manual memory imports have max length.
 - [x] WhatsApp imports have max length.
+- [x] Production startup rejects profile photo upload limits above 10 MB.
 - [ ] Add durable production rate limits using infrastructure, Redis, or provider controls.
 - [ ] Add upload/file size limits at proxy/runtime level.
 - [ ] Add alerts for repeated throttling or safety reports.
