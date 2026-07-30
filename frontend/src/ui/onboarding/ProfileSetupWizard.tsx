@@ -30,6 +30,10 @@ type SetupValues = {
   phone: string;
 };
 
+type AuthUser = {
+  display_name?: string | null;
+};
+
 type PhotoValue = {
   file: File;
   url: string;
@@ -115,6 +119,24 @@ export function ProfileSetupWizard() {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
   }, [values]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/auth/me")
+      .then((response) => response.ok ? response.json() : null)
+      .then((user: AuthUser | null) => {
+        const displayName = user?.display_name?.trim();
+        if (!displayName || cancelled) return;
+        setValues((current) => current.displayName.trim() ? current : {
+          ...current,
+          displayName
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -379,7 +401,7 @@ export function ProfileSetupWizard() {
                   <small>Omiryn is for people aged 18 and above.</small>
                 </div>
                 {errors.dob ? <small className="field-error">{errors.dob}</small> : null}
-
+                <div style={{marginTop: "15px"}}>
                 <fieldset className="choice-fieldset">
                   <legend>How do you describe yourself?</legend>
                   <div className="choice-grid gender-grid">
@@ -398,6 +420,7 @@ export function ProfileSetupWizard() {
                   </div>
                   {errors.gender ? <small className="field-error">{errors.gender}</small> : null}
                 </fieldset>
+                </div>
               </div>
             ) : null}
 
