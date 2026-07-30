@@ -502,8 +502,12 @@
 
 .icon-input input,
 .icon-input select {
-  padding-right: 42px;
+  padding-right: 18px;
   padding-left: 44px;
+}
+
+.icon-input input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
 }
 
 .photo-grid {
@@ -516,13 +520,21 @@
   position: relative;
   min-height: 160px;
   overflow: hidden;
-  border: 1.5px dashed #d9cdef;
+  border: 2px dashed #bcaee0;
   border-radius: 18px;
-  background: linear-gradient(145deg, #fdfbff, #f8f4ff);
+  background: linear-gradient(145deg, #fbf8ff, #f1ebff);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .photo-tile.main {
-  border-color: rgba(118, 87, 220, 0.48);
+  border-color: rgba(118, 87, 220, 0.72);
+}
+
+.photo-tile:not(.has-photo):hover,
+.photo-tile:not(.has-photo):focus-within {
+  border-color: rgba(118, 87, 220, 0.9);
+  background: linear-gradient(145deg, #f9f6ff, #ebe3ff);
+  box-shadow: 0 12px 28px rgba(59, 46, 96, 0.12);
 }
 
 .add-photo {
@@ -536,21 +548,41 @@
   border: 0;
   color: var(--ink-soft);
   background: transparent;
+  transition: color 160ms ease, background 160ms ease;
 }
 
 .add-photo svg {
   width: 28px;
   margin-bottom: 5px;
   color: var(--purple);
+  transition: color 160ms ease, opacity 160ms ease;
 }
 
 .add-photo strong {
+  color: var(--ink-soft);
   font-size: 12px;
 }
 
 .add-photo small {
   color: var(--muted);
   font-size: 10px;
+}
+
+.setup-card .add-photo:hover,
+.setup-card .add-photo:focus-visible {
+  color: var(--ink);
+  background: transparent;
+}
+
+.setup-card .add-photo:hover svg,
+.setup-card .add-photo:focus-visible svg {
+  color: var(--purple);
+  opacity: 1;
+}
+
+.setup-card .add-photo:focus-visible {
+  outline: 3px solid rgba(118, 87, 220, 0.18);
+  outline-offset: -6px;
 }
 
 .photo-tile img {
@@ -808,13 +840,25 @@
 }
 
 .skip-link {
-  padding: 0 8px;
+  min-width: 108px;
+  border: 1px solid rgba(118, 87, 220, 0.2);
+  padding: 0 14px;
+  color: #594978;
+  background: rgba(255, 255, 255, 0.88);
   font-size: 12px;
 }
 
 .back-button:hover,
 .skip-link:hover {
   color: var(--purple);
+}
+
+.skip-link:hover,
+.skip-link:focus-visible {
+  color: #5133b6;
+  border-color: rgba(118, 87, 220, 0.36);
+  background: rgba(246, 242, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(59, 46, 96, 0.08);
 }
 
 .back-button:hover:not(:disabled) {
@@ -939,6 +983,11 @@
 
   .interest-card {
     min-height: 58px;
+  }
+
+  .location-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .photo-grid {

@@ -14,7 +14,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { OmirynLogo } from "../brand/OmirynLogo";
 
@@ -117,6 +117,7 @@ export function ProfileSetupWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const cityInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
@@ -158,7 +159,9 @@ export function ProfileSetupWizard() {
   const progress = ((stepIndex + 1) / steps.length) * 100;
   const maxDob = useMemo(() => dateYearsAgo(18), []);
   const minDob = useMemo(() => dateYearsAgo(100), []);
-  const selectedState = locationData.states?.find((state) => state.name === values.state);
+  const stateOptions = locationData.states || [];
+  const selectedState = stateOptions.find((state) => state.name.toLowerCase() === values.state.trim().toLowerCase());
+  const stateNames = stateOptions.map((state) => state.name);
   const cityOptions = selectedState
     ? [...(locationData.citiesByState?.[selectedState.code] || [])]
       .sort((a, b) => (b.population || 0) - (a.population || 0))
@@ -191,6 +194,48 @@ export function ProfileSetupWizard() {
     });
   }
 
+  function bestLocationMatch(value: string, options: string[]) {
+    const query = value.trim().toLowerCase();
+    if (!query) return "";
+    return (
+      options.find((option) => option.toLowerCase() === query) ||
+      options.find((option) => option.toLowerCase().startsWith(query)) ||
+      options.find((option) => option.toLowerCase().includes(query)) ||
+      ""
+    );
+  }
+
+  function commitStateSuggestion(value: string) {
+    const match = bestLocationMatch(value, stateNames);
+    if (!match) return false;
+    if (match !== values.state) updateState(match);
+    return true;
+  }
+
+  function commitCitySuggestion(value: string) {
+    const match = bestLocationMatch(value, cityOptions);
+    if (!match) return false;
+    if (match !== values.city) updateValue("city", match);
+    return true;
+  }
+
+  function handleStateKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Tab" && event.key !== "Enter") return;
+    const committed = commitStateSuggestion(event.currentTarget.value);
+    if (!committed) return;
+    if (event.key === "Enter") event.preventDefault();
+    if (event.key === "Tab") {
+      event.preventDefault();
+      window.requestAnimationFrame(() => cityInputRef.current?.focus());
+    }
+  }
+
+  function handleCityKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Tab" && event.key !== "Enter") return;
+    const committed = commitCitySuggestion(event.currentTarget.value);
+    if (event.key === "Enter" && committed) event.preventDefault();
+  }
+
   function validateStep() {
     const nextErrors: Record<string, string> = {};
     if (stepIndex === 0) {
@@ -204,7 +249,8 @@ export function ProfileSetupWizard() {
     if (stepIndex === 1) {
       if (!values.interestedIn) nextErrors.interestedIn = "Choose who you would like to meet.";
       if (!values.state) nextErrors.state = "Choose your state.";
-      if (values.city.trim().length < 2) nextErrors.city = "Enter your city.";
+      else if (!selectedState) nextErrors.state = "Choose a state from suggestions.";
+      if (selectedState && values.city.trim().length < 2) nextErrors.city = "Enter your city.";
     }
     if (stepIndex === 3 && values.phone && !/^[0-9\s-]{7,15}$/.test(values.phone.trim())) {
       nextErrors.phone = "Enter a valid mobile number, or skip this step.";
@@ -469,19 +515,22 @@ export function ProfileSetupWizard() {
                     <label className="field-label" htmlFor="state">Your state</label>
                     <div className="icon-input">
                       <MapPin aria-hidden="true" />
-                      <select
+                      <input
                         id="state"
+                        list="state-options"
                         className={errors.state ? "invalid" : ""}
                         value={values.state}
                         onChange={(event) => updateState(event.target.value)}
+                        onBlur={(event) => commitStateSuggestion(event.currentTarget.value)}
+                        onKeyDown={handleStateKeyDown}
+                        placeholder="Search your state"
                         autoComplete="address-level1"
-                      >
-                        <option value="">Choose your state</option>
-                        {(locationData.states || []).map((state) => (
-                          <option value={state.name} key={state.code}>{state.name}</option>
+                      />
+                      <datalist id="state-options">
+                        {stateOptions.map((state) => (
+                          <option value={state.name} key={state.code} />
                         ))}
-                      </select>
-                      <ChevronDown aria-hidden="true" />
+                      </datalist>
                     </div>
                     {errors.state ? <small className="field-error">{errors.state}</small> : null}
                   </div>
@@ -490,27 +539,31 @@ export function ProfileSetupWizard() {
                     <label className="field-label" htmlFor="city">Your city</label>
                     <div className="icon-input">
                       <MapPin aria-hidden="true" />
-                      <select
+                      <input
                         id="city"
+                        ref={cityInputRef}
+                        list="city-options"
                         className={errors.city ? "invalid" : ""}
                         value={values.city}
                         onChange={(event) => updateValue("city", event.target.value)}
-                        disabled={!values.state}
+                        onBlur={(event) => commitCitySuggestion(event.currentTarget.value)}
+                        onKeyDown={handleCityKeyDown}
+                        disabled={!selectedState}
+                        placeholder={selectedState ? "Search your city" : "Choose state first"}
                         autoComplete="address-level2"
-                      >
-                        <option value="">{values.state ? "Choose your city" : "Choose state first"}</option>
+                      />
+                      <datalist id="city-options">
                         {cityOptions.map((city, index) => (
-                          <option value={city} key={`${city}-${index}`}>{city}</option>
+                          <option value={city} key={`${city}-${index}`} />
                         ))}
-                      </select>
-                      <ChevronDown aria-hidden="true" />
+                      </datalist>
                     </div>
                     {errors.city ? <small className="field-error">{errors.city}</small> : null}
                   </div>
                 </div>
 
                 <p className="field-help">
-                  {values.state ? "Used to suggest practical nearby matches." : "Choose a state first to see city suggestions."}
+                  {selectedState ? "Type to search nearby city suggestions. You can still enter your exact place." : "Choose a state from suggestions first to see city suggestions."}
                 </p>
               </div>
             ) : null}
@@ -535,7 +588,7 @@ export function ProfileSetupWizard() {
                           <small>{slot === 0 ? "Choose a clear, recent photo" : "Optional"}</small>
                         </button>
                       )}
-                      {slot === 0 ? <span className="main-photo-label">Main photo</span> : null}
+                      {slot === 0 && photo ? <span className="main-photo-label">Main photo</span> : null}
                     </div>
                   ))}
                 </div>
