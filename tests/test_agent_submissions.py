@@ -1,3 +1,4 @@
+import asyncio
 import os
 import unittest
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from agent.runtime.providers import (
     _estimated_cost_usd,
     _groq_rate_limit_headers,
     _mock_reply,
+    _openai_compatible_chat,
     _openai_compatible_provider_config,
     _provider_error_detail,
     _prompt_debug,
@@ -48,6 +50,7 @@ from storage import (
     list_agent_context_snapshots,
     list_agent_trace_steps,
     list_agent_traces,
+    list_agent_usage_events,
     list_user_app_events,
     list_user_data_requests,
     list_user_feedback_submissions,
@@ -1778,6 +1781,55 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(headers["x-ratelimit-limit-requests"], "14400")
         self.assertEqual(headers["x-ratelimit-remaining-tokens"], "12000")
         self.assertNotIn("ignored-header", headers)
+
+    def test_provider_error_usage_does_not_store_raw_response_body(self) -> None:
+        save_conversation(
+            {
+                "id": "conversation-privacy",
+                "user_id": "test-user",
+                "status": "active",
+                "messages": [{"role": "assistant", "content": "Hi."}],
+            }
+        )
+
+        async def fake_post(*args, **kwargs):
+            request = httpx.Request("POST", "https://provider.example/chat/completions")
+            response = httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "message": "Bad request included private user text: secret chat line",
+                        "code": "bad_request",
+                    }
+                },
+                request=request,
+            )
+            raise httpx.HTTPStatusError("bad request", request=request, response=response)
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEEPINFRA_API_KEY": "test-key",
+                "DEEPINFRA_BASE_URL": "https://provider.example",
+            },
+        ), patch("httpx.AsyncClient.post", new=fake_post):
+            with self.assertRaises(Exception):
+                asyncio.run(
+                    _openai_compatible_chat(
+                        "deepinfra",
+                        "system",
+                        [{"role": "user", "content": "secret chat line"}],
+                        conversation_id="conversation-privacy",
+                    )
+                )
+
+        events = list_agent_usage_events(user_id="test-user")
+        event = next(item for item in events if item["conversation_id"] == "conversation-privacy")
+        raw_usage = event["raw_usage"]
+        self.assertEqual(raw_usage["error_status_code"], 400)
+        self.assertNotIn("error", raw_usage)
+        self.assertNotIn("error_text", raw_usage)
+        self.assertNotIn("secret chat line", str(raw_usage))
 
     def test_usage_response_includes_configured_limits(self) -> None:
         with patch.dict(

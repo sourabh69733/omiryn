@@ -29,9 +29,13 @@ class ProductionSecurityConfigTest(unittest.TestCase):
                 "AUTH_PROVIDER": "supabase",
                 "SUPABASE_URL": "https://example.supabase.co",
                 "SUPABASE_ANON_KEY": "anon-public-key",
+                "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/omiryn",
                 "ENCRYPTION_MASTER_KEY": _valid_master_key(),
+                "SECRET_KEY": "x" * 32,
                 "ADMIN_EMAILS": "admin@example.com",
                 "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "false",
+                "PROFILE_PHOTO_GCS_BUCKET": "omiryn-profile-photos",
+                "PROFILE_PHOTO_MAX_MB": "10",
             },
             clear=True,
         ):
@@ -47,10 +51,14 @@ class ProductionSecurityConfigTest(unittest.TestCase):
                 "AUTH_PROVIDER": "none",
                 "SUPABASE_URL": "",
                 "SUPABASE_ANON_KEY": "",
+                "DATABASE_URL": "sqlite:///./data/omiryn.db",
                 "ENCRYPTION_MASTER_KEY": "",
+                "SECRET_KEY": "change-me-in-local-env",
                 "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
                 "ADMIN_EMAILS": "",
                 "ADMIN_USER_IDS": "",
+                "PROFILE_PHOTO_GCS_BUCKET": "",
+                "PROFILE_PHOTO_MAX_MB": "25",
             },
             clear=True,
         ):
@@ -60,8 +68,12 @@ class ProductionSecurityConfigTest(unittest.TestCase):
         message = str(error.exception)
         self.assertIn("AUTH_REQUIRED must be true", message)
         self.assertIn("AUTH_PROVIDER must be supabase", message)
+        self.assertIn("DATABASE_URL must use Postgres, not SQLite", message)
+        self.assertIn("SECRET_KEY must be set", message)
         self.assertIn("ADMIN_ALLOW_UNAUTHENTICATED_DEV must be false", message)
         self.assertIn("ADMIN_EMAILS or ADMIN_USER_IDS", message)
+        self.assertIn("PROFILE_PHOTO_GCS_BUCKET is required", message)
+        self.assertIn("PROFILE_PHOTO_MAX_MB must be greater than 0 and no more than 10", message)
 
     def test_cloud_run_environment_is_treated_as_production(self) -> None:
         with patch.dict(
@@ -75,4 +87,3 @@ class ProductionSecurityConfigTest(unittest.TestCase):
             self.assertTrue(production_runtime_enabled())
             with self.assertRaises(ProductionSecurityConfigError):
                 validate_production_security_config()
-
