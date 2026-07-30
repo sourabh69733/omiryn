@@ -225,13 +225,24 @@
   box-shadow: 0 26px 70px rgba(55, 43, 92, 0.1);
 }
 
-.card-heading {
+.setup-card .card-heading {
+  display: grid;
+  grid-template-columns: max-content auto minmax(0, 1fr) max-content;
+  gap: 14px 28px;
+  align-items: start;
   position: relative;
   padding: 34px 38px 24px;
+  border-bottom: 0;
 }
 
-.card-heading h2 {
-  margin: 8px 0 10px;
+.setup-card .card-heading .eyebrow {
+  grid-column: 1;
+  margin-top: 10px;
+}
+
+.setup-card .card-heading h2 {
+  grid-column: 2;
+  margin: 0;
   color: var(--ink);
   font-family: var(--font-display);
   font-size: clamp(28px, 3vw, 36px);
@@ -240,8 +251,9 @@
   line-height: 1.08;
 }
 
-.card-heading > p:last-of-type {
-  max-width: 540px;
+.setup-card .card-heading > p:last-of-type {
+  grid-column: 3;
+  max-width: none;
   margin: 0;
   color: var(--muted);
   font-size: 14px;
@@ -249,9 +261,8 @@
 }
 
 .optional-badge {
-  position: absolute;
-  top: 32px;
-  right: 38px;
+  grid-column: 4;
+  justify-self: end;
   border: 1px solid rgba(255, 95, 154, 0.22);
   border-radius: 999px;
   padding: 6px 10px;
@@ -259,6 +270,7 @@
   background: rgba(255, 95, 154, 0.08);
   font-size: 11px;
   font-weight: 750;
+  white-space: nowrap;
 }
 
 .form-section {
@@ -827,22 +839,28 @@
     box-shadow: none;
   }
 
-  .card-heading {
+  .setup-card .card-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
     padding: 24px 20px 18px;
   }
 
-  .card-heading .eyebrow {
+  .setup-card .card-heading .eyebrow {
     display: none;
   }
 
-  .card-heading h2 {
+  .setup-card .card-heading h2 {
+    grid-column: 1;
     margin-top: 0;
     font-size: 29px;
   }
 
+  .setup-card .card-heading > p:last-of-type {
+    grid-column: 1 / -1;
+  }
+
   .optional-badge {
-    top: 21px;
-    right: 20px;
+    grid-column: 2;
   }
 
   .form-section {
