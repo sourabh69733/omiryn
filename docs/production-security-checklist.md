@@ -1,6 +1,6 @@
 # Omiryn Production Security Checklist
 
-Last updated: July 28, 2026
+Last updated: July 30, 2026
 
 This checklist tracks the privacy and security layer required before a real public launch.
 
@@ -29,18 +29,22 @@ This checklist tracks the privacy and security layer required before a real publ
 
 ## Auth And Access Control
 
-- [ ] Production env sets `AUTH_REQUIRED=true`.
+- [x] Production startup fails unless `AUTH_REQUIRED=true`.
 - [ ] Production env uses Supabase Auth with production redirect URLs.
-- [ ] All private user-data routes require `current_user` or stricter auth.
-- [ ] Admin routes allow only configured admin emails.
+- [x] All private user-data routes require signed-in auth.
+- [x] Admin routes allow only configured admin emails or user IDs.
+- [x] Unauthenticated admin dev bypass is disabled in production.
 - [ ] Staging and production auth configs are separate.
 
 ## Data And Storage
 
 - [ ] Production uses Postgres, not SQLite.
+- [x] New private tables require `user_id`.
+- [x] Production startup fails if private tables contain rows without `user_id`.
+- [ ] Run `scripts/data_ops/assign-legacy-data-to-user.sh --dry-run` and backfill/delete legacy anonymous rows before deployment.
 - [ ] Daily backups are enabled.
 - [ ] Restore process is tested.
-- [ ] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, and public leads where applicable.
+- [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, and public leads where applicable.
 - [ ] Add admin/internal view for deletion and export requests.
 - [ ] Raw sensitive content is not written to application logs.
 
