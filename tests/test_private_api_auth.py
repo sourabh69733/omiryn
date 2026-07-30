@@ -3,16 +3,21 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy import inspect
 
 from api.main import app
 from storage import (
+    ENGINE,
+    PRIVATE_USER_OWNED_TABLE_NAMES,
     list_agent_usage_events,
     list_conversations,
+    private_data_ownership_violations,
     save_agent_message_feedback,
     save_agent_trace,
     save_agent_usage_event,
     save_context_source,
     save_conversation,
+    save_data_point_extraction_debug,
     save_draft,
     reset_db,
 )
@@ -99,6 +104,16 @@ class PrivateApiAuthTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             list_agent_usage_events()
 
+        with self.assertRaises(ValueError):
+            save_data_point_extraction_debug(
+                {
+                    "source_kind": "agent_conversation",
+                    "decision": "approved",
+                    "candidate": {},
+                    "review": {},
+                }
+            )
+
     def test_private_storage_does_not_reassign_existing_owner(self) -> None:
         conversation = {"id": "conversation-a", "status": "active", "messages": []}
         save_conversation(conversation, "user-a")
@@ -111,3 +126,16 @@ class PrivateApiAuthTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             save_draft(draft, "user-b")
+
+    def test_private_user_owned_tables_have_non_nullable_user_id(self) -> None:
+        inspector = inspect(ENGINE)
+        for table_name in PRIVATE_USER_OWNED_TABLE_NAMES:
+            columns = {
+                column["name"]: column
+                for column in inspector.get_columns(table_name)
+            }
+            self.assertIn("user_id", columns, table_name)
+            self.assertFalse(columns["user_id"]["nullable"], table_name)
+
+    def test_private_data_ownership_audit_is_clean_after_reset(self) -> None:
+        self.assertEqual(private_data_ownership_violations(), {})

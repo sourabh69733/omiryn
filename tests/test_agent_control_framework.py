@@ -30,6 +30,7 @@ from agent.runtime.providers import _deep_fact_extraction_text
 from agent.runtime.replies import split_assistant_reply
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
+from security.auth import CurrentUser, current_user
 from storage import list_agent_behavior_rules, reset_db, save_conversation
 
 
@@ -45,9 +46,15 @@ class AgentControlFrameworkTest(unittest.TestCase):
         )
         self.env_patch.start()
         reset_db()
+
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="test-user", email="test@example.com")
+
+        app.dependency_overrides[current_user] = signed_in_user
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        app.dependency_overrides.clear()
         self.env_patch.stop()
 
     def test_prompt_builder_keeps_behavior_and_context_explicit(self) -> None:
