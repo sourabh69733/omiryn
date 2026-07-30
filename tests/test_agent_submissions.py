@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from fastapi.testclient import TestClient
 
+from api.config import PROFILE_UPLOAD_DIR
 from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
 from api.routes.public import _reset_public_rate_limits
 from agent.memory_engine.memory import (
@@ -39,13 +40,16 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    get_conversation,
     get_profile_fact,
+    get_user_profile,
     list_data_point_extraction_debug,
     list_data_point_feedback,
     list_agent_context_snapshots,
     list_agent_trace_steps,
     list_agent_traces,
     list_user_app_events,
+    list_user_data_requests,
     list_user_feedback_submissions,
     list_context_sources,
     list_profile_facts,
@@ -56,6 +60,8 @@ from storage import (
     list_whatsapp_style_profiles,
     reset_db,
     save_app_events,
+    save_context_source,
+    save_conversation,
     save_data_point_extraction_debug,
     save_data_point_feedback,
     save_data_request,
@@ -64,6 +70,8 @@ from storage import (
     save_feedback_submission,
     save_public_event,
     save_public_lead,
+    save_user_profile,
+    save_whatsapp_import_bundle,
     upsert_profile_fact,
 )
 
@@ -2642,6 +2650,175 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 422)
+
+    def test_account_data_deletion_requires_confirmation(self) -> None:
+        response = self.client.delete("/api/me/account-data")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Pass confirm=true to delete account data.",
+        )
+
+    def test_account_data_deletion_removes_private_rows_and_local_photos(self) -> None:
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id="user-a", email="a@example.com", display_name="Aarav")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        photo_path = PROFILE_UPLOAD_DIR / "delete-me.jpg"
+        photo_path.write_bytes(b"photo")
+        save_user_profile(
+            "user-a",
+            "man",
+            "women",
+            "Aarav",
+            31,
+            "Bengaluru",
+            "9999999999",
+            "/uploads/profile_photos/delete-me.jpg",
+            ["/uploads/profile_photos/delete-me.jpg"],
+            "delete-me.jpg",
+            ["delete-me.jpg"],
+        )
+        conversation = {
+            "id": "conversation-a",
+            "status": "active",
+            "messages": [{"role": "assistant", "content": "Hello"}],
+        }
+        save_conversation(conversation, "user-a")
+        source = save_context_source(
+            {
+                "user_id": "user-a",
+                "conversation_id": "conversation-a",
+                "source_type": "manual_notes",
+                "title": "Private notes",
+                "content": "The user values calm communication.",
+            }
+        )
+        save_whatsapp_import_bundle(
+            {
+                "user_id": "user-a",
+                "conversation_id": "conversation-a",
+                "context_source_id": source["id"],
+                "style_kind": "user_style",
+                "title": "Chat import",
+                "messages": [
+                    {
+                        "sender": "Aarav",
+                        "content": "coffee at five",
+                        "message_index": 0,
+                    }
+                ],
+                "chunks": [
+                    {
+                        "chunk_index": 1,
+                        "start_message_index": 0,
+                        "end_message_index": 0,
+                        "content": "Aarav: coffee at five",
+                    }
+                ],
+                "people": [{"sender": "Aarav", "message_count": 1, "role": "selected_user"}],
+                "style_profiles": [{"sender": "Aarav", "summary": {}, "sample_messages": []}],
+            },
+            "user-a",
+        )
+        fact = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "values",
+                "key": "calm",
+                "value": {"meaning": "calm communication"},
+                "label": "Values calm communication",
+                "confidence": 0.9,
+                "source_kind": "agent_chat",
+                "source_id": "conversation-a",
+                "evidence": [],
+                "status": "active",
+                "visibility": "private",
+                "used_for_matching": True,
+                "used_for_chat_context": True,
+            }
+        )
+        save_data_point_feedback(
+            {
+                "user_id": "user-a",
+                "profile_fact_id": fact["id"],
+                "rating": "good",
+                "reason": "accurate",
+            }
+        )
+        save_data_point_extraction_debug(
+            {
+                "user_id": "user-a",
+                "source_kind": "agent_conversation",
+                "source_id": "conversation-a",
+                "decision": "approved",
+                "candidate": {},
+                "review": {},
+            }
+        )
+        save_agent_usage_event(
+            {
+                "user_id": "user-a",
+                "conversation_id": "conversation-a",
+                "request_kind": "chat_reply",
+                "provider": "mock",
+                "success": True,
+            }
+        )
+        save_agent_message_feedback(
+            {
+                "user_id": "user-a",
+                "conversation_id": "conversation-a",
+                "message_index": 0,
+                "rating": "good",
+            }
+        )
+        save_app_events("user-a", [{"event_name": "app_opened", "page": "chat"}])
+        save_feedback_submission(
+            {
+                "user_id": "user-a",
+                "email": "a@example.com",
+                "category": "feedback",
+                "message": "Please remove this too.",
+            }
+        )
+        save_data_request(
+            {
+                "user_id": "user-a",
+                "email": "a@example.com",
+                "request_type": "deletion",
+                "message": "Delete my data.",
+            }
+        )
+        save_public_lead(
+            {
+                "contact": "a@example.com",
+                "channel": "email",
+                "intent": "privacy",
+            }
+        )
+
+        response = self.client.delete("/api/me/account-data?confirm=true")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "deleted")
+        self.assertGreaterEqual(data["deleted"]["agent_conversations"], 1)
+        self.assertGreaterEqual(data["deleted"]["profile_facts"], 1)
+        self.assertGreaterEqual(data["deleted"]["public_leads"], 1)
+        self.assertEqual(data["deleted_profile_photos"], ["delete-me.jpg"])
+        self.assertFalse(photo_path.exists())
+        self.assertIsNone(get_user_profile("user-a"))
+        self.assertIsNone(get_conversation("conversation-a", "user-a"))
+        self.assertEqual(list_profile_facts("user-a"), [])
+        self.assertEqual(list_data_point_feedback(user_id="user-a"), [])
+        self.assertEqual(list_data_point_extraction_debug(user_id="user-a"), [])
+        self.assertEqual(list_whatsapp_imports(user_id="user-a"), [])
+        self.assertEqual(list_user_app_events("user-a"), [])
+        self.assertEqual(list_user_feedback_submissions("user-a"), [])
+        self.assertEqual(list_user_data_requests("user-a"), [])
 
     def test_auth_required_blocks_anonymous_app_events(self) -> None:
         app.dependency_overrides.clear()

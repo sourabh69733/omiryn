@@ -7,6 +7,7 @@ from agent.memory_engine.data_point_feedback import normalize_data_point_feedbac
 from security.auth import CurrentUser, require_user
 from storage import (
     delete_profile_fact,
+    delete_user_private_data,
     get_profile_fact,
     get_user_profile,
     save_app_events,
@@ -28,6 +29,7 @@ from ..helpers import (
     _clean_optional_text,
     _context_source_summary,
     _data_point_feedback_summary_for_fact,
+    _delete_profile_photo_file_names,
     _dedupe_context_sources,
     _group_profile_facts,
     _latest_data_point_feedback_by_fact,
@@ -204,6 +206,23 @@ async def create_me_data_request(
         }
     )
     return {"request": request}
+
+
+@router.delete("/api/me/account-data")
+async def delete_me_account_data(
+    confirm: bool = False,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Pass confirm=true to delete account data.")
+    summary = delete_user_private_data(user.id, user.email)
+    deleted_photos = _delete_profile_photo_file_names(summary.get("profile_photo_file_names", []))
+    return {
+        "user_id": user.id,
+        "status": "deleted",
+        "deleted": summary["deleted"],
+        "deleted_profile_photos": deleted_photos,
+    }
 
 
 @router.post("/api/me/events", status_code=201)

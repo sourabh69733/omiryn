@@ -284,6 +284,54 @@ def _store_profile_photo(
     return _profile_photo_public_url(filename), filename
 
 
+def _delete_profile_photo_file_names(file_names: object) -> list[str]:
+    if not isinstance(file_names, list):
+        return []
+    bucket = str(_compat_setting("PROFILE_PHOTO_GCS_BUCKET", PROFILE_PHOTO_GCS_BUCKET) or "")
+    deleted: list[str] = []
+    for raw_name in file_names:
+        file_name = str(raw_name or "")
+        if not file_name:
+            continue
+        if bucket:
+            if _delete_gcs_profile_photo(file_name, bucket):
+                deleted.append(file_name)
+        elif _delete_local_profile_photo(file_name):
+            deleted.append(file_name)
+    return deleted
+
+
+def _delete_gcs_profile_photo(object_name: str, bucket: str) -> bool:
+    if gcs_storage is None:
+        logger.warning("profile_photo.delete_gcs_unavailable object_name=%s", object_name)
+        return False
+    client = gcs_storage.Client()
+    blob = client.bucket(bucket).blob(object_name)
+    try:
+        blob.delete()
+    except Exception as error:  # pragma: no cover - provider behavior varies
+        logger.warning(
+            "profile_photo.delete_gcs_failed object_name=%s error=%s",
+            object_name,
+            error,
+        )
+        return False
+    return True
+
+
+def _delete_local_profile_photo(file_name: str) -> bool:
+    upload_root = PROFILE_UPLOAD_DIR.resolve()
+    candidate = (upload_root / file_name).resolve()
+    try:
+        candidate.relative_to(upload_root)
+    except ValueError:
+        return False
+    if not candidate.is_file():
+        return False
+    candidate.unlink()
+    return True
+
+
 def _basic_profile_complete(profile: dict[str, object] | None) -> bool:
     return bool(
         profile
