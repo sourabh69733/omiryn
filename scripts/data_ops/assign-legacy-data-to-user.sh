@@ -7,4 +7,4 @@ fi
 
 export PYTHONPATH="${PYTHONPATH:-src}"
 
-python scripts/assign_legacy_data_to_user.py "$@"
+python scripts/data_ops/assign_legacy_data_to_user.py "$@"

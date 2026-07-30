@@ -11,7 +11,7 @@ except ModuleNotFoundError:  # pragma: no cover
     load_dotenv = None
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
@@ -42,11 +42,21 @@ def main() -> None:
     from sqlalchemy import func, select
     from storage import (
         ENGINE,
+        agent_context_snapshots,
         agent_conversations,
+        agent_message_feedback,
+        agent_trace_steps,
+        agent_traces,
         agent_usage_events,
         conversation_context_sources,
+        data_point_extraction_debug,
         draft_profiles,
         init_db,
+        whatsapp_chunks,
+        whatsapp_imports,
+        whatsapp_messages,
+        whatsapp_people,
+        whatsapp_style_profiles,
     )
 
     init_db()
@@ -55,7 +65,17 @@ def main() -> None:
         draft_profiles,
         agent_conversations,
         agent_usage_events,
+        agent_context_snapshots,
+        agent_traces,
+        agent_trace_steps,
         conversation_context_sources,
+        whatsapp_imports,
+        whatsapp_messages,
+        whatsapp_chunks,
+        whatsapp_people,
+        whatsapp_style_profiles,
+        data_point_extraction_debug,
+        agent_message_feedback,
     )
     user_id = args.user_id or _lookup_supabase_user_id(args.email)
     print(f"Target user_id: {user_id}")
