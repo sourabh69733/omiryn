@@ -227,17 +227,16 @@
 
 .setup-card .card-heading {
   display: grid;
-  grid-template-columns: max-content auto minmax(0, 1fr) max-content;
-  gap: 14px 28px;
-  align-items: start;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 8px 28px;
+  align-items: center;
   position: relative;
-  padding: 34px 38px 24px;
+  padding: 30px 38px 22px;
   border-bottom: 0;
 }
 
 .setup-card .card-heading .eyebrow {
   grid-column: 1;
-  margin-top: 10px;
 }
 
 .setup-card .card-heading h2 {
@@ -252,8 +251,8 @@
 }
 
 .setup-card .card-heading > p:last-of-type {
-  grid-column: 3;
-  max-width: none;
+  grid-column: 2 / -1;
+  max-width: 620px;
   margin: 0;
   color: var(--muted);
   font-size: 14px;
@@ -292,7 +291,7 @@
   margin: 19px 0 9px;
   padding: 0;
   color: var(--ink-soft);
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 740;
 }
 
@@ -301,7 +300,8 @@
   margin-top: 0;
 }
 
-.setup-card input {
+.setup-card input,
+.setup-card select {
   width: 100%;
   min-height: 52px;
   outline: none;
@@ -318,18 +318,33 @@
   color: var(--muted-2);
 }
 
-.setup-card input:hover {
+.setup-card select {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.setup-card input:hover,
+.setup-card select:hover {
   border-color: #cfc4e2;
 }
 
-.setup-card input:focus {
+.setup-card input:focus,
+.setup-card select:focus {
   border-color: var(--purple-2);
   box-shadow: 0 0 0 4px rgba(118, 87, 220, 0.11);
 }
 
-.setup-card input.invalid {
+.setup-card input.invalid,
+.setup-card select.invalid {
   border-color: #d04462;
   background: #fffafb;
+}
+
+.setup-card input:disabled,
+.setup-card select:disabled {
+  color: var(--muted);
+  background: #f8f5fb;
+  cursor: not-allowed;
 }
 
 .input-with-note {
@@ -449,6 +464,20 @@
   font-size: 10px;
 }
 
+.location-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-top: 15px;
+  /* grid-template-columns: 1fr; */
+  /* gap: 0; */
+}
+
+.location-field {
+  min-width: 0;
+}
+
 .icon-input {
   position: relative;
 }
@@ -471,7 +500,8 @@
   pointer-events: none;
 }
 
-.icon-input input {
+.icon-input input,
+.icon-input select {
   padding-right: 42px;
   padding-left: 44px;
 }

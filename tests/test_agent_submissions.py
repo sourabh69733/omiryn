@@ -362,13 +362,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
     def test_auth_me_returns_current_user(self) -> None:
         async def signed_in_user() -> CurrentUser:
-            return CurrentUser(id="user-a", email="a@example.com")
+            return CurrentUser(
+                id="user-a",
+                email="a@example.com",
+                display_name="Aarav Google",
+                avatar_url="https://example.com/avatar.png",
+            )
 
         app.dependency_overrides[current_user] = signed_in_user
         response = self.client.get("/api/auth/me")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"id": "user-a", "email": "a@example.com"})
+        self.assertEqual(
+            response.json(),
+            {
+                "id": "user-a",
+                "email": "a@example.com",
+                "display_name": "Aarav Google",
+                "avatar_url": "https://example.com/avatar.png",
+            },
+        )
 
     def test_dating_basics_are_required_profile_data(self) -> None:
         async def signed_in_user() -> CurrentUser:

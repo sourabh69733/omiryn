@@ -26,6 +26,7 @@ type SetupValues = {
   dob: string;
   gender: Gender;
   interestedIn: InterestedIn;
+  state: string;
   city: string;
   phone: string;
 };
@@ -71,6 +72,7 @@ const emptyValues: SetupValues = {
   dob: "",
   gender: "",
   interestedIn: "",
+  state: "",
   city: "",
   phone: ""
 };
@@ -111,7 +113,7 @@ export function ProfileSetupWizard() {
   const [photos, setPhotos] = useState<Array<PhotoValue | null>>([null, null, null, null]);
   const [activePhotoSlot, setActivePhotoSlot] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [locationData, setLocationData] = useState<LocationData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -144,16 +146,9 @@ export function ProfileSetupWizard() {
       .then((response) => response.json())
       .then((data: LocationData) => {
         if (cancelled || !data.states || !data.citiesByState) return;
-        const options = data.states.flatMap((state) =>
-          (data.citiesByState?.[state.code] || []).map((city) => ({
-            label: `${city.name}, ${state.name}`,
-            population: city.population || 0
-          }))
-        );
-        options.sort((a, b) => b.population - a.population);
-        setCityOptions(options.map((option) => option.label));
+        setLocationData(data);
       })
-      .catch(() => setCityOptions([]));
+      .catch(() => setLocationData({}));
     return () => {
       cancelled = true;
     };
@@ -163,6 +158,13 @@ export function ProfileSetupWizard() {
   const progress = ((stepIndex + 1) / steps.length) * 100;
   const maxDob = useMemo(() => dateYearsAgo(18), []);
   const minDob = useMemo(() => dateYearsAgo(100), []);
+  const selectedState = locationData.states?.find((state) => state.name === values.state);
+  const cityOptions = selectedState
+    ? [...(locationData.citiesByState?.[selectedState.code] || [])]
+      .sort((a, b) => (b.population || 0) - (a.population || 0))
+      .map((city) => city.name)
+    : [];
+  const profileCity = [values.city.trim(), values.state.trim()].filter(Boolean).join(", ");
 
   function updateValue<Key extends keyof SetupValues>(key: Key, value: SetupValues[Key]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -170,6 +172,21 @@ export function ProfileSetupWizard() {
       if (!current[key]) return current;
       const next = { ...current };
       delete next[key];
+      return next;
+    });
+  }
+
+  function updateState(value: string) {
+    setValues((current) => ({
+      ...current,
+      state: value,
+      city: ""
+    }));
+    setErrors((current) => {
+      if (!current.state && !current.city) return current;
+      const next = { ...current };
+      delete next.state;
+      delete next.city;
       return next;
     });
   }
@@ -186,6 +203,7 @@ export function ProfileSetupWizard() {
     }
     if (stepIndex === 1) {
       if (!values.interestedIn) nextErrors.interestedIn = "Choose who you would like to meet.";
+      if (!values.state) nextErrors.state = "Choose your state.";
       if (values.city.trim().length < 2) nextErrors.city = "Enter your city.";
     }
     if (stepIndex === 3 && values.phone && !/^[0-9\s-]{7,15}$/.test(values.phone.trim())) {
@@ -231,7 +249,7 @@ export function ProfileSetupWizard() {
           age,
           gender: values.gender,
           interested_in: values.interestedIn,
-          city: values.city.trim(),
+          city: profileCity,
           phone: values.phone.trim() || null
         })
       });
@@ -446,25 +464,54 @@ export function ProfileSetupWizard() {
                   {errors.interestedIn ? <small className="field-error">{errors.interestedIn}</small> : null}
                 </fieldset>
 
-                <label className="field-label" htmlFor="city">Your city</label>
-                <div className="icon-input">
-                  <MapPin aria-hidden="true" />
-                  <input
-                    id="city"
-                    className={errors.city ? "invalid" : ""}
-                    list="india-city-options"
-                    value={values.city}
-                    onChange={(event) => updateValue("city", event.target.value)}
-                    placeholder="Start typing your city"
-                    autoComplete="address-level2"
-                  />
-                  <ChevronDown aria-hidden="true" />
+                <div className="location-row">
+                  <div className="location-field">
+                    <label className="field-label" htmlFor="state">Your state</label>
+                    <div className="icon-input">
+                      <MapPin aria-hidden="true" />
+                      <select
+                        id="state"
+                        className={errors.state ? "invalid" : ""}
+                        value={values.state}
+                        onChange={(event) => updateState(event.target.value)}
+                        autoComplete="address-level1"
+                      >
+                        <option value="">Choose your state</option>
+                        {(locationData.states || []).map((state) => (
+                          <option value={state.name} key={state.code}>{state.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown aria-hidden="true" />
+                    </div>
+                    {errors.state ? <small className="field-error">{errors.state}</small> : null}
+                  </div>
+
+                  <div className="location-field">
+                    <label className="field-label" htmlFor="city">Your city</label>
+                    <div className="icon-input">
+                      <MapPin aria-hidden="true" />
+                      <select
+                        id="city"
+                        className={errors.city ? "invalid" : ""}
+                        value={values.city}
+                        onChange={(event) => updateValue("city", event.target.value)}
+                        disabled={!values.state}
+                        autoComplete="address-level2"
+                      >
+                        <option value="">{values.state ? "Choose your city" : "Choose state first"}</option>
+                        {cityOptions.map((city, index) => (
+                          <option value={city} key={`${city}-${index}`}>{city}</option>
+                        ))}
+                      </select>
+                      <ChevronDown aria-hidden="true" />
+                    </div>
+                    {errors.city ? <small className="field-error">{errors.city}</small> : null}
+                  </div>
                 </div>
-                <datalist id="india-city-options">
-                  {cityOptions.map((city) => <option value={city} key={city} />)}
-                </datalist>
-                <p className="field-help">Used to suggest practical nearby matches.</p>
-                {errors.city ? <small className="field-error">{errors.city}</small> : null}
+
+                <p className="field-help">
+                  {values.state ? "Used to suggest practical nearby matches." : "Choose a state first to see city suggestions."}
+                </p>
               </div>
             ) : null}
 
