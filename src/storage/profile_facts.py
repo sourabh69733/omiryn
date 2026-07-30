@@ -9,7 +9,7 @@ from security.encryption import decrypt_json, maybe_encrypt_json
 
 from .database import ENGINE
 from .schema import data_point_extraction_debug, data_point_feedback, profile_facts
-from .utils import _isoformat_utc
+from .utils import _isoformat_utc, _require_user_id
 
 def upsert_profile_fact(fact: dict[str, Any]) -> dict[str, Any]:
     payload = _profile_fact_payload(fact)
@@ -263,7 +263,7 @@ def list_data_point_feedback(
 
 
 def save_data_point_extraction_debug(entry: dict[str, Any]) -> dict[str, Any]:
-    user_id = entry.get("user_id")
+    user_id = _require_user_id(entry.get("user_id"), "data point extraction debug")
     payload = {
         "id": entry.get("id") or str(uuid4()),
         "user_id": user_id,
@@ -293,11 +293,12 @@ def list_data_point_extraction_debug(
     decision: str | None = None,
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
-    statement = select(data_point_extraction_debug).order_by(
+    owner_id = _require_user_id(user_id, "data point extraction debug list")
+    statement = select(data_point_extraction_debug).where(
+        data_point_extraction_debug.c.user_id == owner_id
+    ).order_by(
         data_point_extraction_debug.c.created_at.desc()
     )
-    if user_id is not None:
-        statement = statement.where(data_point_extraction_debug.c.user_id == user_id)
     if source_id is not None:
         statement = statement.where(data_point_extraction_debug.c.source_id == source_id)
     if import_id is not None:
