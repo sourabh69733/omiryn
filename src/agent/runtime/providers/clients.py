@@ -81,13 +81,12 @@ async def _openai_compatible_chat(
             raw_usage = {"prompt_debug": prompt_debug}
             detail = ""
             if error.response is not None:
+                raw_usage["error_status_code"] = error.response.status_code
                 raw_usage["rate_limit"] = _provider_rate_limit_headers(error.response)
                 try:
-                    raw_usage["error"] = error.response.json()
-                    detail = _provider_error_detail(raw_usage["error"])
+                    detail = _provider_error_detail(error.response.json())
                 except ValueError:
-                    raw_usage["error_text"] = error.response.text[:500]
-                    detail = error.response.text[:240]
+                    detail = ""
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -248,11 +247,8 @@ async def _groq_chat(
         except httpx.HTTPStatusError as error:
             raw_usage = {"prompt_debug": prompt_debug}
             if error.response is not None:
+                raw_usage["error_status_code"] = error.response.status_code
                 raw_usage["rate_limit"] = _groq_rate_limit_headers(error.response)
-                try:
-                    raw_usage["error"] = error.response.json()
-                except ValueError:
-                    raw_usage["error_text"] = error.response.text[:500]
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -339,13 +335,13 @@ async def _ollama_chat(
             return content
         except httpx.HTTPStatusError as error:
             raw_usage = {"prompt_debug": prompt_debug}
+            raw_usage["error_status_code"] = error.response.status_code
             detail = ""
             try:
-                raw_usage["error"] = error.response.json()
-                detail = str(raw_usage["error"].get("error") or "")
+                error_payload = error.response.json()
+                detail = str(error_payload.get("error") or "") if isinstance(error_payload, dict) else ""
             except ValueError:
-                raw_usage["error_text"] = error.response.text[:500]
-                detail = error.response.text[:240]
+                detail = ""
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
