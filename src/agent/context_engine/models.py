@@ -57,6 +57,18 @@ class EmotionState:
 
 
 @dataclass(frozen=True)
+class ConversationalStance:
+    mode: str = "neutral"
+    confidence: float = 0.0
+    claim_type: str = "none"
+    question_purpose: str = "none"
+    constraints: tuple[str, ...] = ()
+    feedback_kind: str | None = None
+    reason: str = "No special stance needed."
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ConversationPlan:
     current_move: str
     response_mode: str = "normal_chat"
@@ -66,6 +78,12 @@ class ConversationPlan:
     data_targets: tuple[str, ...] = ()
     tone_instruction: str = ""
     reason: str = ""
+    stance: str = "neutral"
+    stance_confidence: float = 0.0
+    claim_type: str = "none"
+    question_purpose: str = "optional"
+    user_constraints: tuple[str, ...] = ()
+    feedback_kind: str | None = None
 
 
 @dataclass(frozen=True)
