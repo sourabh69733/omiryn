@@ -50,6 +50,7 @@ from ..models import (
     DraftProfile,
     UserMessage,
 )
+from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
 
 router = APIRouter()
 
@@ -200,6 +201,7 @@ async def send_agent_message(
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
+    enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     runtime = agent_runtime_status()
     _sync_conversation_runtime(conversation, runtime)
 

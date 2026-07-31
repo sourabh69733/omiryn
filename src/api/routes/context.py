@@ -36,6 +36,7 @@ from ..helpers import (
     _whatsapp_style_context_content,
 )
 from ..models import ContextSourceAttachmentsUpdate, ContextSourceCreate, WhatsappChatImportCreate
+from ..usage_limits import CONTEXT_IMPORT_LIMIT, WHATSAPP_IMPORT_LIMIT, enforce_user_action_limit
 
 router = APIRouter()
 
@@ -91,6 +92,7 @@ def create_conversation_context_source(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
+    enforce_user_action_limit(_user_id(user), CONTEXT_IMPORT_LIMIT)
     source = save_context_source(
         {
             "user_id": _user_id(user),
@@ -194,6 +196,7 @@ def create_whatsapp_context_source(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
+    enforce_user_action_limit(_user_id(user), WHATSAPP_IMPORT_LIMIT)
     try:
         style_summary = build_whatsapp_style_summary(
             payload.content,

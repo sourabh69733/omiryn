@@ -52,6 +52,7 @@ from ..models import (
     ProfileFactPatch,
     UserProfilePatch,
 )
+from ..usage_limits import PHOTO_UPLOAD_LIMIT, enforce_user_action_limit
 
 router = APIRouter()
 
@@ -328,6 +329,7 @@ async def put_me_profile_photo(
     if len(content) > PROFILE_PHOTO_MAX_BYTES:
         max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
         raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
+    enforce_user_action_limit(user.id, PHOTO_UPLOAD_LIMIT)
 
     existing_profile = get_user_profile(user.id)
     existing_photo_urls = [
