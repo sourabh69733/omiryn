@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .database import ENGINE
 from .schema import app_events
@@ -32,6 +32,31 @@ def list_user_app_events(user_id: str) -> list[dict[str, Any]]:
             .order_by(app_events.c.created_at.asc())
         ).mappings().all()
     return [_app_event_from_row(row) for row in rows]
+
+
+def count_user_app_events_since(user_id: str, event_name: str, since: Any) -> int:
+    with ENGINE.begin() as connection:
+        return int(
+            connection.execute(
+                select(func.count())
+                .select_from(app_events)
+                .where(app_events.c.user_id == user_id)
+                .where(app_events.c.event_name == event_name)
+                .where(app_events.c.created_at >= since)
+            ).scalar_one()
+        )
+
+
+def user_app_event_window_stats(user_id: str, event_name: str, since: Any) -> dict[str, Any]:
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(func.count(), func.min(app_events.c.created_at))
+            .select_from(app_events)
+            .where(app_events.c.user_id == user_id)
+            .where(app_events.c.event_name == event_name)
+            .where(app_events.c.created_at >= since)
+        ).one()
+    return {"count": int(row[0] or 0), "oldest_created_at": row[1]}
 
 
 def _app_event_payload(user_id: str, event: dict[str, Any]) -> dict[str, Any]:
