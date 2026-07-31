@@ -5,6 +5,7 @@ import os
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.versions.v1 import V1_PROMPT_VERSION
 from agent.context_engine.prompt_engine.versions.v2 import V2_PROMPT_VERSION
+from agent.context_engine.prompt_engine.versions.v3 import V3_PROMPT_VERSION
 
 DEFAULT_PROMPT_VERSION_ID = "v1"
 
@@ -13,6 +14,8 @@ _PROMPT_VERSIONS = {
     V1_PROMPT_VERSION.name: V1_PROMPT_VERSION,
     V2_PROMPT_VERSION.version_id: V2_PROMPT_VERSION,
     V2_PROMPT_VERSION.name: V2_PROMPT_VERSION,
+    V3_PROMPT_VERSION.version_id: V3_PROMPT_VERSION,
+    V3_PROMPT_VERSION.name: V3_PROMPT_VERSION,
 }
 
 

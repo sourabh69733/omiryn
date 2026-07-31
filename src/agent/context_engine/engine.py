@@ -40,7 +40,7 @@ def build_model_context_package(
         user_profile=user_profile,
         style_source_id=style_source_id,
     )
-    if prompt_version.version_id == "v2":
+    if prompt_version.version_id in {"v2", "v3"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
         query_intent = context_query_intent(user_text, pending_turn_state=pending_turn_state)
