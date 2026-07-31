@@ -5900,11 +5900,16 @@ p {
   align-items: stretch;
 }
 
+.profile-photo-gallery.single-photo {
+  grid-template-columns: 1fr;
+}
+
 .profile-main-photo,
 .profile-thumb {
   position: relative;
   overflow: hidden;
   display: block;
+  width: 100%;
   appearance: none;
   border: 0;
   padding: 0;
@@ -5945,6 +5950,21 @@ p {
   height: clamp(360px, 42vw, 560px);
   min-height: 0;
   border-radius: 28px;
+}
+
+.profile-photo-slot {
+  position: relative;
+  min-height: 0;
+}
+
+.profile-photo-slot.is-main {
+  height: clamp(360px, 42vw, 560px);
+}
+
+.profile-photo-slot.is-main .profile-main-photo,
+.profile-thumb-stack .profile-photo-slot,
+.profile-thumb-stack .profile-thumb {
+  height: 100%;
 }
 
 .profile-thumb-stack {
@@ -6038,6 +6058,38 @@ p {
   box-shadow: 0 10px 24px rgba(15, 37, 35, 0.18);
 }
 
+.profile-remove-photo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-items: center;
+  border: 1px solid rgba(189, 40, 75, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #bd284b;
+  padding: 0;
+  box-shadow: 0 10px 24px rgba(68, 25, 38, 0.14);
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.profile-remove-photo:hover,
+.profile-remove-photo:focus-visible {
+  transform: translateY(-1px);
+  background: #ffffff;
+  box-shadow: 0 14px 28px rgba(68, 25, 38, 0.18);
+}
+
+.profile-remove-photo:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
 .profile-photo-copy {
   display: grid;
   gap: 5px;
@@ -6055,6 +6107,24 @@ p {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.profile-photo-status {
+  margin: 14px 18px 0;
+  border: 1px solid rgba(35, 107, 99, 0.14);
+  border-radius: 16px;
+  background: rgba(239, 252, 249, 0.82);
+  color: #236b63;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.profile-photo-status.is-error {
+  border-color: rgba(189, 40, 75, 0.2);
+  background: rgba(255, 245, 248, 0.94);
+  color: #bd284b;
 }
 
 .profile-form {
