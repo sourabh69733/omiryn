@@ -27,12 +27,16 @@ def conversation_plan_prompt(
     )
     avoid_topics = "\n".join(f"- {topic}" for topic in plan.avoid_topics[:8])
     suggested_topics = "\n".join(f"- {topic}" for topic in plan.suggested_topics[:3])
+    stance_context = _stance_context(plan)
+    stance_rules = _stance_rules(plan)
     return f"""Conversation plan for this turn:
 - Move: {plan.current_move}
 - Response mode: {plan.response_mode}
 - Active topic: {plan.active_topic or "none"}
 - Reason: {plan.reason}
 - Tone instruction: {plan.tone_instruction}
+{stance_context}
+{stance_rules}
 
 Active/recent topic state:
 {active_topics or "- No strong topic state yet."}
@@ -53,3 +57,33 @@ Rules:
 - Do not start generic music, movie, truth-or-dare, or how-was-your-day topics unless the user explicitly brings them up.
 - If using music/movies, connect them to a sharper dating, memory, personality, or relationship angle.
 - Ask at most one natural question, and only if it improves the flow."""
+
+
+def _stance_context(plan: ConversationPlan) -> str:
+    if plan.question_purpose == "optional" and plan.stance == "neutral" and not plan.user_constraints:
+        return ""
+    constraints = ", ".join(plan.user_constraints) or "none"
+    return f"""
+- Conversational stance: {plan.stance} (confidence={plan.stance_confidence:.2f})
+- Claim type: {plan.claim_type}
+- Question purpose: {plan.question_purpose}
+- Explicit user constraints: {constraints}
+- Feedback kind: {plan.feedback_kind or "none"}"""
+
+
+def _stance_rules(plan: ConversationPlan) -> str:
+    if plan.question_purpose == "optional" and plan.stance == "neutral" and not plan.user_constraints:
+        return ""
+    question_rule = {
+        "none": "Do not ask a question in this reply.",
+        "clarify": "You may ask one question only to clarify the user's meaning or feedback.",
+        "deepen": "You may ask one specific question that deepens the active disclosure.",
+        "challenge": "You may ask one question that tests the unsupported assumption without cross-examining the user.",
+        "offer_choice": "You may offer one easy choice instead of an open-ended interview question.",
+    }.get(plan.question_purpose, "Ask only when it has a clear conversational purpose.")
+    return f"""Listener-first rules:
+- Validate feelings as experiences; do not treat an unproven conclusion as fact.
+- Agreement must be earned by context. Do not agree merely to soothe or please.
+- Disagreement must be relevant and grounded. Do not manufacture conflict to seem human.
+- Separate a valid emotional point from exaggeration or unsupported attribution.
+- {question_rule}"""
