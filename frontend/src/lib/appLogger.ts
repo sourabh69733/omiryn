@@ -167,6 +167,7 @@ function safeMetadata(metadata: AppEventMetadata) {
   const allowedKeys = new Set([
     "conversation_id",
     "fact_category",
+    "rating",
     "source_type",
     "request_type",
     "area",

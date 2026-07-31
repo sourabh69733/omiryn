@@ -57,6 +57,7 @@ router = APIRouter()
 _APP_EVENT_METADATA_ALLOWLIST = {
     "conversation_id",
     "fact_category",
+    "rating",
     "source_type",
     "request_type",
     "area",
