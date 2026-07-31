@@ -93,7 +93,6 @@ optional_env_names=(
   USER_CHAT_MONTHLY_LIMIT
   USER_CONTEXT_IMPORT_MONTHLY_LIMIT
   USER_WHATSAPP_IMPORT_MONTHLY_LIMIT
-  USER_PHOTO_UPLOAD_MONTHLY_LIMIT
 )
 
 for name in "${optional_env_names[@]}"; do

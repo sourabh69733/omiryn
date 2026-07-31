@@ -39,15 +39,6 @@ WHATSAPP_IMPORT_LIMIT = UserActionLimit(
     monthly_default=3,
     label="WhatsApp imports",
 )
-PHOTO_UPLOAD_LIMIT = UserActionLimit(
-    action="profile_photo_upload",
-    event_name="quota.profile_photo_upload",
-    monthly_env="USER_PHOTO_UPLOAD_MONTHLY_LIMIT",
-    monthly_default=20,
-    label="profile photo uploads",
-)
-
-
 def enforce_user_action_limit(user_id: str, limit: UserActionLimit) -> None:
     now = datetime.now(timezone.utc)
     monthly_limit = _env_int(limit.monthly_env, limit.monthly_default)
