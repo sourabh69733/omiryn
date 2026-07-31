@@ -81,6 +81,7 @@ def build_context_snapshot_v2(
     emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
+    engine_version: str = "context_v2",
 ) -> dict[str, Any]:
     budgeted_sources = budget_context_sources(context_sources)
     included_ids = {
@@ -108,7 +109,7 @@ def build_context_snapshot_v2(
         "conversation_id": conversation_id,
         "message_index": assistant_message_index,
         "summary": {
-            "engine_version": "context_v2",
+            "engine_version": engine_version,
             "user_message_index": user_message_index,
             "assistant_message_index": assistant_message_index,
             "model": model,
@@ -129,6 +130,12 @@ def build_context_snapshot_v2(
             "emotion": emotion_state.emotion,
             "emotion_confidence": emotion_state.confidence,
             "active_topic": conversation_plan.active_topic,
+            "stance": conversation_plan.stance,
+            "stance_confidence": conversation_plan.stance_confidence,
+            "claim_type": conversation_plan.claim_type,
+            "question_purpose": conversation_plan.question_purpose,
+            "user_constraints": list(conversation_plan.user_constraints),
+            "feedback_kind": conversation_plan.feedback_kind,
             **flags,
         },
         "context": {
@@ -241,6 +248,12 @@ def _conversation_plan_snapshot(plan: ConversationPlan) -> dict[str, Any]:
         "data_targets": list(plan.data_targets),
         "tone_instruction": plan.tone_instruction,
         "reason": plan.reason,
+        "stance": plan.stance,
+        "stance_confidence": plan.stance_confidence,
+        "claim_type": plan.claim_type,
+        "question_purpose": plan.question_purpose,
+        "user_constraints": list(plan.user_constraints),
+        "feedback_kind": plan.feedback_kind,
     }
 
 
