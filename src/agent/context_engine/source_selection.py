@@ -86,6 +86,7 @@ def build_reply_context(
     user_id: str | None = None,
     user_profile: dict[str, Any] | None = None,
     style_source_id: str | None = None,
+    strict_intent: bool = False,
 ) -> AgentContext:
     return AgentContext(
         user_profile=user_profile,
@@ -94,6 +95,7 @@ def build_reply_context(
             style_source_id,
             user_text,
             user_id,
+            strict_intent=strict_intent,
         ),
     )
 
@@ -103,8 +105,10 @@ def build_reply_context_sources(
     style_source_id: str | None,
     user_text: str,
     user_id: str | None = None,
+    *,
+    strict_intent: bool = False,
 ) -> list[dict[str, Any]]:
-    query_intent = context_query_intent(user_text)
+    query_intent = context_query_intent(user_text, strict_whatsapp=strict_intent)
     all_sources = list_context_sources(conversation_id, user_id)
     attached_sources = _valid_attached_context_sources(all_sources, user_id)
     selected_styles = _selected_style_sources(all_sources, style_source_id)

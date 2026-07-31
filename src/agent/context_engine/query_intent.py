@@ -34,6 +34,13 @@ WHATSAPP_QUERY_PHRASES = {
     "uploaded chat",
     "whatsapp chat",
 }
+STRICT_WHATSAPP_QUERY_PHRASES = {
+    "last convo",
+    "last message",
+    "pichli baat",
+    "uploaded chat",
+    "whatsapp chat",
+}
 LOW_INFORMATION_TERMS = {"hmm", "hm", "ok", "okay", "yeah", "yes", "no", "haan", "ha", "nhi", "nah"}
 SIMPLE_ACKNOWLEDGEMENT_EXACT = {
     "ok",
@@ -70,6 +77,7 @@ def context_query_intent(
     user_text: str,
     *,
     pending_turn_state: dict | None = None,
+    strict_whatsapp: bool = False,
 ) -> ContextQueryIntent:
     normalized = normalized_memory_text(user_text)
     query_terms = memory_terms(user_text)
@@ -82,9 +90,7 @@ def context_query_intent(
         labels.append("confirmation")
     elif _is_simple_acknowledgement(normalized):
         labels.append("simple_ack")
-    if any(term in query_terms for term in WHATSAPP_QUERY_TERMS) or any(
-        phrase in normalized for phrase in WHATSAPP_QUERY_PHRASES
-    ):
+    if _is_whatsapp_query(query_terms, normalized, strict=strict_whatsapp):
         labels.append("whatsapp")
     if query_terms & RECENCY_QUERY_TERMS:
         labels.append("recent")
@@ -114,8 +120,8 @@ def context_query_intent(
     prefer_structured = bool({"whatsapp", "recent", "style", "topics"} & set(labels)) and (
         "whatsapp" in labels
         or "style" in labels
-        or ("recent" in labels and any(term in query_terms for term in WHATSAPP_QUERY_TERMS))
-        or ("topics" in labels and any(term in query_terms for term in WHATSAPP_QUERY_TERMS))
+        or ("recent" in labels and _is_whatsapp_query(query_terms, normalized, strict=strict_whatsapp))
+        or ("topics" in labels and _is_whatsapp_query(query_terms, normalized, strict=strict_whatsapp))
     )
     confidence = min(0.95, 0.25 + (len(labels) * 0.18) + (len(entities) * 0.08))
     return ContextQueryIntent(
@@ -124,6 +130,16 @@ def context_query_intent(
         confidence=confidence if labels else 0.15,
         entities=tuple(entities),
         is_low_information=is_low_information,
+    )
+
+
+def _is_whatsapp_query(query_terms: set[str], normalized: str, *, strict: bool) -> bool:
+    if not strict:
+        return bool(query_terms & WHATSAPP_QUERY_TERMS) or any(
+            phrase in normalized for phrase in WHATSAPP_QUERY_PHRASES
+        )
+    return "whatsapp" in query_terms or any(
+        phrase in normalized for phrase in STRICT_WHATSAPP_QUERY_PHRASES
     )
 
 
