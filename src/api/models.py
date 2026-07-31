@@ -203,9 +203,12 @@ class DataPointFeedbackCreate(BaseModel):
 
 
 class ProfileFactPatch(BaseModel):
-    label: str = Field(min_length=2, max_length=240)
+    label: str | None = Field(default=None, min_length=2, max_length=240)
     status: Literal["active", "rejected"] = "active"
     comment: str | None = Field(default=None, max_length=1000)
+    confirmed: bool = False
+    used_for_matching: bool | None = None
+    used_for_chat_context: bool | None = None
 
 
 class DataRequestCreate(BaseModel):

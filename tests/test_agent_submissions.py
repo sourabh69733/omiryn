@@ -893,6 +893,38 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(get_profile_fact(fact["id"], "user-b")["label"], "Values family involvement")
 
+    def test_user_can_limit_profile_fact_usage_without_changing_confidence(self) -> None:
+        fact = upsert_profile_fact(
+            {
+                "user_id": "test-user",
+                "category": "communication_style",
+                "key": "direct",
+                "value": {"style": "direct"},
+                "label": "Values direct communication",
+                "confidence": 0.86,
+                "used_for_matching": True,
+                "used_for_chat_context": True,
+            }
+        )
+
+        response = self.client.patch(
+            f"/api/me/profile-facts/{fact['id']}",
+            json={
+                "status": "active",
+                "used_for_matching": False,
+                "used_for_chat_context": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        updated = response.json()["fact"]
+        self.assertEqual(updated["status"], "active")
+        self.assertFalse(updated["used_for_matching"])
+        self.assertTrue(updated["used_for_chat_context"])
+        self.assertEqual(updated["confidence"], 0.86)
+        self.assertIsNone(response.json()["feedback"])
+        self.assertEqual(list_data_point_feedback(user_id="test-user"), [])
+
     def test_data_point_feedback_is_saved_and_returned_with_raw_points(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")

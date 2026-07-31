@@ -136,10 +136,13 @@ def update_profile_fact_user_correction(
     fact_id: str,
     user_id: str,
     *,
-    label: str,
+    label: str | None = None,
     status: str,
+    confirmed: bool = False,
+    used_for_matching: bool | None = None,
+    used_for_chat_context: bool | None = None,
 ) -> dict[str, Any] | None:
-    clean_label = str(label or "").strip()
+    clean_label = str(label or "").strip() if label is not None else ""
     clean_status = str(status or "active").strip().lower()
     if clean_status not in {"active", "rejected"}:
         clean_status = "active"
@@ -152,16 +155,30 @@ def update_profile_fact_user_correction(
         ).mappings().first()
         if not existing:
             return None
+        clean_used_for_matching = (
+            bool(used_for_matching)
+            if used_for_matching is not None
+            else bool(existing["used_for_matching"])
+        )
+        clean_used_for_chat_context = (
+            bool(used_for_chat_context)
+            if used_for_chat_context is not None
+            else bool(existing["used_for_chat_context"])
+        )
         update_values = {
             "label": clean_label or existing["label"],
             "status": clean_status,
             "confidence": (
                 min(_bounded_confidence(existing["confidence"]), 0.2)
                 if clean_status == "rejected"
-                else max(_bounded_confidence(existing["confidence"]), 0.9)
+                else (
+                    max(_bounded_confidence(existing["confidence"]), 0.9)
+                    if confirmed or clean_label
+                    else _bounded_confidence(existing["confidence"])
+                )
             ),
-            "used_for_matching": clean_status == "active",
-            "used_for_chat_context": clean_status == "active",
+            "used_for_matching": clean_status == "active" and clean_used_for_matching,
+            "used_for_chat_context": clean_status == "active" and clean_used_for_chat_context,
             "updated_at": func.now(),
         }
         connection.execute(

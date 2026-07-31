@@ -557,28 +557,33 @@ async def patch_me_profile_fact(
         user.id,
         label=payload.label,
         status=payload.status,
+        confirmed=payload.confirmed,
+        used_for_matching=payload.used_for_matching,
+        used_for_chat_context=payload.used_for_chat_context,
     )
     if not updated_fact:
         raise HTTPException(status_code=404, detail="Data point not found.")
 
-    feedback = normalize_data_point_feedback(
-        {
-            "user_id": user.id,
-            "profile_fact_id": fact_id,
-            "rating": "disagree" if payload.status == "rejected" else "agree",
-            "reason": "user_corrected",
-            "comment": payload.comment,
-            "metadata": {
-                "category": fact.get("category"),
-                "key": fact.get("key"),
-                "source_kind": fact.get("source_kind"),
-                "source_id": fact.get("source_id"),
-                "corrected_label": payload.label,
-                "corrected_status": payload.status,
-            },
-        }
-    )
-    saved_feedback = save_data_point_feedback(feedback)
+    saved_feedback = None
+    if payload.status == "rejected" or payload.confirmed or payload.label or payload.comment:
+        feedback = normalize_data_point_feedback(
+            {
+                "user_id": user.id,
+                "profile_fact_id": fact_id,
+                "rating": "disagree" if payload.status == "rejected" else "agree",
+                "reason": "user_corrected" if payload.label else ("user_rejected" if payload.status == "rejected" else "user_confirmed"),
+                "comment": payload.comment,
+                "metadata": {
+                    "category": fact.get("category"),
+                    "key": fact.get("key"),
+                    "source_kind": fact.get("source_kind"),
+                    "source_id": fact.get("source_id"),
+                    "corrected_label": payload.label,
+                    "corrected_status": payload.status,
+                },
+            }
+        )
+        saved_feedback = save_data_point_feedback(feedback)
     return {
         "fact": {
             **updated_fact,
