@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from agent.context_engine.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
+from agent.context_engine.models import (
+    ContextQueryIntent,
+    ConversationalStance,
+    ConversationPlan,
+    EmotionState,
+    TopicState,
+)
 from agent.context_engine.topic_catalog import COMMON_STARTER_TOPIC_POLICY, relevant_topics_for_intent
 from agent.context_engine.topic_state import active_topic_state, avoid_topic_labels
 
@@ -18,7 +24,17 @@ def build_conversation_plan(
     intent: ContextQueryIntent,
     topic_states: list[TopicState],
     emotion_state: EmotionState | None = None,
+    conversational_stance: ConversationalStance | None = None,
+    listener_first: bool = False,
 ) -> ConversationPlan:
+    if listener_first:
+        return _build_listener_first_plan(
+            user_text=user_text,
+            intent=intent,
+            topic_states=topic_states,
+            emotion_state=emotion_state or EmotionState(),
+            stance=conversational_stance or ConversationalStance(),
+        )
     labels = set(intent.labels)
     active = active_topic_state(topic_states)
     avoid_topics = _avoid_topics(labels, topic_states)
@@ -39,6 +55,189 @@ def build_conversation_plan(
         tone_instruction=_tone_instruction(labels, emotion),
         reason=_plan_reason(labels, active, emotion),
     )
+
+
+def _build_listener_first_plan(
+    *,
+    user_text: str,
+    intent: ContextQueryIntent,
+    topic_states: list[TopicState],
+    emotion_state: EmotionState,
+    stance: ConversationalStance,
+) -> ConversationPlan:
+    labels = set(intent.labels)
+    prioritized = _stance_requires_attention(stance)
+    active = _listener_first_active_topic(topic_states, labels, prioritized)
+    suggested_topics = _listener_first_suggested_topics(
+        user_text,
+        intent,
+        topic_states,
+        prioritized,
+    )
+    question_purpose = stance.question_purpose
+    if question_purpose == "none" and not prioritized and labels & {"low_information", "boredom_complaint"}:
+        question_purpose = "offer_choice"
+    return ConversationPlan(
+        current_move=_listener_first_move(labels, active, emotion_state, stance),
+        response_mode=_listener_first_response_mode(user_text, labels, emotion_state, stance),
+        active_topic=active.label if active else None,
+        avoid_topics=_avoid_topics(labels, topic_states),
+        suggested_topics=suggested_topics,
+        data_targets=_data_targets_for_suggestions(user_text, intent, suggested_topics),
+        tone_instruction=_listener_first_tone_instruction(labels, emotion_state, stance),
+        reason=_listener_first_reason(labels, active, emotion_state, stance),
+        stance=stance.mode,
+        stance_confidence=stance.confidence,
+        claim_type=stance.claim_type,
+        question_purpose=question_purpose,
+        user_constraints=stance.constraints,
+        feedback_kind=stance.feedback_kind,
+    )
+
+
+def _stance_requires_attention(stance: ConversationalStance) -> bool:
+    return bool(
+        stance.feedback_kind
+        or stance.constraints
+        or stance.mode
+        in {"agree", "partially_agree", "disagree", "challenge_gently", "validate_experience", "uncertain"}
+    )
+
+
+def _listener_first_active_topic(
+    topic_states: list[TopicState],
+    labels: set[str],
+    prioritized: bool,
+) -> TopicState | None:
+    if prioritized:
+        return None
+    if labels & {"low_information", "boredom_complaint"}:
+        return active_topic_state(topic_states)
+    return next(
+        (
+            state
+            for state in topic_states
+            if state.repeat_count > 0 and state.status in {"new", "active"}
+        ),
+        None,
+    )
+
+
+def _listener_first_suggested_topics(
+    user_text: str,
+    intent: ContextQueryIntent,
+    topic_states: list[TopicState],
+    prioritized: bool,
+) -> tuple[str, ...]:
+    if prioritized:
+        return ()
+    labels = set(intent.labels)
+    has_grounded_topic = any(state.repeat_count > 0 for state in topic_states)
+    if not has_grounded_topic and not labels & {"low_information", "boredom_complaint"}:
+        return ()
+    return tuple(topic.label for topic in relevant_topics_for_intent(user_text, intent, limit=3))
+
+
+def _data_targets_for_suggestions(
+    user_text: str,
+    intent: ContextQueryIntent,
+    suggested_topics: tuple[str, ...],
+) -> tuple[str, ...]:
+    if not suggested_topics:
+        return ()
+    return _data_targets(user_text, intent)
+
+
+def _listener_first_response_mode(
+    user_text: str,
+    labels: set[str],
+    emotion: EmotionState,
+    stance: ConversationalStance,
+) -> str:
+    constraints = set(stance.constraints)
+    if "give_space" in constraints:
+        return "give_space"
+    if stance.feedback_kind:
+        return "respond_to_feedback"
+    if constraints & {"no_advice", "listen_only"}:
+        return "empathize_listen"
+    if stance.mode in {"disagree", "challenge_gently", "partially_agree", "agree", "uncertain"}:
+        return stance.mode
+    if stance.mode == "validate_experience" and emotion.response_mode == "normal_chat":
+        return "empathize_listen"
+    return _response_mode(user_text, labels, emotion)
+
+
+def _listener_first_move(
+    labels: set[str],
+    active: TopicState | None,
+    emotion: EmotionState,
+    stance: ConversationalStance,
+) -> str:
+    if "give_space" in stance.constraints:
+        return "respect_space"
+    if stance.feedback_kind:
+        return "repair_with_backbone"
+    moves = {
+        "agree": "agree_with_reason",
+        "partially_agree": "partial_agreement",
+        "disagree": "disagree_gently",
+        "challenge_gently": "challenge_assumption",
+        "validate_experience": "validate_experience",
+        "uncertain": "clarify_claim",
+    }
+    if stance.mode in moves:
+        return moves[stance.mode]
+    return _conversation_move(labels, active, emotion)
+
+
+def _listener_first_tone_instruction(
+    labels: set[str],
+    emotion: EmotionState,
+    stance: ConversationalStance,
+) -> str:
+    constraints = set(stance.constraints)
+    if "give_space" in constraints:
+        return "Respect the request for space with one brief acknowledgment. Do not ask a question or restart the conversation."
+    if stance.feedback_kind:
+        stance_rules = {
+            "agree": "Own the accurate feedback briefly and adjust.",
+            "partially_agree": "Accept the valid experience while gently qualifying any overstatement.",
+            "disagree": "Correct the inaccurate frequency claim using recent evidence, while taking the user's unwanted experience seriously.",
+            "uncertain": "Do not assume the claim is true; acknowledge the experience and clarify what created that impression.",
+        }
+        return (
+            f"{stance_rules.get(stance.mode, 'Respond to the feedback directly.')} "
+            "Do not become defensive, automatically apologize, or promise passive obedience."
+        )
+    if "no_questions" in constraints:
+        return "Do not ask a question. Respond directly and stay with the user's active point."
+    if constraints & {"no_advice", "listen_only"}:
+        return "Listen and reflect the specific experience. Do not give advice, solutions, or a disguised suggestion."
+    if stance.mode == "disagree":
+        return "Disagree clearly but warmly. Give a brief reason; do not lecture or manufacture conflict."
+    if stance.mode == "challenge_gently":
+        return "Validate the reaction, separate it from the unproven conclusion, and offer a plausible alternative without sounding superior."
+    if stance.mode == "partially_agree":
+        return "Say which part is fair and which part you see differently. Keep an independent point of view."
+    if stance.mode == "agree":
+        return "Agree because the evidence supports it, not merely to please the user."
+    if stance.mode == "validate_experience":
+        return "Treat the feeling as the user's real experience. Do not debate it or automatically endorse external conclusions."
+    if stance.mode == "uncertain":
+        return "State uncertainty naturally and check available context instead of pretending to agree."
+    return _tone_instruction(labels, emotion)
+
+
+def _listener_first_reason(
+    labels: set[str],
+    active: TopicState | None,
+    emotion: EmotionState,
+    stance: ConversationalStance,
+) -> str:
+    if _stance_requires_attention(stance):
+        return stance.reason
+    return _plan_reason(labels, active, emotion)
 
 
 def _conversation_move(

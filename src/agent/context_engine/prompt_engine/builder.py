@@ -302,7 +302,7 @@ def _v2_prompt_sections(
         PromptSection(
             id="final_reminder",
             title="Final Reminder",
-            content=final_reminder_prompt(),
+            content=final_reminder_prompt(conversation_plan),
             position="end",
             priority=90,
             can_skip=False,

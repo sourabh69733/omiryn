@@ -13,6 +13,7 @@ from agent.context_engine.prompt_engine.builder import (
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.context_engine.query_intent import context_query_intent
 from agent.context_engine.source_selection import build_reply_context
+from agent.context_engine.stance_engine import analyze_conversational_stance
 from agent.context_engine.topic_state import build_topic_state
 from agent.context_engine.turn_state import active_turn_state
 from storage import get_conversation
@@ -33,21 +34,36 @@ def build_model_context_package(
     prompt_version_id: str | None = None,
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
+    listener_first = prompt_version.version_id == "v3"
     reply_context = build_reply_context(
         conversation_id,
         user_text,
         user_id=user_id,
         user_profile=user_profile,
         style_source_id=style_source_id,
+        strict_intent=listener_first,
     )
     if prompt_version.version_id in {"v2", "v3"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
-        query_intent = context_query_intent(user_text, pending_turn_state=pending_turn_state)
+        query_intent = context_query_intent(
+            user_text,
+            pending_turn_state=pending_turn_state,
+            strict_whatsapp=listener_first,
+        )
         emotion_state = detect_emotion_state(
             user_text=user_text,
             messages=planning_messages,
             intent=query_intent,
+        )
+        conversational_stance = (
+            analyze_conversational_stance(
+                user_text,
+                planning_messages[:-1],
+                emotion_state=emotion_state,
+            )
+            if listener_first
+            else None
         )
         topic_states = build_topic_state(planning_messages, user_text, query_intent)
         conversation_plan = build_conversation_plan(
@@ -55,6 +71,8 @@ def build_model_context_package(
             intent=query_intent,
             topic_states=topic_states,
             emotion_state=emotion_state,
+            conversational_stance=conversational_stance,
+            listener_first=listener_first,
         )
         system_prompt = build_companion_system_prompt_v2(
             context_sources=reply_context.context_sources,
@@ -78,6 +96,7 @@ def build_model_context_package(
             style_source_id=style_source_id,
             prompt_version=prompt_version.version_id,
             prompt_version_name=prompt_version.name,
+            engine_version="context_v3" if listener_first else "context_v2",
             query_intent=query_intent,
             emotion_state=emotion_state,
             topic_states=topic_states,
