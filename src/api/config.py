@@ -22,7 +22,24 @@ FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 LANDING_PAGE_FILE = FRONTEND_DIST_DIR / "landing.html"
 PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
 APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
-PROFILE_PHOTO_MAX_BYTES = int(float(os.getenv("PROFILE_PHOTO_MAX_MB", "10")) * 1024 * 1024)
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+PROFILE_PHOTO_MAX_BYTES = int(_float_env("PROFILE_PHOTO_MAX_MB", 10) * 1024 * 1024)
+PROFILE_PHOTO_MAX_COUNT = 4
 PROFILE_PHOTO_GCS_BUCKET = os.getenv("PROFILE_PHOTO_GCS_BUCKET", "").strip()
 PROFILE_PHOTO_GCS_PREFIX = os.getenv("PROFILE_PHOTO_GCS_PREFIX", "profile_photos").strip("/")
 PROFILE_PHOTO_GCS_PUBLIC_BASE_URL = os.getenv("PROFILE_PHOTO_GCS_PUBLIC_BASE_URL", "").strip().rstrip("/")

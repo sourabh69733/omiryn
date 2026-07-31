@@ -22,7 +22,7 @@ from storage import (
     update_profile_fact_user_correction,
 )
 
-from ..config import PROFILE_PHOTO_CONTENT_TYPES, PROFILE_PHOTO_MAX_BYTES
+from ..config import PROFILE_PHOTO_CONTENT_TYPES, PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_MAX_COUNT
 from ..helpers import (
     _auth_user_payload,
     _basic_profile_complete,
@@ -52,8 +52,6 @@ from ..models import (
     ProfileFactPatch,
     UserProfilePatch,
 )
-from ..usage_limits import PHOTO_UPLOAD_LIMIT, enforce_user_action_limit
-
 router = APIRouter()
 
 _APP_EVENT_METADATA_ALLOWLIST = {
@@ -134,6 +132,7 @@ async def get_me_profile(
         "learned_facts": facts_with_feedback,
         "learned_fact_groups": _group_profile_facts(facts_with_feedback),
         "data_point_feedback_summary": _summarize_data_point_feedback(data_point_feedback),
+        "profile_photo_max_count": PROFILE_PHOTO_MAX_COUNT,
         "style_sources": [
             _context_source_summary(source)
             for source in sources
@@ -329,19 +328,19 @@ async def put_me_profile_photo(
     if len(content) > PROFILE_PHOTO_MAX_BYTES:
         max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
         raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
-    enforce_user_action_limit(user.id, PHOTO_UPLOAD_LIMIT)
 
     existing_profile = get_user_profile(user.id)
+    max_photo_count = PROFILE_PHOTO_MAX_COUNT
     existing_photo_urls = [
         str(url) if isinstance(url, str) else ""
         for url in ((existing_profile or {}).get("profile_photo_urls") or [])
-    ][:4]
+    ][:max_photo_count]
     if not existing_photo_urls and (existing_profile or {}).get("profile_photo_url"):
         existing_photo_urls = [str((existing_profile or {}).get("profile_photo_url"))]
     existing_photo_file_names = [
         str(file_name) if isinstance(file_name, str) else ""
         for file_name in ((existing_profile or {}).get("profile_photo_file_names") or [])
-    ][:4]
+    ][:max_photo_count]
     if not existing_photo_file_names and (existing_profile or {}).get("profile_photo_file_name"):
         existing_photo_file_names = [str((existing_profile or {}).get("profile_photo_file_name"))]
     raw_slot = request.query_params.get("slot")
@@ -350,12 +349,21 @@ async def put_me_profile_photo(
         try:
             photo_slot = int(raw_slot)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.") from None
-        if photo_slot < 0 or photo_slot > 3:
-            raise HTTPException(status_code=422, detail="Profile photo slot must be between 0 and 3.")
-    if photo_slot is None and len(existing_photo_urls) >= 4:
-        raise HTTPException(status_code=422, detail="You can upload up to 4 profile photos.")
-
+            raise HTTPException(
+                status_code=422,
+                detail=f"Profile photo slot must be between 0 and {max_photo_count - 1}.",
+            ) from None
+        if photo_slot < 0 or photo_slot >= max_photo_count:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Profile photo slot must be between 0 and {max_photo_count - 1}.",
+            )
+    active_photo_count = sum(1 for url in existing_photo_urls if url)
+    if photo_slot is None and active_photo_count >= max_photo_count:
+        raise HTTPException(
+            status_code=422,
+            detail=f"You can upload up to {max_photo_count} profile photo{'s' if max_photo_count != 1 else ''}.",
+        )
     try:
         photo_url, photo_file_name = _store_profile_photo(
             user_id=user.id,
@@ -371,8 +379,8 @@ async def put_me_profile_photo(
             status_code=500,
             detail="Could not store profile photo. Check GCS bucket access or unset PROFILE_PHOTO_GCS_BUCKET locally.",
         ) from exc
-    profile_photo_urls = existing_photo_urls[:4]
-    profile_photo_file_names = existing_photo_file_names[:4]
+    profile_photo_urls = existing_photo_urls[:max_photo_count]
+    profile_photo_file_names = existing_photo_file_names[:max_photo_count]
     while len(profile_photo_urls) <= (photo_slot or -1):
         profile_photo_urls.append("")
     while len(profile_photo_file_names) < len(profile_photo_urls):
@@ -381,10 +389,10 @@ async def put_me_profile_photo(
         profile_photo_urls[photo_slot] = photo_url
         profile_photo_file_names[photo_slot] = photo_file_name
     else:
-        profile_photo_urls = [*profile_photo_urls, photo_url][:4]
-        profile_photo_file_names = [*profile_photo_file_names, photo_file_name][:4]
-    profile_photo_urls = profile_photo_urls[:4]
-    profile_photo_file_names = profile_photo_file_names[:4]
+        profile_photo_urls = [*profile_photo_urls, photo_url][:max_photo_count]
+        profile_photo_file_names = [*profile_photo_file_names, photo_file_name][:max_photo_count]
+    profile_photo_urls = profile_photo_urls[:max_photo_count]
+    profile_photo_file_names = profile_photo_file_names[:max_photo_count]
     primary_photo_index = next((index for index, url in enumerate(profile_photo_urls) if url), 0)
     primary_photo_url = profile_photo_urls[primary_photo_index] or photo_url
     primary_photo_file_name = profile_photo_file_names[primary_photo_index] or photo_file_name
@@ -421,6 +429,91 @@ async def put_me_profile_photo(
         "profile_photo_urls": profile_photo_urls,
         "profile_photo_file_name": primary_photo_file_name,
         "profile_photo_file_names": profile_photo_file_names,
+        "profile": profile,
+    }
+
+
+@router.delete("/api/me/profile-photo")
+async def delete_me_profile_photo(
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    existing_profile = get_user_profile(user.id)
+    if not existing_profile:
+        raise HTTPException(status_code=404, detail="No profile photo found.")
+
+    max_photo_count = PROFILE_PHOTO_MAX_COUNT
+    raw_slot = request.query_params.get("slot", "0")
+    try:
+        photo_slot = int(raw_slot)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Profile photo slot must be between 0 and {max_photo_count - 1}.",
+        ) from None
+    if photo_slot < 0 or photo_slot >= max_photo_count:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Profile photo slot must be between 0 and {max_photo_count - 1}.",
+        )
+
+    profile_photo_urls = [
+        str(url) if isinstance(url, str) else ""
+        for url in (existing_profile.get("profile_photo_urls") or [])
+    ][:max_photo_count]
+    if not profile_photo_urls and existing_profile.get("profile_photo_url"):
+        profile_photo_urls = [str(existing_profile.get("profile_photo_url"))]
+    profile_photo_file_names = [
+        str(file_name) if isinstance(file_name, str) else ""
+        for file_name in (existing_profile.get("profile_photo_file_names") or [])
+    ][:max_photo_count]
+    if not profile_photo_file_names and existing_profile.get("profile_photo_file_name"):
+        profile_photo_file_names = [str(existing_profile.get("profile_photo_file_name"))]
+
+    while len(profile_photo_urls) <= photo_slot:
+        profile_photo_urls.append("")
+    while len(profile_photo_file_names) <= photo_slot:
+        profile_photo_file_names.append("")
+    removed_file_name = profile_photo_file_names[photo_slot]
+    if not profile_photo_urls[photo_slot] and not removed_file_name:
+        raise HTTPException(status_code=404, detail="No profile photo found in that slot.")
+
+    profile_photo_urls[photo_slot] = ""
+    profile_photo_file_names[photo_slot] = ""
+    while profile_photo_urls and not profile_photo_urls[-1]:
+        profile_photo_urls.pop()
+    while profile_photo_file_names and len(profile_photo_file_names) > len(profile_photo_urls):
+        profile_photo_file_names.pop()
+    while len(profile_photo_file_names) < len(profile_photo_urls):
+        profile_photo_file_names.append("")
+
+    primary_photo_index = next((index for index, url in enumerate(profile_photo_urls) if url), None)
+    primary_photo_url = profile_photo_urls[primary_photo_index] if primary_photo_index is not None else None
+    primary_photo_file_name = (
+        profile_photo_file_names[primary_photo_index] if primary_photo_index is not None else None
+    )
+    profile = save_user_profile(
+        user.id,
+        str(existing_profile.get("gender") or "prefer_not_to_say"),
+        str(existing_profile.get("interested_in") or "everyone"),
+        _clean_optional_text(existing_profile.get("display_name")),
+        existing_profile.get("age"),
+        _clean_optional_text(existing_profile.get("city")),
+        _clean_optional_text(existing_profile.get("phone")),
+        primary_photo_url,
+        profile_photo_urls,
+        primary_photo_file_name,
+        profile_photo_file_names,
+    )
+    deleted_photo_files = _delete_profile_photo_file_names([removed_file_name])
+    return {
+        "profile_photo_url": primary_photo_url,
+        "profile_photo_urls": profile_photo_urls,
+        "profile_photo_file_name": primary_photo_file_name,
+        "profile_photo_file_names": profile_photo_file_names,
+        "deleted_profile_photos": deleted_photo_files,
         "profile": profile,
     }
 

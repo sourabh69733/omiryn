@@ -448,27 +448,44 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response.json()["profile_photo_url"],
         )
 
-    def test_profile_photo_uploads_are_limited_per_user_month(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
-                "USER_PHOTO_UPLOAD_MONTHLY_LIMIT": "1",
-            },
-        ):
-            first_response = self.client.put(
-                "/api/me/profile-photo",
-                content=b"first-image",
-                headers={"content-type": "image/png"},
-            )
-            second_response = self.client.put(
-                "/api/me/profile-photo?slot=0",
-                content=b"second-image",
-                headers={"content-type": "image/png"},
-            )
+    def test_profile_photo_replaces_existing_slot_without_monthly_quota(self) -> None:
+        first_response = self.client.put(
+            "/api/me/profile-photo",
+            content=b"first-image",
+            headers={"content-type": "image/png"},
+        )
+        second_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"second-image",
+            headers={"content-type": "image/png"},
+        )
 
         self.assertEqual(first_response.status_code, 200)
-        self.assertEqual(second_response.status_code, 429)
-        self.assertIn("Monthly limit reached", second_response.json()["detail"])
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(len(second_response.json()["profile_photo_urls"]), 1)
+
+    def test_profile_photo_max_count_limits_gallery_slots(self) -> None:
+        first_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"first-image",
+            headers={"content-type": "image/png"},
+        )
+        add_response = self.client.put(
+            "/api/me/profile-photo?slot=4",
+            content=b"fifth-image",
+            headers={"content-type": "image/png"},
+        )
+        replace_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"replacement-image",
+            headers={"content-type": "image/png"},
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(add_response.status_code, 422)
+        self.assertIn("slot must be between 0 and 3", add_response.json()["detail"])
+        self.assertEqual(replace_response.status_code, 200)
+        self.assertEqual(len(replace_response.json()["profile_photo_urls"]), 1)
 
     def test_profile_photo_slot_upload_preserves_existing_slots(self) -> None:
         async def signed_in_user() -> CurrentUser:
@@ -516,6 +533,26 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(second_urls[0], first_url)
         self.assertTrue(second_urls[1].startswith("/uploads/profile_photos/"))
         self.assertEqual(second_urls[2], third_url)
+
+    def test_profile_photo_can_be_removed_and_reuploaded(self) -> None:
+        upload_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"first-image",
+            headers={"content-type": "image/png"},
+        )
+        delete_response = self.client.delete("/api/me/profile-photo?slot=0")
+        reupload_response = self.client.put(
+            "/api/me/profile-photo?slot=0",
+            content=b"replacement-image",
+            headers={"content-type": "image/png"},
+        )
+
+        self.assertEqual(upload_response.status_code, 200)
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertIsNone(delete_response.json()["profile_photo_url"])
+        self.assertEqual(delete_response.json()["profile_photo_urls"], [])
+        self.assertEqual(reupload_response.status_code, 200)
+        self.assertEqual(len(reupload_response.json()["profile_photo_urls"]), 1)
 
     def test_agent_initial_persona_uses_interested_gender(self) -> None:
         async def signed_in_user() -> CurrentUser:
