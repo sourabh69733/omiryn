@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
+from agent.context_engine.prompt_engine.registry import (
+    available_prompt_versions,
+    configured_prompt_version_id,
+    get_prompt_behavior_version,
+)
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.memory import capture_profile_facts_from_user_message
 from agent.memory_engine.data_point_extraction import (
@@ -170,6 +174,48 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(version.version_id, "v1")
         self.assertEqual(version.name, "v1_companion_basic")
         self.assertIn("relationship_intent", version.data_point_targets)
+
+    def test_prompt_versions_are_independently_selectable(self) -> None:
+        versions = {version.version_id: version for version in available_prompt_versions()}
+
+        self.assertEqual(set(versions), {"v1", "v2", "v3"})
+        self.assertEqual(get_prompt_behavior_version("v1").name, "v1_companion_basic")
+        self.assertEqual(get_prompt_behavior_version("v2").name, "v2_structured_context_companion")
+        self.assertEqual(get_prompt_behavior_version("v3").name, "v3_listener_first_companion")
+
+    def test_configured_prompt_version_can_switch_without_changing_default(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(configured_prompt_version_id(), "v1")
+            self.assertEqual(get_prompt_behavior_version().version_id, "v1")
+
+        with patch.dict("os.environ", {"AGENT_BEHAVIOR_VERSION": "v3"}, clear=True):
+            self.assertEqual(configured_prompt_version_id(), "v3")
+            self.assertEqual(get_prompt_behavior_version().version_id, "v3")
+
+    def test_v3_uses_structured_planning_with_listener_first_contract(self) -> None:
+        package = build_model_context_package(
+            conversation_id="conversation-a",
+            user_text="I don't want advice right now",
+            user_id="user-a",
+            user_profile={"user_id": "user-a", "interested_in": "women"},
+            model="llama-70b",
+            agent_tone="auto",
+            agent_name="Annie",
+            style_source_id=None,
+            user_message_index=0,
+            assistant_message_index=1,
+            prompt_version_id="v3",
+        )
+
+        self.assertEqual(package.prompt_version, "v3")
+        self.assertEqual(package.prompt_version_name, "v3_listener_first_companion")
+        self.assertIn("## Conversation Plan", package.system_prompt)
+        self.assertIn("Choose the turn in this strict order", package.system_prompt)
+        self.assertIn("I don't want advice", package.system_prompt)
+        self.assertNotIn("prompt behavior version", package.system_prompt.lower())
+        self.assertNotIn("v2", package.system_prompt.lower())
+        self.assertNotIn("v3", package.system_prompt.lower())
+        self.assertEqual(package.snapshot["summary"]["prompt_version"], "v3")
 
     def test_v2_context_package_includes_planner_debug(self) -> None:
         package = build_model_context_package(

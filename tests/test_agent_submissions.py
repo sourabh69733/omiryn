@@ -3023,17 +3023,40 @@ class AgentSubmissionApiTest(unittest.TestCase):
                             "raw_error": "private stack should not be stored",
                         },
                     },
+                    {
+                        "session_id": "session-a",
+                        "event_name": "learned_signal_feedback_sent",
+                        "page": "style",
+                        "target_type": "profile_fact",
+                        "target_id": "fact-a",
+                        "metadata": {
+                            "fact_category": "communication",
+                            "rating": "disagree",
+                        },
+                    },
                 ]
             },
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["accepted"], 3)
+        self.assertEqual(response.json()["accepted"], 4)
         events = list_user_app_events("user-a")
-        self.assertEqual([event["event_name"] for event in events], ["page_viewed", "memory_import_completed", "client_error"])
+        self.assertEqual(
+            [event["event_name"] for event in events],
+            [
+                "page_viewed",
+                "memory_import_completed",
+                "client_error",
+                "learned_signal_feedback_sent",
+            ],
+        )
         self.assertEqual(events[0]["metadata"], {"page": "style"})
         self.assertEqual(events[1]["metadata"], {"source_type": "manual_notes"})
         self.assertEqual(events[2]["metadata"], {"area": "unhandled_rejection", "message_code": "failed_to_fetch"})
+        self.assertEqual(
+            events[3]["metadata"],
+            {"fact_category": "communication", "rating": "disagree"},
+        )
 
     def test_app_events_only_allow_known_event_names(self) -> None:
         async def signed_in_user() -> CurrentUser:
