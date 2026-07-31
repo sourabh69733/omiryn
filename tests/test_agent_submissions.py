@@ -448,6 +448,28 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response.json()["profile_photo_url"],
         )
 
+    def test_profile_photo_uploads_are_limited_per_user_month(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "USER_PHOTO_UPLOAD_MONTHLY_LIMIT": "1",
+            },
+        ):
+            first_response = self.client.put(
+                "/api/me/profile-photo",
+                content=b"first-image",
+                headers={"content-type": "image/png"},
+            )
+            second_response = self.client.put(
+                "/api/me/profile-photo?slot=0",
+                content=b"second-image",
+                headers={"content-type": "image/png"},
+            )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 429)
+        self.assertIn("Monthly limit reached", second_response.json()["detail"])
+
     def test_profile_photo_slot_upload_preserves_existing_slots(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
@@ -3112,6 +3134,43 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["agent_model"], "llama3.1:8b")
         self.assertEqual(run_turn.await_args.kwargs["model"], "llama3.1:8b")
 
+    def test_chat_messages_are_limited_per_user_month(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation = conversation_response.json()
+        turn_result = AgentTurnResult(
+            messages=conversation["messages"]
+            + [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ],
+            quality_valid=True,
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "USER_CHAT_MONTHLY_LIMIT": "1",
+            },
+        ), patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)) as run_turn:
+            first_response = self.client.post(
+                f"/api/agent/conversations/{conversation['id']}/messages",
+                json={"message": "hi"},
+            )
+            second_response = self.client.post(
+                f"/api/agent/conversations/{conversation['id']}/messages",
+                json={"message": "again"},
+            )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 429)
+        self.assertIn("Monthly limit reached", second_response.json()["detail"])
+        self.assertGreater(int(second_response.headers["Retry-After"]), 0)
+        self.assertEqual(
+            second_response.headers["Retry-After"],
+            second_response.headers["X-RateLimit-Reset-Seconds"],
+        )
+        self.assertEqual(run_turn.await_count, 1)
+
     def test_conversation_can_import_external_context(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
         conversation_id = conversation_response.json()["id"]
@@ -3159,6 +3218,37 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         history_response = self.client.get("/api/agent/conversations")
         self.assertEqual(history_response.json()["conversations"][0]["context_source_count"], 1)
+
+    def test_context_imports_have_short_burst_limit(self) -> None:
+        conversation_response = self.client.post("/api/agent/conversations")
+        conversation_id = conversation_response.json()["id"]
+
+        with patch.dict(
+            os.environ,
+            {
+                "USER_CONTEXT_IMPORT_MONTHLY_LIMIT": "20",
+            },
+        ):
+            responses = [
+                self.client.post(
+                    f"/api/agent/conversations/{conversation_id}/context-sources",
+                    json={
+                        "source_type": "manual_notes",
+                        "title": f"Preference notes {index}",
+                        "content": (
+                            "A calm lifestyle and thoughtful communication matter a lot. "
+                            f"This is import number {index}."
+                        ),
+                    },
+                )
+                for index in range(11)
+            ]
+
+        self.assertTrue(all(response.status_code == 201 for response in responses[:10]))
+        self.assertEqual(responses[10].status_code, 429)
+        self.assertIn("Too many requests", responses[10].json()["detail"])
+        self.assertGreater(int(responses[10].headers["Retry-After"]), 0)
+        self.assertLessEqual(int(responses[10].headers["Retry-After"]), 60)
 
     def test_user_context_can_attach_to_another_session(self) -> None:
         first_response = self.client.post("/api/agent/conversations")

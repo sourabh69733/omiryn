@@ -4828,6 +4828,45 @@ p {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
+.composer-pause-note {
+  margin: 0;
+  padding: 10px 18px 0;
+  color: #bd3760;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.composer-pause-note span {
+  display: inline-grid;
+  min-width: 34px;
+  height: 24px;
+  margin-left: 6px;
+  place-items: center;
+  border: 1px solid rgba(189, 55, 96, 0.18);
+  border-radius: 999px;
+  color: #8f2c4d;
+  background: rgba(255, 246, 249, 0.9);
+  font-size: 12px;
+}
+
+.composer-pause-note.is-monthly {
+  color: #7c3d1c;
+}
+
+.composer-pause-note.is-monthly span {
+  border-color: rgba(181, 103, 28, 0.2);
+  color: #7c3d1c;
+  background: rgba(255, 249, 237, 0.94);
+  /* top | right | bottom | left */
+  padding: 4px 10px 6px 10px;
+}
+
+.agentic-chat .composer.is-paused {
+  border-top-color: rgba(255, 126, 179, 0.2);
+}
+
 .privacy-note {
   border: 1px solid #dbe9e4;
   border-radius: 8px;

@@ -201,6 +201,8 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
+  const [pauseNow, setPauseNow] = useState(() => Date.now());
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidePanel, setSidePanel] = useState<"history" | "usage">("history");
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
@@ -217,6 +219,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const floatingDayTimerRef = useRef<number | null>(null);
+  const composerPauseTimerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const shouldRestoreInputFocusRef = useRef(false);
@@ -350,8 +353,30 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   useEffect(() => {
     return () => {
       if (floatingDayTimerRef.current !== null) window.clearTimeout(floatingDayTimerRef.current);
+      if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!composerLimit?.until) return;
+    if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
+    composerPauseTimerRef.current = window.setInterval(() => {
+      setPauseNow(Date.now());
+      if (composerLimit.until && Date.now() >= composerLimit.until) {
+        setComposerLimit(null);
+        if (composerPauseTimerRef.current !== null) {
+          window.clearInterval(composerPauseTimerRef.current);
+          composerPauseTimerRef.current = null;
+        }
+      }
+    }, 1000);
+    return () => {
+      if (composerPauseTimerRef.current !== null) {
+        window.clearInterval(composerPauseTimerRef.current);
+        composerPauseTimerRef.current = null;
+      }
+    };
+  }, [composerLimit]);
 
   function updateFloatingDayOnScroll() {
     const log = logRef.current;
@@ -388,23 +413,52 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || !conversation || sending) return;
+    if (!message || !conversation || sending || composerLimit) return;
     shouldStickToBottomRef.current = true;
     const activeElement = document.activeElement;
     shouldRestoreInputFocusRef.current = activeElement instanceof HTMLElement && Boolean(activeElement.closest(".composer"));
+    const previousConversation = conversation;
     setDraft("");
     setSending(true);
     setError("");
+    setComposerLimit(null);
     setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sent" }] });
     syncChatToBottom();
     if (shouldRestoreInputFocusRef.current) focusComposer();
+    let handledInlineError = false;
     try {
       const response = await apiFetch(`/api/agent/conversations/${conversation.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })
       });
-      if (!response.ok) throw new Error(await apiErrorMessage(response, "Omiryn could not reply."));
+      if (!response.ok) {
+        const detail = await apiErrorMessage(response, "Omiryn could not reply.");
+        setConversation(previousConversation);
+        if (response.status === 429) {
+          const friendly = friendlyQuotaMessage(detail);
+          const retryAfterSeconds = retryAfterFromResponse(response);
+          if (detail.toLowerCase().includes("short time")) {
+            const pausedAt = Date.now();
+            setPauseNow(pausedAt);
+            setComposerLimit({ until: pausedAt + (retryAfterSeconds || 60) * 1000, message: friendly, kind: "burst" });
+            setError("");
+            handledInlineError = true;
+          } else {
+            const pausedAt = Date.now();
+            setPauseNow(pausedAt);
+            setComposerLimit({
+              until: retryAfterSeconds ? pausedAt + retryAfterSeconds * 1000 : undefined,
+              message: friendly,
+              kind: "monthly"
+            });
+            setError("");
+            handledInlineError = true;
+          }
+          throw new Error(friendly);
+        }
+        throw new Error(detail);
+      }
       const nextConversation = (await response.json()) as Conversation;
       setSending(false);
       setConversation(nextConversation);
@@ -412,7 +466,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
       void loadConversationUsage(nextConversation.id);
     } catch (caught) {
       setDraft(message);
-      setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
+      if (!handledInlineError) setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
     } finally {
       setSending(false);
       if (shouldRestoreInputFocusRef.current) focusComposer();
@@ -488,6 +542,8 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const averageUsage = averageChatUsage(usageEvents, usageSummary);
   const usageCost = usageSummary.estimated_cost_usd ? ` · $${usageSummary.estimated_cost_usd.toFixed(6)}` : "";
   const usageInrCost = usageSummary.estimated_cost_inr ? ` / Rs ${usageSummary.estimated_cost_inr.toFixed(4)}` : "";
+  const pauseRemainingSeconds = composerLimit?.until ? Math.max(0, Math.ceil((composerLimit.until - pauseNow) / 1000)) : 0;
+  const composerBlocked = Boolean(composerLimit && (!composerLimit.until || pauseRemainingSeconds > 0));
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
@@ -564,9 +620,10 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
-          <form className="composer" onSubmit={sendMessage}>
-            <textarea ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Say what matters..." rows={1} disabled={!conversation} readOnly={sending} />
-            <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
+          {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
+          <form className={`composer ${composerBlocked ? "is-paused" : ""}`} onSubmit={sendMessage}>
+            <textarea ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} readOnly={sending} aria-describedby={composerBlocked ? "composer-pause-note" : undefined} />
+            <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
         </section>
       </div>
@@ -577,6 +634,56 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function friendlyQuotaMessage(detail: string) {
+  if (detail.toLowerCase().includes("short time")) {
+    return randomCooldownMessage();
+  }
+  if (detail.toLowerCase().includes("monthly limit")) {
+    return randomMonthlyQuotaMessage();
+  }
+  return detail;
+}
+
+function retryAfterFromResponse(response: Response) {
+  const raw = response.headers.get("X-RateLimit-Reset-Seconds") || response.headers.get("Retry-After");
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function formatLimitCountdown(totalSeconds: number) {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  if (seconds <= 0) return "soon";
+  if (seconds < 60) return `${seconds} sec`;
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `${hours} hr`;
+  const days = Math.ceil(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function randomCooldownMessage() {
+  const messages = [
+    "Arre, aap toh bahut fast ho. Bas 1 minute do, mujhe aapki speed catch karne do.",
+    "Aap rocket mode mein ho. Mujhe ek minute do replies thoughtful rakhne ke liye.",
+    "Bas ek chhota sa breather. 1 minute mein phir full speed.",
+    "Thoda sa pause. Omiryn ko aapki speed se sync hone do.",
+    "Speed impressive hai. Main bas ek minute mein catch up karti hoon.",
+    "Hold that thought. Ek minute ka tiny cooldown, phir baat continue.",
+  ];
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
+function randomMonthlyQuotaMessage() {
+  const messages = [
+    "Aaj ke liye Omiryn ka quota full ho gaya. Your draft is safe, but sending is paused until quota frees up.",
+    "You have reached your chat quota for now. Thoda sa pause, thoughtful replies need some breathing room.",
+    "Omiryn needs a longer breather now. Chat quota is full, and sending will unlock when quota resets.",
+    "Full speed used up for this quota window. Main yahin hoon, bas sending abhi paused hai.",
+  ];
+  return messages[Math.floor(Math.random() * messages.length)];
 }
 
 function messageDate(message: Message, index: number) {
