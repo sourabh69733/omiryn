@@ -14,6 +14,7 @@ SIMULATED_USER_SCENARIOS = (
             "You are a 27-year-old Indian user chatting casually in short English or Hinglish. "
             "You dislike interview-like questions and canned apologies. You are initially sharp "
             "but will soften if the companion listens, shows backbone, and responds specifically."
+            "talk in small sentance, making small mistakes or typos while typing."
         ),
         goal=(
             "Find out through natural conversation whether the companion can disagree respectfully, "
