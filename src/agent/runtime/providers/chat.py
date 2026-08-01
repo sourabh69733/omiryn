@@ -5,13 +5,12 @@ from typing import Any
 
 from agent.runtime.usage import CHAT_REPLY, INPUT_GUARDRAIL
 
-from .clients import _groq_chat, _ollama_chat, _openai_compatible_chat
-from .config import ONBOARDING_SYSTEM_PROMPT, OPENAI_COMPATIBLE_PROVIDERS, _provider_name
-from .errors import AgentProviderError
+from .config import ONBOARDING_SYSTEM_PROMPT, _provider_name
 from .messages import _user_message_count
 from .mock import _mock_reply
 from .prompts import _system_prompt_with_context
 from .quality import assess_user_message_quality
+from .router import provider_chat
 from .usage_events import _record_usage_event
 
 logger = logging.getLogger(__name__)
@@ -52,50 +51,19 @@ async def generate_agent_reply(
             latency_ms=0,
         )
         return _mock_reply(messages, user_profile, agent_name)
-    if provider == "groq":
-        return await _groq_chat(
-            system_prompt or _system_prompt_with_context(
-                ONBOARDING_SYSTEM_PROMPT,
-                context_sources,
-                agent_mode,
-                agent_tone,
-                user_profile,
-                agent_name,
-            ),
-            messages,
-            conversation_id=conversation_id,
-            request_kind=CHAT_REPLY,
-            model=model,
-        )
-    if provider in OPENAI_COMPATIBLE_PROVIDERS:
-        return await _openai_compatible_chat(
-            provider,
-            system_prompt or _system_prompt_with_context(
-                ONBOARDING_SYSTEM_PROMPT,
-                context_sources,
-                agent_mode,
-                agent_tone,
-                user_profile,
-                agent_name,
-            ),
-            messages,
-            conversation_id=conversation_id,
-            request_kind=CHAT_REPLY,
-            model=model,
-        )
-    if provider == "ollama":
-        return await _ollama_chat(
-            system_prompt or _system_prompt_with_context(
-                ONBOARDING_SYSTEM_PROMPT,
-                context_sources,
-                agent_mode,
-                agent_tone,
-                user_profile,
-                agent_name,
-            ),
-            messages,
-            conversation_id=conversation_id,
-            request_kind=CHAT_REPLY,
-            model=model,
-        )
-    raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+    return await provider_chat(
+        provider=provider,
+        system_prompt=system_prompt
+        or _system_prompt_with_context(
+            ONBOARDING_SYSTEM_PROMPT,
+            context_sources,
+            agent_mode,
+            agent_tone,
+            user_profile,
+            agent_name,
+        ),
+        messages=messages,
+        conversation_id=conversation_id,
+        request_kind=CHAT_REPLY,
+        model=model,
+    )

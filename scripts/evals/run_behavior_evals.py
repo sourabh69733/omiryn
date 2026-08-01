@@ -37,6 +37,11 @@ from agent.evals.behavior.runtime_driver import (  # noqa: E402
     RuntimeScenarioDriver,
 )
 from agent.evals.behavior.scenarios import COMPANION_BEHAVIOR_SCENARIOS  # noqa: E402
+from agent.runtime.providers.registry import (  # noqa: E402
+    EVAL_PROVIDER_NAMES,
+    PROVIDER_NAMES,
+    provider_model,
+)
 from storage import init_db, reset_db  # noqa: E402
 
 
@@ -47,7 +52,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--provider",
         default=os.getenv("AGENT_PROVIDER", "deepinfra"),
-        choices=("deepinfra", "fireworks", "groq", "ollama", "mock"),
+        choices=PROVIDER_NAMES,
         help="Provider used by the companion under evaluation.",
     )
     parser.add_argument("--model", default=None, help="Optional companion model override.")
@@ -65,7 +70,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--judge-provider",
         default=os.getenv("AGENT_EVAL_JUDGE_PROVIDER") or os.getenv("AGENT_PROVIDER", "deepinfra"),
-        choices=("deepinfra", "fireworks", "groq", "mock"),
+        choices=EVAL_PROVIDER_NAMES,
         help="Independent semantic-rubric judge provider. Mock deliberately fails closed.",
     )
     parser.add_argument(
@@ -248,23 +253,7 @@ def _selected_scenarios(scenario_ids: list[str] | None):
 
 
 def _companion_model_name(args: argparse.Namespace) -> str:
-    if args.model:
-        return args.model
-    env_names = {
-        "deepinfra": "DEEPINFRA_MODEL",
-        "fireworks": "FIREWORKS_MODEL",
-        "groq": "GROQ_MODEL",
-        "ollama": "OLLAMA_MODEL",
-    }
-    defaults = {
-        "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        "fireworks": "accounts/fireworks/models/gpt-oss-120b",
-        "groq": "llama-3.1-8b-instant",
-        "ollama": "llama3.1:8b",
-        "mock": "mock",
-    }
-    env_name = env_names.get(args.provider)
-    return (os.getenv(env_name) if env_name else None) or defaults[args.provider]
+    return args.model or provider_model(args.provider) or "provider-default"
 
 
 def _resolved_output_dir(path: Path) -> Path:

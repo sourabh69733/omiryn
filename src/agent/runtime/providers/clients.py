@@ -9,9 +9,15 @@ import httpx
 
 from agent.runtime.usage import CHAT_REPLY
 
-from .config import _deepinfra_api_key
 from .errors import AgentProviderError
 from .messages import _compact_chat_reply, _provider_messages
+from .registry import (
+    provider_api_key,
+    provider_base_url,
+    provider_model,
+    provider_spec,
+    provider_timeout_seconds,
+)
 from .usage_events import _elapsed_ms, _emit_prompt_debug, _prompt_debug, _record_usage_event, _sum_optional_ints
 
 logger = logging.getLogger(__name__)
@@ -123,45 +129,21 @@ def _openai_compatible_provider_config(
     provider: str,
     model: str | None,
 ) -> dict[str, str | int]:
-    if provider == "deepinfra":
-        api_key = _deepinfra_api_key()
-        if not api_key:
-            raise AgentProviderError(
-                "DEEPINFRA_API_KEY or DEEPINFRA_TOKEN is required when "
-                "AGENT_PROVIDER=deepinfra."
-            )
-        base_url = os.getenv("DEEPINFRA_BASE_URL", "https://api.deepinfra.com/v1/openai")
-        return {
-            "api_key": api_key,
-            "chat_url": f"{base_url.rstrip('/')}/chat/completions",
-            "model": model or os.getenv(
-                "DEEPINFRA_MODEL",
-                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            ),
-            "timeout_seconds": int(os.getenv("DEEPINFRA_TIMEOUT_SECONDS", "45")),
-        }
-
-    if provider == "fireworks":
-        api_key = os.getenv("FIREWORKS_API_KEY")
-        if not api_key:
-            raise AgentProviderError(
-                "FIREWORKS_API_KEY is required when AGENT_PROVIDER=fireworks."
-            )
-        base_url = os.getenv(
-            "FIREWORKS_BASE_URL",
-            "https://api.fireworks.ai/inference/v1",
-        )
-        return {
-            "api_key": api_key,
-            "chat_url": f"{base_url.rstrip('/')}/chat/completions",
-            "model": model or os.getenv(
-                "FIREWORKS_MODEL",
-                "accounts/fireworks/models/gpt-oss-120b",
-            ),
-            "timeout_seconds": int(os.getenv("FIREWORKS_TIMEOUT_SECONDS", "45")),
-        }
-
-    raise AgentProviderError(f"Unsupported OpenAI-compatible provider: {provider}")
+    spec = provider_spec(provider)
+    if spec is None or spec.transport != "openai_compatible":
+        raise AgentProviderError(f"Unsupported OpenAI-compatible provider: {provider}")
+    api_key = provider_api_key(provider)
+    if not api_key:
+        expected = " or ".join(spec.api_key_envs)
+        raise AgentProviderError(f"{expected} is required when AGENT_PROVIDER={provider}.")
+    base_url = provider_base_url(provider)
+    assert base_url is not None
+    return {
+        "api_key": api_key,
+        "chat_url": f"{base_url.rstrip('/')}/chat/completions",
+        "model": model or provider_model(provider) or spec.default_model,
+        "timeout_seconds": provider_timeout_seconds(provider),
+    }
 
 
 def _provider_error_detail(error_payload: Any) -> str:

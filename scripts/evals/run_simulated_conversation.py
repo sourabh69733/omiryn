@@ -32,6 +32,11 @@ from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
     get_simulated_user_scenario,
 )
 from agent.evals.behavior.simulated_user import ProviderSimulatedUser  # noqa: E402
+from agent.runtime.providers.registry import (  # noqa: E402
+    EVAL_PROVIDER_NAMES,
+    PROVIDER_NAMES,
+    provider_model,
+)
 from storage import init_db, reset_db  # noqa: E402
 
 
@@ -42,7 +47,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--provider",
         default=os.getenv("AGENT_PROVIDER", "deepinfra"),
-        choices=("deepinfra", "fireworks", "groq", "ollama", "mock"),
+        choices=PROVIDER_NAMES,
         help="Companion provider.",
     )
     parser.add_argument("--model", default=None, help="Companion model override.")
@@ -60,7 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--user-provider",
         default=os.getenv("AGENT_EVAL_USER_PROVIDER", "deepinfra"),
-        choices=("deepinfra", "fireworks", "groq", "mock"),
+        choices=EVAL_PROVIDER_NAMES,
         help="Provider for the AI model acting as the user.",
     )
     parser.add_argument(
@@ -143,22 +148,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
 
 
 def _resolved_model(provider: str, model: str | None) -> str:
-    if model:
-        return model
-    env_names = {
-        "deepinfra": "DEEPINFRA_MODEL",
-        "fireworks": "FIREWORKS_MODEL",
-        "groq": "GROQ_MODEL",
-    }
-    defaults = {
-        "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        "fireworks": "accounts/fireworks/models/gpt-oss-120b",
-        "groq": "llama-3.1-8b-instant",
-        "ollama": "llama3.1:8b",
-        "mock": "mock",
-    }
-    env_name = env_names.get(provider)
-    return (os.getenv(env_name) if env_name else None) or defaults[provider]
+    return model or provider_model(provider) or "provider-default"
 
 
 def _output_dir(path: Path) -> Path:

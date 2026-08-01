@@ -13,13 +13,13 @@ from agent.profile_engine.extraction import normalize_extracted_profile
 from agent.profile_engine.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.runtime.usage import DATA_POINT_EXTRACT, PROFILE_EXTRACT, PROFILE_EXTRACT_REPAIR, PROFILE_FACT_EXTRACT
 
-from .clients import _groq_chat, _ollama_chat, _openai_compatible_chat
-from .config import OPENAI_COMPATIBLE_PROVIDERS, _provider_name
+from .config import _provider_name
 from .errors import AgentProviderError
 from .json_utils import _parse_json_object
 from .messages import _conversation_and_context_text, _messages_for_profile_extraction, _user_message_count
 from .mock import _mock_deep_profile_facts, _mock_llm_data_point_reviews, _mock_llm_data_points, _mock_profile
 from .normalization import _deep_fact_extraction_text, _normalize_deep_profile_facts
+from .router import provider_chat
 from .usage_events import _record_usage_event
 
 logger = logging.getLogger(__name__)
@@ -51,69 +51,29 @@ async def extract_profile(
             "content": _conversation_and_context_text(profile_messages, context_sources),
         }
     ]
-    if provider == "groq":
-        content = await _groq_chat(
-            EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_EXTRACT,
-            model=model,
-        )
-    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
-        content = await _openai_compatible_chat(
-            provider,
-            EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_EXTRACT,
-            model=model,
-        )
-    elif provider == "ollama":
-        content = await _ollama_chat(
-            EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_EXTRACT,
-            model=model,
-        )
-    else:
-        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=EXTRACTION_SYSTEM_PROMPT,
+        messages=extraction_messages,
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=PROFILE_EXTRACT,
+        model=model,
+    )
 
     try:
         raw_profile = _parse_json_object(content)
     except (json.JSONDecodeError, AgentProviderError):
         repair_messages = extraction_messages + [{"role": "assistant", "content": content}]
-        if provider == "groq":
-            content = await _groq_chat(
-                EXTRACTION_REPAIR_PROMPT,
-                repair_messages,
-                temperature=0,
-                conversation_id=conversation_id,
-                request_kind=PROFILE_EXTRACT_REPAIR,
-                model=model,
-            )
-        elif provider in OPENAI_COMPATIBLE_PROVIDERS:
-            content = await _openai_compatible_chat(
-                provider,
-                EXTRACTION_REPAIR_PROMPT,
-                repair_messages,
-                temperature=0,
-                conversation_id=conversation_id,
-                request_kind=PROFILE_EXTRACT_REPAIR,
-                model=model,
-            )
-        else:
-            content = await _ollama_chat(
-                EXTRACTION_REPAIR_PROMPT,
-                repair_messages,
-                temperature=0,
-                conversation_id=conversation_id,
-                request_kind=PROFILE_EXTRACT_REPAIR,
-                model=model,
-            )
+        content = await provider_chat(
+            provider=provider,
+            system_prompt=EXTRACTION_REPAIR_PROMPT,
+            messages=repair_messages,
+            temperature=0,
+            conversation_id=conversation_id,
+            request_kind=PROFILE_EXTRACT_REPAIR,
+            model=model,
+        )
         raw_profile = _parse_json_object(content)
 
     return normalize_extracted_profile(raw_profile, provider)
@@ -143,36 +103,15 @@ async def extract_deep_profile_facts(
             "content": _deep_fact_extraction_text(messages),
         }
     ]
-    if provider == "groq":
-        content = await _groq_chat(
-            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_FACT_EXTRACT,
-            model=model,
-        )
-    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
-        content = await _openai_compatible_chat(
-            provider,
-            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_FACT_EXTRACT,
-            model=model,
-        )
-    elif provider == "ollama":
-        content = await _ollama_chat(
-            DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
-            extraction_messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=PROFILE_FACT_EXTRACT,
-            model=model,
-        )
-    else:
-        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
+        messages=extraction_messages,
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=PROFILE_FACT_EXTRACT,
+        model=model,
+    )
 
     raw = _parse_json_object(content)
     return _normalize_deep_profile_facts(raw, user_id, conversation_id)
@@ -197,36 +136,15 @@ async def extract_llm_data_point_candidates(
         return _mock_llm_data_points(extraction_text)
 
     messages = [{"role": "user", "content": extraction_text}]
-    if provider == "groq":
-        content = await _groq_chat(
-            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
-        content = await _openai_compatible_chat(
-            provider,
-            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    elif provider == "ollama":
-        content = await _ollama_chat(
-            DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    else:
-        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=DATA_POINT_EXTRACTION_SYSTEM_PROMPT,
+        messages=messages,
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=DATA_POINT_EXTRACT,
+        model=model,
+    )
 
     return _parse_json_object(content)
 
@@ -250,35 +168,14 @@ async def review_llm_data_point_candidates(
         return _mock_llm_data_point_reviews(review_text)
 
     messages = [{"role": "user", "content": review_text}]
-    if provider == "groq":
-        content = await _groq_chat(
-            DATA_POINT_REVIEW_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    elif provider in OPENAI_COMPATIBLE_PROVIDERS:
-        content = await _openai_compatible_chat(
-            provider,
-            DATA_POINT_REVIEW_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    elif provider == "ollama":
-        content = await _ollama_chat(
-            DATA_POINT_REVIEW_SYSTEM_PROMPT,
-            messages,
-            temperature=0,
-            conversation_id=conversation_id,
-            request_kind=DATA_POINT_EXTRACT,
-            model=model,
-        )
-    else:
-        raise AgentProviderError(f"Unsupported AGENT_PROVIDER: {provider}")
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=DATA_POINT_REVIEW_SYSTEM_PROMPT,
+        messages=messages,
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=DATA_POINT_EXTRACT,
+        model=model,
+    )
 
     return _parse_json_object(content)

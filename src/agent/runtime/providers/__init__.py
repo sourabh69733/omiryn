@@ -77,6 +77,7 @@ from .quality import (
     _quality_result,
     assess_user_message_quality,
 )
+from .router import provider_chat
 from .usage_events import (
     _elapsed_ms,
     _emit_prompt_debug,
@@ -95,5 +96,6 @@ __all__ = [
     "extract_llm_data_point_candidates",
     "extract_profile",
     "generate_agent_reply",
+    "provider_chat",
     "review_llm_data_point_candidates",
 ]

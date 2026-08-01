@@ -8,9 +8,9 @@ from typing import Any, Awaitable, Callable, Protocol
 import httpx
 
 from agent.evals.behavior.events import EventSink, emit_event
-from agent.runtime.providers.clients import _groq_chat, _openai_compatible_chat
 from agent.runtime.providers.errors import AgentProviderError
 from agent.runtime.providers.json_utils import _parse_json_object
+from agent.runtime.providers.router import provider_chat
 
 SIMULATED_USER_REQUEST_KIND = "behavior_eval_user_simulator"
 
@@ -253,19 +253,19 @@ def _mock_decision(
 
 
 def _provider_call(provider: str) -> Callable[..., Awaitable[str]]:
-    if provider == "groq":
-        return _groq_chat
-    if provider in {"deepinfra", "fireworks"}:
+    async def call_provider(
+        system_prompt: str,
+        messages: list[dict[str, str]],
+        **kwargs: Any,
+    ) -> str:
+        return await provider_chat(
+            provider=provider,
+            system_prompt=system_prompt,
+            messages=messages,
+            **kwargs,
+        )
 
-        async def call_openai_compatible(
-            system_prompt: str,
-            messages: list[dict[str, str]],
-            **kwargs: Any,
-        ) -> str:
-            return await _openai_compatible_chat(provider, system_prompt, messages, **kwargs)
-
-        return call_openai_compatible
-    raise SimulatedUserProtocolError(f"Unsupported AI user provider: {provider or 'empty'}.")
+    return call_provider
 
 
 def _is_transient_error(error: Exception) -> bool:

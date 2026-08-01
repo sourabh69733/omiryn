@@ -7,6 +7,8 @@ from typing import Any
 
 from storage import save_agent_usage_event
 
+from .registry import provider_env_prefix
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,12 +109,7 @@ def _estimated_cost_usd(
     )
 
 def _provider_token_costs(provider: str) -> tuple[float, float]:
-    env_prefixes = {
-        "groq": "GROQ",
-        "deepinfra": "DEEPINFRA",
-        "fireworks": "FIREWORKS",
-    }
-    env_prefix = env_prefixes.get(provider)
+    env_prefix = provider_env_prefix(provider)
     if not env_prefix:
         return 0.0, 0.0
     input_cost = float(os.getenv(f"{env_prefix}_INPUT_COST_PER_1M", "0") or 0)
