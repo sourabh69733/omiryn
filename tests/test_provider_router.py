@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import unittest
 from unittest.mock import AsyncMock, patch
+
+import httpx
 
 from agent.evals.behavior.judge import _provider_call as judge_provider_call
 from agent.evals.behavior.simulated_user import _provider_call as simulated_user_provider_call
 from agent.runtime.providers.chat import generate_agent_reply
+from agent.runtime.providers.clients import _openai_compatible_chat
 from agent.runtime.providers.registry import (
     EVAL_PROVIDER_NAMES,
     OPENAI_COMPATIBLE_PROVIDERS,
@@ -95,11 +99,82 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
     def test_provider_names_have_one_shared_source(self) -> None:
         self.assertEqual(
             PROVIDER_NAMES,
-            ("deepinfra", "fireworks", "groq", "ollama", "mock"),
+            ("openai", "deepinfra", "fireworks", "groq", "ollama", "mock"),
         )
-        self.assertEqual(EVAL_PROVIDER_NAMES, ("deepinfra", "fireworks", "groq", "mock"))
-        self.assertEqual(OPENAI_COMPATIBLE_PROVIDERS, {"deepinfra", "fireworks"})
+        self.assertEqual(
+            EVAL_PROVIDER_NAMES,
+            ("openai", "deepinfra", "fireworks", "groq", "mock"),
+        )
+        self.assertEqual(
+            OPENAI_COMPATIBLE_PROVIDERS,
+            {"openai", "deepinfra", "fireworks"},
+        )
         self.assertEqual(PROVIDER_NAMES, tuple(PROVIDER_REGISTRY))
+
+    def test_openai_registry_entry_uses_standard_api_configuration(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENAI_API_KEY": "test-openai-key",
+                "OPENAI_MODEL": "gpt-test-model",
+            },
+        ):
+            from agent.runtime.providers.clients import _openai_compatible_provider_config
+
+            config = _openai_compatible_provider_config("openai", None)
+
+        self.assertEqual(config["api_key"], "test-openai-key")
+        self.assertEqual(config["model"], "gpt-test-model")
+        self.assertEqual(config["chat_url"], "https://api.openai.com/v1/chat/completions")
+
+    async def test_openai_request_uses_key_model_and_chat_completions_endpoint(self) -> None:
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["url"] = str(request.url)
+            captured["authorization"] = request.headers.get("Authorization")
+            captured["payload"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": "OpenAI reply"}}],
+                    "usage": {
+                        "prompt_tokens": 10,
+                        "completion_tokens": 3,
+                        "total_tokens": 13,
+                    },
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "test-openai-key"}),
+            patch(
+                "agent.runtime.providers.clients.httpx.AsyncClient",
+                side_effect=client_factory,
+            ),
+            patch("agent.runtime.providers.clients._record_usage_event") as usage,
+        ):
+            result = await _openai_compatible_chat(
+                "openai",
+                "system prompt",
+                [{"role": "user", "content": "hello"}],
+                model="gpt-test-model",
+                request_kind="behavior_eval_user_judge",
+            )
+
+        self.assertEqual(result, "OpenAI reply")
+        self.assertEqual(captured["url"], "https://api.openai.com/v1/chat/completions")
+        self.assertEqual(captured["authorization"], "Bearer test-openai-key")
+        self.assertEqual(captured["payload"]["model"], "gpt-test-model")
+        self.assertEqual(captured["payload"]["messages"][0]["role"], "system")
+        self.assertEqual(usage.call_args.kwargs["provider"], "openai")
 
     async def test_one_compatible_registry_entry_is_enough_for_shared_routing(self) -> None:
         spec = ProviderSpec(

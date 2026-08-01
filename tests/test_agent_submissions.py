@@ -87,6 +87,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
+
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="test-user", email="test@example.com", display_name="Test User")
 
@@ -891,7 +892,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(get_profile_fact(fact["id"], "user-b")["label"], "Values family involvement")
+        self.assertEqual(
+            get_profile_fact(fact["id"], "user-b")["label"], "Values family involvement"
+        )
 
     def test_user_can_limit_profile_fact_usage_without_changing_confidence(self) -> None:
         fact = upsert_profile_fact(
@@ -1298,9 +1301,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(message_response.status_code, 200)
         self.assertGreaterEqual(len(message_response.json()["messages"]), 3)
 
-        extract_response = self.client.post(
-            f"/api/agent/conversations/{conversation_id}/extract"
-        )
+        extract_response = self.client.post(f"/api/agent/conversations/{conversation_id}/extract")
         self.assertEqual(extract_response.status_code, 200)
         draft_id = extract_response.json()["draft_id"]
         draft_response = self.client.get(f"/api/drafts/{draft_id}")
@@ -1519,9 +1520,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         fact_keys = {(fact["category"], fact["key"]) for fact in facts}
         self.assertIn(("values", "ambition"), fact_keys)
         self.assertIn(("values", "mutual_respect"), fact_keys)
-        reviewed_facts = [
-            fact for fact in facts if fact["source_kind"] == "agent_conversation"
-        ]
+        reviewed_facts = [fact for fact in facts if fact["source_kind"] == "agent_conversation"]
         self.assertTrue(reviewed_facts)
 
     def test_hybrid_chat_data_point_review_falls_back_on_rate_limit(self) -> None:
@@ -1537,16 +1536,19 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response=httpx.Response(429, request=request),
         )
 
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_PROVIDER": "mock",
-                "DATA_POINT_EXTRACTOR": "hybrid",
-                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
-            },
-        ), patch(
-            "agent.memory_engine.data_point_extraction.review_llm_data_point_candidates",
-            new=AsyncMock(side_effect=rate_limit_error),
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PROVIDER": "mock",
+                    "DATA_POINT_EXTRACTOR": "hybrid",
+                    "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+                },
+            ),
+            patch(
+                "agent.memory_engine.data_point_extraction.review_llm_data_point_candidates",
+                new=AsyncMock(side_effect=rate_limit_error),
+            ),
         ):
             for index in range(2):
                 response = self.client.post(
@@ -1674,7 +1676,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(first_response.status_code, 200)
         self.assertEqual(second_response.status_code, 200)
         self.assertNotEqual(first_response.json()["messages"][-2].get("quality"), "low_information")
-        self.assertNotEqual(second_response.json()["messages"][-2].get("quality"), "low_information")
+        self.assertNotEqual(
+            second_response.json()["messages"][-2].get("quality"), "low_information"
+        )
 
     def test_short_acknowledgements_are_not_marked_low_information(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
@@ -1897,13 +1901,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
             )
             raise httpx.HTTPStatusError("bad request", request=request, response=response)
 
-        with patch.dict(
-            os.environ,
-            {
-                "DEEPINFRA_API_KEY": "test-key",
-                "DEEPINFRA_BASE_URL": "https://provider.example",
-            },
-        ), patch("httpx.AsyncClient.post", new=fake_post):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "DEEPINFRA_API_KEY": "test-key",
+                    "DEEPINFRA_BASE_URL": "https://provider.example",
+                },
+            ),
+            patch("httpx.AsyncClient.post", new=fake_post),
+        ):
             with self.assertRaises(Exception):
                 asyncio.run(
                     _openai_compatible_chat(
@@ -2353,7 +2360,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         app.dependency_overrides[current_user] = user_a
         conversation_a = self.client.post("/api/agent/conversations").json()["id"]
-        draft_a = self.client.post("/api/agent-submissions/profile", json=sample_submission()).json()
+        draft_a = self.client.post(
+            "/api/agent-submissions/profile", json=sample_submission()
+        ).json()
         upsert_profile_fact(
             {
                 "user_id": "user-a",
@@ -2460,7 +2469,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["user"]["display_name_source"], "draft")
         self.assertEqual(data["profile"]["display_name"], "Aarav")
         self.assertEqual(data["profile"]["source"], "draft")
-        self.assertEqual([conversation["id"] for conversation in data["conversations"]], [conversation_a])
+        self.assertEqual(
+            [conversation["id"] for conversation in data["conversations"]], [conversation_a]
+        )
         self.assertEqual([draft["id"] for draft in data["drafts"]], [draft_a["draft_id"]])
         self.assertEqual([fact["label"] for fact in data["facts"]], ["Values kindness"])
         self.assertEqual(data["usage_events"][0]["user_id"], "user-a")
@@ -2620,12 +2631,32 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("model", data)
         self.assertIn("available_models", data)
         self.assertIn("api_key_loaded", data)
+        self.assertIn("openai_api_key_loaded", data)
         self.assertIn("groq_api_key_loaded", data)
         self.assertIn("deepinfra_api_key_loaded", data)
         self.assertIn("fireworks_api_key_loaded", data)
         self.assertNotIn("groq_api_key", data)
+        self.assertNotIn("openai_api_key", data)
         self.assertNotIn("deepinfra_api_key", data)
         self.assertNotIn("fireworks_api_key", data)
+
+    def test_openai_runtime_config_uses_env_key_and_models(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_PROVIDER": "openai",
+                "OPENAI_API_KEY": "openai-test-key",
+                "OPENAI_MODEL": "gpt-4.1-mini",
+            },
+        ):
+            status = agent_runtime_status()
+            config = _openai_compatible_provider_config("openai", None)
+
+        self.assertEqual(status["provider"], "openai")
+        self.assertTrue(status["api_key_loaded"])
+        self.assertTrue(status["openai_api_key_loaded"])
+        self.assertIn("gpt-4.1-mini", status["available_models"])
+        self.assertEqual(config["chat_url"], "https://api.openai.com/v1/chat/completions")
 
     def test_deepinfra_runtime_config_uses_env_key_and_models(self) -> None:
         with patch.dict(
@@ -3052,7 +3083,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(events[0]["metadata"], {"page": "style"})
         self.assertEqual(events[1]["metadata"], {"source_type": "manual_notes"})
-        self.assertEqual(events[2]["metadata"], {"area": "unhandled_rejection", "message_code": "failed_to_fetch"})
+        self.assertEqual(
+            events[2]["metadata"],
+            {"area": "unhandled_rejection", "message_code": "failed_to_fetch"},
+        )
         self.assertEqual(
             events[3]["metadata"],
             {"fact_category": "communication", "rating": "disagree"},
@@ -3195,26 +3229,29 @@ class AgentSubmissionApiTest(unittest.TestCase):
             )
         conversation = create_response.json()
 
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_PROVIDER": "ollama",
-                "OLLAMA_MODEL": "llama3.1:8b",
-                "OLLAMA_AVAILABLE_MODELS": "llama3.1:8b,gpt-oss:20b",
-            },
-        ), patch(
-            "api.main.run_agent_turn",
-            new=AsyncMock(
-                return_value=AgentTurnResult(
-                    messages=conversation["messages"]
-                    + [
-                        {"role": "user", "content": "hi"},
-                        {"role": "assistant", "content": "hello"},
-                    ],
-                    quality_valid=True,
-                )
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PROVIDER": "ollama",
+                    "OLLAMA_MODEL": "llama3.1:8b",
+                    "OLLAMA_AVAILABLE_MODELS": "llama3.1:8b,gpt-oss:20b",
+                },
             ),
-        ) as run_turn:
+            patch(
+                "api.main.run_agent_turn",
+                new=AsyncMock(
+                    return_value=AgentTurnResult(
+                        messages=conversation["messages"]
+                        + [
+                            {"role": "user", "content": "hi"},
+                            {"role": "assistant", "content": "hello"},
+                        ],
+                        quality_valid=True,
+                    )
+                ),
+            ) as run_turn,
+        ):
             response = self.client.post(
                 f"/api/agent/conversations/{conversation['id']}/messages",
                 json={"message": "hi"},
@@ -3238,12 +3275,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
             quality_valid=True,
         )
 
-        with patch.dict(
-            os.environ,
-            {
-                "USER_CHAT_MONTHLY_LIMIT": "1",
-            },
-        ), patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)) as run_turn:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "USER_CHAT_MONTHLY_LIMIT": "1",
+                },
+            ),
+            patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)) as run_turn,
+        ):
             first_response = self.client.post(
                 f"/api/agent/conversations/{conversation['id']}/messages",
                 json={"message": "hi"},
@@ -3411,7 +3451,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         history_response = self.client.get("/api/agent/conversations")
         self.assertEqual(history_response.json()["conversations"][0]["context_source_count"], 0)
-        list_response = self.client.get(f"/api/agent/conversations/{conversation_id}/context-sources")
+        list_response = self.client.get(
+            f"/api/agent/conversations/{conversation_id}/context-sources"
+        )
         self.assertEqual(list_response.json()["count"], 0)
         self.assertEqual(list_response.json()["available_sources"], [])
 
@@ -3597,7 +3639,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(create_response.status_code, 201)
 
-        casual_sources = _smart_reply_context_sources(conversation_id, None, "haan okay", "test-user")
+        casual_sources = _smart_reply_context_sources(
+            conversation_id, None, "haan okay", "test-user"
+        )
         self.assertFalse(
             any(source["source_type"] == "whatsapp_structured_context" for source in casual_sources)
         )
@@ -3759,7 +3803,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertIn("whatsapp_recurring_topics", {fact["category"] for fact in facts})
         self.assertTrue(all(row["candidate"]["source"] == "rules" for row in debug_rows))
-        self.assertTrue(all(row["review"]["decision"] in {"approve", "rewrite", "merge", "reject"} for row in debug_rows))
+        self.assertTrue(
+            all(
+                row["review"]["decision"] in {"approve", "rewrite", "merge", "reject"}
+                for row in debug_rows
+            )
+        )
 
     def test_whatsapp_source_delete_removes_data_point_debug_rows(self) -> None:
         async def user_a() -> CurrentUser:
@@ -4020,7 +4069,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertGreaterEqual(len(structured.chunks), 1)
         self.assertEqual(structured.people[0].sender, "Aarav")
         self.assertEqual(structured.people[0].role, "selected_user")
-        self.assertEqual({profile.sender for profile in structured.style_profiles}, {"Aarav", "Riya"})
+        self.assertEqual(
+            {profile.sender for profile in structured.style_profiles}, {"Aarav", "Riya"}
+        )
         self.assertTrue(structured.metadata["embedding_ready"])
         self.assertEqual(structured.chunks[0].embedding["kind"], "local_hash_v1")
 
@@ -4034,9 +4085,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("6-7 bje around", messages[2].content)
         self.assertIn("wahi per", messages[4].content)
 
-        structured = build_whatsapp_structured_memory(sample_bracketed_whatsapp_export(), "Sourabh sahu")
+        structured = build_whatsapp_structured_memory(
+            sample_bracketed_whatsapp_export(), "Sourabh sahu"
+        )
         self.assertEqual(len(structured.messages), 5)
-        self.assertEqual({person.sender for person in structured.people}, {"Sourabh sahu", "abhishek"})
+        self.assertEqual(
+            {person.sender for person in structured.people}, {"Sourabh sahu", "abhishek"}
+        )
 
     def test_usage_page_is_served(self) -> None:
         response = self.client.get("/usage")

@@ -26,6 +26,7 @@ ONBOARDING_SYSTEM_PROMPT = COMPANION_SYSTEM_PROMPT
 def _provider_name() -> str:
     return os.getenv("AGENT_PROVIDER", "mock").strip().lower()
 
+
 def agent_runtime_status() -> dict[str, Any]:
     provider = _provider_name()
     return {
@@ -33,20 +34,19 @@ def agent_runtime_status() -> dict[str, Any]:
         "model": _provider_model(provider),
         "available_models": _available_models(provider),
         "api_key_loaded": _provider_api_key_loaded(provider),
+        "openai_api_key_loaded": bool(os.getenv("OPENAI_API_KEY")),
         "groq_api_key_loaded": bool(os.getenv("GROQ_API_KEY")),
         "deepinfra_api_key_loaded": bool(_deepinfra_api_key()),
         "fireworks_api_key_loaded": bool(os.getenv("FIREWORKS_API_KEY")),
         "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     }
 
+
 def _models_from_env(env_name: str, defaults: list[str]) -> list[str]:
-    configured = [
-        model.strip()
-        for model in os.getenv(env_name, "").split(",")
-        if model.strip()
-    ]
+    configured = [model.strip() for model in os.getenv(env_name, "").split(",") if model.strip()]
     models = configured or defaults
     return list(dict.fromkeys(models))
+
 
 def _deepinfra_api_key() -> str:
     return _provider_api_key("deepinfra")

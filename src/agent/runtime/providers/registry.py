@@ -24,6 +24,22 @@ class ProviderSpec:
 
 
 PROVIDER_REGISTRY = {
+    "openai": ProviderSpec(
+        name="openai",
+        transport="openai_compatible",
+        api_key_envs=("OPENAI_API_KEY",),
+        base_url_env="OPENAI_BASE_URL",
+        default_base_url="https://api.openai.com/v1",
+        model_env="OPENAI_MODEL",
+        default_model="gpt-4.1-mini",
+        available_models_env="OPENAI_AVAILABLE_MODELS",
+        default_available_models=(
+            "gpt-4.1-mini",
+            "gpt-5.6-luna",
+            "gpt-5.6-terra",
+        ),
+        timeout_env="OPENAI_TIMEOUT_SECONDS",
+    ),
     "deepinfra": ProviderSpec(
         name="deepinfra",
         transport="openai_compatible",
