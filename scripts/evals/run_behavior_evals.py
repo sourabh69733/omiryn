@@ -22,6 +22,11 @@ from agent.evals.behavior.calibration import (  # noqa: E402
 )
 from agent.evals.behavior.consensus import ConservativeConsensusJudge  # noqa: E402
 from agent.evals.behavior.judge import ProviderRubricJudge  # noqa: E402
+from agent.evals.behavior.live_reporter import TerminalProgressReporter  # noqa: E402
+from agent.evals.behavior.report_writer import (  # noqa: E402
+    attach_run_metadata,
+    save_evaluation_reports,
+)
 from agent.evals.behavior.runner import (  # noqa: E402
     BehaviorEvalConfig,
     report_payload,
@@ -108,12 +113,32 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--persist", action="store_true", help="Persist results for admin review.")
     parser.add_argument("--reset", action="store_true", help="Reset the dedicated eval database.")
-    parser.add_argument("--output", type=Path, help="Write the full JSON failure artifact.")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("reports/evals"),
+        help="Directory for Markdown, JSON, and history reports (default: reports/evals).",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Optional explicit JSON path; a matching Markdown report is also written.",
+    )
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not save Markdown or JSON report files.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Hide live progress; the final summary and reports are still produced.",
+    )
     parser.add_argument("--json", action="store_true", help="Print full JSON instead of summary.")
     return parser
 
 
-async def _run(args: argparse.Namespace) -> dict:
+async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> dict:
     if args.reset:
         reset_db()
     else:
@@ -123,11 +148,12 @@ async def _run(args: argparse.Namespace) -> dict:
             provider=args.provider,
             model=args.model,
             prompt_version=args.prompt_version,
-        )
+        ),
+        event_sink=reporter,
     )
-    judge, judge_names = _build_judge(args)
+    judge, judge_names = _build_judge(args, reporter)
     _validate_run_mode(args, judge_names)
-    calibration = await run_judge_calibration(judge)
+    calibration = await run_judge_calibration(judge, event_sink=reporter)
     calibration_payload = calibration_report_payload(calibration)
     if args.calibration_only or not calibration.passed:
         return {
@@ -150,6 +176,7 @@ async def _run(args: argparse.Namespace) -> dict:
             samples_override=args.samples,
             persist=args.persist,
         ),
+        event_sink=reporter,
     )
     payload = report_payload(report)
     payload["stage"] = "behavior_evaluation"
@@ -160,7 +187,7 @@ async def _run(args: argparse.Namespace) -> dict:
     return payload
 
 
-def _build_judge(args: argparse.Namespace):
+def _build_judge(args: argparse.Namespace, reporter: TerminalProgressReporter):
     models = args.judge_models or [None]
     judges = tuple(
         (
@@ -170,6 +197,7 @@ def _build_judge(args: argparse.Namespace):
                 model=model,
                 timeout_seconds=args.judge_timeout_seconds,
                 max_attempts=args.judge_max_attempts,
+                event_sink=reporter,
             ),
         )
         for model in models
@@ -213,20 +241,92 @@ def _selected_scenarios(scenario_ids: list[str] | None):
     return selected
 
 
+def _companion_model_name(args: argparse.Namespace) -> str:
+    if args.model:
+        return args.model
+    env_names = {
+        "deepinfra": "DEEPINFRA_MODEL",
+        "fireworks": "FIREWORKS_MODEL",
+        "groq": "GROQ_MODEL",
+        "ollama": "OLLAMA_MODEL",
+    }
+    defaults = {
+        "deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "fireworks": "accounts/fireworks/models/gpt-oss-120b",
+        "groq": "llama-3.1-8b-instant",
+        "ollama": "llama3.1:8b",
+        "mock": "mock",
+    }
+    env_name = env_names.get(args.provider)
+    return (os.getenv(env_name) if env_name else None) or defaults[args.provider]
+
+
+def _resolved_output_dir(path: Path) -> Path:
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
+    if args.no_save and args.output:
+        parser.error("--no-save cannot be combined with --output.")
+    reporter = TerminalProgressReporter(enabled=not args.quiet)
     try:
-        payload = asyncio.run(_run(args))
+        payload = asyncio.run(_run(args, reporter))
     except ValueError as error:
         parser.error(str(error))
+    except Exception as error:
+        payload = {
+            "stage": "execution_error",
+            "passed": False,
+            "mode": args.mode,
+            "judges": [
+                f"{args.judge_provider}:{model}"
+                for model in (args.judge_models or ["provider-default"])
+            ],
+            "judge_runtime": _judge_runtime_payload(args),
+            "judge_calibration": {
+                "passed": False,
+                "accuracy": 0.0,
+                "false_accepts": 0,
+                "false_rejects": 0,
+                "judge_errors": 1,
+                "completed_cases": 0,
+                "total_cases": 0,
+                "cases": [],
+            },
+            "execution_error": f"{type(error).__name__}: {error}",
+        }
+    attach_run_metadata(
+        payload,
+        stats=reporter.stats(),
+        companion_provider=args.provider,
+        companion_model=_companion_model_name(args),
+        prompt_version=args.prompt_version,
+    )
+    saved_paths = None
+    if not args.no_save:
+        saved_paths = save_evaluation_reports(
+            payload,
+            output_dir=_resolved_output_dir(args.output_dir),
+            explicit_json_path=args.output,
+        )
+        if not args.quiet:
+            print(
+                "\nReports saved:\n"
+                f"  Easy report: {saved_paths.markdown}\n"
+                f"  Full data:   {saved_paths.json}\n"
+                f"  History:     {saved_paths.history}",
+                file=sys.stderr,
+                flush=True,
+            )
     rendered = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered + "\n", encoding="utf-8")
     if args.json:
         print(rendered)
     else:
+        if payload["stage"] == "execution_error":
+            print(f"Evaluation stopped: {payload['execution_error']}")
+            return 1
         if payload["stage"] == "judge_calibration":
             calibration = payload["judge_calibration"]
             status = "PASS" if calibration["passed"] else "FAIL"
