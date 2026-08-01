@@ -12,7 +12,11 @@ from agent.evals.behavior.runtime_driver import (
     _direct_reply_reason,
     _runtime_environment,
 )
-from agent.evals.behavior.simulated_user import SimulatedUser, SimulatedUserScenario
+from agent.evals.behavior.simulated_user import (
+    SimulatedUser,
+    SimulatedUserScenario,
+    UserExperienceVerdict,
+)
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
     list_agent_context_snapshots,
@@ -28,6 +32,7 @@ class SimulatedConversationResult:
     turns: tuple[ObservedTurn, ...]
     stop_reason: str
     conversation_id: str
+    user_verdict: UserExperienceVerdict
 
 
 async def run_simulated_conversation(
@@ -174,10 +179,44 @@ async def run_simulated_conversation(
                 ),
                 user_id,
             )
+    final_transcript = tuple(
+        {"role": str(item.get("role") or ""), "content": str(item.get("content") or "")}
+        for item in messages
+        if item.get("role") in {"user", "assistant"}
+    )
+    emit_event(
+        event_sink,
+        "user_judgment_started",
+        "AI user started judging the completed conversation.",
+        scenario_id=scenario.id,
+        turn_count=len(observed_turns),
+    )
+    user_verdict = await simulated_user.judge_conversation(
+        scenario=scenario,
+        transcript=final_transcript,
+        conversation_id=conversation_id,
+    )
+    emit_event(
+        event_sink,
+        "user_judgment_completed",
+        "AI user finished judging the completed conversation.",
+        scenario_id=scenario.id,
+        passed=user_verdict.passed,
+        average_score=user_verdict.average_score,
+        would_continue=user_verdict.would_continue,
+        dimensions=[
+            {
+                "dimension_id": grade.dimension_id,
+                "score": grade.score,
+                "reason": grade.reason,
+            }
+            for grade in user_verdict.grades
+        ],
+    )
     emit_event(
         event_sink,
         "simulated_conversation_completed",
-        "AI-user conversation completed without a quality verdict.",
+        "AI-user conversation and user judgment completed; independent judgment is pending.",
         scenario_id=scenario.id,
         turn_count=len(observed_turns),
         stop_reason=stop_reason,
@@ -187,6 +226,7 @@ async def run_simulated_conversation(
         turns=tuple(observed_turns),
         stop_reason=stop_reason,
         conversation_id=conversation_id,
+        user_verdict=user_verdict,
     )
 
 
@@ -199,10 +239,26 @@ def simulated_conversation_payload(
     return {
         "stage": "simulated_conversation",
         "passed": None,
-        "verdict": "unscored",
+        "verdict": "pending_independent_judge",
         "simulated_user": {
             "provider": simulated_user_provider,
             "model": simulated_user_model,
+        },
+        "judges": [f"AI user judge ({simulated_user_provider} / {simulated_user_model})"],
+        "user_judgment": {
+            "passed": result.user_verdict.passed,
+            "average_score": result.user_verdict.average_score,
+            "would_continue": result.user_verdict.would_continue,
+            "overall_reason": result.user_verdict.overall_reason,
+            "biggest_problem": result.user_verdict.biggest_problem,
+            "dimensions": [
+                {
+                    "dimension_id": grade.dimension_id,
+                    "score": grade.score,
+                    "reason": grade.reason,
+                }
+                for grade in result.user_verdict.grades
+            ],
         },
         "conversations": [
             {

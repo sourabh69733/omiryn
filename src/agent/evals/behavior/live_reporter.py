@@ -90,16 +90,39 @@ def _render_event(event: EvalEvent) -> str | None:
             f"(up to {data['maximum_turns']} turns)"
         )
     if event.kind == "simulated_user_call_started":
+        activities = {
+            "judgment": "judging the conversation",
+            "judgment_repair": "repairing its verdict format",
+            "conversation_repair": "repairing its message format",
+        }
+        activity = activities.get(data.get("purpose"), "thinking")
         return (
-            f"    AI User ({data['model_name']}) is thinking "
+            f"    AI User ({data['model_name']}) is {activity} "
             f"(attempt {data['attempt']}/{data['max_attempts']})..."
         )
     if event.kind == "simulated_user_call_retry":
-        return f"    AI User had a temporary problem: {data['error']}. Trying again..."
+        role = "judge" if str(data.get("purpose", "")).startswith("judgment") else "user"
+        return f"    AI {role} had a temporary problem: {data['error']}. Trying again..."
     if event.kind == "simulated_user_call_failed":
-        return f"    AI User call failed: {data['error']}"
+        role = "judge" if str(data.get("purpose", "")).startswith("judgment") else "user"
+        return f"    AI {role} call failed: {data['error']}"
     if event.kind == "simulated_user_finished":
         return "    AI User chose to end the conversation naturally."
+    if event.kind == "user_judgment_started":
+        return "    AI User is now judging how the conversation felt..."
+    if event.kind == "user_judgment_completed":
+        status = "PASS" if data["passed"] else "FAIL"
+        continuation = "yes" if data["would_continue"] else "no"
+        lines = [
+            f"    AI-user verdict: {status} — {data['average_score']:.1f}/4, "
+            f"would continue: {continuation}"
+        ]
+        for dimension in data.get("dimensions", []):
+            lines.append(
+                f"      {_plain_name(dimension['dimension_id'])}: "
+                f"{dimension['score']}/4 — {dimension['reason']}"
+            )
+        return "\n".join(lines)
     if event.kind == "sample_started":
         return f"  Conversation {data['sample_number']}/{data['sample_count']}"
     if event.kind == "user_turn":
@@ -141,7 +164,7 @@ def _render_event(event: EvalEvent) -> str | None:
     if event.kind == "simulated_conversation_completed":
         return (
             f"\nConversation captured: {data['turn_count']} turns. "
-            "Result: UNSCORED (judging is the next verified step)."
+            "Overall result: PENDING independent judge."
         )
     return None
 

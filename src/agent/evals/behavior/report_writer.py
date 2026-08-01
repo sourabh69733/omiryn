@@ -196,12 +196,33 @@ def _scenario_markdown(scenario: dict[str, Any]) -> list[str]:
 
 def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
     simulated_user = payload.get("simulated_user") or {}
+    judgment = payload.get("user_judgment") or {}
+    user_status = "PASS" if judgment.get("passed") else "FAIL"
+    continuation = "yes" if judgment.get("would_continue") else "no"
     lines = [
         "## AI user",
         "",
         f"**Model:** {simulated_user.get('provider', 'unknown')} / "
         f"{simulated_user.get('model', 'provider-default')}",
+        "",
+        "## AI-user verdict",
+        "",
+        f"**User verdict:** {user_status}",
+        f"**Average score:** {judgment.get('average_score', 0):.1f}/4",
+        f"**Would continue chatting:** {continuation}",
     ]
+    for dimension in judgment.get("dimensions", []):
+        lines.append(
+            f"- {_plain_name(dimension['dimension_id'])}: {dimension['score']}/4 — "
+            f"{dimension['reason']}"
+        )
+    lines.extend(
+        [
+            "",
+            f"**Overall reason:** {judgment.get('overall_reason', 'not provided')}",
+            f"**Biggest problem:** {judgment.get('biggest_problem', 'not provided')}",
+        ]
+    )
     for conversation in payload.get("conversations", []):
         lines.extend(
             [
@@ -238,9 +259,12 @@ def _simple_summary(payload: dict[str, Any]) -> str:
         turn_count = sum(
             len(conversation.get("turns", [])) for conversation in payload.get("conversations", [])
         )
+        judgment = payload.get("user_judgment") or {}
+        user_status = "PASS" if judgment.get("passed") else "FAIL"
         return (
-            f"An AI model acted as the user for {turn_count} conversation turns. "
-            "No quality verdict was produced because judging is not part of this step yet."
+            f"An AI model acted as the user for {turn_count} conversation turns and judged "
+            f"the experience {user_status} ({judgment.get('average_score', 0):.1f}/4). "
+            "The final result is pending an independent judge."
         )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
@@ -261,8 +285,8 @@ def _bottom_line(payload: dict[str, Any]) -> str:
         )
     if payload.get("stage") == "simulated_conversation":
         return (
-            "Review whether the AI user behaved realistically and challenged the companion naturally. "
-            "Do not treat this report as a pass or failure."
+            "The AI-user verdict reflects the simulated user's experience, but it is not the final "
+            "release verdict. An independent judge must review the conversation next."
         )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
@@ -362,6 +386,11 @@ def _table_text(value: str) -> str:
 
 
 def _result_label(payload: dict[str, Any]) -> str:
+    if (
+        payload.get("stage") == "simulated_conversation"
+        and payload.get("verdict") == "pending_independent_judge"
+    ):
+        return "PENDING INDEPENDENT JUDGE"
     if payload.get("passed") is None:
         return "UNSCORED"
     return "PASS" if payload.get("passed") else "FAIL"

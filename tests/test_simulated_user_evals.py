@@ -30,8 +30,13 @@ from agent.evals.behavior.simulated_user import (
     SimulatedUserExecutionError,
     SimulatedUserProtocolError,
     SimulatedUserScenario,
+    USER_EXPERIENCE_DIMENSIONS,
+    UserExperienceGrade,
+    UserExperienceVerdict,
     build_simulated_user_request,
+    build_user_experience_judge_request,
     parse_simulated_user_decision,
+    parse_user_experience_verdict,
 )
 
 
@@ -48,14 +53,55 @@ def ai_user_scenario(*, minimum_turns: int = 2, maximum_turns: int = 4):
     )
 
 
+def user_verdict(*, passed: bool = True) -> UserExperienceVerdict:
+    score = 3 if passed else 2
+    return UserExperienceVerdict(
+        passed=passed,
+        average_score=float(score),
+        would_continue=passed,
+        grades=tuple(
+            UserExperienceGrade(dimension, score, f"Evidence for {dimension}.")
+            for dimension in USER_EXPERIENCE_DIMENSIONS
+        ),
+        overall_reason="It felt engaging." if passed else "It felt weak.",
+        biggest_problem="none" if passed else "The replies felt generic.",
+    )
+
+
+def user_verdict_json(*, scores: dict[str, int] | None = None, would_continue=True) -> str:
+    actual_scores = {dimension: 3 for dimension in USER_EXPERIENCE_DIMENSIONS}
+    actual_scores.update(scores or {})
+    return json.dumps(
+        {
+            "dimensions": [
+                {"id": dimension, "score": actual_scores[dimension], "reason": "Evidence."}
+                for dimension in USER_EXPERIENCE_DIMENSIONS
+            ],
+            "would_continue": would_continue,
+            "overall_reason": "Honest summary.",
+            "biggest_problem": "none",
+        }
+    )
+
+
 class SequenceUser:
-    def __init__(self, decisions: list[SimulatedUserDecision]) -> None:
+    def __init__(
+        self,
+        decisions: list[SimulatedUserDecision],
+        verdict: UserExperienceVerdict | None = None,
+    ) -> None:
         self.decisions = decisions
+        self.verdict = verdict or user_verdict()
         self.transcripts: list[tuple[dict[str, str], ...]] = []
+        self.judgment_transcripts: list[tuple[dict[str, str], ...]] = []
 
     async def next_turn(self, *, transcript, **_kwargs):
         self.transcripts.append(transcript)
         return self.decisions.pop(0)
+
+    async def judge_conversation(self, *, transcript, **_kwargs):
+        self.judgment_transcripts.append(transcript)
+        return self.verdict
 
 
 class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
@@ -107,6 +153,51 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
             with self.subTest(raw=raw), self.assertRaises(SimulatedUserProtocolError):
                 parse_simulated_user_decision(raw, allow_finish=True)
 
+    def test_user_judge_prompt_is_separate_and_contains_full_context(self) -> None:
+        prompt, payload = build_user_experience_judge_request(
+            scenario=ai_user_scenario(),
+            transcript=(
+                {"role": "user", "content": "You never disagree."},
+                {"role": "assistant", "content": "I disagree with that."},
+            ),
+        )
+
+        self.assertIn("stop generating chat messages and judge", prompt)
+        self.assertIn("untrusted conversation data", prompt)
+        self.assertNotIn('"action":"message"', prompt)
+        decoded = json.loads(payload)
+        self.assertEqual(decoded["required_dimensions"], list(USER_EXPERIENCE_DIMENSIONS))
+        self.assertEqual(decoded["transcript"][-1]["role"], "assistant")
+
+    def test_user_judge_parser_computes_pass_and_fail_deterministically(self) -> None:
+        passing = parse_user_experience_verdict(user_verdict_json())
+        low_dimension = parse_user_experience_verdict(user_verdict_json(scores={"naturalness": 2}))
+        would_not_continue = parse_user_experience_verdict(user_verdict_json(would_continue=False))
+
+        self.assertTrue(passing.passed)
+        self.assertFalse(low_dimension.passed)
+        self.assertFalse(would_not_continue.passed)
+        self.assertAlmostEqual(low_dimension.average_score, 17 / 6, places=3)
+
+    def test_user_judge_parser_rejects_invalid_schema(self) -> None:
+        valid = json.loads(user_verdict_json())
+        invalid_payloads = []
+        missing = {**valid, "dimensions": valid["dimensions"][:-1]}
+        invalid_payloads.append(missing)
+        duplicate = {**valid, "dimensions": [*valid["dimensions"][:-1], valid["dimensions"][0]]}
+        invalid_payloads.append(duplicate)
+        boolean_score = json.loads(user_verdict_json())
+        boolean_score["dimensions"][0]["score"] = True
+        invalid_payloads.append(boolean_score)
+        empty_reason = json.loads(user_verdict_json())
+        empty_reason["dimensions"][0]["reason"] = ""
+        invalid_payloads.append(empty_reason)
+        invalid_payloads.append({**valid, "would_continue": "yes"})
+
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload), self.assertRaises(SimulatedUserProtocolError):
+                parse_user_experience_verdict(json.dumps(payload))
+
     async def test_mock_user_has_deterministic_offline_sequence(self) -> None:
         user = ProviderSimulatedUser(provider="mock")
         scenario = ai_user_scenario()
@@ -132,6 +223,14 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual((first.message, second.message), ("first", "second"))
         self.assertEqual(finished.action, "finish")
+
+        verdict = await user.judge_conversation(
+            scenario=scenario,
+            transcript=(),
+            conversation_id="conversation",
+        )
+        self.assertFalse(verdict.passed)
+        self.assertFalse(verdict.would_continue)
 
     async def test_provider_retries_timeout_and_emits_visible_events(self) -> None:
         calls = 0
@@ -193,6 +292,118 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
                 conversation_id="conversation",
             )
 
+    async def test_provider_repairs_non_json_user_message_once(self) -> None:
+        responses = iter(
+            (
+                "Still not convinced.",
+                '{"action":"message","message":"Still not convinced."}',
+            )
+        )
+        calls = []
+
+        async def provider_call(system_prompt, messages, **kwargs):
+            calls.append((system_prompt, messages, kwargs))
+            return next(responses)
+
+        user = ProviderSimulatedUser(provider="deepinfra", model="user-model")
+        with patch(
+            "agent.evals.behavior.simulated_user._provider_call",
+            return_value=provider_call,
+        ):
+            decision = await user.next_turn(
+                scenario=ai_user_scenario(),
+                transcript=(),
+                turn_index=0,
+                conversation_id="conversation",
+            )
+
+        self.assertEqual(decision.message, "Still not convinced.")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            calls[1][2]["request_kind"],
+            "behavior_eval_user_simulator_repair",
+        )
+        repair_data = json.loads(calls[1][1][0]["content"])
+        self.assertEqual(repair_data["malformed_response"], "Still not convinced.")
+        self.assertFalse(repair_data["finishing_allowed"])
+
+    async def test_provider_fails_closed_after_bad_user_message_repair(self) -> None:
+        calls = 0
+
+        async def provider_call(*_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            return "still not json"
+
+        user = ProviderSimulatedUser(provider="deepinfra")
+        with (
+            patch(
+                "agent.evals.behavior.simulated_user._provider_call",
+                return_value=provider_call,
+            ),
+            self.assertRaises(SimulatedUserProtocolError),
+        ):
+            await user.next_turn(
+                scenario=ai_user_scenario(),
+                transcript=(),
+                turn_index=0,
+                conversation_id="conversation",
+            )
+
+        self.assertEqual(calls, 2)
+
+    async def test_user_judgment_uses_same_provider_model_and_judge_request_kind(self) -> None:
+        calls = []
+
+        async def provider_call(*args, **kwargs):
+            calls.append((args, kwargs))
+            return user_verdict_json()
+
+        user = ProviderSimulatedUser(provider="deepinfra", model="same-user-model")
+        with patch(
+            "agent.evals.behavior.simulated_user._provider_call",
+            return_value=provider_call,
+        ):
+            verdict = await user.judge_conversation(
+                scenario=ai_user_scenario(),
+                transcript=({"role": "user", "content": "hello"},),
+                conversation_id="conversation",
+            )
+
+        self.assertTrue(verdict.passed)
+        self.assertEqual(calls[0][1]["model"], "same-user-model")
+        self.assertEqual(calls[0][1]["temperature"], 0.0)
+        self.assertEqual(calls[0][1]["request_kind"], "behavior_eval_user_judge")
+
+    async def test_provider_repairs_malformed_user_judgment_once(self) -> None:
+        responses = iter(("I would continue, 3 out of 4.", user_verdict_json()))
+        calls = []
+
+        async def provider_call(system_prompt, messages, **kwargs):
+            calls.append((system_prompt, messages, kwargs))
+            return next(responses)
+
+        user = ProviderSimulatedUser(provider="deepinfra", model="same-user-model")
+        with patch(
+            "agent.evals.behavior.simulated_user._provider_call",
+            return_value=provider_call,
+        ):
+            verdict = await user.judge_conversation(
+                scenario=ai_user_scenario(),
+                transcript=({"role": "user", "content": "hello"},),
+                conversation_id="conversation",
+            )
+
+        self.assertTrue(verdict.passed)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            calls[1][2]["request_kind"],
+            "behavior_eval_user_judge_repair",
+        )
+        repair_data = json.loads(calls[1][1][0]["content"])
+        self.assertEqual(repair_data["required_dimensions"], list(USER_EXPERIENCE_DIMENSIONS))
+        self.assertIn("do not improve", calls[1][0])
+
 
 class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
     async def test_runner_alternates_using_the_growing_transcript(self) -> None:
@@ -245,6 +456,15 @@ class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
             user.transcripts[1][1]["content"],
             "I don't agree with that.",
         )
+        self.assertEqual(
+            [item["role"] for item in user.judgment_transcripts[0]],
+            ["user", "assistant", "user", "assistant"],
+        )
+        self.assertTrue(result.user_verdict.passed)
+        event_kinds = [event.kind for event in events]
+        self.assertLess(
+            event_kinds.index("user_judgment_started"), event_kinds.index("user_judgment_completed")
+        )
         self.assertIn("simulated_conversation_completed", [event.kind for event in events])
 
     async def test_runner_stops_at_maximum_turns(self) -> None:
@@ -288,6 +508,7 @@ class SimulatedConversationReportTest(unittest.TestCase):
         result = SimpleNamespace(
             scenario_id="dynamic_test",
             stop_reason="ai_user_finished",
+            user_verdict=user_verdict(passed=False),
             turns=(
                 SimpleNamespace(
                     turn_index=0,
@@ -316,19 +537,22 @@ class SimulatedConversationReportTest(unittest.TestCase):
         )
         return payload
 
-    def test_markdown_is_explicitly_unscored_and_understandable(self) -> None:
+    def test_markdown_shows_user_verdict_and_pending_independent_judge(self) -> None:
         markdown = render_markdown_report(self._payload())
 
-        self.assertIn("**Result:** UNSCORED", markdown)
+        self.assertIn("**Result:** PENDING INDEPENDENT JUDGE", markdown)
         self.assertIn("**Companion agent:** Mira", markdown)
         self.assertIn("**Companion provider:** deepinfra", markdown)
         self.assertIn("**Companion model:** companion-model", markdown)
         self.assertIn("**AI User:** You always agree.", markdown)
         self.assertIn("**Companion:** No, I don't think that is fair.", markdown)
-        self.assertIn("No quality verdict", markdown)
+        self.assertIn("**User verdict:** FAIL", markdown)
+        self.assertIn("**Average score:** 2.0/4", markdown)
+        self.assertIn("The replies felt generic.", markdown)
+        self.assertIn("AI user judge (deepinfra / user-model)", markdown)
         self.assertNotIn("## Judge reliability check", markdown)
 
-    def test_saved_report_and_history_preserve_unscored_status(self) -> None:
+    def test_saved_report_and_history_preserve_pending_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             paths = save_evaluation_reports(
                 self._payload(),
@@ -336,11 +560,14 @@ class SimulatedConversationReportTest(unittest.TestCase):
                 now=datetime(2026, 8, 1, tzinfo=timezone.utc),
             )
 
-            self.assertIn("UNSCORED", paths.markdown.read_text(encoding="utf-8"))
-            self.assertIn("| UNSCORED |", paths.history.read_text(encoding="utf-8"))
+            self.assertIn("PENDING INDEPENDENT JUDGE", paths.markdown.read_text(encoding="utf-8"))
+            self.assertIn(
+                "| PENDING INDEPENDENT JUDGE |",
+                paths.history.read_text(encoding="utf-8"),
+            )
             self.assertIsNone(json.loads(paths.json.read_text(encoding="utf-8"))["passed"])
 
-    def test_terminal_distinguishes_ai_user_and_unscored_result(self) -> None:
+    def test_terminal_distinguishes_conversation_and_user_judgment(self) -> None:
         stream = StringIO()
         reporter = TerminalProgressReporter(stream=stream)
         reporter(
@@ -351,6 +578,31 @@ class SimulatedConversationReportTest(unittest.TestCase):
                     "model_name": "user-model",
                     "attempt": 1,
                     "max_attempts": 3,
+                    "purpose": "conversation",
+                },
+            )
+        )
+        reporter(
+            EvalEvent(
+                kind="simulated_user_call_started",
+                message="started",
+                data={
+                    "model_name": "user-model",
+                    "attempt": 1,
+                    "max_attempts": 3,
+                    "purpose": "judgment",
+                },
+            )
+        )
+        reporter(
+            EvalEvent(
+                kind="user_judgment_completed",
+                message="done",
+                data={
+                    "passed": False,
+                    "average_score": 2.0,
+                    "would_continue": False,
+                    "dimensions": [],
                 },
             )
         )
@@ -363,8 +615,10 @@ class SimulatedConversationReportTest(unittest.TestCase):
         )
 
         self.assertIn("AI User (user-model) is thinking", stream.getvalue())
-        self.assertIn("UNSCORED", stream.getvalue())
-        self.assertEqual(reporter.api_calls, 1)
+        self.assertIn("is judging the conversation", stream.getvalue())
+        self.assertIn("AI-user verdict: FAIL", stream.getvalue())
+        self.assertIn("PENDING independent judge", stream.getvalue())
+        self.assertEqual(reporter.api_calls, 2)
 
 
 class SimulatedConversationCliTest(unittest.TestCase):
@@ -392,11 +646,12 @@ class SimulatedConversationCliTest(unittest.TestCase):
             check=False,
         )
 
-    def test_cli_runs_offline_and_reports_unscored(self) -> None:
+    def test_cli_runs_offline_and_reports_user_verdict(self) -> None:
         result = self._run_cli("--no-save")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("AI-user conversation captured: 3 turns, UNSCORED", result.stdout)
+        self.assertIn("user verdict FAIL", result.stdout)
+        self.assertIn("overall PENDING independent judge", result.stdout)
         self.assertIn("AI-user scenario", result.stderr)
         self.assertIn("AI User:", result.stderr)
 

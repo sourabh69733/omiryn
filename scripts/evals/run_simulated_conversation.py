@@ -205,7 +205,12 @@ def main() -> int:
         return 1
     else:
         turns = sum(len(item["turns"]) for item in payload["conversations"])
-        print(f"AI-user conversation captured: {turns} turns, UNSCORED")
+        judgment = payload["user_judgment"]
+        user_status = "PASS" if judgment["passed"] else "FAIL"
+        print(
+            f"AI-user conversation: {turns} turns; user verdict {user_status} "
+            f"({judgment['average_score']:.1f}/4); overall PENDING independent judge"
+        )
     return 0
 
 
