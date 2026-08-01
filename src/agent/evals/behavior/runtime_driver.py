@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 from uuid import uuid4
 
+from agent.evals.behavior.events import EventSink, emit_event
 from agent.evals.behavior.models import BehaviorScenario, ObservedTurn
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
@@ -27,8 +28,9 @@ class RuntimeDriverConfig:
 
 
 class RuntimeScenarioDriver:
-    def __init__(self, config: RuntimeDriverConfig) -> None:
+    def __init__(self, config: RuntimeDriverConfig, event_sink: EventSink | None = None) -> None:
         self.config = config
+        self.event_sink = event_sink
 
     async def run_sample(
         self,
@@ -59,18 +61,48 @@ class RuntimeScenarioDriver:
         with _runtime_environment(self.config):
             for turn_index, scenario_turn in enumerate(scenario.turns):
                 prior_message_count = len(messages)
-                result = await run_agent_turn(
-                    conversation_id=conversation_id,
-                    messages=messages,
-                    user_text=scenario_turn.user_message,
-                    user_id=user_id,
-                    user_profile=profile,
-                    model=self.config.model,
-                    agent_mode=self.config.agent_mode,
-                    agent_tone=self.config.agent_tone,
-                    style_source_id=None,
-                    agent_name=self.config.agent_name,
+                emit_event(
+                    self.event_sink,
+                    "user_turn",
+                    "Synthetic user turn started.",
+                    scenario_id=scenario.id,
+                    sample_index=sample_index,
+                    turn_index=turn_index,
+                    message=scenario_turn.user_message,
                 )
+                emit_event(
+                    self.event_sink,
+                    "companion_call_started",
+                    "Companion model call started.",
+                    scenario_id=scenario.id,
+                    sample_index=sample_index,
+                    turn_index=turn_index,
+                    model_name=self.config.model or f"{self.config.provider} default",
+                )
+                try:
+                    result = await run_agent_turn(
+                        conversation_id=conversation_id,
+                        messages=messages,
+                        user_text=scenario_turn.user_message,
+                        user_id=user_id,
+                        user_profile=profile,
+                        model=self.config.model,
+                        agent_mode=self.config.agent_mode,
+                        agent_tone=self.config.agent_tone,
+                        style_source_id=None,
+                        agent_name=self.config.agent_name,
+                    )
+                except Exception as error:
+                    emit_event(
+                        self.event_sink,
+                        "companion_call_failed",
+                        "Companion model call failed.",
+                        scenario_id=scenario.id,
+                        sample_index=sample_index,
+                        turn_index=turn_index,
+                        error=f"{type(error).__name__}: {error}",
+                    )
+                    raise
                 messages = result.messages
                 assistant_messages = tuple(
                     str(message.get("content") or "")
@@ -92,18 +124,36 @@ class RuntimeScenarioDriver:
                     if has_snapshot_step and snapshots
                     else {}
                 )
-                observed_turns.append(
-                    ObservedTurn(
+                observed = ObservedTurn(
+                    turn_index=turn_index,
+                    user_message=scenario_turn.user_message,
+                    assistant_reply=" ".join(assistant_messages).strip(),
+                    assistant_messages=assistant_messages,
+                    trace_steps=tuple(str(step["step_name"]) for step in trace_steps),
+                    direct_reply_reason=_direct_reply_reason(trace_steps),
+                    context_summary=context_summary,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                )
+                observed_turns.append(observed)
+                if "model_call" in observed.trace_steps:
+                    emit_event(
+                        self.event_sink,
+                        "companion_api_call_completed",
+                        "Companion provider call completed.",
+                        scenario_id=scenario.id,
+                        sample_index=sample_index,
                         turn_index=turn_index,
-                        user_message=scenario_turn.user_message,
-                        assistant_reply=" ".join(assistant_messages).strip(),
-                        assistant_messages=assistant_messages,
-                        trace_steps=tuple(str(step["step_name"]) for step in trace_steps),
-                        direct_reply_reason=_direct_reply_reason(trace_steps),
-                        context_summary=context_summary,
-                        conversation_id=conversation_id,
-                        user_id=user_id,
+                        model_name=self.config.model or f"{self.config.provider} default",
                     )
+                emit_event(
+                    self.event_sink,
+                    "companion_turn",
+                    "Companion turn completed.",
+                    scenario_id=scenario.id,
+                    sample_index=sample_index,
+                    turn_index=turn_index,
+                    message=observed.assistant_reply,
                 )
                 save_conversation(
                     _conversation_payload(

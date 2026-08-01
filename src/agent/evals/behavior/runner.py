@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from agent.evals.behavior.events import EventSink, emit_event
 from agent.evals.behavior.graders import combine_turn_grade
 from agent.evals.behavior.models import (
     BehaviorEvalReport,
@@ -41,14 +42,32 @@ async def run_behavior_evals(
     driver: ScenarioDriver,
     judge: BehaviorJudge | None,
     config: BehaviorEvalConfig | None = None,
+    event_sink: EventSink | None = None,
 ) -> BehaviorEvalReport:
     run_config = config or BehaviorEvalConfig()
     _validate_scenario_suite(scenarios)
     scenario_results: list[ScenarioResult] = []
     for scenario in scenarios:
         sample_count = run_config.samples_override or scenario.samples
+        emit_event(
+            event_sink,
+            "scenario_started",
+            "Behavior scenario started.",
+            scenario_id=scenario.id,
+            description=scenario.description,
+            sample_count=sample_count,
+        )
         sample_results: list[SampleResult] = []
         for sample_index in range(sample_count):
+            emit_event(
+                event_sink,
+                "sample_started",
+                "Conversation sample started.",
+                scenario_id=scenario.id,
+                sample_index=sample_index,
+                sample_number=sample_index + 1,
+                sample_count=sample_count,
+            )
             observed_turns = await driver.run_sample(scenario, sample_index)
             if len(observed_turns) != len(scenario.turns):
                 raise ValueError(
@@ -62,6 +81,15 @@ async def run_behavior_evals(
                 judge_result = None
                 judge_error = None
                 if scenario_turn.expectation.rubric:
+                    emit_event(
+                        event_sink,
+                        "turn_grading_started",
+                        "Turn grading started.",
+                        scenario_id=scenario.id,
+                        sample_index=sample_index,
+                        turn_index=turn_index,
+                        turn_number=turn_index + 1,
+                    )
                     if judge is None:
                         judge_error = "No semantic judge configured."
                     else:
@@ -74,35 +102,68 @@ async def run_behavior_evals(
                             )
                         except Exception as error:
                             judge_error = f"{type(error).__name__}: {error}"
-                grades.append(
-                    combine_turn_grade(
-                        scenario=scenario,
-                        turn=scenario_turn,
-                        observed=observed,
-                        prior_turns=observed_turns[:turn_index],
-                        judge_result=judge_result,
-                        judge_error=judge_error,
-                    )
+                grade = combine_turn_grade(
+                    scenario=scenario,
+                    turn=scenario_turn,
+                    observed=observed,
+                    prior_turns=observed_turns[:turn_index],
+                    judge_result=judge_result,
+                    judge_error=judge_error,
                 )
-            sample_results.append(
-                SampleResult(
+                grades.append(grade)
+                emit_event(
+                    event_sink,
+                    "turn_graded",
+                    "Turn grading completed.",
                     scenario_id=scenario.id,
                     sample_index=sample_index,
-                    passed=all(grade.passed for grade in grades),
-                    turns=observed_turns,
-                    grades=tuple(grades),
+                    turn_index=turn_index,
+                    passed=grade.passed,
+                    weighted_score=grade.weighted_score,
+                    dimensions=[
+                        {
+                            "id": dimension.dimension_id,
+                            "score": dimension.score,
+                            "reason": dimension.reason,
+                        }
+                        for dimension in grade.dimension_grades
+                    ],
+                    findings=[finding.message for finding in grade.findings],
                 )
+            sample_result = SampleResult(
+                scenario_id=scenario.id,
+                sample_index=sample_index,
+                passed=all(grade.passed for grade in grades),
+                turns=observed_turns,
+                grades=tuple(grades),
+            )
+            sample_results.append(sample_result)
+            emit_event(
+                event_sink,
+                "sample_completed",
+                "Conversation sample completed.",
+                scenario_id=scenario.id,
+                sample_index=sample_index,
+                passed=sample_result.passed,
             )
         passed_samples = sum(sample.passed for sample in sample_results)
         sample_pass_rate = passed_samples / len(sample_results)
-        scenario_results.append(
-            ScenarioResult(
-                scenario_id=scenario.id,
-                passed=sample_pass_rate >= scenario.minimum_sample_pass_rate,
-                sample_pass_rate=sample_pass_rate,
-                required_sample_pass_rate=scenario.minimum_sample_pass_rate,
-                samples=tuple(sample_results),
-            )
+        scenario_result = ScenarioResult(
+            scenario_id=scenario.id,
+            passed=sample_pass_rate >= scenario.minimum_sample_pass_rate,
+            sample_pass_rate=sample_pass_rate,
+            required_sample_pass_rate=scenario.minimum_sample_pass_rate,
+            samples=tuple(sample_results),
+        )
+        scenario_results.append(scenario_result)
+        emit_event(
+            event_sink,
+            "scenario_completed",
+            "Behavior scenario completed.",
+            scenario_id=scenario.id,
+            passed=scenario_result.passed,
+            passed_samples=passed_samples,
+            sample_count=len(sample_results),
         )
 
     passed_count = sum(result.passed for result in scenario_results)
@@ -133,6 +194,14 @@ async def run_behavior_evals(
             scenarios=report.scenarios,
             metadata={**report.metadata, "run_id": run_id},
         )
+    emit_event(
+        event_sink,
+        "evaluation_completed",
+        "Behavior evaluation completed.",
+        passed=report.passed,
+        scenario_passed=report.scenario_passed,
+        scenario_total=report.scenario_passed + report.scenario_failed,
+    )
     return report
 
 
@@ -240,9 +309,7 @@ def _persist_report(report: BehaviorEvalReport, config: BehaviorEvalConfig) -> s
                     "required_sample_pass_rate": scenario["required_sample_pass_rate"],
                 },
                 "observed": scenario,
-                "trace_count": sum(
-                    len(sample["turns"]) for sample in scenario["samples"]
-                ),
+                "trace_count": sum(len(sample["turns"]) for sample in scenario["samples"]),
             }
         )
     finish_agent_eval_run(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
+from agent.evals.behavior.events import EventSink, emit_event
 from agent.evals.behavior.graders import combine_turn_grade
 from agent.evals.behavior.models import (
     BehaviorJudge,
@@ -53,10 +54,17 @@ class JudgeCalibrationReport:
 async def run_judge_calibration(
     judge: BehaviorJudge,
     cases: tuple[JudgeCalibrationCase, ...] | None = None,
+    event_sink: EventSink | None = None,
 ) -> JudgeCalibrationReport:
     selected = cases or JUDGE_CALIBRATION_CASES
     if not selected:
         raise ValueError("Judge calibration requires at least one case.")
+    emit_event(
+        event_sink,
+        "calibration_started",
+        "Judge calibration started.",
+        total_cases=len(selected),
+    )
     user_id = f"behavior-eval-judge-calibration-{uuid4().hex[:8]}"
     conversation_id = f"behavior-eval-judge-calibration-{uuid4().hex}"
     save_conversation(
@@ -72,7 +80,15 @@ async def run_judge_calibration(
         user_id,
     )
     results: list[JudgeCalibrationCaseResult] = []
-    for case in selected:
+    for case_number, case in enumerate(selected, start=1):
+        emit_event(
+            event_sink,
+            "calibration_case_started",
+            "Calibration case started.",
+            case_id=case.id,
+            case_number=case_number,
+            total_cases=len(selected),
+        )
         observed = replace(
             case.observed,
             conversation_id=conversation_id,
@@ -114,23 +130,28 @@ async def run_judge_calibration(
                 weighted_score=grade.weighted_score,
             )
         )
+        emit_event(
+            event_sink,
+            "calibration_case_completed",
+            "Calibration case completed.",
+            case_id=case.id,
+            case_number=case_number,
+            passed=matches,
+            judge_error=judge_error,
+        )
         if judge_error is not None:
             break
     false_accepts = sum(
-        result.judge_error is None
-        and not result.expected_pass
-        and result.observed_pass
+        result.judge_error is None and not result.expected_pass and result.observed_pass
         for result in results
     )
     false_rejects = sum(
-        result.judge_error is None
-        and result.expected_pass
-        and not result.observed_pass
+        result.judge_error is None and result.expected_pass and not result.observed_pass
         for result in results
     )
     judge_errors = sum(result.judge_error is not None for result in results)
     accuracy = sum(result.passed for result in results) / len(selected)
-    return JudgeCalibrationReport(
+    report = JudgeCalibrationReport(
         passed=(
             len(results) == len(selected)
             and judge_errors == 0
@@ -145,6 +166,16 @@ async def run_judge_calibration(
         total_cases=len(selected),
         cases=tuple(results),
     )
+    emit_event(
+        event_sink,
+        "calibration_completed",
+        "Judge calibration completed.",
+        passed=report.passed,
+        judge_errors=report.judge_errors,
+        completed_cases=report.completed_cases,
+        total_cases=report.total_cases,
+    )
+    return report
 
 
 def calibration_report_payload(report: JudgeCalibrationReport) -> dict:

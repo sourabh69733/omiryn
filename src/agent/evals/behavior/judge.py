@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from time import perf_counter
 from typing import Any, Awaitable, Callable
 
 import httpx
 
+from agent.evals.behavior.events import EventSink, emit_event
 from agent.evals.behavior.models import (
     BehaviorScenario,
     DimensionGrade,
@@ -38,9 +40,11 @@ class ProviderRubricJudge:
         timeout_seconds: float | None = None,
         max_attempts: int | None = None,
         retry_delay_seconds: float | None = None,
+        event_sink: EventSink | None = None,
     ) -> None:
         self.provider = provider.strip().casefold()
         self.model = model
+        self.event_sink = event_sink
         self.timeout_seconds = (
             timeout_seconds
             if timeout_seconds is not None
@@ -87,6 +91,7 @@ class ProviderRubricJudge:
             system_prompt,
             [{"role": "user", "content": user_payload}],
             observed=observed,
+            purpose="grade",
         )
         try:
             return parse_judge_result(raw)
@@ -94,15 +99,14 @@ class ProviderRubricJudge:
             repair_prompt, repair_payload = build_judge_repair_request(
                 raw=raw,
                 error=str(error),
-                required_dimension_ids=tuple(
-                    dimension.id for dimension in turn.expectation.rubric
-                ),
+                required_dimension_ids=tuple(dimension.id for dimension in turn.expectation.rubric),
             )
             repaired = await self._call_with_retry(
                 call,
                 repair_prompt,
                 [{"role": "user", "content": repair_payload}],
                 observed=observed,
+                purpose="repair",
             )
             return parse_judge_result(repaired)
 
@@ -113,11 +117,22 @@ class ProviderRubricJudge:
         messages: list[dict[str, str]],
         *,
         observed: ObservedTurn,
+        purpose: str,
     ) -> str:
         last_error: Exception | None = None
         for attempt in range(1, self.max_attempts + 1):
+            emit_event(
+                self.event_sink,
+                "judge_call_started",
+                "Judge provider call started.",
+                judge_name=self.judge_name,
+                attempt=attempt,
+                max_attempts=self.max_attempts,
+                purpose=purpose,
+            )
+            started_at = perf_counter()
             try:
-                return await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     call(
                         system_prompt,
                         messages,
@@ -129,20 +144,62 @@ class ProviderRubricJudge:
                     ),
                     timeout=self.timeout_seconds + 1,
                 )
+                emit_event(
+                    self.event_sink,
+                    "judge_call_completed",
+                    "Judge provider call completed.",
+                    judge_name=self.judge_name,
+                    attempt=attempt,
+                    purpose=purpose,
+                    duration_seconds=perf_counter() - started_at,
+                )
+                return result
             except Exception as error:
                 last_error = error
                 if not _is_transient_judge_error(error):
+                    emit_event(
+                        self.event_sink,
+                        "judge_call_failed",
+                        "Judge provider call failed.",
+                        judge_name=self.judge_name,
+                        attempt=attempt,
+                        purpose=purpose,
+                        error=_error_description(error),
+                    )
                     raise
                 if attempt == self.max_attempts:
                     break
+                emit_event(
+                    self.event_sink,
+                    "judge_call_retry",
+                    "Judge provider call will retry.",
+                    judge_name=self.judge_name,
+                    attempt=attempt,
+                    max_attempts=self.max_attempts,
+                    purpose=purpose,
+                    error=_error_description(error),
+                )
                 if self.retry_delay_seconds:
                     await asyncio.sleep(self.retry_delay_seconds * attempt)
         assert last_error is not None
+        emit_event(
+            self.event_sink,
+            "judge_call_failed",
+            "Judge provider call failed after all attempts.",
+            judge_name=self.judge_name,
+            attempt=self.max_attempts,
+            purpose=purpose,
+            error=_error_description(last_error),
+        )
         raise JudgeExecutionError(
             "Judge provider call failed after "
             f"{self.max_attempts} attempts with timeout={self.timeout_seconds:g}s: "
             f"{_error_description(last_error)}"
         ) from last_error
+
+    @property
+    def judge_name(self) -> str:
+        return f"Judge {self.provider}:{self.model or 'provider-default'}"
 
 
 def build_judge_request(
@@ -297,6 +354,7 @@ def _provider_call(provider: str) -> Callable[..., Awaitable[str]]:
     if provider == "groq":
         return _groq_chat
     if provider in {"deepinfra", "fireworks"}:
+
         async def call_openai_compatible(
             system_prompt: str,
             messages: list[dict[str, str]],
