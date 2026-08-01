@@ -11,6 +11,7 @@ from agent.context_engine.models import (
     EmotionState,
     TopicState,
 )
+from agent.context_engine.turn_understanding.contract import TurnUnderstanding
 
 SNAPSHOT_PREVIEW_CHARS = 500
 
@@ -82,6 +83,7 @@ def build_context_snapshot_v2(
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
     engine_version: str = "context_v2",
+    turn_understanding: TurnUnderstanding | None = None,
 ) -> dict[str, Any]:
     budgeted_sources = budget_context_sources(context_sources)
     included_ids = {
@@ -104,58 +106,108 @@ def build_context_snapshot_v2(
     source_summaries = [_source_snapshot(item) for item in budgeted_sources]
     flags = _snapshot_flags(source_summaries)
 
+    summary = {
+        "engine_version": engine_version,
+        "user_message_index": user_message_index,
+        "assistant_message_index": assistant_message_index,
+        "model": model,
+        "agent_tone": agent_tone,
+        "prompt_version": prompt_version,
+        "prompt_version_name": prompt_version_name,
+        "style_source_id": style_source_id,
+        "source_count": len(context_sources),
+        "included_source_count": len(budgeted_sources),
+        "skipped_source_count": len(skipped_blocks),
+        "context_chars": total_chars,
+        "rough_context_tokens": _rough_tokens(total_chars),
+        "source_type_counts": dict(source_type_counts),
+        "intent_labels": list(query_intent.labels),
+        "intent_confidence": query_intent.confidence,
+        "conversation_move": conversation_plan.current_move,
+        "response_mode": conversation_plan.response_mode,
+        "emotion": emotion_state.emotion,
+        "emotion_confidence": emotion_state.confidence,
+        "active_topic": conversation_plan.active_topic,
+        "stance": conversation_plan.stance,
+        "stance_confidence": conversation_plan.stance_confidence,
+        "claim_type": conversation_plan.claim_type,
+        "question_purpose": conversation_plan.question_purpose,
+        "user_constraints": list(conversation_plan.user_constraints),
+        "feedback_kind": conversation_plan.feedback_kind,
+        **flags,
+    }
+    context = {
+        "intent": {
+            "labels": list(query_intent.labels),
+            "confidence": query_intent.confidence,
+            "entities": list(query_intent.entities),
+            "prefer_structured_whatsapp": query_intent.prefer_structured_whatsapp,
+            "is_low_information": query_intent.is_low_information,
+        },
+        "emotion_state": _emotion_state_snapshot(emotion_state),
+        "topic_state": [_topic_state_snapshot(state) for state in topic_states],
+        "conversation_plan": _conversation_plan_snapshot(conversation_plan),
+        "blocks": selected_blocks,
+        "skipped_blocks": skipped_blocks,
+        "sources": source_summaries,
+        "budget": {
+            "context_chars": total_chars,
+            "rough_context_tokens": _rough_tokens(total_chars),
+        },
+    }
+    if turn_understanding is not None:
+        language_profile = turn_understanding.language_profile
+        summary.update(
+            {
+                "turn_interpreter": turn_understanding.interpreter_id,
+                "turn_interpreter_version": turn_understanding.interpreter_version,
+                "requested_turn_interpreter": turn_understanding.requested_interpreter,
+                "turn_interpreter_fallback": turn_understanding.fallback_reason,
+                "primary_script": language_profile.primary_script,
+                "detected_scripts": list(language_profile.scripts),
+                "mixed_script": language_profile.is_mixed_script,
+            }
+        )
+        context["turn_understanding"] = _turn_understanding_snapshot(turn_understanding)
+
     return {
         "user_id": user_id,
         "conversation_id": conversation_id,
         "message_index": assistant_message_index,
-        "summary": {
-            "engine_version": engine_version,
-            "user_message_index": user_message_index,
-            "assistant_message_index": assistant_message_index,
-            "model": model,
-            "agent_tone": agent_tone,
-            "prompt_version": prompt_version,
-            "prompt_version_name": prompt_version_name,
-            "style_source_id": style_source_id,
-            "source_count": len(context_sources),
-            "included_source_count": len(budgeted_sources),
-            "skipped_source_count": len(skipped_blocks),
-            "context_chars": total_chars,
-            "rough_context_tokens": _rough_tokens(total_chars),
-            "source_type_counts": dict(source_type_counts),
-            "intent_labels": list(query_intent.labels),
-            "intent_confidence": query_intent.confidence,
-            "conversation_move": conversation_plan.current_move,
-            "response_mode": conversation_plan.response_mode,
-            "emotion": emotion_state.emotion,
-            "emotion_confidence": emotion_state.confidence,
-            "active_topic": conversation_plan.active_topic,
-            "stance": conversation_plan.stance,
-            "stance_confidence": conversation_plan.stance_confidence,
-            "claim_type": conversation_plan.claim_type,
-            "question_purpose": conversation_plan.question_purpose,
-            "user_constraints": list(conversation_plan.user_constraints),
-            "feedback_kind": conversation_plan.feedback_kind,
-            **flags,
+        "summary": summary,
+        "context": context,
+    }
+
+
+def _turn_understanding_snapshot(turn: TurnUnderstanding) -> dict[str, Any]:
+    language = turn.language_profile
+    return {
+        "interpreter_id": turn.interpreter_id,
+        "interpreter_version": turn.interpreter_version,
+        "requested_interpreter": turn.requested_interpreter,
+        "fallback_reason": turn.fallback_reason,
+        "language_profile": {
+            "scripts": list(language.scripts),
+            "primary_script": language.primary_script,
+            "script_counts": {script: count for script, count in language.script_counts},
+            "is_mixed_script": language.is_mixed_script,
+            "has_letters": language.has_letters,
         },
-        "context": {
-            "intent": {
-                "labels": list(query_intent.labels),
-                "confidence": query_intent.confidence,
-                "entities": list(query_intent.entities),
-                "prefer_structured_whatsapp": query_intent.prefer_structured_whatsapp,
-                "is_low_information": query_intent.is_low_information,
-            },
-            "emotion_state": _emotion_state_snapshot(emotion_state),
-            "topic_state": [_topic_state_snapshot(state) for state in topic_states],
-            "conversation_plan": _conversation_plan_snapshot(conversation_plan),
-            "blocks": selected_blocks,
-            "skipped_blocks": skipped_blocks,
-            "sources": source_summaries,
-            "budget": {
-                "context_chars": total_chars,
-                "rough_context_tokens": _rough_tokens(total_chars),
-            },
+        "intent": {
+            "labels": list(turn.intent.labels),
+            "confidence": turn.intent.confidence,
+        },
+        "emotion": {
+            "label": turn.emotion.emotion,
+            "confidence": turn.emotion.confidence,
+        },
+        "stance": {
+            "mode": turn.stance.mode,
+            "confidence": turn.stance.confidence,
+            "claim_type": turn.stance.claim_type,
+            "constraints": list(turn.stance.constraints),
+            "question_purpose": turn.stance.question_purpose,
+            "feedback_kind": turn.stance.feedback_kind,
         },
     }
 

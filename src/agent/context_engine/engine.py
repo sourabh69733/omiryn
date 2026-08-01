@@ -13,8 +13,8 @@ from agent.context_engine.prompt_engine.builder import (
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.context_engine.query_intent import context_query_intent
 from agent.context_engine.source_selection import build_reply_context
-from agent.context_engine.stance_engine import analyze_conversational_stance
 from agent.context_engine.topic_state import build_topic_state
+from agent.context_engine.turn_understanding import interpret_turn
 from agent.context_engine.turn_state import active_turn_state
 from storage import get_conversation
 
@@ -46,25 +46,27 @@ def build_model_context_package(
     if prompt_version.version_id in {"v2", "v3"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
-        query_intent = context_query_intent(
-            user_text,
-            pending_turn_state=pending_turn_state,
-            strict_whatsapp=listener_first,
-        )
-        emotion_state = detect_emotion_state(
-            user_text=user_text,
-            messages=planning_messages,
-            intent=query_intent,
-        )
-        conversational_stance = (
-            analyze_conversational_stance(
-                user_text,
-                planning_messages[:-1],
-                emotion_state=emotion_state,
+        turn_understanding = None
+        if listener_first:
+            turn_understanding = interpret_turn(
+                user_text=user_text,
+                history_messages=planning_messages[:-1],
+                pending_turn_state=pending_turn_state,
             )
-            if listener_first
-            else None
-        )
+            query_intent = turn_understanding.intent
+            emotion_state = turn_understanding.emotion
+            conversational_stance = turn_understanding.stance
+        else:
+            query_intent = context_query_intent(
+                user_text,
+                pending_turn_state=pending_turn_state,
+            )
+            emotion_state = detect_emotion_state(
+                user_text=user_text,
+                messages=planning_messages,
+                intent=query_intent,
+            )
+            conversational_stance = None
         topic_states = build_topic_state(planning_messages, user_text, query_intent)
         conversation_plan = build_conversation_plan(
             user_text=user_text,
@@ -101,6 +103,7 @@ def build_model_context_package(
             emotion_state=emotion_state,
             topic_states=topic_states,
             conversation_plan=conversation_plan,
+            turn_understanding=turn_understanding,
         )
     else:
         query_intent = context_query_intent(user_text)
