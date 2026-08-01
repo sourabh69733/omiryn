@@ -46,8 +46,6 @@ ACKNOWLEDGEMENT_TOKENS = {
     "thik",
     "thx",
     "ty",
-    "yes",
-    "you",
 }
 
 REQUEST_OR_CONTENT_TOKENS = {
@@ -103,4 +101,4 @@ def _is_acceptance_acknowledgement(normalized: str) -> bool:
     if not known_tokens:
         return False
     unknown_tokens = [token for token in words if token not in ACKNOWLEDGEMENT_TOKENS]
-    return len(unknown_tokens) <= 1 and len(known_tokens) >= max(1, len(words) - 1)
+    return not unknown_tokens and len(known_tokens) == len(words)
