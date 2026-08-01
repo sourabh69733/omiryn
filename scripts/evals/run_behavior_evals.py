@@ -52,6 +52,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", default=None, help="Optional companion model override.")
     parser.add_argument(
+        "--agent-name",
+        default=os.getenv("AGENT_NAME", "Mira"),
+        help="Companion persona name shown in the conversation and report.",
+    )
+    parser.add_argument(
         "--prompt-version",
         default="v3",
         choices=("v1", "v2", "v3"),
@@ -148,6 +153,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             provider=args.provider,
             model=args.model,
             prompt_version=args.prompt_version,
+            agent_name=args.agent_name,
         ),
         event_sink=reporter,
     )
@@ -303,6 +309,7 @@ def main() -> int:
         companion_provider=args.provider,
         companion_model=_companion_model_name(args),
         prompt_version=args.prompt_version,
+        companion_agent_name=args.agent_name,
     )
     saved_paths = None
     if not args.no_save:
