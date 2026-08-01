@@ -5,6 +5,8 @@ import sys
 import tempfile
 import unittest
 from dataclasses import replace
+from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -16,6 +18,7 @@ from agent.evals.behavior.calibration import (
     run_judge_calibration,
 )
 from agent.evals.behavior.consensus import ConservativeConsensusJudge
+from agent.evals.behavior.events import EvalEvent
 from agent.evals.behavior.graders import combine_turn_grade, hard_rule_findings
 from agent.evals.behavior.judge import (
     JudgeExecutionError,
@@ -24,6 +27,7 @@ from agent.evals.behavior.judge import (
     build_judge_request,
     parse_judge_result,
 )
+from agent.evals.behavior.live_reporter import LiveRunStats, TerminalProgressReporter
 from agent.evals.behavior.models import (
     BehaviorScenario,
     DimensionGrade,
@@ -37,6 +41,11 @@ from agent.evals.behavior.runner import (
     BehaviorEvalConfig,
     report_payload,
     run_behavior_evals,
+)
+from agent.evals.behavior.report_writer import (
+    attach_run_metadata,
+    render_markdown_report,
+    save_evaluation_reports,
 )
 from agent.evals.behavior.runtime_driver import RuntimeDriverConfig, RuntimeScenarioDriver
 from agent.evals.behavior.scenarios import COMPANION_BEHAVIOR_SCENARIOS
@@ -306,19 +315,24 @@ class HardRuleGraderTest(unittest.TestCase):
         )
 
         self.assertIn("forbidden_direct_reply_path", {item.code for item in findings})
-        self.assertIn("forbidden_exact_reply", {
-            item.code
-            for item in hard_rule_findings(
-                ScenarioTurn("x", TurnExpectation(forbidden_exact=("okay",))),
-                observed("okay"),
-                (),
-            )
-        })
+        self.assertIn(
+            "forbidden_exact_reply",
+            {
+                item.code
+                for item in hard_rule_findings(
+                    ScenarioTurn("x", TurnExpectation(forbidden_exact=("okay",))),
+                    observed("okay"),
+                    (),
+                )
+            },
+        )
 
     def test_repeated_reply_is_detected_after_first_turn(self) -> None:
         turn = ScenarioTurn("again", TurnExpectation(forbid_repeating_prior_reply=True))
 
-        findings = hard_rule_findings(turn, observed("Same reply", turn_index=1), (observed("same reply"),))
+        findings = hard_rule_findings(
+            turn, observed("Same reply", turn_index=1), (observed("same reply"),)
+        )
 
         self.assertIn("repeated_assistant_reply", {item.code for item in findings})
 
@@ -541,6 +555,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
         expectation = TurnExpectation(rubric=rubric("listening"))
         case = scenario(expectation=expectation)
         calls = []
+        events = []
         request = httpx.Request("POST", "https://judge.test/chat")
 
         async def fake_call(system_prompt, messages, **kwargs):
@@ -557,6 +572,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             timeout_seconds=150,
             max_attempts=3,
             retry_delay_seconds=0,
+            event_sink=events.append,
         )
         with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
             result = await judge.judge(
@@ -569,6 +585,12 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.grades[0].score, 4)
         self.assertEqual(len(calls), 3)
         self.assertTrue(all(call["timeout_seconds"] == 150 for call in calls))
+        self.assertEqual(
+            [event.kind for event in events].count("judge_call_started"),
+            3,
+        )
+        self.assertEqual([event.kind for event in events].count("judge_call_retry"), 2)
+        self.assertEqual([event.kind for event in events].count("judge_call_completed"), 1)
 
     async def test_provider_client_receives_judge_timeout_override(self) -> None:
         expectation = TurnExpectation(rubric=rubric("listening"))
@@ -737,9 +759,7 @@ class ConservativeConsensusJudgeTest(unittest.IsolatedAsyncioTestCase):
         expectation = TurnExpectation(rubric=rubric("listening", "backbone"))
         case = scenario(expectation=expectation)
         judged_turn = observed("A structurally valid response.")
-        judge = ConservativeConsensusJudge(
-            (("optimistic", PerfectJudge()), ("strict", LowJudge()))
-        )
+        judge = ConservativeConsensusJudge((("optimistic", PerfectJudge()), ("strict", LowJudge())))
 
         result = await judge.judge(
             scenario=case,
@@ -755,9 +775,7 @@ class ConservativeConsensusJudgeTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "at least two"):
             ConservativeConsensusJudge((("only", PerfectJudge()),))
         with self.assertRaisesRegex(ValueError, "unique"):
-            ConservativeConsensusJudge(
-                (("same", PerfectJudge()), ("same", LowJudge()))
-            )
+            ConservativeConsensusJudge((("same", PerfectJudge()), ("same", LowJudge())))
 
     async def test_missing_dimension_from_any_judge_fails_closed(self) -> None:
         expectation = TurnExpectation(rubric=rubric("listening", "backbone"))
@@ -789,9 +807,7 @@ class JudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(expected.count(True), expected.count(False))
         self.assertGreaterEqual(len(expected), 6)
-        self.assertTrue(
-            all(case.turn.expectation.rubric for case in JUDGE_CALIBRATION_CASES)
-        )
+        self.assertTrue(all(case.turn.expectation.rubric for case in JUDGE_CALIBRATION_CASES))
 
     async def test_trusts_judge_only_when_every_golden_case_matches(self) -> None:
         report = await run_judge_calibration(CalibrationJudge())
@@ -828,6 +844,233 @@ class JudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(report.cases[0].passed)
 
 
+class HumanReadableReportingTest(unittest.TestCase):
+    def test_terminal_reporter_uses_simple_live_language_and_counts_calls(self) -> None:
+        stream = StringIO()
+        reporter = TerminalProgressReporter(stream=stream)
+        events = (
+            EvalEvent(
+                "calibration_started",
+                "started",
+                {"total_cases": 6},
+            ),
+            EvalEvent(
+                "judge_call_started",
+                "judge",
+                {
+                    "judge_name": "Judge DeepSeek",
+                    "attempt": 1,
+                    "max_attempts": 3,
+                    "purpose": "grade",
+                },
+            ),
+            EvalEvent(
+                "companion_call_started",
+                "companion",
+                {"model_name": "Llama 3.3"},
+            ),
+            EvalEvent(
+                "companion_api_call_completed",
+                "companion api",
+                {"model_name": "Llama 3.3"},
+            ),
+            EvalEvent("user_turn", "user", {"message": "I only want you to listen."}),
+            EvalEvent("companion_turn", "assistant", {"message": "I'm listening."}),
+            EvalEvent(
+                "turn_graded",
+                "graded",
+                {
+                    "passed": False,
+                    "weighted_score": 2.0,
+                    "dimensions": [
+                        {
+                            "id": "specific_listening",
+                            "score": 2,
+                            "reason": "The reply was too generic.",
+                        }
+                    ],
+                    "findings": ["The response did not mention the user's situation."],
+                },
+            ),
+        )
+
+        for event in events:
+            reporter(event)
+
+        output = stream.getvalue()
+        self.assertIn("Checking the judge models with 6 known examples", output)
+        self.assertIn("User: I only want you to listen.", output)
+        self.assertIn("Companion: I'm listening.", output)
+        self.assertIn("Specific listening: 2/4", output)
+        self.assertIn("Problem: The response did not mention", output)
+        self.assertEqual(reporter.stats().api_calls, 2)
+
+    def test_markdown_and_json_reports_are_saved_with_history(self) -> None:
+        payload = {
+            "suite_name": "companion_behavior_v1",
+            "stage": "behavior_evaluation",
+            "passed": False,
+            "scenario_passed": 0,
+            "scenario_failed": 1,
+            "mode": "release",
+            "judges": ["deepinfra:deepseek", "deepinfra:qwen"],
+            "judge_calibration": {
+                "passed": True,
+                "completed_cases": 6,
+                "total_cases": 6,
+                "judge_errors": 0,
+                "cases": [],
+            },
+            "scenarios": [
+                {
+                    "scenario_id": "listen_without_advice_or_questions",
+                    "passed": False,
+                    "sample_pass_rate": 0.0,
+                    "required_sample_pass_rate": 1.0,
+                    "samples": [
+                        {
+                            "sample_index": 0,
+                            "passed": False,
+                            "turns": [
+                                {
+                                    "turn_index": 0,
+                                    "user_message": "Please just listen.",
+                                    "assistant_reply": "What happened?",
+                                }
+                            ],
+                            "grades": [
+                                {
+                                    "turn_index": 0,
+                                    "passed": False,
+                                    "weighted_score": 2.0,
+                                    "judge_error": None,
+                                    "dimension_grades": [
+                                        {
+                                            "dimension_id": "boundary_respect",
+                                            "score": 2,
+                                            "reason": "It asked a question after a clear boundary.",
+                                        }
+                                    ],
+                                    "findings": [
+                                        {"message": "The reply asked an unwanted question."}
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        fixed_time = datetime(2026, 8, 1, 12, 30, tzinfo=timezone.utc)
+        attach_run_metadata(
+            payload,
+            stats=LiveRunStats(
+                started_at=fixed_time,
+                finished_at=fixed_time,
+                duration_seconds=12.5,
+                api_calls=30,
+            ),
+            companion_provider="deepinfra",
+            companion_model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            prompt_version="v3",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = save_evaluation_reports(
+                payload,
+                output_dir=Path(directory),
+                now=fixed_time,
+            )
+            markdown = paths.markdown.read_text(encoding="utf-8")
+            saved_json = json.loads(paths.json.read_text(encoding="utf-8"))
+            history = paths.history.read_text(encoding="utf-8")
+
+        self.assertIn("2026-08-01", paths.markdown.name)
+        self.assertIn("listen-without-advice-or-questions", paths.markdown.name)
+        self.assertIn("## Simple summary", markdown)
+        self.assertIn("The companion passed 0 scenarios and failed 1", markdown)
+        self.assertIn("**User:** Please just listen.", markdown)
+        self.assertIn("Boundary respect: 2/4", markdown)
+        self.assertIn("Model API calls:** 30", markdown)
+        self.assertEqual(saved_json["run"]["api_calls"], 30)
+        self.assertIn("| Finished (UTC) | Result", history)
+        self.assertIn("[Open report]", history)
+
+    def test_calibration_error_report_explains_that_companion_was_not_tested(self) -> None:
+        payload = {
+            "stage": "judge_calibration",
+            "passed": False,
+            "judges": ["deepinfra:qwen"],
+            "judge_calibration": {
+                "passed": False,
+                "completed_cases": 1,
+                "total_cases": 6,
+                "judge_errors": 1,
+                "cases": [
+                    {
+                        "id": "reject_canned_repeated_hostility",
+                        "passed": False,
+                        "judge_error": "ReadTimeout after 3 attempts",
+                    }
+                ],
+            },
+            "run": {
+                "finished_at": "2026-08-01T12:30:00+00:00",
+                "duration_seconds": 360.0,
+                "api_calls": 3,
+            },
+            "companion": {
+                "provider": "deepinfra",
+                "model": "llama",
+                "prompt_version": "v3",
+            },
+        }
+
+        report = render_markdown_report(payload)
+
+        self.assertIn("companion testing stopped before", report)
+        self.assertIn("ReadTimeout after 3 attempts", report)
+        self.assertIn("no quality verdict", report.lower())
+
+
+class LiveConversationReportingIntegrationTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        reset_db()
+
+    async def test_real_runtime_conversation_and_grade_stream_in_simple_language(self) -> None:
+        behavior_scenario = BehaviorScenario(
+            id="live_listening_check",
+            description="Show a live synthetic conversation.",
+            turns=(
+                ScenarioTurn(
+                    "I felt ignored today. Just listen.",
+                    TurnExpectation(rubric=rubric("specific_listening")),
+                ),
+            ),
+        )
+        stream = StringIO()
+        reporter = TerminalProgressReporter(stream=stream)
+        driver = RuntimeScenarioDriver(
+            RuntimeDriverConfig(provider="mock", model="mock", prompt_version="v3"),
+            event_sink=reporter,
+        )
+
+        report = await run_behavior_evals(
+            scenarios=(behavior_scenario,),
+            driver=driver,
+            judge=PerfectJudge(),
+            event_sink=reporter,
+        )
+
+        output = stream.getvalue()
+        self.assertTrue(report.passed)
+        self.assertIn("Scenario: Live listening check", output)
+        self.assertIn("User: I felt ignored today. Just listen.", output)
+        self.assertIn("Companion:", output)
+        self.assertIn("Turn result: PASS", output)
+        self.assertIn("Evaluation complete: PASS", output)
+
+
 class BehaviorEvalCliTest(unittest.TestCase):
     def _run_cli(self, *arguments: str) -> subprocess.CompletedProcess[str]:
         project_root = Path(__file__).resolve().parents[1]
@@ -841,6 +1084,8 @@ class BehaviorEvalCliTest(unittest.TestCase):
                 [
                     sys.executable,
                     str(project_root / "scripts/evals/run_behavior_evals.py"),
+                    "--output-dir",
+                    str(Path(directory) / "reports"),
                     *arguments,
                 ],
                 cwd=project_root,
@@ -880,6 +1125,9 @@ class BehaviorEvalCliTest(unittest.TestCase):
         self.assertIn("judge_errors=1", result.stdout)
         self.assertIn("cases=1/6", result.stdout)
         self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("Checking the judge models with 6 known examples", result.stderr)
+        self.assertIn("Reports saved:", result.stderr)
+        self.assertIn("Easy report:", result.stderr)
 
     def test_json_report_exposes_timeout_settings_and_never_passes_judge_error(self) -> None:
         result = self._run_cli(
@@ -908,8 +1156,70 @@ class BehaviorEvalCliTest(unittest.TestCase):
         self.assertFalse(failed_case["observed_pass"])
         self.assertFalse(failed_case["passed"])
 
+    def test_no_save_keeps_live_output_but_writes_no_report_message(self) -> None:
+        result = self._run_cli(
+            "--provider",
+            "mock",
+            "--judge-provider",
+            "mock",
+            "--mode",
+            "smoke",
+            "--calibration-only",
+            "--no-save",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Checking the judge models", result.stderr)
+        self.assertNotIn("Reports saved:", result.stderr)
+
+    def test_no_save_and_explicit_output_are_rejected(self) -> None:
+        result = self._run_cli(
+            "--provider",
+            "mock",
+            "--judge-provider",
+            "mock",
+            "--mode",
+            "smoke",
+            "--calibration-only",
+            "--no-save",
+            "--output",
+            "result.json",
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--no-save cannot be combined with --output", result.stderr)
+
 
 class BehaviorEvalRunnerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_runner_emits_progress_and_grade_events_in_order(self) -> None:
+        expectation = TurnExpectation(rubric=rubric("listening"))
+        case = scenario(expectation=expectation)
+        events = []
+
+        report = await run_behavior_evals(
+            scenarios=(case,),
+            driver=ScriptedDriver({0: ("I heard the specific point.",)}),
+            judge=PerfectJudge(),
+            event_sink=events.append,
+        )
+
+        self.assertTrue(report.passed)
+        self.assertEqual(
+            [event.kind for event in events],
+            [
+                "scenario_started",
+                "sample_started",
+                "turn_grading_started",
+                "turn_graded",
+                "sample_completed",
+                "scenario_completed",
+                "evaluation_completed",
+            ],
+        )
+        grade_event = next(event for event in events if event.kind == "turn_graded")
+        self.assertTrue(grade_event.data["passed"])
+        self.assertEqual(grade_event.data["dimensions"][0]["score"], 4)
+
     async def test_good_agent_and_judge_pass(self) -> None:
         expectation = TurnExpectation(
             minimum_words=2,
@@ -963,10 +1273,7 @@ class BehaviorEvalRunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(report.passed)
         self.assertIn(
             "rubric_dimension_below_threshold",
-            {
-                finding.code
-                for finding in report.scenarios[0].samples[0].grades[0].findings
-            },
+            {finding.code for finding in report.scenarios[0].samples[0].grades[0].findings},
         )
 
     async def test_missing_and_broken_judges_fail_closed(self) -> None:
@@ -1142,6 +1449,33 @@ class RuntimeBehaviorDriverTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(turns[0].context_summary["engine_version"], "context_v3")
         self.assertTrue(turns[0].conversation_id)
         self.assertTrue(turns[0].user_id)
+
+    async def test_real_runtime_emits_user_and_companion_turns_live(self) -> None:
+        case = BehaviorScenario(
+            id="runtime_live_events",
+            description="Expose the synthetic conversation while it runs.",
+            turns=(ScenarioTurn("Tell me one thought.", TurnExpectation()),),
+        )
+        events = []
+        driver = RuntimeScenarioDriver(
+            RuntimeDriverConfig(provider="mock", model="mock", prompt_version="v3"),
+            event_sink=events.append,
+        )
+
+        turns = await driver.run_sample(case, 0)
+
+        kinds = [event.kind for event in events]
+        self.assertEqual(
+            kinds,
+            [
+                "user_turn",
+                "companion_call_started",
+                "companion_api_call_completed",
+                "companion_turn",
+            ],
+        )
+        self.assertEqual(events[0].data["message"], "Tell me one thought.")
+        self.assertEqual(events[3].data["message"], turns[0].assistant_reply)
 
     async def test_runtime_driver_restores_process_environment(self) -> None:
         case = BehaviorScenario(
