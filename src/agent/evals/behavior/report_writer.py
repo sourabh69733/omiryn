@@ -24,6 +24,7 @@ def attach_run_metadata(
     companion_provider: str,
     companion_model: str,
     prompt_version: str,
+    companion_agent_name: str = "Mira",
 ) -> None:
     payload["run"] = {
         "started_at": stats.started_at.isoformat(),
@@ -32,6 +33,7 @@ def attach_run_metadata(
         "api_calls": stats.api_calls,
     }
     payload["companion"] = {
+        "agent_name": companion_agent_name,
         "provider": companion_provider,
         "model": companion_model,
         "prompt_version": prompt_version,
@@ -79,8 +81,7 @@ def save_evaluation_reports(
 
 
 def render_markdown_report(payload: dict[str, Any]) -> str:
-    passed = bool(payload.get("passed"))
-    result = "PASS" if passed else "FAIL"
+    result = _result_label(payload)
     run = payload.get("run") or {}
     companion = payload.get("companion") or {}
     calibration = payload.get("judge_calibration") or {}
@@ -89,10 +90,11 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         "",
         f"**Result:** {result}",
         f"**Finished:** {_display_time(run.get('finished_at'))}",
-        f"**Companion:** {companion.get('provider', 'unknown')} / "
-        f"{companion.get('model', 'provider-default')}",
+        f"**Companion agent:** {companion.get('agent_name', 'unknown')}",
+        f"**Companion provider:** {companion.get('provider', 'unknown')}",
+        f"**Companion model:** {companion.get('model', 'provider-default')}",
         f"**Prompt version:** {companion.get('prompt_version', 'unknown')}",
-        f"**Judges:** {', '.join(payload.get('judges') or ['none'])}",
+        f"**Judges:** {', '.join(payload.get('judges') or ['not run'])}",
         f"**Duration:** {run.get('duration_seconds', 0):.1f} seconds",
         f"**Model API calls:** {run.get('api_calls', 0)}",
         "",
@@ -100,15 +102,22 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         "",
         _simple_summary(payload),
         "",
-        "## Judge reliability check",
-        "",
-        (
-            f"The judges completed {calibration.get('completed_cases', 0)}/"
-            f"{calibration.get('total_cases', 0)} known examples. "
-            f"Errors: {calibration.get('judge_errors', 0)}. "
-            f"Result: {'PASS' if calibration.get('passed') else 'FAIL'}."
-        ),
     ]
+    if payload.get("stage") == "simulated_conversation":
+        lines.extend(_simulated_conversations_markdown(payload))
+    else:
+        lines.extend(
+            [
+                "## Judge reliability check",
+                "",
+                (
+                    f"The judges completed {calibration.get('completed_cases', 0)}/"
+                    f"{calibration.get('total_cases', 0)} known examples. "
+                    f"Errors: {calibration.get('judge_errors', 0)}. "
+                    f"Result: {'PASS' if calibration.get('passed') else 'FAIL'}."
+                ),
+            ]
+        )
     failed_calibration_cases = [
         case for case in calibration.get("cases", []) if not case.get("passed")
     ]
@@ -185,6 +194,36 @@ def _scenario_markdown(scenario: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
+    simulated_user = payload.get("simulated_user") or {}
+    lines = [
+        "## AI user",
+        "",
+        f"**Model:** {simulated_user.get('provider', 'unknown')} / "
+        f"{simulated_user.get('model', 'provider-default')}",
+    ]
+    for conversation in payload.get("conversations", []):
+        lines.extend(
+            [
+                "",
+                f"## Conversation: {_plain_name(conversation['scenario_id'])}",
+                "",
+                f"**Stopped because:** {_plain_name(conversation.get('stop_reason', 'unknown'))}",
+                "",
+            ]
+        )
+        for turn in conversation.get("turns", []):
+            lines.extend(
+                [
+                    f"**AI User:** {turn.get('user_message', '')}",
+                    "",
+                    f"**Companion:** {turn.get('assistant_reply', '') or '(no reply)'}",
+                    "",
+                ]
+            )
+    return lines
+
+
 def _simple_summary(payload: dict[str, Any]) -> str:
     if payload.get("stage") == "execution_error":
         return f"The evaluation stopped because of a technical error: {payload['execution_error']}"
@@ -194,6 +233,14 @@ def _simple_summary(payload: dict[str, Any]) -> str:
         return (
             "The judge models were not reliable enough, so companion testing stopped before "
             "the conversation scenarios began."
+        )
+    if payload.get("stage") == "simulated_conversation":
+        turn_count = sum(
+            len(conversation.get("turns", [])) for conversation in payload.get("conversations", [])
+        )
+        return (
+            f"An AI model acted as the user for {turn_count} conversation turns. "
+            "No quality verdict was produced because judging is not part of this step yet."
         )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
@@ -211,6 +258,11 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             "did not complete successfully. This run has no quality verdict for the companion."
             if not payload.get("passed")
             else "The judges are ready for a companion evaluation run."
+        )
+    if payload.get("stage") == "simulated_conversation":
+        return (
+            "Review whether the AI user behaved realistically and challenged the companion naturally. "
+            "Do not treat this report as a pass or failure."
         )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
@@ -233,13 +285,16 @@ def _calibration_failure_reason(case: dict[str, Any]) -> str:
 def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
     scope = "calibration"
     scenarios = payload.get("scenarios") or []
-    if len(scenarios) == 1:
+    conversations = payload.get("conversations") or []
+    if len(conversations) == 1:
+        scope = conversations[0]["scenario_id"]
+    elif len(scenarios) == 1:
         scope = scenarios[0]["scenario_id"]
     elif len(scenarios) > 1:
         scope = payload.get("suite_name") or "behavior_suite"
     companion = payload.get("companion") or {}
     model = companion.get("model") or "provider-default"
-    status = "passed" if payload.get("passed") else "failed"
+    status = _result_label(payload).casefold()
     stamp = timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d_%H%M%S_%fZ")[:-4] + "Z"
     return "__".join((_slug(stamp), _slug(scope), _slug(str(model)), status))
 
@@ -261,7 +316,9 @@ def _append_history(history_path: Path, payload: dict[str, Any], markdown_path: 
         f"{payload.get('scenario_passed', 0) + payload.get('scenario_failed', 0)} scenarios"
         if payload.get("stage") == "behavior_evaluation"
         else (
-            f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
+            f"{sum(len(item.get('turns', [])) for item in payload.get('conversations', []))} turns"
+            if payload.get("stage") == "simulated_conversation"
+            else f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
             f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
         )
     )
@@ -271,7 +328,7 @@ def _append_history(history_path: Path, payload: dict[str, Any], markdown_path: 
         report_link = markdown_path.resolve().as_posix()
     row = (
         f"| {_display_time(run.get('finished_at'))} | "
-        f"{'PASS' if payload.get('passed') else 'FAIL'} | "
+        f"{_result_label(payload)} | "
         f"{_plain_name(payload.get('stage', 'unknown'))} | "
         f"{_table_text(str(companion.get('model', 'provider-default')))} | "
         f"{passed_text} | [Open report]({report_link}) |"
@@ -302,3 +359,9 @@ def _display_time(value: Any) -> str:
 
 def _table_text(value: str) -> str:
     return value.replace("|", "\\|").replace("\n", " ")
+
+
+def _result_label(payload: dict[str, Any]) -> str:
+    if payload.get("passed") is None:
+        return "UNSCORED"
+    return "PASS" if payload.get("passed") else "FAIL"

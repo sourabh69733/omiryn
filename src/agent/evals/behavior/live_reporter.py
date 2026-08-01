@@ -28,7 +28,11 @@ class TerminalProgressReporter:
         self.api_calls = 0
 
     def __call__(self, event: EvalEvent) -> None:
-        if event.kind in {"judge_call_started", "companion_api_call_completed"}:
+        if event.kind in {
+            "judge_call_started",
+            "companion_api_call_completed",
+            "simulated_user_call_started",
+        }:
             self.api_calls += 1
         if not self.enabled:
             return
@@ -80,10 +84,26 @@ def _render_event(event: EvalEvent) -> str | None:
         )
     if event.kind == "scenario_started":
         return f"\nScenario: {_plain_name(data['scenario_id'])}"
+    if event.kind == "simulated_conversation_started":
+        return (
+            f"\nAI-user scenario: {_plain_name(data['scenario_id'])} "
+            f"(up to {data['maximum_turns']} turns)"
+        )
+    if event.kind == "simulated_user_call_started":
+        return (
+            f"    AI User ({data['model_name']}) is thinking "
+            f"(attempt {data['attempt']}/{data['max_attempts']})..."
+        )
+    if event.kind == "simulated_user_call_retry":
+        return f"    AI User had a temporary problem: {data['error']}. Trying again..."
+    if event.kind == "simulated_user_call_failed":
+        return f"    AI User call failed: {data['error']}"
+    if event.kind == "simulated_user_finished":
+        return "    AI User chose to end the conversation naturally."
     if event.kind == "sample_started":
         return f"  Conversation {data['sample_number']}/{data['sample_count']}"
     if event.kind == "user_turn":
-        return f"    User: {data['message']}"
+        return f"    {data.get('speaker_label', 'User')}: {data['message']}"
     if event.kind == "companion_call_started":
         return f"    Companion ({data['model_name']}) is replying..."
     if event.kind == "companion_turn":
@@ -117,6 +137,11 @@ def _render_event(event: EvalEvent) -> str | None:
             "\nEvaluation complete: "
             f"{'PASS' if data['passed'] else 'FAIL'} — "
             f"{data['scenario_passed']}/{data['scenario_total']} scenarios passed."
+        )
+    if event.kind == "simulated_conversation_completed":
+        return (
+            f"\nConversation captured: {data['turn_count']} turns. "
+            "Result: UNSCORED (judging is the next verified step)."
         )
     return None
 
