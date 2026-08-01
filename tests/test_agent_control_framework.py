@@ -76,7 +76,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
         )
 
         self.assertIn("Internal prompt behavior version: v1_companion_basic", prompt)
-        self.assertIn("Prompt behavior version: v1 (v1_companion_basic)", prompt)
+        self.assertNotIn("Prompt behavior version: v1 (v1_companion_basic)", prompt)
         self.assertIn("Agent persona: name=Annie", prompt)
         self.assertIn("Tone setting: Warm", prompt)
         self.assertIn("[llm_profile] Imported profile", prompt)

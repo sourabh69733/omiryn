@@ -973,6 +973,7 @@ class HumanReadableReportingTest(unittest.TestCase):
             companion_provider="deepinfra",
             companion_model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
             prompt_version="v3",
+            companion_agent_name="Annie",
         )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -992,7 +993,14 @@ class HumanReadableReportingTest(unittest.TestCase):
         self.assertIn("**User:** Please just listen.", markdown)
         self.assertIn("Boundary respect: 2/4", markdown)
         self.assertIn("Model API calls:** 30", markdown)
+        self.assertIn("**Companion agent:** Annie", markdown)
+        self.assertIn("**Companion provider:** deepinfra", markdown)
+        self.assertIn(
+            "**Companion model:** meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            markdown,
+        )
         self.assertEqual(saved_json["run"]["api_calls"], 30)
+        self.assertEqual(saved_json["companion"]["agent_name"], "Annie")
         self.assertIn("| Finished (UTC) | Result", history)
         self.assertIn("[Open report]", history)
 
