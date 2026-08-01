@@ -79,7 +79,6 @@ def behavior_module_prompt(
         else "Do not romantic-roleplay, claim intimacy, or pretend to be a real partner."
     )
     return (
-        f"Prompt behavior version: {behavior.version} ({behavior.version_name}).\n"
         f"User identity: display_name={display_name}, email={email}.\n"
         f"User basics: gender={gender}, interested_in={interested_in}, "
         f"location={location}, country={country}.\n"
