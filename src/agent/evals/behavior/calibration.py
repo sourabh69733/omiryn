@@ -44,6 +44,9 @@ class JudgeCalibrationReport:
     accuracy: float
     false_accepts: int
     false_rejects: int
+    judge_errors: int
+    completed_cases: int
+    total_cases: int
     cases: tuple[JudgeCalibrationCaseResult, ...]
 
 
@@ -98,7 +101,7 @@ async def run_judge_calibration(
             judge_result=judge_result,
             judge_error=judge_error,
         )
-        matches = grade.passed == case.expected_pass
+        matches = judge_error is None and grade.passed == case.expected_pass
         results.append(
             JudgeCalibrationCaseResult(
                 id=case.id,
@@ -111,18 +114,35 @@ async def run_judge_calibration(
                 weighted_score=grade.weighted_score,
             )
         )
+        if judge_error is not None:
+            break
     false_accepts = sum(
-        not result.expected_pass and result.observed_pass for result in results
+        result.judge_error is None
+        and not result.expected_pass
+        and result.observed_pass
+        for result in results
     )
     false_rejects = sum(
-        result.expected_pass and not result.observed_pass for result in results
+        result.judge_error is None
+        and result.expected_pass
+        and not result.observed_pass
+        for result in results
     )
-    accuracy = sum(result.passed for result in results) / len(results)
+    judge_errors = sum(result.judge_error is not None for result in results)
+    accuracy = sum(result.passed for result in results) / len(selected)
     return JudgeCalibrationReport(
-        passed=false_accepts == 0 and false_rejects == 0,
+        passed=(
+            len(results) == len(selected)
+            and judge_errors == 0
+            and false_accepts == 0
+            and false_rejects == 0
+        ),
         accuracy=accuracy,
         false_accepts=false_accepts,
         false_rejects=false_rejects,
+        judge_errors=judge_errors,
+        completed_cases=len(results),
+        total_cases=len(selected),
         cases=tuple(results),
     )
 
@@ -133,6 +153,9 @@ def calibration_report_payload(report: JudgeCalibrationReport) -> dict:
         "accuracy": report.accuracy,
         "false_accepts": report.false_accepts,
         "false_rejects": report.false_rejects,
+        "judge_errors": report.judge_errors,
+        "completed_cases": report.completed_cases,
+        "total_cases": report.total_cases,
         "cases": [
             {
                 "id": case.id,

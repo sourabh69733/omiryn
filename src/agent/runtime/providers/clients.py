@@ -25,6 +25,7 @@ async def _openai_compatible_chat(
     conversation_id: str | None = None,
     request_kind: str = "chat_reply",
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> str:
     config = _openai_compatible_provider_config(provider, model)
     provider_messages = _provider_messages(messages)
@@ -40,7 +41,10 @@ async def _openai_compatible_chat(
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=config["timeout_seconds"]) as client:
+    request_timeout = (
+        timeout_seconds if timeout_seconds is not None else float(config["timeout_seconds"])
+    )
+    async with httpx.AsyncClient(timeout=request_timeout) as client:
         logger.info(
             "agent.%s.request model=%s messages=%s temperature=%s",
             provider,
@@ -189,6 +193,7 @@ async def _groq_chat(
     conversation_id: str | None = None,
     request_kind: str = "chat_reply",
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -204,7 +209,7 @@ async def _groq_chat(
     _emit_prompt_debug("groq", payload["model"], request_kind, prompt_debug)
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    async with httpx.AsyncClient(timeout=45) as client:
+    async with httpx.AsyncClient(timeout=timeout_seconds or 45) as client:
         logger.info(
             "agent.groq.request model=%s messages=%s temperature=%s",
             payload["model"],

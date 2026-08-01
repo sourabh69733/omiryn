@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 from typing import Any, Awaitable, Callable
+
+import httpx
 
 from agent.evals.behavior.models import (
     BehaviorScenario,
@@ -11,6 +15,7 @@ from agent.evals.behavior.models import (
     ScenarioTurn,
 )
 from agent.runtime.providers.clients import _groq_chat, _openai_compatible_chat
+from agent.runtime.providers.errors import AgentProviderError
 from agent.runtime.providers.json_utils import _parse_json_object
 
 JUDGE_REQUEST_KIND = "behavior_eval_judge"
@@ -20,10 +25,43 @@ class JudgeProtocolError(ValueError):
     pass
 
 
+class JudgeExecutionError(RuntimeError):
+    pass
+
+
 class ProviderRubricJudge:
-    def __init__(self, *, provider: str, model: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str | None = None,
+        timeout_seconds: float | None = None,
+        max_attempts: int | None = None,
+        retry_delay_seconds: float | None = None,
+    ) -> None:
         self.provider = provider.strip().casefold()
         self.model = model
+        self.timeout_seconds = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else float(os.getenv("AGENT_EVAL_JUDGE_TIMEOUT_SECONDS", "120"))
+        )
+        self.max_attempts = (
+            max_attempts
+            if max_attempts is not None
+            else int(os.getenv("AGENT_EVAL_JUDGE_MAX_ATTEMPTS", "3"))
+        )
+        self.retry_delay_seconds = (
+            retry_delay_seconds
+            if retry_delay_seconds is not None
+            else float(os.getenv("AGENT_EVAL_JUDGE_RETRY_DELAY_SECONDS", "1"))
+        )
+        if self.timeout_seconds <= 0:
+            raise ValueError("Judge timeout_seconds must be positive.")
+        if self.max_attempts < 1:
+            raise ValueError("Judge max_attempts must be at least 1.")
+        if self.retry_delay_seconds < 0:
+            raise ValueError("Judge retry_delay_seconds cannot be negative.")
 
     async def judge(
         self,
@@ -44,13 +82,11 @@ class ProviderRubricJudge:
             transcript=transcript,
         )
         call = _provider_call(self.provider)
-        raw = await call(
+        raw = await self._call_with_retry(
+            call,
             system_prompt,
             [{"role": "user", "content": user_payload}],
-            temperature=0.0,
-            conversation_id=observed.conversation_id,
-            request_kind=JUDGE_REQUEST_KIND,
-            model=self.model,
+            observed=observed,
         )
         try:
             return parse_judge_result(raw)
@@ -62,15 +98,51 @@ class ProviderRubricJudge:
                     dimension.id for dimension in turn.expectation.rubric
                 ),
             )
-            repaired = await call(
+            repaired = await self._call_with_retry(
+                call,
                 repair_prompt,
                 [{"role": "user", "content": repair_payload}],
-                temperature=0.0,
-                conversation_id=observed.conversation_id,
-                request_kind=JUDGE_REQUEST_KIND,
-                model=self.model,
+                observed=observed,
             )
             return parse_judge_result(repaired)
+
+    async def _call_with_retry(
+        self,
+        call: Callable[..., Awaitable[str]],
+        system_prompt: str,
+        messages: list[dict[str, str]],
+        *,
+        observed: ObservedTurn,
+    ) -> str:
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                return await asyncio.wait_for(
+                    call(
+                        system_prompt,
+                        messages,
+                        temperature=0.0,
+                        conversation_id=observed.conversation_id,
+                        request_kind=JUDGE_REQUEST_KIND,
+                        model=self.model,
+                        timeout_seconds=self.timeout_seconds,
+                    ),
+                    timeout=self.timeout_seconds + 1,
+                )
+            except Exception as error:
+                last_error = error
+                if not _is_transient_judge_error(error):
+                    raise
+                if attempt == self.max_attempts:
+                    break
+                if self.retry_delay_seconds:
+                    await asyncio.sleep(self.retry_delay_seconds * attempt)
+        assert last_error is not None
+        raise JudgeExecutionError(
+            "Judge provider call failed after "
+            f"{self.max_attempts} attempts with timeout={self.timeout_seconds:g}s: "
+            f"{_error_description(last_error)}"
+        ) from last_error
 
 
 def build_judge_request(
@@ -196,6 +268,29 @@ Every required dimension must appear exactly once. Scores must be integers from 
         sort_keys=True,
     )
     return system_prompt, user_payload
+
+
+def _is_transient_judge_error(error: Exception) -> bool:
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (TimeoutError, httpx.TimeoutException, httpx.TransportError)):
+            return True
+        if isinstance(current, httpx.HTTPStatusError):
+            status_code = current.response.status_code
+            return status_code in {408, 409, 425, 429} or status_code >= 500
+        if isinstance(current, AgentProviderError):
+            normalized = str(current).casefold()
+            if "rate limit" in normalized or "temporarily unavailable" in normalized:
+                return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _error_description(error: Exception) -> str:
+    detail = str(error).strip()
+    return f"{type(error).__name__}: {detail}" if detail else type(error).__name__
 
 
 def _provider_call(provider: str) -> Callable[..., Awaitable[str]]:

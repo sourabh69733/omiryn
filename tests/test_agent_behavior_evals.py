@@ -8,6 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from agent.evals.behavior.calibration import (
     JUDGE_CALIBRATION_CASES,
     calibration_report_payload,
@@ -16,6 +18,7 @@ from agent.evals.behavior.calibration import (
 from agent.evals.behavior.consensus import ConservativeConsensusJudge
 from agent.evals.behavior.graders import combine_turn_grade, hard_rule_findings
 from agent.evals.behavior.judge import (
+    JudgeExecutionError,
     JudgeProtocolError,
     ProviderRubricJudge,
     build_judge_request,
@@ -532,6 +535,137 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen["request_kind"], "behavior_eval_judge")
         self.assertEqual(seen["model"], "judge-model")
         self.assertEqual(seen["conversation_id"], "eval-conv")
+        self.assertEqual(seen["timeout_seconds"], 120)
+
+    async def test_provider_judge_retries_transient_timeouts_then_succeeds(self) -> None:
+        expectation = TurnExpectation(rubric=rubric("listening"))
+        case = scenario(expectation=expectation)
+        calls = []
+        request = httpx.Request("POST", "https://judge.test/chat")
+
+        async def fake_call(system_prompt, messages, **kwargs):
+            calls.append(kwargs)
+            if len(calls) < 3:
+                raise httpx.ReadTimeout("judge was slow", request=request)
+            return (
+                '{"dimensions":[{"id":"listening","score":4,'
+                '"reason":"specific"}],"overall_reason":"good"}'
+            )
+
+        judge = ProviderRubricJudge(
+            provider="deepinfra",
+            timeout_seconds=150,
+            max_attempts=3,
+            retry_delay_seconds=0,
+        )
+        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+            result = await judge.judge(
+                scenario=case,
+                turn=case.turns[0],
+                observed=observed("A specific response."),
+                transcript=(observed("A specific response."),),
+            )
+
+        self.assertEqual(result.grades[0].score, 4)
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(call["timeout_seconds"] == 150 for call in calls))
+
+    async def test_provider_client_receives_judge_timeout_override(self) -> None:
+        expectation = TurnExpectation(rubric=rubric("listening"))
+        case = scenario(expectation=expectation)
+        seen = {}
+
+        class FakeAsyncClient:
+            def __init__(self, *, timeout):
+                seen["timeout"] = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+            async def post(self, url, *, json, headers):
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": (
+                                        '{"dimensions":[{"id":"listening","score":4,'
+                                        '"reason":"specific"}],"overall_reason":"good"}'
+                                    )
+                                }
+                            }
+                        ],
+                        "usage": {},
+                    },
+                    request=request,
+                )
+
+        judge = ProviderRubricJudge(
+            provider="deepinfra",
+            timeout_seconds=175,
+            max_attempts=1,
+        )
+        with (
+            patch.dict(os.environ, {"DEEPINFRA_API_KEY": "test-key"}),
+            patch(
+                "agent.runtime.providers.clients.httpx.AsyncClient",
+                FakeAsyncClient,
+            ),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+        ):
+            result = await judge.judge(
+                scenario=case,
+                turn=case.turns[0],
+                observed=observed("A specific response."),
+                transcript=(observed("A specific response."),),
+            )
+
+        self.assertEqual(result.grades[0].score, 4)
+        self.assertEqual(seen["timeout"], 175)
+
+    async def test_provider_judge_reports_exhausted_timeout_attempts(self) -> None:
+        expectation = TurnExpectation(rubric=rubric("listening"))
+        case = scenario(expectation=expectation)
+        calls = 0
+        request = httpx.Request("POST", "https://judge.test/chat")
+
+        async def fake_call(system_prompt, messages, **kwargs):
+            nonlocal calls
+            calls += 1
+            raise httpx.ReadTimeout("", request=request)
+
+        judge = ProviderRubricJudge(
+            provider="deepinfra",
+            timeout_seconds=180,
+            max_attempts=3,
+            retry_delay_seconds=0,
+        )
+        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+            with self.assertRaisesRegex(
+                JudgeExecutionError,
+                "3 attempts with timeout=180s: ReadTimeout",
+            ):
+                await judge.judge(
+                    scenario=case,
+                    turn=case.turns[0],
+                    observed=observed("A response."),
+                    transcript=(observed("A response."),),
+                )
+
+        self.assertEqual(calls, 3)
+
+    def test_provider_judge_rejects_invalid_reliability_settings(self) -> None:
+        with self.assertRaisesRegex(ValueError, "timeout_seconds"):
+            ProviderRubricJudge(provider="deepinfra", timeout_seconds=-1)
+        with self.assertRaisesRegex(ValueError, "max_attempts"):
+            ProviderRubricJudge(provider="deepinfra", max_attempts=-1)
+        with self.assertRaisesRegex(ValueError, "retry_delay_seconds"):
+            ProviderRubricJudge(provider="deepinfra", retry_delay_seconds=-1)
 
     async def test_mock_provider_cannot_fake_semantic_judgment(self) -> None:
         expectation = TurnExpectation(rubric=rubric("listening"))
@@ -682,8 +816,16 @@ class JudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         report = await run_judge_calibration(BrokenJudge())
 
         self.assertFalse(report.passed)
-        self.assertEqual(report.false_rejects, 3)
-        self.assertTrue(all(case.judge_error for case in report.cases))
+        self.assertEqual(report.false_accepts, 0)
+        self.assertEqual(report.false_rejects, 0)
+        self.assertEqual(report.judge_errors, 1)
+        self.assertEqual(report.completed_cases, 1)
+        self.assertEqual(report.total_cases, len(JUDGE_CALIBRATION_CASES))
+        self.assertEqual(report.accuracy, 0)
+        self.assertTrue(report.cases[0].judge_error)
+        self.assertFalse(report.cases[0].expected_pass)
+        self.assertFalse(report.cases[0].observed_pass)
+        self.assertFalse(report.cases[0].passed)
 
 
 class BehaviorEvalCliTest(unittest.TestCase):
@@ -735,8 +877,36 @@ class BehaviorEvalCliTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("FAIL semantic judge calibration", result.stdout)
-        self.assertIn("false_rejects=3", result.stdout)
+        self.assertIn("judge_errors=1", result.stdout)
+        self.assertIn("cases=1/6", result.stdout)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_json_report_exposes_timeout_settings_and_never_passes_judge_error(self) -> None:
+        result = self._run_cli(
+            "--provider",
+            "mock",
+            "--judge-provider",
+            "mock",
+            "--mode",
+            "smoke",
+            "--calibration-only",
+            "--judge-timeout-seconds",
+            "240",
+            "--judge-max-attempts",
+            "5",
+            "--json",
+        )
+
+        payload = json.loads(result.stdout)
+        calibration = payload["judge_calibration"]
+        failed_case = calibration["cases"][0]
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["judge_runtime"]["timeout_seconds"], 240)
+        self.assertEqual(payload["judge_runtime"]["max_attempts"], 5)
+        self.assertEqual(calibration["judge_errors"], 1)
+        self.assertFalse(failed_case["expected_pass"])
+        self.assertFalse(failed_case["observed_pass"])
+        self.assertFalse(failed_case["passed"])
 
 
 class BehaviorEvalRunnerTest(unittest.IsolatedAsyncioTestCase):

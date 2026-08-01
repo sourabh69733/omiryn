@@ -68,6 +68,18 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--judge-timeout-seconds",
+        type=float,
+        default=float(os.getenv("AGENT_EVAL_JUDGE_TIMEOUT_SECONDS", "120")),
+        help="Timeout for each judge-provider attempt (default: 120 seconds).",
+    )
+    parser.add_argument(
+        "--judge-max-attempts",
+        type=int,
+        default=int(os.getenv("AGENT_EVAL_JUDGE_MAX_ATTEMPTS", "3")),
+        help="Maximum attempts for transient judge failures (default: 3).",
+    )
+    parser.add_argument(
         "--mode",
         choices=("release", "smoke"),
         default="release",
@@ -123,6 +135,7 @@ async def _run(args: argparse.Namespace) -> dict:
             "passed": calibration.passed,
             "mode": args.mode,
             "judges": list(judge_names),
+            "judge_runtime": _judge_runtime_payload(args),
             "judge_calibration": calibration_payload,
         }
     report = await run_behavior_evals(
@@ -142,6 +155,7 @@ async def _run(args: argparse.Namespace) -> dict:
     payload["stage"] = "behavior_evaluation"
     payload["mode"] = args.mode
     payload["judges"] = list(judge_names)
+    payload["judge_runtime"] = _judge_runtime_payload(args)
     payload["judge_calibration"] = calibration_payload
     return payload
 
@@ -151,7 +165,12 @@ def _build_judge(args: argparse.Namespace):
     judges = tuple(
         (
             f"{args.judge_provider}:{model or 'provider-default'}",
-            ProviderRubricJudge(provider=args.judge_provider, model=model),
+            ProviderRubricJudge(
+                provider=args.judge_provider,
+                model=model,
+                timeout_seconds=args.judge_timeout_seconds,
+                max_attempts=args.judge_max_attempts,
+            ),
         )
         for model in models
     )
@@ -159,6 +178,13 @@ def _build_judge(args: argparse.Namespace):
     if len(judges) == 1:
         return judges[0][1], names
     return ConservativeConsensusJudge(judges), names
+
+
+def _judge_runtime_payload(args: argparse.Namespace) -> dict:
+    return {
+        "timeout_seconds": args.judge_timeout_seconds,
+        "max_attempts": args.judge_max_attempts,
+    }
 
 
 def _validate_run_mode(args: argparse.Namespace, judge_names: tuple[str, ...]) -> None:
@@ -207,7 +233,9 @@ def main() -> int:
             print(
                 f"{status} semantic judge calibration: accuracy={calibration['accuracy']:.2f} "
                 f"false_accepts={calibration['false_accepts']} "
-                f"false_rejects={calibration['false_rejects']}"
+                f"false_rejects={calibration['false_rejects']} "
+                f"judge_errors={calibration['judge_errors']} "
+                f"cases={calibration['completed_cases']}/{calibration['total_cases']}"
             )
             for case in calibration["cases"]:
                 if not case["passed"]:
