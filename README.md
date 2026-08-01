@@ -140,6 +140,11 @@ Provider options live in `.env`:
 # no external model cost, good for development
 AGENT_PROVIDER=mock
 
+# OpenAI API
+AGENT_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+
 # hosted model
 AGENT_PROVIDER=groq
 GROQ_API_KEY=...
