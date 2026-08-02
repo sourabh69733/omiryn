@@ -58,8 +58,10 @@ def save_evaluation_reports(
         history_path = output_dir / "HISTORY.md"
     else:
         stem = _report_stem(payload, timestamp)
-        json_path = output_dir / f"{stem}.json"
-        markdown_path = output_dir / f"{stem}.md"
+        day_directory = output_dir / _history_day(timestamp)
+        day_directory.mkdir(parents=True, exist_ok=True)
+        json_path = day_directory / f"{stem}.json"
+        markdown_path = day_directory / f"{stem}.md"
         history_path = output_dir / "HISTORY.md"
 
     payload["report_files"] = {
@@ -72,7 +74,7 @@ def save_evaluation_reports(
         json_path,
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
     )
-    _append_history(history_path, payload, markdown_path)
+    _append_history(history_path, payload, timestamp)
     return SavedReportPaths(
         markdown=markdown_path,
         json=json_path,
@@ -323,15 +325,16 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
     return "__".join((_slug(stamp), _slug(scope), _slug(str(model)), status))
 
 
-def _append_history(history_path: Path, payload: dict[str, Any], markdown_path: Path) -> None:
+def _append_history(
+    history_path: Path,
+    payload: dict[str, Any],
+    timestamp: datetime,
+) -> None:
     if history_path.exists():
         existing = history_path.read_text(encoding="utf-8").rstrip()
     else:
         existing = (
-            "# Evaluation History\n\n"
-            "Synthetic evaluation runs are kept here for day-by-day comparison.\n\n"
-            "| Finished (UTC) | Result | Stage | Companion | Passed | Report |\n"
-            "| --- | --- | --- | --- | --- | --- |"
+            "# Evaluation History\n\nSynthetic evaluation scores are grouped by day for comparison."
         )
     companion = payload.get("companion") or {}
     run = payload.get("run") or {}
@@ -346,18 +349,61 @@ def _append_history(history_path: Path, payload: dict[str, Any], markdown_path: 
             f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
         )
     )
-    try:
-        report_link = markdown_path.relative_to(history_path.parent).as_posix()
-    except ValueError:
-        report_link = markdown_path.resolve().as_posix()
+    day = _history_day(timestamp)
     row = (
-        f"| {_display_time(run.get('finished_at'))} | "
+        f"| {_history_time(run.get('finished_at'), timestamp)} | "
         f"{_result_label(payload)} | "
         f"{_plain_name(payload.get('stage', 'unknown'))} | "
         f"{_table_text(str(companion.get('model', 'provider-default')))} | "
-        f"{passed_text} | [Open report]({report_link}) |"
+        f"{_history_score(payload)} | {passed_text} |"
     )
-    _write_text_atomic(history_path, existing + "\n" + row + "\n")
+    section_header = f"## {day}"
+    table_header = (
+        "| Time (UTC) | Result | Stage | Companion | Score | Passed |\n"
+        "| --- | --- | --- | --- | --- | --- |"
+    )
+    if section_header not in existing:
+        updated = f"{existing}\n\n{section_header}\n\n{table_header}\n{row}\n"
+    else:
+        section_start = existing.index(section_header)
+        next_section = existing.find("\n## ", section_start + len(section_header))
+        insert_at = len(existing) if next_section == -1 else next_section
+        updated = (
+            existing[:insert_at].rstrip()
+            + "\n"
+            + row
+            + ("\n" if next_section == -1 else "\n\n")
+            + existing[insert_at:].lstrip()
+        )
+    _write_text_atomic(history_path, updated)
+
+
+def _history_score(payload: dict[str, Any]) -> str:
+    if payload.get("stage") == "simulated_conversation":
+        score = (payload.get("user_judgment") or {}).get("average_score")
+        return f"{score:.1f}/4" if isinstance(score, (int, float)) else "—"
+    scores = [
+        grade.get("weighted_score")
+        for scenario in payload.get("scenarios", [])
+        for sample in scenario.get("samples", [])
+        for grade in sample.get("grades", [])
+        if isinstance(grade.get("weighted_score"), (int, float))
+    ]
+    return f"{sum(scores) / len(scores):.1f}/4" if scores else "—"
+
+
+def _history_day(timestamp: datetime) -> str:
+    return timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _history_time(value: Any, fallback: datetime) -> str:
+    try:
+        parsed = datetime.fromisoformat(str(value))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        parsed = fallback
+    return parsed.astimezone(timezone.utc).strftime("%H:%M:%S")
 
 
 def _write_text_atomic(path: Path, content: str) -> None:

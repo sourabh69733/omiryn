@@ -565,7 +565,31 @@ class SimulatedConversationReportTest(unittest.TestCase):
                 "| PENDING INDEPENDENT JUDGE |",
                 paths.history.read_text(encoding="utf-8"),
             )
+            self.assertEqual(paths.markdown.parent.name, "2026-08-01")
+            self.assertIn("## 2026-08-01", paths.history.read_text(encoding="utf-8"))
+            self.assertIn("| 2.0/4 |", paths.history.read_text(encoding="utf-8"))
             self.assertIsNone(json.loads(paths.json.read_text(encoding="utf-8"))["passed"])
+
+    def test_history_groups_multiple_runs_under_their_day(self) -> None:
+        day_one = datetime(2026, 8, 1, 10, 0, tzinfo=timezone.utc)
+        day_two_first = datetime(2026, 8, 2, 10, 0, tzinfo=timezone.utc)
+        day_two_second = datetime(2026, 8, 2, 11, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            for timestamp in (day_one, day_two_first, day_two_second):
+                payload = self._payload()
+                payload["run"]["finished_at"] = timestamp.isoformat()
+                save_evaluation_reports(
+                    payload,
+                    output_dir=Path(directory),
+                    now=timestamp,
+                )
+
+            history = (Path(directory) / "HISTORY.md").read_text(encoding="utf-8")
+
+        self.assertEqual(history.count("## 2026-08-01"), 1)
+        self.assertEqual(history.count("## 2026-08-02"), 1)
+        self.assertEqual(history.count("| PENDING INDEPENDENT JUDGE |"), 3)
+        self.assertNotIn("Open report", history)
 
     def test_terminal_distinguishes_conversation_and_user_judgment(self) -> None:
         stream = StringIO()
@@ -660,8 +684,10 @@ class SimulatedConversationCliTest(unittest.TestCase):
             result = self._run_cli("--quiet", "--output-dir", directory)
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(list(Path(directory).glob("*.md")))
-            self.assertTrue(list(Path(directory).glob("*.json")))
+            day_directories = [path for path in Path(directory).iterdir() if path.is_dir()]
+            self.assertEqual(len(day_directories), 1)
+            self.assertTrue(list(day_directories[0].glob("*.md")))
+            self.assertTrue(list(day_directories[0].glob("*.json")))
             self.assertTrue((Path(directory) / "HISTORY.md").exists())
 
 

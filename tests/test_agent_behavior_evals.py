@@ -987,6 +987,8 @@ class HumanReadableReportingTest(unittest.TestCase):
             history = paths.history.read_text(encoding="utf-8")
 
         self.assertIn("2026-08-01", paths.markdown.name)
+        self.assertEqual(paths.markdown.parent.name, "2026-08-01")
+        self.assertEqual(paths.json.parent.name, "2026-08-01")
         self.assertIn("listen-without-advice-or-questions", paths.markdown.name)
         self.assertIn("## Simple summary", markdown)
         self.assertIn("The companion passed 0 scenarios and failed 1", markdown)
@@ -1001,8 +1003,10 @@ class HumanReadableReportingTest(unittest.TestCase):
         )
         self.assertEqual(saved_json["run"]["api_calls"], 30)
         self.assertEqual(saved_json["companion"]["agent_name"], "Annie")
-        self.assertIn("| Finished (UTC) | Result", history)
-        self.assertIn("[Open report]", history)
+        self.assertIn("## 2026-08-01", history)
+        self.assertIn("| Time (UTC) | Result", history)
+        self.assertIn("| 2.0/4 |", history)
+        self.assertNotIn("[Open report]", history)
 
     def test_calibration_error_report_explains_that_companion_was_not_tested(self) -> None:
         payload = {
