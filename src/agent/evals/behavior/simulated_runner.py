@@ -12,6 +12,7 @@ from agent.evals.behavior.runtime_driver import (
     _direct_reply_reason,
     _runtime_environment,
 )
+from agent.evals.behavior.simulated_judge import ConversationJudge, IndependentJudgment
 from agent.evals.behavior.simulated_user import (
     SimulatedUser,
     SimulatedUserScenario,
@@ -33,6 +34,7 @@ class SimulatedConversationResult:
     stop_reason: str
     conversation_id: str
     user_verdict: UserExperienceVerdict
+    independent_judgments: tuple[IndependentJudgment, ...] = ()
 
 
 async def run_simulated_conversation(
@@ -40,6 +42,7 @@ async def run_simulated_conversation(
     scenario: SimulatedUserScenario,
     simulated_user: SimulatedUser,
     companion: RuntimeDriverConfig,
+    independent_judges: tuple[ConversationJudge, ...] = (),
     event_sink: EventSink | None = None,
 ) -> SimulatedConversationResult:
     user_id = f"ai-user-eval-{scenario.id}-{uuid4().hex[:8]}"
@@ -213,13 +216,23 @@ async def run_simulated_conversation(
             for grade in user_verdict.grades
         ],
     )
+    independent_judgments = await _run_independent_judges(
+        judges=independent_judges,
+        scenario=scenario,
+        transcript=final_transcript,
+        conversation_id=conversation_id,
+        event_sink=event_sink,
+    )
+    consensus = _conversation_consensus(user_verdict, independent_judgments)
     emit_event(
         event_sink,
         "simulated_conversation_completed",
-        "AI-user conversation and user judgment completed; independent judgment is pending.",
+        "AI-user conversation and judgments completed.",
         scenario_id=scenario.id,
         turn_count=len(observed_turns),
         stop_reason=stop_reason,
+        passed=consensus["passed"],
+        verdict=consensus["verdict"],
     )
     return SimulatedConversationResult(
         scenario_id=scenario.id,
@@ -227,6 +240,7 @@ async def run_simulated_conversation(
         stop_reason=stop_reason,
         conversation_id=conversation_id,
         user_verdict=user_verdict,
+        independent_judgments=independent_judgments,
     )
 
 
@@ -236,15 +250,22 @@ def simulated_conversation_payload(
     simulated_user_provider: str,
     simulated_user_model: str,
 ) -> dict[str, Any]:
+    independent_payload = [
+        _independent_judgment_payload(judgment) for judgment in result.independent_judgments
+    ]
+    consensus = _conversation_consensus(result.user_verdict, result.independent_judgments)
     return {
         "stage": "simulated_conversation",
-        "passed": None,
-        "verdict": "pending_independent_judge",
+        "passed": consensus["passed"],
+        "verdict": consensus["verdict"],
         "simulated_user": {
             "provider": simulated_user_provider,
             "model": simulated_user_model,
         },
-        "judges": [f"AI user judge ({simulated_user_provider} / {simulated_user_model})"],
+        "judges": [
+            f"AI user judge ({simulated_user_provider} / {simulated_user_model})",
+            *(item["judge_name"] for item in independent_payload),
+        ],
         "user_judgment": {
             "passed": result.user_verdict.passed,
             "average_score": result.user_verdict.average_score,
@@ -260,6 +281,8 @@ def simulated_conversation_payload(
                 for grade in result.user_verdict.grades
             ],
         },
+        "independent_judgments": independent_payload,
+        "consensus": consensus,
         "conversations": [
             {
                 "scenario_id": result.scenario_id,
@@ -273,6 +296,162 @@ def simulated_conversation_payload(
                     for turn in result.turns
                 ],
             }
+        ],
+    }
+
+
+async def _run_independent_judges(
+    *,
+    judges: tuple[ConversationJudge, ...],
+    scenario: SimulatedUserScenario,
+    transcript: tuple[dict[str, str], ...],
+    conversation_id: str,
+    event_sink: EventSink | None,
+) -> tuple[IndependentJudgment, ...]:
+    judgments: list[IndependentJudgment] = []
+    for judge in judges:
+        emit_event(
+            event_sink,
+            "independent_judgment_started",
+            "Independent judge started reviewing the completed conversation.",
+            judge_name=judge.judge_name,
+            scenario_id=scenario.id,
+        )
+        try:
+            verdict = await judge.judge_conversation(
+                scenario=scenario,
+                transcript=transcript,
+                conversation_id=conversation_id,
+            )
+        except Exception as error:
+            message = f"{type(error).__name__}: {error}"
+            judgments.append(IndependentJudgment(judge_name=judge.judge_name, error=message))
+            emit_event(
+                event_sink,
+                "independent_judgment_failed",
+                "Independent judge failed.",
+                judge_name=judge.judge_name,
+                scenario_id=scenario.id,
+                error=message,
+            )
+            continue
+        judgments.append(IndependentJudgment(judge_name=judge.judge_name, verdict=verdict))
+        emit_event(
+            event_sink,
+            "independent_judgment_completed",
+            "Independent judge finished reviewing the completed conversation.",
+            judge_name=judge.judge_name,
+            scenario_id=scenario.id,
+            passed=verdict.passed,
+            average_score=verdict.average_score,
+            would_continue=verdict.would_continue,
+            dimensions=[
+                {
+                    "dimension_id": grade.dimension_id,
+                    "score": grade.score,
+                    "reason": grade.reason,
+                }
+                for grade in verdict.grades
+            ],
+        )
+    return tuple(judgments)
+
+
+def _conversation_consensus(
+    user_verdict: UserExperienceVerdict,
+    independent_judgments: tuple[IndependentJudgment, ...],
+) -> dict[str, Any]:
+    voices: list[dict[str, Any]] = [
+        {
+            "name": "AI user judge",
+            "passed": user_verdict.passed,
+            "average_score": user_verdict.average_score,
+            "error": None,
+        }
+    ]
+    for judgment in independent_judgments:
+        voices.append(
+            {
+                "name": judgment.judge_name,
+                "passed": judgment.passed,
+                "average_score": (
+                    judgment.verdict.average_score if judgment.verdict is not None else None
+                ),
+                "error": judgment.error,
+            }
+        )
+    judge_errors = sum(voice["error"] is not None for voice in voices)
+    passing_voices = sum(bool(voice["passed"]) for voice in voices)
+    has_independent = bool(independent_judgments)
+    passed = has_independent and judge_errors == 0 and passing_voices == len(voices)
+    verdict = "consensus_pass" if passed else "consensus_fail"
+    disagreements = []
+    if has_independent and len({bool(voice["passed"]) for voice in voices}) > 1:
+        disagreements.append("AI-user and independent judge verdicts disagree.")
+    if not has_independent:
+        verdict = "pending_independent_judge"
+    scores = [
+        voice["average_score"]
+        for voice in voices
+        if isinstance(voice["average_score"], (int, float))
+    ]
+    return {
+        "passed": passed if has_independent else None,
+        "verdict": verdict,
+        "average_score": round(sum(scores) / len(scores), 3) if scores else None,
+        "required_voices": 2,
+        "total_voices": len(voices),
+        "passing_voices": passing_voices,
+        "judge_errors": judge_errors,
+        "disagreements": disagreements,
+        "reason": _consensus_reason(has_independent, passed, judge_errors, disagreements),
+    }
+
+
+def _consensus_reason(
+    has_independent: bool,
+    passed: bool,
+    judge_errors: int,
+    disagreements: list[str],
+) -> str:
+    if not has_independent:
+        return "The AI-user verdict exists, but no independent judge has reviewed the transcript yet."
+    if judge_errors:
+        return "At least one judge errored, so the consensus fails closed."
+    if disagreements:
+        return "The user and independent judge disagree, so this needs review before trusting it."
+    if passed:
+        return "The AI-user and independent judge both passed the conversation."
+    return "At least one judging voice failed the conversation."
+
+
+def _independent_judgment_payload(judgment: IndependentJudgment) -> dict[str, Any]:
+    if judgment.verdict is None:
+        return {
+            "judge_name": judgment.judge_name,
+            "passed": False,
+            "error": judgment.error,
+            "average_score": None,
+            "would_continue": False,
+            "overall_reason": "",
+            "biggest_problem": judgment.error or "Independent judge failed.",
+            "dimensions": [],
+        }
+    return {
+        "judge_name": judgment.judge_name,
+        "passed": judgment.verdict.passed,
+        "error": None,
+        "average_score": judgment.verdict.average_score,
+        "would_continue": judgment.verdict.would_continue,
+        "overall_reason": judgment.verdict.overall_reason,
+        "biggest_problem": judgment.verdict.biggest_problem,
+        "dimensions": [
+            {
+                "dimension_id": grade.dimension_id,
+                "score": grade.score,
+                "reason": grade.reason,
+            }
+            for grade in judgment.verdict.grades
         ],
     }
 
