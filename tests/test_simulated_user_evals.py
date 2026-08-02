@@ -571,8 +571,8 @@ class SimulatedConversationReportTest(unittest.TestCase):
             self.assertIsNone(json.loads(paths.json.read_text(encoding="utf-8"))["passed"])
 
     def test_history_groups_multiple_runs_under_their_day(self) -> None:
-        day_one = datetime(2026, 8, 1, 10, 0, tzinfo=timezone.utc)
-        day_two_first = datetime(2026, 8, 2, 10, 0, tzinfo=timezone.utc)
+        day_one = datetime(2026, 8, 1, 18, 29, tzinfo=timezone.utc)
+        day_two_first = datetime(2026, 8, 1, 18, 31, tzinfo=timezone.utc)
         day_two_second = datetime(2026, 8, 2, 11, 0, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as directory:
             for timestamp in (day_one, day_two_first, day_two_second):
@@ -589,6 +589,7 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertEqual(history.count("## 2026-08-01"), 1)
         self.assertEqual(history.count("## 2026-08-02"), 1)
         self.assertEqual(history.count("| PENDING INDEPENDENT JUDGE |"), 3)
+        self.assertIn("| Time (IST) |", history)
         self.assertNotIn("Open report", history)
 
     def test_terminal_distinguishes_conversation_and_user_judgment(self) -> None:

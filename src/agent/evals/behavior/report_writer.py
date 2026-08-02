@@ -6,8 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from agent.evals.behavior.live_reporter import LiveRunStats
+
+REPORT_TIMEZONE = ZoneInfo("Asia/Kolkata")
 
 
 @dataclass(frozen=True)
@@ -309,20 +312,21 @@ def _calibration_failure_reason(case: dict[str, Any]) -> str:
 
 
 def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
-    scope = "calibration"
-    scenarios = payload.get("scenarios") or []
-    conversations = payload.get("conversations") or []
-    if len(conversations) == 1:
-        scope = conversations[0]["scenario_id"]
-    elif len(scenarios) == 1:
-        scope = scenarios[0]["scenario_id"]
-    elif len(scenarios) > 1:
-        scope = payload.get("suite_name") or "behavior_suite"
-    companion = payload.get("companion") or {}
-    model = companion.get("model") or "provider-default"
-    status = _result_label(payload).casefold()
-    stamp = timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d_%H%M%S_%fZ")[:-4] + "Z"
-    return "__".join((_slug(stamp), _slug(scope), _slug(str(model)), status))
+    local_time = timestamp.astimezone(REPORT_TIMEZONE)
+    stamp = local_time.strftime("%H%M%S_%f")[:-3]
+    stage = {
+        "behavior_evaluation": "behavior",
+        "simulated_conversation": "simulated",
+        "judge_calibration": "calibration",
+        "execution_error": "error",
+    }.get(str(payload.get("stage") or ""), "evaluation")
+    status = {
+        "PENDING INDEPENDENT JUDGE": "pending",
+        "UNSCORED": "unscored",
+        "PASS": "pass",
+        "FAIL": "fail",
+    }[_result_label(payload)]
+    return f"{stamp}__{stage}__{status}"
 
 
 def _append_history(
@@ -359,7 +363,7 @@ def _append_history(
     )
     section_header = f"## {day}"
     table_header = (
-        "| Time (UTC) | Result | Stage | Companion | Score | Passed |\n"
+        "| Time (IST) | Result | Stage | Companion | Score | Passed |\n"
         "| --- | --- | --- | --- | --- | --- |"
     )
     if section_header not in existing:
@@ -393,17 +397,12 @@ def _history_score(payload: dict[str, Any]) -> str:
 
 
 def _history_day(timestamp: datetime) -> str:
-    return timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    return timestamp.astimezone(REPORT_TIMEZONE).strftime("%Y-%m-%d")
 
 
 def _history_time(value: Any, fallback: datetime) -> str:
-    try:
-        parsed = datetime.fromisoformat(str(value))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-    except (TypeError, ValueError):
-        parsed = fallback
-    return parsed.astimezone(timezone.utc).strftime("%H:%M:%S")
+    parsed = _parse_datetime(value) or fallback
+    return parsed.astimezone(REPORT_TIMEZONE).strftime("%H:%M:%S")
 
 
 def _write_text_atomic(path: Path, content: str) -> None:
@@ -422,9 +421,25 @@ def _slug(value: str) -> str:
 
 
 def _display_time(value: Any) -> str:
-    if not value:
-        return "unknown"
-    return str(value).replace("T", " ").replace("+00:00", " UTC")
+    parsed = _parse_datetime(value)
+    return (
+        parsed.astimezone(REPORT_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S IST")
+        if parsed
+        else "unknown"
+    )
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    elif value:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
 
 
 def _table_text(value: str) -> str:

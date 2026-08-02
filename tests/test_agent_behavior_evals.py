@@ -986,10 +986,10 @@ class HumanReadableReportingTest(unittest.TestCase):
             saved_json = json.loads(paths.json.read_text(encoding="utf-8"))
             history = paths.history.read_text(encoding="utf-8")
 
-        self.assertIn("2026-08-01", paths.markdown.name)
         self.assertEqual(paths.markdown.parent.name, "2026-08-01")
         self.assertEqual(paths.json.parent.name, "2026-08-01")
-        self.assertIn("listen-without-advice-or-questions", paths.markdown.name)
+        self.assertEqual(paths.markdown.name, "180000_000__behavior__fail.md")
+        self.assertNotIn("meta-llama", paths.markdown.name)
         self.assertIn("## Simple summary", markdown)
         self.assertIn("The companion passed 0 scenarios and failed 1", markdown)
         self.assertIn("**User:** Please just listen.", markdown)
@@ -997,6 +997,7 @@ class HumanReadableReportingTest(unittest.TestCase):
         self.assertIn("Model API calls:** 30", markdown)
         self.assertIn("**Companion agent:** Annie", markdown)
         self.assertIn("**Companion provider:** deepinfra", markdown)
+        self.assertIn("**Finished:** 2026-08-01 18:00:00 IST", markdown)
         self.assertIn(
             "**Companion model:** meta-llama/Llama-3.3-70B-Instruct-Turbo",
             markdown,
@@ -1004,7 +1005,7 @@ class HumanReadableReportingTest(unittest.TestCase):
         self.assertEqual(saved_json["run"]["api_calls"], 30)
         self.assertEqual(saved_json["companion"]["agent_name"], "Annie")
         self.assertIn("## 2026-08-01", history)
-        self.assertIn("| Time (UTC) | Result", history)
+        self.assertIn("| Time (IST) | Result", history)
         self.assertIn("| 2.0/4 |", history)
         self.assertNotIn("[Open report]", history)
 
