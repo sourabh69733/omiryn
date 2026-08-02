@@ -33,6 +33,7 @@ from agent.evals.behavior.simulated_runner import (  # noqa: E402
 from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
     SIMULATED_USER_SCENARIOS,
     get_simulated_user_scenario,
+    list_simulated_user_scenarios,
 )
 from agent.evals.behavior.simulated_judge import ProviderConversationJudge  # noqa: E402
 from agent.evals.behavior.simulated_user import ProviderSimulatedUser  # noqa: E402
@@ -81,6 +82,18 @@ def _parser() -> argparse.ArgumentParser:
         "--scenario",
         default=SIMULATED_USER_SCENARIOS[0].id,
         help="AI-user scenario id.",
+    )
+    parser.add_argument(
+        "--scenario-tag",
+        action="append",
+        dest="scenario_tags",
+        default=None,
+        help="Filter --list-scenarios by tag. Repeat to require multiple tags.",
+    )
+    parser.add_argument(
+        "--list-scenarios",
+        action="store_true",
+        help="List available AI-user scenarios and exit without model calls.",
     )
     parser.add_argument(
         "--max-turns",
@@ -196,9 +209,33 @@ def _output_dir(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
+def _print_scenarios(*, tags: tuple[str, ...]) -> None:
+    scenarios = list_simulated_user_scenarios(tags=tags)
+    if not scenarios:
+        selected = ", ".join(tags) or "none"
+        print(f"No AI-user scenarios matched tags: {selected}")
+        return
+    print("Available AI-user scenarios:")
+    for scenario in scenarios:
+        profile = scenario.user_profile
+        print(
+            "- "
+            f"{scenario.id} | gender={profile.get('gender', 'unknown')} | "
+            f"language={profile.get('language_style', 'unknown')} | "
+            f"turns={scenario.minimum_turns}-{scenario.maximum_turns} | "
+            f"tags={','.join(scenario.tags)}"
+        )
+        print(f"  {scenario.description}")
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
+    if args.list_scenarios:
+        _print_scenarios(tags=tuple(args.scenario_tags or ()))
+        return 0
+    if args.scenario_tags:
+        parser.error("--scenario-tag is only supported with --list-scenarios for now.")
     if args.no_save and args.output:
         parser.error("--no-save cannot be combined with --output.")
     reporter = TerminalProgressReporter(enabled=not args.quiet)
