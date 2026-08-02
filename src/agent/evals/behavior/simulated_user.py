@@ -41,6 +41,7 @@ class SimulatedUserScenario:
     persona: str
     goal: str
     user_profile: dict[str, Any]
+    tags: tuple[str, ...] = ()
     minimum_turns: int = 3
     maximum_turns: int = 6
     mock_messages: tuple[str, ...] = ()
@@ -50,6 +51,8 @@ class SimulatedUserScenario:
             raise ValueError("Simulated-user scenario id is required.")
         if not self.description.strip() or not self.persona.strip() or not self.goal.strip():
             raise ValueError(f"Simulated-user scenario '{self.id}' is incomplete.")
+        if any(not tag.strip() for tag in self.tags) or len(self.tags) != len(set(self.tags)):
+            raise ValueError(f"Simulated-user scenario '{self.id}' has invalid tags.")
         if self.minimum_turns < 1:
             raise ValueError("minimum_turns must be at least 1.")
         if self.maximum_turns < self.minimum_turns:

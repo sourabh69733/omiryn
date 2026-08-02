@@ -26,7 +26,9 @@ SIMULATED_USER_SCENARIOS = (
             "gender": "unknown",
             "interested_in": "unknown",
             "location": "India",
+            "language_style": "hinglish",
         },
+        tags=("backbone", "india", "hinglish", "gender_unknown"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
@@ -57,6 +59,7 @@ SIMULATED_USER_SCENARIOS = (
             "location": "India",
             "language_style": "hinglish",
         },
+        tags=("backbone", "india", "hinglish", "male"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
@@ -87,6 +90,7 @@ SIMULATED_USER_SCENARIOS = (
             "location": "India",
             "language_style": "english",
         },
+        tags=("backbone", "india", "english", "female"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
@@ -96,6 +100,20 @@ SIMULATED_USER_SCENARIOS = (
         ),
     ),
 )
+
+
+def list_simulated_user_scenarios(
+    *,
+    tags: tuple[str, ...] = (),
+) -> tuple[SimulatedUserScenario, ...]:
+    if not tags:
+        return SIMULATED_USER_SCENARIOS
+    required = {tag.strip().casefold() for tag in tags if tag.strip()}
+    return tuple(
+        scenario
+        for scenario in SIMULATED_USER_SCENARIOS
+        if required.issubset({tag.casefold() for tag in scenario.tags})
+    )
 
 
 def get_simulated_user_scenario(scenario_id: str) -> SimulatedUserScenario:
