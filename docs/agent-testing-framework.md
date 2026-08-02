@@ -9,6 +9,7 @@ Current priority: make companion behavior measurable before adding more behavior
 - An independent transcript judge reviews the full conversation separately.
 - Consensus fails unless the AI user and independent judge both pass.
 - Reports are written in simple Markdown plus full JSON under day-wise IST folders.
+- Simulated scenarios can be listed and filtered by tags before running model calls.
 
 ## Scenario Matrix
 
@@ -16,6 +17,7 @@ Phase 3 starts small:
 
 - User identity coverage: male and female Indian user scenarios.
 - Language coverage: English and Hinglish scenarios.
+- Scenario tags for discoverability: `backbone`, `india`, `english`, `hinglish`, `male`, `female`.
 
 Later scenario categories:
 
