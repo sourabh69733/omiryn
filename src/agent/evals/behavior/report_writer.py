@@ -202,20 +202,37 @@ def _scenario_markdown(scenario: dict[str, Any]) -> list[str]:
 def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
     simulated_user = payload.get("simulated_user") or {}
     judgment = payload.get("user_judgment") or {}
+    independent_judgments = payload.get("independent_judgments") or []
+    consensus = payload.get("consensus") or {}
     user_status = "PASS" if judgment.get("passed") else "FAIL"
     continuation = "yes" if judgment.get("would_continue") else "no"
+    consensus_status = _result_label(payload)
     lines = [
         "## AI user",
         "",
         f"**Model:** {simulated_user.get('provider', 'unknown')} / "
         f"{simulated_user.get('model', 'provider-default')}",
         "",
-        "## AI-user verdict",
+        "## Consensus",
         "",
-        f"**User verdict:** {user_status}",
-        f"**Average score:** {judgment.get('average_score', 0):.1f}/4",
-        f"**Would continue chatting:** {continuation}",
+        f"**Final verdict:** {consensus_status}",
+        f"**Voices passed:** {consensus.get('passing_voices', 0)}/"
+        f"{consensus.get('total_voices', 0)}",
+        f"**Consensus score:** {_score_text(consensus.get('average_score'))}",
+        f"**Reason:** {consensus.get('reason', 'not provided')}",
     ]
+    for disagreement in consensus.get("disagreements", []):
+        lines.append(f"- Disagreement: {disagreement}")
+    lines.extend(
+        [
+            "",
+            "## AI-user verdict",
+            "",
+            f"**User verdict:** {user_status}",
+            f"**Average score:** {judgment.get('average_score', 0):.1f}/4",
+            f"**Would continue chatting:** {continuation}",
+        ]
+    )
     for dimension in judgment.get("dimensions", []):
         lines.append(
             f"- {_plain_name(dimension['dimension_id'])}: {dimension['score']}/4 — "
@@ -228,6 +245,32 @@ def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
             f"**Biggest problem:** {judgment.get('biggest_problem', 'not provided')}",
         ]
     )
+    if independent_judgments:
+        lines.extend(["", "## Independent judge verdicts"])
+        for item in independent_judgments:
+            status = "PASS" if item.get("passed") else "FAIL"
+            lines.extend(
+                [
+                    "",
+                    f"### {item.get('judge_name', 'Independent judge')} — {status}",
+                    "",
+                    f"**Average score:** {_score_text(item.get('average_score'))}",
+                    f"**Would continue chatting:** {'yes' if item.get('would_continue') else 'no'}",
+                ]
+            )
+            if item.get("error"):
+                lines.append(f"**Judge error:** {item['error']}")
+            for dimension in item.get("dimensions", []):
+                lines.append(
+                    f"- {_plain_name(dimension['dimension_id'])}: {dimension['score']}/4 — "
+                    f"{dimension['reason']}"
+                )
+            lines.extend(
+                [
+                    f"**Overall reason:** {item.get('overall_reason', 'not provided')}",
+                    f"**Biggest problem:** {item.get('biggest_problem', 'not provided')}",
+                ]
+            )
     for conversation in payload.get("conversations", []):
         lines.extend(
             [
@@ -269,7 +312,7 @@ def _simple_summary(payload: dict[str, Any]) -> str:
         return (
             f"An AI model acted as the user for {turn_count} conversation turns and judged "
             f"the experience {user_status} ({judgment.get('average_score', 0):.1f}/4). "
-            "The final result is pending an independent judge."
+            f"The consensus result is {_result_label(payload)}."
         )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
@@ -289,9 +332,9 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             else "The judges are ready for a companion evaluation run."
         )
     if payload.get("stage") == "simulated_conversation":
-        return (
-            "The AI-user verdict reflects the simulated user's experience, but it is not the final "
-            "release verdict. An independent judge must review the conversation next."
+        return (payload.get("consensus") or {}).get(
+            "reason",
+            "The simulated conversation was judged by the available evaluation voices.",
         )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
@@ -384,7 +427,9 @@ def _append_history(
 
 def _history_score(payload: dict[str, Any]) -> str:
     if payload.get("stage") == "simulated_conversation":
-        score = (payload.get("user_judgment") or {}).get("average_score")
+        score = (payload.get("consensus") or {}).get("average_score")
+        if not isinstance(score, (int, float)):
+            score = (payload.get("user_judgment") or {}).get("average_score")
         return f"{score:.1f}/4" if isinstance(score, (int, float)) else "—"
     scores = [
         grade.get("weighted_score")
@@ -455,3 +500,7 @@ def _result_label(payload: dict[str, Any]) -> str:
     if payload.get("passed") is None:
         return "UNSCORED"
     return "PASS" if payload.get("passed") else "FAIL"
+
+
+def _score_text(value: Any) -> str:
+    return f"{value:.1f}/4" if isinstance(value, (int, float)) else "not available"

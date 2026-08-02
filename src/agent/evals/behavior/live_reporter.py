@@ -123,6 +123,23 @@ def _render_event(event: EvalEvent) -> str | None:
                 f"{dimension['score']}/4 — {dimension['reason']}"
             )
         return "\n".join(lines)
+    if event.kind == "independent_judgment_started":
+        return f"    {data['judge_name']} is reviewing the full conversation..."
+    if event.kind == "independent_judgment_completed":
+        status = "PASS" if data["passed"] else "FAIL"
+        continuation = "yes" if data["would_continue"] else "no"
+        lines = [
+            f"    {data['judge_name']} verdict: {status} — "
+            f"{data['average_score']:.1f}/4, would continue: {continuation}"
+        ]
+        for dimension in data.get("dimensions", []):
+            lines.append(
+                f"      {_plain_name(dimension['dimension_id'])}: "
+                f"{dimension['score']}/4 — {dimension['reason']}"
+            )
+        return "\n".join(lines)
+    if event.kind == "independent_judgment_failed":
+        return f"    {data['judge_name']} failed: {data['error']}"
     if event.kind == "sample_started":
         return f"  Conversation {data['sample_number']}/{data['sample_count']}"
     if event.kind == "user_turn":
@@ -162,9 +179,11 @@ def _render_event(event: EvalEvent) -> str | None:
             f"{data['scenario_passed']}/{data['scenario_total']} scenarios passed."
         )
     if event.kind == "simulated_conversation_completed":
+        passed = data.get("passed")
+        status = "PENDING independent judge" if passed is None else ("PASS" if passed else "FAIL")
         return (
             f"\nConversation captured: {data['turn_count']} turns. "
-            "Overall result: PENDING independent judge."
+            f"Consensus result: {status}."
         )
     return None
 
