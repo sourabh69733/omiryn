@@ -30,7 +30,10 @@ from agent.evals.behavior.simulated_judge import (
     build_independent_judge_request,
     parse_independent_judge_verdict,
 )
-from agent.evals.behavior.simulated_scenarios import SIMULATED_USER_SCENARIOS
+from agent.evals.behavior.simulated_scenarios import (
+    SIMULATED_USER_SCENARIOS,
+    list_simulated_user_scenarios,
+)
 from agent.evals.behavior.simulated_user import (
     ProviderSimulatedUser,
     SimulatedUserDecision,
@@ -814,6 +817,18 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("female", genders)
         self.assertIn("hinglish", language_styles)
         self.assertIn("english", language_styles)
+        self.assertTrue(all(scenario.tags for scenario in SIMULATED_USER_SCENARIOS))
+
+    def test_simulated_scenario_tag_filtering_is_conjunctive(self) -> None:
+        hinglish = list_simulated_user_scenarios(tags=("hinglish",))
+        male_hinglish = list_simulated_user_scenarios(tags=("male", "hinglish"))
+        no_match = list_simulated_user_scenarios(tags=("female", "hinglish"))
+
+        self.assertGreaterEqual(len(hinglish), 2)
+        self.assertEqual([scenario.id for scenario in male_hinglish], [
+            "frustrated_man_hinglish_tests_backbone"
+        ])
+        self.assertEqual(no_match, ())
 
 
 class SimulatedConversationCliTest(unittest.TestCase):
@@ -861,6 +876,21 @@ class SimulatedConversationCliTest(unittest.TestCase):
             self.assertTrue(list(day_directories[0].glob("*.md")))
             self.assertTrue(list(day_directories[0].glob("*.json")))
             self.assertTrue((Path(directory) / "HISTORY.md").exists())
+
+    def test_cli_lists_scenarios_without_running_models(self) -> None:
+        result = self._run_cli("--list-scenarios", "--scenario-tag", "male")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Available AI-user scenarios", result.stdout)
+        self.assertIn("frustrated_man_hinglish_tests_backbone", result.stdout)
+        self.assertIn("gender=male", result.stdout)
+        self.assertNotIn("AI-user scenario:", result.stderr)
+
+    def test_cli_rejects_scenario_tag_without_listing(self) -> None:
+        result = self._run_cli("--scenario-tag", "male", "--no-save")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--scenario-tag is only supported with --list-scenarios", result.stderr)
 
 
 if __name__ == "__main__":
