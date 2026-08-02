@@ -23,4 +23,7 @@ build/
 data/
 backups/
 .vscode
-reports/evals/*.json
+# Evaluation artifacts stay local; only the compact history is versioned.
+reports/**
+!reports/evals/
+!reports/evals/HISTORY.md
