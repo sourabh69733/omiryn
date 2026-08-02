@@ -34,6 +34,7 @@ from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
     SIMULATED_USER_SCENARIOS,
     get_simulated_user_scenario,
 )
+from agent.evals.behavior.simulated_judge import ProviderConversationJudge  # noqa: E402
 from agent.evals.behavior.simulated_user import ProviderSimulatedUser  # noqa: E402
 from agent.runtime.providers.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
@@ -99,6 +100,31 @@ def _parser() -> argparse.ArgumentParser:
         default=int(os.getenv("AGENT_EVAL_USER_MAX_ATTEMPTS", "3")),
         help="Maximum AI-user attempts for transient failures (default: 3).",
     )
+    parser.add_argument(
+        "--judge-provider",
+        default=os.getenv("AGENT_EVAL_JUDGE_PROVIDER"),
+        choices=EVAL_PROVIDER_NAMES,
+        help="Provider for independent transcript judge. Defaults to --user-provider.",
+    )
+    parser.add_argument(
+        "--judge-model",
+        action="append",
+        dest="judge_models",
+        default=None,
+        help="Independent transcript judge model. Repeat to run multiple independent judges.",
+    )
+    parser.add_argument(
+        "--judge-timeout-seconds",
+        type=float,
+        default=float(os.getenv("AGENT_EVAL_JUDGE_TIMEOUT_SECONDS", "120")),
+        help="Timeout for each independent judge attempt (default: 120 seconds).",
+    )
+    parser.add_argument(
+        "--judge-max-attempts",
+        type=int,
+        default=int(os.getenv("AGENT_EVAL_JUDGE_MAX_ATTEMPTS", "3")),
+        help="Maximum independent judge attempts for transient failures (default: 3).",
+    )
     parser.add_argument("--reset", action="store_true", help="Reset the evaluation database.")
     parser.add_argument(
         "--output-dir",
@@ -132,6 +158,17 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         max_attempts=args.user_max_attempts,
         event_sink=reporter,
     )
+    judge_provider = args.judge_provider or args.user_provider
+    independent_judges = tuple(
+        ProviderConversationJudge(
+            provider=judge_provider,
+            model=model,
+            timeout_seconds=args.judge_timeout_seconds,
+            max_attempts=args.judge_max_attempts,
+            event_sink=reporter,
+        )
+        for model in (args.judge_models or [None])
+    )
     result = await run_simulated_conversation(
         scenario=scenario,
         simulated_user=simulated_user,
@@ -141,6 +178,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             prompt_version=args.prompt_version,
             agent_name=args.agent_name,
         ),
+        independent_judges=independent_judges,
         event_sink=reporter,
     )
     return simulated_conversation_payload(
@@ -177,6 +215,13 @@ def main() -> int:
                 "provider": args.user_provider,
                 "model": _resolved_model(args.user_provider, args.user_model),
             },
+            "independent_judges": [
+                {
+                    "provider": args.judge_provider or args.user_provider,
+                    "model": _resolved_model(args.judge_provider or args.user_provider, model),
+                }
+                for model in (args.judge_models or [None])
+            ],
         }
     attach_run_metadata(
         payload,
@@ -210,9 +255,12 @@ def main() -> int:
         turns = sum(len(item["turns"]) for item in payload["conversations"])
         judgment = payload["user_judgment"]
         user_status = "PASS" if judgment["passed"] else "FAIL"
+        consensus = payload.get("consensus") or {}
+        consensus_status = "PASS" if consensus.get("passed") else "FAIL"
         print(
             f"AI-user conversation: {turns} turns; user verdict {user_status} "
-            f"({judgment['average_score']:.1f}/4); overall PENDING independent judge"
+            f"({judgment['average_score']:.1f}/4); consensus {consensus_status} "
+            f"({consensus.get('passing_voices', 0)}/{consensus.get('total_voices', 0)} voices)"
         )
     return 0
 
