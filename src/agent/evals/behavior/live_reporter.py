@@ -89,6 +89,15 @@ def _render_event(event: EvalEvent) -> str | None:
             f"\nAI-user scenario: {_plain_name(data['scenario_id'])} "
             f"(up to {data['maximum_turns']} turns)"
         )
+    if event.kind == "conversation_judge_calibration_started":
+        return f"\nChecking conversation judges with {data['total_cases']} known transcripts..."
+    if event.kind == "conversation_judge_calibration_completed":
+        status = "PASSED" if data["passed"] else "FAILED"
+        return (
+            f"Conversation judge calibration {status}: "
+            f"{data['completed_cases']} checks, {data['failed_cases']} failed, "
+            f"{data['judge_errors']} errors."
+        )
     if event.kind == "simulated_user_call_started":
         activities = {
             "judgment": "judging the conversation",

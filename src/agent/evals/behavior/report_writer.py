@@ -112,6 +112,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         lines.extend(_simulated_conversations_markdown(payload))
     elif payload.get("stage") == "simulated_conversation_suite":
         lines.extend(_simulated_conversation_suite_markdown(payload))
+    elif payload.get("stage") == "conversation_judge_calibration":
+        lines.extend(_conversation_judge_calibration_markdown(payload))
     else:
         lines.extend(
             [
@@ -136,6 +138,10 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
 
     for scenario in payload.get("scenarios", []):
         lines.extend(_scenario_markdown(scenario))
+
+    if payload.get("stage") in {"simulated_conversation", "simulated_conversation_suite"}:
+        lines.extend(_improvement_targets_markdown(payload))
+        lines.extend(_human_review_markdown(payload))
 
     lines.extend(
         [
@@ -329,6 +335,70 @@ def _simulated_conversation_suite_markdown(payload: dict[str, Any]) -> list[str]
     return lines
 
 
+def _conversation_judge_calibration_markdown(payload: dict[str, Any]) -> list[str]:
+    calibration = payload.get("conversation_judge_calibration") or {}
+    lines = [
+        "## Conversation judge calibration",
+        "",
+        (
+            f"Completed {calibration.get('completed_cases', 0)}/"
+            f"{calibration.get('total_cases', 0)} known transcript checks."
+        ),
+        f"**Failed cases:** {calibration.get('failed_cases', 0)}",
+        f"**Judge errors:** {calibration.get('judge_errors', 0)}",
+    ]
+    for case in calibration.get("cases", []):
+        status = "PASS" if case.get("passed") else "FAIL"
+        lines.extend(
+            [
+                "",
+                f"- **{_plain_name(case.get('id', 'unknown'))}:** {status}; "
+                f"expected={'PASS' if case.get('expected_pass') else 'FAIL'}, "
+                f"observed={'PASS' if case.get('observed_pass') else 'FAIL'}",
+            ]
+        )
+        if case.get("error"):
+            lines.append(f"  Error: {case['error']}")
+        if case.get("reason"):
+            lines.append(f"  Why this matters: {case['reason']}")
+    return lines
+
+
+def _improvement_targets_markdown(payload: dict[str, Any]) -> list[str]:
+    targets = payload.get("improvement_targets") or []
+    lines = ["", "## Improvement targets", ""]
+    if not targets:
+        lines.append("No improvement targets were generated from this run.")
+        return lines
+    for target in targets:
+        evidence = target.get("evidence") or {}
+        lines.extend(
+            [
+                (
+                    f"- **{_plain_name(target.get('dimension_id', 'overall'))}:** "
+                    f"{target.get('problem', 'No problem text provided')}"
+                ),
+                f"  Suggested area: {target.get('suggested_area', 'companion behavior')}",
+                f"  Scenario: {target.get('scenario_id', 'unknown')}",
+                f"  Evidence: user='{evidence.get('user_message', '')}' | "
+                f"companion='{evidence.get('assistant_reply', '')}'",
+            ]
+        )
+    return lines
+
+
+def _human_review_markdown(payload: dict[str, Any]) -> list[str]:
+    review = payload.get("human_review") or {}
+    return [
+        "",
+        "## Human review",
+        "",
+        f"**Status:** {review.get('status', 'pending')}",
+        "**Decision:** pending",
+        "**Reviewer notes:** not added",
+    ]
+
+
 def _simple_summary(payload: dict[str, Any]) -> str:
     if payload.get("stage") == "execution_error":
         return f"The evaluation stopped because of a technical error: {payload['execution_error']}"
@@ -357,6 +427,13 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             f"{summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed, "
             f"{summary.get('pending', 0)} pending. Average score: "
             f"{_score_text(summary.get('average_score'))}."
+        )
+    if payload.get("stage") == "conversation_judge_calibration":
+        calibration = payload.get("conversation_judge_calibration") or {}
+        return (
+            "The independent full-conversation judges were checked against known good and "
+            f"bad transcripts. Failed cases: {calibration.get('failed_cases', 0)}; "
+            f"errors: {calibration.get('judge_errors', 0)}."
         )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
@@ -389,6 +466,12 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             f"Passed: {summary.get('passed', 0)}, failed: {summary.get('failed', 0)}, "
             f"pending: {summary.get('pending', 0)}."
         )
+    if payload.get("stage") == "conversation_judge_calibration":
+        return (
+            "The full-conversation judge calibration passed."
+            if payload.get("passed")
+            else "Do not trust full-conversation verdicts from this judge until calibration passes."
+        )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
     failed = [
@@ -414,6 +497,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "behavior_evaluation": "behavior",
         "simulated_conversation": "simulated",
         "simulated_conversation_suite": "sim_suite",
+        "conversation_judge_calibration": "conv_judge_calibration",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -450,8 +534,13 @@ def _append_history(
                 f"{payload.get('summary', {}).get('passed', 0)}/"
                 f"{payload.get('summary', {}).get('total', 0)} scenarios"
                 if payload.get("stage") == "simulated_conversation_suite"
-                else f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
-                f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
+                else (
+                    f"{payload.get('conversation_judge_calibration', {}).get('completed_cases', 0)}/"
+                    f"{payload.get('conversation_judge_calibration', {}).get('total_cases', 0)} checks"
+                    if payload.get("stage") == "conversation_judge_calibration"
+                    else f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
+                    f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
+                )
             )
         )
     )
