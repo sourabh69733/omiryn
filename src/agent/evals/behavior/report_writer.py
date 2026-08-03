@@ -110,6 +110,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     ]
     if payload.get("stage") == "simulated_conversation":
         lines.extend(_simulated_conversations_markdown(payload))
+    elif payload.get("stage") == "simulated_conversation_suite":
+        lines.extend(_simulated_conversation_suite_markdown(payload))
     else:
         lines.extend(
             [
@@ -293,6 +295,40 @@ def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _simulated_conversation_suite_markdown(payload: dict[str, Any]) -> list[str]:
+    summary = payload.get("summary") or {}
+    selection = payload.get("selection") or {}
+    lines = [
+        "## Suite summary",
+        "",
+        f"**Selected scenarios:** {summary.get('total', 0)}",
+        f"**Passed:** {summary.get('passed', 0)}",
+        f"**Failed:** {summary.get('failed', 0)}",
+        f"**Pending:** {summary.get('pending', 0)}",
+        f"**Average consensus score:** {_score_text(summary.get('average_score'))}",
+        f"**Selection:** {_suite_selection_text(selection)}",
+    ]
+    for conversation in payload.get("conversations", []):
+        status = _result_label(conversation)
+        consensus = conversation.get("consensus") or {}
+        scenario_id = (conversation.get("conversations") or [{}])[0].get(
+            "scenario_id",
+            "unknown",
+        )
+        lines.extend(
+            [
+                "",
+                f"## Scenario: {_plain_name(scenario_id)}",
+                "",
+                f"**Result:** {status}",
+                f"**Consensus score:** {_score_text(consensus.get('average_score'))}",
+                f"**Reason:** {consensus.get('reason', 'not provided')}",
+            ]
+        )
+        lines.extend(_simulated_conversations_markdown(conversation))
+    return lines
+
+
 def _simple_summary(payload: dict[str, Any]) -> str:
     if payload.get("stage") == "execution_error":
         return f"The evaluation stopped because of a technical error: {payload['execution_error']}"
@@ -313,6 +349,14 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             f"An AI model acted as the user for {turn_count} conversation turns and judged "
             f"the experience {user_status} ({judgment.get('average_score', 0):.1f}/4). "
             f"The consensus result is {_result_label(payload)}."
+        )
+    if payload.get("stage") == "simulated_conversation_suite":
+        summary = payload.get("summary") or {}
+        return (
+            f"The simulated suite ran {summary.get('total', 0)} scenarios: "
+            f"{summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed, "
+            f"{summary.get('pending', 0)} pending. Average score: "
+            f"{_score_text(summary.get('average_score'))}."
         )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
@@ -335,6 +379,15 @@ def _bottom_line(payload: dict[str, Any]) -> str:
         return (payload.get("consensus") or {}).get(
             "reason",
             "The simulated conversation was judged by the available evaluation voices.",
+        )
+    if payload.get("stage") == "simulated_conversation_suite":
+        summary = payload.get("summary") or {}
+        if payload.get("passed"):
+            return "Every selected simulated conversation passed consensus."
+        return (
+            "At least one selected simulated conversation failed or is pending. "
+            f"Passed: {summary.get('passed', 0)}, failed: {summary.get('failed', 0)}, "
+            f"pending: {summary.get('pending', 0)}."
         )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
@@ -360,6 +413,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
     stage = {
         "behavior_evaluation": "behavior",
         "simulated_conversation": "simulated",
+        "simulated_conversation_suite": "sim_suite",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -392,8 +446,13 @@ def _append_history(
         else (
             f"{sum(len(item.get('turns', [])) for item in payload.get('conversations', []))} turns"
             if payload.get("stage") == "simulated_conversation"
-            else f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
-            f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
+            else (
+                f"{payload.get('summary', {}).get('passed', 0)}/"
+                f"{payload.get('summary', {}).get('total', 0)} scenarios"
+                if payload.get("stage") == "simulated_conversation_suite"
+                else f"{payload.get('judge_calibration', {}).get('completed_cases', 0)}/"
+                f"{payload.get('judge_calibration', {}).get('total_cases', 0)} judge checks"
+            )
         )
     )
     day = _history_day(timestamp)
@@ -426,6 +485,9 @@ def _append_history(
 
 
 def _history_score(payload: dict[str, Any]) -> str:
+    if payload.get("stage") == "simulated_conversation_suite":
+        score = (payload.get("summary") or {}).get("average_score")
+        return f"{score:.1f}/4" if isinstance(score, (int, float)) else "—"
     if payload.get("stage") == "simulated_conversation":
         score = (payload.get("consensus") or {}).get("average_score")
         if not isinstance(score, (int, float)):
@@ -504,3 +566,14 @@ def _result_label(payload: dict[str, Any]) -> str:
 
 def _score_text(value: Any) -> str:
     return f"{value:.1f}/4" if isinstance(value, (int, float)) else "not available"
+
+
+def _suite_selection_text(selection: dict[str, Any]) -> str:
+    scenarios = selection.get("scenario_ids") or []
+    tags = selection.get("tags") or []
+    parts = []
+    if tags:
+        parts.append("tags=" + ",".join(str(tag) for tag in tags))
+    if scenarios:
+        parts.append("scenarios=" + ",".join(str(item) for item in scenarios))
+    return "; ".join(parts) if parts else "default scenario"
