@@ -30,6 +30,7 @@ from agent.evals.behavior.simulated_judge import (
     ProviderConversationJudge,
     build_independent_judge_request,
     parse_independent_judge_verdict,
+    run_conversation_judge_calibration,
 )
 from agent.evals.behavior.simulated_scenarios import (
     SIMULATED_USER_SCENARIOS,
@@ -137,6 +138,16 @@ class BrokenConversationJudge:
 
     async def judge_conversation(self, **_kwargs):
         raise TimeoutError("slow")
+
+
+class CalibratedConversationJudge:
+    @property
+    def judge_name(self) -> str:
+        return "calibrated judge"
+
+    async def judge_conversation(self, *, conversation_id, **_kwargs):
+        passed = conversation_id.endswith("accept_warm_specific_backbone")
+        return user_verdict(passed=passed)
 
 
 class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
@@ -489,6 +500,19 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[0][2]["request_kind"], "behavior_eval_conversation_judge")
         self.assertEqual(calls[1][2]["request_kind"], "behavior_eval_conversation_judge_repair")
 
+    async def test_conversation_judge_calibration_checks_known_good_and_bad_transcripts(self) -> None:
+        payload = await run_conversation_judge_calibration((CalibratedConversationJudge(),))
+
+        self.assertEqual(payload["stage"], "conversation_judge_calibration")
+        self.assertTrue(payload["passed"])
+        calibration = payload["conversation_judge_calibration"]
+        self.assertEqual(calibration["completed_cases"], 2)
+        self.assertEqual(calibration["failed_cases"], 0)
+        self.assertEqual(
+            {case["id"] for case in calibration["cases"]},
+            {"reject_blind_agreement_to_hostility", "accept_warm_specific_backbone"},
+        )
+
 
 class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
     async def test_runner_alternates_using_the_growing_transcript(self) -> None:
@@ -699,6 +723,10 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("**Final verdict:** FAIL", markdown)
         self.assertIn("Independent judge deepinfra:judge-model", markdown)
         self.assertIn("Disagreement", markdown)
+        self.assertIn("## Improvement targets", markdown)
+        self.assertIn("warm disagreement and backbone", markdown)
+        self.assertIn("## Human review", markdown)
+        self.assertIn("**Status:** pending", markdown)
         self.assertNotIn("## Judge reliability check", markdown)
 
     def test_saved_report_and_history_preserve_consensus_status(self) -> None:
@@ -787,6 +815,8 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("## Suite summary", markdown)
         self.assertIn("**Selection:** tags=backbone", markdown)
         self.assertIn("Scenario: Frustrated man hinglish tests backbone", markdown)
+        self.assertIn("## Improvement targets", markdown)
+        self.assertIn("## Human review", markdown)
         with tempfile.TemporaryDirectory() as directory:
             paths = save_evaluation_reports(
                 payload,
@@ -896,6 +926,10 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("hinglish", language_styles)
         self.assertIn("english", language_styles)
         self.assertTrue(all(scenario.tags for scenario in SIMULATED_USER_SCENARIOS))
+        self.assertTrue(all("core_v1" in scenario.tags for scenario in SIMULATED_USER_SCENARIOS))
+        self.assertTrue(
+            all("release_gate" in scenario.tags for scenario in SIMULATED_USER_SCENARIOS)
+        )
 
     def test_simulated_scenario_tag_filtering_is_conjunctive(self) -> None:
         hinglish = list_simulated_user_scenarios(tags=("hinglish",))
@@ -985,6 +1019,13 @@ class SimulatedConversationCliTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("No AI-user scenarios matched tags: missing", result.stderr)
+
+    def test_cli_calibrates_conversation_judge_and_fails_closed_with_mock(self) -> None:
+        result = self._run_cli("--calibrate-conversation-judge", "--no-save")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Conversation judge calibration: FAIL", result.stdout)
+        self.assertIn("known transcripts", result.stderr)
 
 
 if __name__ == "__main__":
