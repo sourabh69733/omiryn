@@ -29,6 +29,7 @@ from agent.evals.behavior.runtime_driver import RuntimeDriverConfig  # noqa: E40
 from agent.evals.behavior.simulated_runner import (  # noqa: E402
     run_simulated_conversation,
     simulated_conversation_payload,
+    simulated_conversation_suite_payload,
 )
 from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
     SIMULATED_USER_SCENARIOS,
@@ -88,7 +89,10 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         dest="scenario_tags",
         default=None,
-        help="Filter --list-scenarios by tag. Repeat to require multiple tags.",
+        help=(
+            "Run all scenarios matching this tag, or filter --list-scenarios. "
+            "Repeat to require multiple tags."
+        ),
     )
     parser.add_argument(
         "--list-scenarios",
@@ -157,13 +161,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         reset_db()
     else:
         init_db()
-    scenario = get_simulated_user_scenario(args.scenario)
-    if args.max_turns is not None:
-        if args.max_turns < scenario.minimum_turns:
-            raise ValueError(
-                f"--max-turns must be at least {scenario.minimum_turns} for this scenario."
-            )
-        scenario = replace(scenario, maximum_turns=args.max_turns)
+    scenarios = _selected_scenarios(args)
     simulated_user = ProviderSimulatedUser(
         provider=args.user_provider,
         model=args.user_model,
@@ -182,23 +180,60 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         )
         for model in (args.judge_models or [None])
     )
-    result = await run_simulated_conversation(
-        scenario=scenario,
-        simulated_user=simulated_user,
-        companion=RuntimeDriverConfig(
-            provider=args.provider,
-            model=args.model,
-            prompt_version=args.prompt_version,
-            agent_name=args.agent_name,
-        ),
-        independent_judges=independent_judges,
-        event_sink=reporter,
+    companion = RuntimeDriverConfig(
+        provider=args.provider,
+        model=args.model,
+        prompt_version=args.prompt_version,
+        agent_name=args.agent_name,
     )
-    return simulated_conversation_payload(
-        result,
+    results = []
+    for scenario in scenarios:
+        results.append(
+            await run_simulated_conversation(
+                scenario=scenario,
+                simulated_user=simulated_user,
+                companion=companion,
+                independent_judges=independent_judges,
+                event_sink=reporter,
+            )
+        )
+    if len(results) == 1:
+        return simulated_conversation_payload(
+            results[0],
+            simulated_user_provider=args.user_provider,
+            simulated_user_model=_resolved_model(args.user_provider, args.user_model),
+        )
+    return simulated_conversation_suite_payload(
+        tuple(results),
         simulated_user_provider=args.user_provider,
         simulated_user_model=_resolved_model(args.user_provider, args.user_model),
+        selection={
+            "tags": list(args.scenario_tags or []),
+            "scenario_ids": [scenario.id for scenario in scenarios],
+        },
     )
+
+
+def _selected_scenarios(args: argparse.Namespace):
+    scenarios = (
+        list_simulated_user_scenarios(tags=tuple(args.scenario_tags or ()))
+        if args.scenario_tags
+        else (get_simulated_user_scenario(args.scenario),)
+    )
+    if not scenarios:
+        selected = ", ".join(args.scenario_tags or [])
+        raise ValueError(f"No AI-user scenarios matched tags: {selected}")
+    if args.max_turns is None:
+        return scenarios
+    selected = []
+    for scenario in scenarios:
+        if args.max_turns < scenario.minimum_turns:
+            raise ValueError(
+                f"--max-turns must be at least {scenario.minimum_turns} for scenario "
+                f"{scenario.id}."
+            )
+        selected.append(replace(scenario, maximum_turns=args.max_turns))
+    return tuple(selected)
 
 
 def _resolved_model(provider: str, model: str | None) -> str:
@@ -234,8 +269,6 @@ def main() -> int:
     if args.list_scenarios:
         _print_scenarios(tags=tuple(args.scenario_tags or ()))
         return 0
-    if args.scenario_tags:
-        parser.error("--scenario-tag is only supported with --list-scenarios for now.")
     if args.no_save and args.output:
         parser.error("--no-save cannot be combined with --output.")
     reporter = TerminalProgressReporter(enabled=not args.quiet)
@@ -289,17 +322,34 @@ def main() -> int:
         print(f"AI-user conversation stopped: {payload['execution_error']}")
         return 1
     else:
-        turns = sum(len(item["turns"]) for item in payload["conversations"])
-        judgment = payload["user_judgment"]
-        user_status = "PASS" if judgment["passed"] else "FAIL"
-        consensus = payload.get("consensus") or {}
-        consensus_status = "PASS" if consensus.get("passed") else "FAIL"
-        print(
-            f"AI-user conversation: {turns} turns; user verdict {user_status} "
-            f"({judgment['average_score']:.1f}/4); consensus {consensus_status} "
-            f"({consensus.get('passing_voices', 0)}/{consensus.get('total_voices', 0)} voices)"
-        )
+        print(_plain_summary(payload))
     return 0
+
+
+def _plain_summary(payload: dict) -> str:
+    if payload["stage"] == "simulated_conversation_suite":
+        summary = payload.get("summary") or {}
+        status = "PASS" if payload.get("passed") else "FAIL"
+        return (
+            f"AI-user suite: {summary.get('total', 0)} scenarios; consensus {status}; "
+            f"{summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed, "
+            f"{summary.get('pending', 0)} pending; average "
+            f"{_score_text(summary.get('average_score'))}"
+        )
+    turns = sum(len(item["turns"]) for item in payload["conversations"])
+    judgment = payload["user_judgment"]
+    user_status = "PASS" if judgment["passed"] else "FAIL"
+    consensus = payload.get("consensus") or {}
+    consensus_status = "PASS" if consensus.get("passed") else "FAIL"
+    return (
+        f"AI-user conversation: {turns} turns; user verdict {user_status} "
+        f"({judgment['average_score']:.1f}/4); consensus {consensus_status} "
+        f"({consensus.get('passing_voices', 0)}/{consensus.get('total_voices', 0)} voices)"
+    )
+
+
+def _score_text(value: object) -> str:
+    return f"{value:.1f}/4" if isinstance(value, (int, float)) else "not available"
 
 
 if __name__ == "__main__":

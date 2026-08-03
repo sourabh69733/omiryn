@@ -300,6 +300,57 @@ def simulated_conversation_payload(
     }
 
 
+def simulated_conversation_suite_payload(
+    results: tuple[SimulatedConversationResult, ...],
+    *,
+    simulated_user_provider: str,
+    simulated_user_model: str,
+    selection: dict[str, Any],
+) -> dict[str, Any]:
+    conversations = [
+        simulated_conversation_payload(
+            result,
+            simulated_user_provider=simulated_user_provider,
+            simulated_user_model=simulated_user_model,
+        )
+        for result in results
+    ]
+    passed_count = sum(payload.get("passed") is True for payload in conversations)
+    failed_count = sum(payload.get("passed") is False for payload in conversations)
+    pending_count = sum(payload.get("passed") is None for payload in conversations)
+    scores = [
+        (payload.get("consensus") or {}).get("average_score")
+        for payload in conversations
+        if isinstance((payload.get("consensus") or {}).get("average_score"), (int, float))
+    ]
+    judge_names = list(
+        dict.fromkeys(
+            judge
+            for payload in conversations
+            for judge in payload.get("judges", [])
+        )
+    )
+    return {
+        "stage": "simulated_conversation_suite",
+        "passed": bool(conversations) and failed_count == 0 and pending_count == 0,
+        "verdict": "suite_pass" if conversations and failed_count == 0 and pending_count == 0 else "suite_fail",
+        "selection": selection,
+        "simulated_user": {
+            "provider": simulated_user_provider,
+            "model": simulated_user_model,
+        },
+        "judges": judge_names,
+        "summary": {
+            "total": len(conversations),
+            "passed": passed_count,
+            "failed": failed_count,
+            "pending": pending_count,
+            "average_score": round(sum(scores) / len(scores), 3) if scores else None,
+        },
+        "conversations": conversations,
+    }
+
+
 async def _run_independent_judges(
     *,
     judges: tuple[ConversationJudge, ...],
