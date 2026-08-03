@@ -23,6 +23,7 @@ from agent.evals.behavior.runtime_driver import RuntimeDriverConfig
 from agent.evals.behavior.simulated_runner import (
     run_simulated_conversation,
     simulated_conversation_payload,
+    simulated_conversation_suite_payload,
 )
 from agent.evals.behavior.simulated_judge import (
     IndependentJudgment,
@@ -718,6 +719,83 @@ class SimulatedConversationReportTest(unittest.TestCase):
             self.assertIn("| 2.5/4 |", paths.history.read_text(encoding="utf-8"))
             self.assertFalse(json.loads(paths.json.read_text(encoding="utf-8"))["passed"])
 
+    def test_suite_report_summarizes_multiple_simulated_conversations(self) -> None:
+        first = SimpleNamespace(
+            scenario_id="frustrated_man_hinglish_tests_backbone",
+            stop_reason="ai_user_finished",
+            user_verdict=user_verdict(passed=False),
+            independent_judgments=(
+                IndependentJudgment(
+                    judge_name="Independent judge mock:provider-default",
+                    verdict=user_verdict(passed=False),
+                ),
+            ),
+            turns=(
+                SimpleNamespace(
+                    turn_index=0,
+                    user_message="fake lag rahe ho",
+                    assistant_reply="fair, that was vague",
+                ),
+            ),
+        )
+        second = SimpleNamespace(
+            scenario_id="frustrated_woman_english_tests_backbone",
+            stop_reason="ai_user_finished",
+            user_verdict=user_verdict(passed=True),
+            independent_judgments=(
+                IndependentJudgment(
+                    judge_name="Independent judge mock:provider-default",
+                    verdict=user_verdict(passed=True),
+                ),
+            ),
+            turns=(
+                SimpleNamespace(
+                    turn_index=0,
+                    user_message="You agree too quickly.",
+                    assistant_reply="I do not agree with that fully.",
+                ),
+            ),
+        )
+        payload = simulated_conversation_suite_payload(
+            (first, second),
+            simulated_user_provider="mock",
+            simulated_user_model="mock",
+            selection={
+                "tags": ["backbone"],
+                "scenario_ids": [first.scenario_id, second.scenario_id],
+            },
+        )
+        attach_run_metadata(
+            payload,
+            stats=LiveRunStats(
+                started_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+                finished_at=datetime(2026, 8, 1, 0, 1, tzinfo=timezone.utc),
+                duration_seconds=60,
+                api_calls=2,
+            ),
+            companion_provider="mock",
+            companion_model="mock",
+            prompt_version="v3",
+            companion_agent_name="Mira",
+        )
+        markdown = render_markdown_report(payload)
+
+        self.assertFalse(payload["passed"])
+        self.assertEqual(payload["summary"]["total"], 2)
+        self.assertEqual(payload["summary"]["passed"], 1)
+        self.assertEqual(payload["summary"]["failed"], 1)
+        self.assertIn("## Suite summary", markdown)
+        self.assertIn("**Selection:** tags=backbone", markdown)
+        self.assertIn("Scenario: Frustrated man hinglish tests backbone", markdown)
+        with tempfile.TemporaryDirectory() as directory:
+            paths = save_evaluation_reports(
+                payload,
+                output_dir=Path(directory),
+                now=datetime(2026, 8, 1, tzinfo=timezone.utc),
+            )
+            self.assertIn("sim_suite", paths.markdown.name)
+            self.assertIn("| 1/2 scenarios |", paths.history.read_text(encoding="utf-8"))
+
     def test_history_groups_multiple_runs_under_their_day(self) -> None:
         day_one = datetime(2026, 8, 1, 18, 29, tzinfo=timezone.utc)
         day_two_first = datetime(2026, 8, 1, 18, 31, tzinfo=timezone.utc)
@@ -886,11 +964,27 @@ class SimulatedConversationCliTest(unittest.TestCase):
         self.assertIn("gender=male", result.stdout)
         self.assertNotIn("AI-user scenario:", result.stderr)
 
-    def test_cli_rejects_scenario_tag_without_listing(self) -> None:
+    def test_cli_runs_scenario_batch_by_tag(self) -> None:
         result = self._run_cli("--scenario-tag", "male", "--no-save")
 
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AI-user conversation:", result.stdout)
+        self.assertIn("Frustrated man hinglish tests backbone", result.stderr)
+
+    def test_cli_runs_multi_scenario_batch_by_tag(self) -> None:
+        result = self._run_cli("--scenario-tag", "backbone", "--no-save")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AI-user suite: 3 scenarios", result.stdout)
+        self.assertIn("0 passed, 3 failed", result.stdout)
+        self.assertIn("Frustrated man hinglish tests backbone", result.stderr)
+        self.assertIn("Frustrated woman english tests backbone", result.stderr)
+
+    def test_cli_rejects_unknown_scenario_tag_for_run(self) -> None:
+        result = self._run_cli("--scenario-tag", "missing", "--no-save")
+
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--scenario-tag is only supported with --list-scenarios", result.stderr)
+        self.assertIn("No AI-user scenarios matched tags: missing", result.stderr)
 
 
 if __name__ == "__main__":
