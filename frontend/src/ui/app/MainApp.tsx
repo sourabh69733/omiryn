@@ -225,12 +225,9 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
   const [usageError, setUsageError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [floatingDayLabel, setFloatingDayLabel] = useState("");
-  const [floatingDayVisible, setFloatingDayVisible] = useState(false);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const floatingDayTimerRef = useRef<number | null>(null);
   const composerPauseTimerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
@@ -364,7 +361,6 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
 
   useEffect(() => {
     return () => {
-      if (floatingDayTimerRef.current !== null) window.clearTimeout(floatingDayTimerRef.current);
       if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
     };
   }, []);
@@ -390,36 +386,8 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     };
   }, [composerLimit]);
 
-  function updateFloatingDayOnScroll() {
-    const log = logRef.current;
-    if (!log || !conversation?.messages.length) return;
-    const logRect = log.getBoundingClientRect();
-    const rows = Array.from(log.querySelectorAll<HTMLElement>("[data-message-index]"));
-    const visibleRow = rows.find((row) => row.getBoundingClientRect().bottom > logRect.top + 24) || rows[0];
-    const index = Number(visibleRow?.dataset.messageIndex);
-    const message = Number.isFinite(index) ? conversation.messages[index] : null;
-    if (!message) return;
-    const dayKey = messageDateKey(message, index);
-    const visibleSeparator = log.querySelector<HTMLElement>(`[data-day-separator="${dayKey}"]`);
-    if (visibleSeparator) {
-      const separatorRect = visibleSeparator.getBoundingClientRect();
-      if (separatorRect.bottom > logRect.top && separatorRect.top < logRect.top + 64) {
-        setFloatingDayVisible(false);
-        return;
-      }
-    }
-    setFloatingDayLabel(messageDayLabel(message, index));
-    setFloatingDayVisible(true);
-    if (floatingDayTimerRef.current !== null) window.clearTimeout(floatingDayTimerRef.current);
-    floatingDayTimerRef.current = window.setTimeout(() => {
-      setFloatingDayVisible(false);
-      floatingDayTimerRef.current = null;
-    }, 2400);
-  }
-
   function handleChatScroll() {
     shouldStickToBottomRef.current = isLogNearBottom();
-    updateFloatingDayOnScroll();
   }
 
   async function sendMessage(event: FormEvent) {
@@ -619,15 +587,33 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
             </div>
           </div>
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
-            <div className={`floating-chat-date ${floatingDayVisible && floatingDayLabel ? "is-visible" : ""}`} aria-hidden="true"><span>{floatingDayLabel}</span></div>
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
             {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);
-              const previousDate = index > 0 ? messageDateKey(conversation.messages[index - 1], index - 1) : "";
-              return <Fragment key={index}>{currentDate !== previousDate ? <div className="chat-day-separator" role="separator" aria-label={messageDayLabel(message, index)} data-day-separator={currentDate}><span>{messageDayLabel(message, index)}</span></div> : null}<div className={`message-row ${agent ? "agent" : "user"}`} data-message-index={index}>{agent ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : null}<div className={`message ${agent ? "agent" : "user"}`}><div className="message-content">{message.content}</div><div className="message-meta"><time dateTime={message.created_at || undefined}>{messageTimeLabel(message, index)}</time></div></div>{!agent ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : null}</div></Fragment>;
+              const previous = index > 0 ? conversation.messages[index - 1] : null;
+              const next = index < conversation.messages.length - 1 ? conversation.messages[index + 1] : null;
+              const previousDate = previous ? messageDateKey(previous, index - 1) : "";
+              const nextDate = next ? messageDateKey(next, index + 1) : "";
+              const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
+              const sameAsNext = Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
+              const clusterClass = !sameAsPrevious && !sameAsNext ? "cluster-single" : !sameAsPrevious ? "cluster-start" : !sameAsNext ? "cluster-end" : "cluster-middle";
+              const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, index - 1, message, index) >= 20;
+              const showAvatar = !sameAsNext;
+              return (
+                <Fragment key={index}>
+                  {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
+                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""}`} id={`message-${index}`} data-message-index={index}>
+                    {agent ? showAvatar ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    <div className={`message ${agent ? "agent" : "user"}`}>
+                      <div className="message-content">{message.content}</div>
+                    </div>
+                    {!agent ? showAvatar ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                  </div>
+                </Fragment>
+              );
             })}
             {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
@@ -728,6 +714,29 @@ function messageDayLabel(message: Message, index: number) {
 
 function messageTimeLabel(message: Message, index: number) {
   return messageDate(message, index).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
+function minutesBetweenMessages(first: Message, firstIndex: number, second: Message, secondIndex: number) {
+  return Math.abs(messageDate(second, secondIndex).getTime() - messageDate(first, firstIndex).getTime()) / 60000;
+}
+
+function messageSessionLabel(message: Message, index: number) {
+  const date = messageDate(message, index);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const time = messageTimeLabel(message, index);
+  if (date.toDateString() === today.toDateString()) return time;
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;
+  const ageInDays = Math.floor((startOfDay(today).getTime() - startOfDay(date).getTime()) / 86400000);
+  if (ageInDays > 1 && ageInDays < 7) {
+    return `${date.toLocaleDateString("en-IN", { weekday: "long" })}, ${time}`;
+  }
+  return `${date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" })}, ${time}`;
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function titleize(value: string) {
