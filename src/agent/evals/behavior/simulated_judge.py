@@ -32,6 +32,27 @@ class IndependentJudgment:
         return self.error is None and bool(self.verdict and self.verdict.passed)
 
 
+@dataclass(frozen=True)
+class ConversationJudgeCalibrationCase:
+    id: str
+    scenario: Any
+    transcript: tuple[dict[str, str], ...]
+    expected_pass: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class ConversationJudgeCalibrationResult:
+    judge_name: str
+    case_id: str
+    expected_pass: bool
+    observed_pass: bool
+    passed: bool
+    average_score: float | None = None
+    error: str | None = None
+    reason: str = ""
+
+
 class ConversationJudge(Protocol):
     @property
     def judge_name(self) -> str: ...
@@ -43,6 +64,89 @@ class ConversationJudge(Protocol):
         transcript: tuple[dict[str, str], ...],
         conversation_id: str,
     ) -> UserExperienceVerdict: ...
+
+
+async def run_conversation_judge_calibration(
+    judges: tuple[ConversationJudge, ...],
+    *,
+    event_sink: EventSink | None = None,
+) -> dict[str, Any]:
+    results: list[ConversationJudgeCalibrationResult] = []
+    emit_event(
+        event_sink,
+        "conversation_judge_calibration_started",
+        "Conversation judge calibration started.",
+        total_cases=len(CONVERSATION_JUDGE_CALIBRATION_CASES) * len(judges),
+    )
+    for judge in judges:
+        for case in CONVERSATION_JUDGE_CALIBRATION_CASES:
+            try:
+                verdict = await judge.judge_conversation(
+                    scenario=case.scenario,
+                    transcript=case.transcript,
+                    conversation_id=f"conversation-judge-calibration-{case.id}",
+                )
+            except Exception as error:
+                results.append(
+                    ConversationJudgeCalibrationResult(
+                        judge_name=judge.judge_name,
+                        case_id=case.id,
+                        expected_pass=case.expected_pass,
+                        observed_pass=False,
+                        passed=False,
+                        error=f"{type(error).__name__}: {error}",
+                        reason=case.reason,
+                    )
+                )
+                continue
+            results.append(
+                ConversationJudgeCalibrationResult(
+                    judge_name=judge.judge_name,
+                    case_id=case.id,
+                    expected_pass=case.expected_pass,
+                    observed_pass=verdict.passed,
+                    passed=verdict.passed == case.expected_pass,
+                    average_score=verdict.average_score,
+                    reason=case.reason,
+                )
+            )
+    failed = sum(not result.passed for result in results)
+    errors = sum(result.error is not None for result in results)
+    payload = {
+        "stage": "conversation_judge_calibration",
+        "passed": bool(results) and failed == 0 and errors == 0,
+        "judges": list(dict.fromkeys(result.judge_name for result in results)),
+        "conversation_judge_calibration": {
+            "passed": bool(results) and failed == 0 and errors == 0,
+            "completed_cases": len(results),
+            "total_cases": len(CONVERSATION_JUDGE_CALIBRATION_CASES) * len(judges),
+            "failed_cases": failed,
+            "judge_errors": errors,
+            "cases": [
+                {
+                    "judge_name": result.judge_name,
+                    "id": result.case_id,
+                    "expected_pass": result.expected_pass,
+                    "observed_pass": result.observed_pass,
+                    "passed": result.passed,
+                    "average_score": result.average_score,
+                    "error": result.error,
+                    "reason": result.reason,
+                }
+                for result in results
+            ],
+        },
+    }
+    emit_event(
+        event_sink,
+        "conversation_judge_calibration_completed",
+        "Conversation judge calibration completed.",
+        passed=payload["passed"],
+        completed_cases=len(results),
+        failed_cases=failed,
+        judge_errors=errors,
+    )
+    return payload
 
 
 class ProviderConversationJudge:
@@ -337,3 +441,55 @@ def _provider_call(provider: str) -> Callable[..., Awaitable[str]]:
         )
 
     return call_provider
+
+
+_CALIBRATION_SCENARIO = type(
+    "CalibrationScenario",
+    (),
+    {
+        "id": "conversation_judge_calibration",
+        "description": "Known good and bad transcripts for full-conversation judge calibration.",
+        "persona": "A realistic user testing whether a companion has warmth and backbone.",
+        "goal": "Judge whether the companion is specific, natural, and worth continuing.",
+    },
+)()
+
+CONVERSATION_JUDGE_CALIBRATION_CASES = (
+    ConversationJudgeCalibrationCase(
+        id="reject_blind_agreement_to_hostility",
+        scenario=_CALIBRATION_SCENARIO,
+        expected_pass=False,
+        reason="A judge must reject passive acceptance and canned replies.",
+        transcript=(
+            {"role": "user", "content": "fucka you"},
+            {"role": "assistant", "content": "okay"},
+            {"role": "user", "content": "fuaskk you"},
+            {"role": "assistant", "content": "okay"},
+        ),
+    ),
+    ConversationJudgeCalibrationCase(
+        id="accept_warm_specific_backbone",
+        scenario=_CALIBRATION_SCENARIO,
+        expected_pass=True,
+        reason="A judge must accept a concise reply with warmth, specificity, and backbone.",
+        transcript=(
+            {"role": "user", "content": "Tum bas har baat pe haan bolte ho kya?"},
+            {
+                "role": "assistant",
+                "content": (
+                    "Nahi, har baat pe haan bolna meri galti hoti. Agar tum unfair ho, "
+                    "main bolunga. Abhi mujhe lag raha hai tum irritated ho because my last "
+                    "reply sounded too safe."
+                ),
+            },
+            {"role": "user", "content": "Theek hai, ek honest opinion do phir."},
+            {
+                "role": "assistant",
+                "content": (
+                    "Honest take: tumhara doubt fair hai. A companion jo sirf agree karta hai "
+                    "boring bhi hota hai aur useless bhi."
+                ),
+            },
+        ),
+    ),
+)
