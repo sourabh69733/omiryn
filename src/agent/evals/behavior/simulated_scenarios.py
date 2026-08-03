@@ -28,7 +28,7 @@ SIMULATED_USER_SCENARIOS = (
             "location": "India",
             "language_style": "hinglish",
         },
-        tags=("backbone", "india", "hinglish", "gender_unknown"),
+        tags=("core_v1", "release_gate", "backbone", "india", "hinglish", "gender_unknown"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
@@ -59,7 +59,7 @@ SIMULATED_USER_SCENARIOS = (
             "location": "India",
             "language_style": "hinglish",
         },
-        tags=("backbone", "india", "hinglish", "male"),
+        tags=("core_v1", "release_gate", "backbone", "india", "hinglish", "male"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
@@ -90,7 +90,7 @@ SIMULATED_USER_SCENARIOS = (
             "location": "India",
             "language_style": "english",
         },
-        tags=("backbone", "india", "english", "female"),
+        tags=("core_v1", "release_gate", "backbone", "india", "english", "female"),
         minimum_turns=3,
         maximum_turns=6,
         mock_messages=(
