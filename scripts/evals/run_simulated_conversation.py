@@ -37,6 +37,7 @@ from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
     list_simulated_user_scenarios,
 )
 from agent.evals.behavior.simulated_judge import ProviderConversationJudge  # noqa: E402
+from agent.evals.behavior.simulated_judge import run_conversation_judge_calibration  # noqa: E402
 from agent.evals.behavior.simulated_user import ProviderSimulatedUser  # noqa: E402
 from agent.runtime.providers.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
@@ -100,6 +101,11 @@ def _parser() -> argparse.ArgumentParser:
         help="List available AI-user scenarios and exit without model calls.",
     )
     parser.add_argument(
+        "--calibrate-conversation-judge",
+        action="store_true",
+        help="Run known transcript checks for the independent conversation judge and exit.",
+    )
+    parser.add_argument(
         "--max-turns",
         type=int,
         default=None,
@@ -161,14 +167,6 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         reset_db()
     else:
         init_db()
-    scenarios = _selected_scenarios(args)
-    simulated_user = ProviderSimulatedUser(
-        provider=args.user_provider,
-        model=args.user_model,
-        timeout_seconds=args.user_timeout_seconds,
-        max_attempts=args.user_max_attempts,
-        event_sink=reporter,
-    )
     judge_provider = args.judge_provider or args.user_provider
     independent_judges = tuple(
         ProviderConversationJudge(
@@ -179,6 +177,19 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             event_sink=reporter,
         )
         for model in (args.judge_models or [None])
+    )
+    if args.calibrate_conversation_judge:
+        return await run_conversation_judge_calibration(
+            independent_judges,
+            event_sink=reporter,
+        )
+    scenarios = _selected_scenarios(args)
+    simulated_user = ProviderSimulatedUser(
+        provider=args.user_provider,
+        model=args.user_model,
+        timeout_seconds=args.user_timeout_seconds,
+        max_attempts=args.user_max_attempts,
+        event_sink=reporter,
     )
     companion = RuntimeDriverConfig(
         provider=args.provider,
@@ -269,6 +280,8 @@ def main() -> int:
     if args.list_scenarios:
         _print_scenarios(tags=tuple(args.scenario_tags or ()))
         return 0
+    if args.calibrate_conversation_judge and args.output:
+        parser.error("--calibrate-conversation-judge cannot be combined with --output.")
     if args.no_save and args.output:
         parser.error("--no-save cannot be combined with --output.")
     reporter = TerminalProgressReporter(enabled=not args.quiet)
@@ -321,6 +334,15 @@ def main() -> int:
     elif payload["stage"] == "execution_error":
         print(f"AI-user conversation stopped: {payload['execution_error']}")
         return 1
+    elif payload["stage"] == "conversation_judge_calibration":
+        calibration = payload["conversation_judge_calibration"]
+        status = "PASS" if payload["passed"] else "FAIL"
+        print(
+            f"Conversation judge calibration: {status}; "
+            f"{calibration['completed_cases']}/{calibration['total_cases']} checks; "
+            f"failed={calibration['failed_cases']}; errors={calibration['judge_errors']}"
+        )
+        return 0 if payload["passed"] else 1
     else:
         print(_plain_summary(payload))
     return 0
