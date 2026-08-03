@@ -27,3 +27,5 @@ backups/
 reports/**
 !reports/evals/
 !reports/evals/HISTORY.md
+
+tmp/
