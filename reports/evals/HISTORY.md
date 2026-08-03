@@ -31,3 +31,5 @@ Synthetic evaluation scores are grouped by day for comparison.
 | Time (IST) | Result | Stage | Companion | Score | Passed |
 | --- | --- | --- | --- | --- | --- |
 | 11:08:29 | FAIL | Simulated conversation suite | meta-llama/Llama-3.3-70B-Instruct-Turbo | 2.2/4 | 0/3 scenarios |
+| 12:29:03 | FAIL | Simulated conversation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 1.1/4 | 6 turns |
+| 14:28:17 | FAIL | Simulated conversation suite | meta-llama/Llama-3.3-70B-Instruct-Turbo | 2.8/4 | 0/3 scenarios |
