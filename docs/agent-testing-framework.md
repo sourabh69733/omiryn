@@ -10,6 +10,7 @@ Current priority: make companion behavior measurable before adding more behavior
 - Consensus fails unless the AI user and independent judge both pass.
 - Reports are written in simple Markdown plus full JSON under day-wise IST folders.
 - Simulated scenarios can be listed and filtered by tags before running model calls.
+- Simulated scenarios can run as a tagged batch with one combined suite report.
 
 ## Scenario Matrix
 
