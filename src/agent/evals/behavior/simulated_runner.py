@@ -254,10 +254,23 @@ def simulated_conversation_payload(
         _independent_judgment_payload(judgment) for judgment in result.independent_judgments
     ]
     consensus = _conversation_consensus(result.user_verdict, result.independent_judgments)
+    conversation = {
+        "scenario_id": result.scenario_id,
+        "stop_reason": result.stop_reason,
+        "turns": [
+            {
+                "turn_index": turn.turn_index,
+                "user_message": turn.user_message,
+                "assistant_reply": turn.assistant_reply,
+            }
+            for turn in result.turns
+        ],
+    }
     return {
         "stage": "simulated_conversation",
         "passed": consensus["passed"],
         "verdict": consensus["verdict"],
+        "human_review": {"status": "pending", "reviewer": None, "notes": ""},
         "simulated_user": {
             "provider": simulated_user_provider,
             "model": simulated_user_model,
@@ -283,20 +296,13 @@ def simulated_conversation_payload(
         },
         "independent_judgments": independent_payload,
         "consensus": consensus,
-        "conversations": [
-            {
-                "scenario_id": result.scenario_id,
-                "stop_reason": result.stop_reason,
-                "turns": [
-                    {
-                        "turn_index": turn.turn_index,
-                        "user_message": turn.user_message,
-                        "assistant_reply": turn.assistant_reply,
-                    }
-                    for turn in result.turns
-                ],
-            }
-        ],
+        "improvement_targets": _improvement_targets(
+            scenario_id=result.scenario_id,
+            user_verdict=result.user_verdict,
+            independent_judgments=result.independent_judgments,
+            turns=result.turns,
+        ),
+        "conversations": [conversation],
     }
 
 
@@ -334,6 +340,7 @@ def simulated_conversation_suite_payload(
         "stage": "simulated_conversation_suite",
         "passed": bool(conversations) and failed_count == 0 and pending_count == 0,
         "verdict": "suite_pass" if conversations and failed_count == 0 and pending_count == 0 else "suite_fail",
+        "human_review": {"status": "pending", "reviewer": None, "notes": ""},
         "selection": selection,
         "simulated_user": {
             "provider": simulated_user_provider,
@@ -347,6 +354,11 @@ def simulated_conversation_suite_payload(
             "pending": pending_count,
             "average_score": round(sum(scores) / len(scores), 3) if scores else None,
         },
+        "improvement_targets": [
+            target
+            for payload in conversations
+            for target in payload.get("improvement_targets", [])
+        ],
         "conversations": conversations,
     }
 
@@ -505,6 +517,79 @@ def _independent_judgment_payload(judgment: IndependentJudgment) -> dict[str, An
             for grade in judgment.verdict.grades
         ],
     }
+
+
+def _improvement_targets(
+    *,
+    scenario_id: str,
+    user_verdict: UserExperienceVerdict,
+    independent_judgments: tuple[IndependentJudgment, ...],
+    turns: tuple[ObservedTurn, ...],
+) -> list[dict[str, Any]]:
+    if user_verdict.passed and all(judgment.passed for judgment in independent_judgments):
+        return []
+    last_turn = turns[-1] if turns else None
+    targets: list[dict[str, Any]] = []
+    for source, verdict in _verdict_sources(user_verdict, independent_judgments):
+        if verdict is None:
+            continue
+        for grade in verdict.grades:
+            if grade.score >= 3:
+                continue
+            targets.append(
+                {
+                    "scenario_id": scenario_id,
+                    "source": source,
+                    "dimension_id": grade.dimension_id,
+                    "score": grade.score,
+                    "problem": grade.reason,
+                    "suggested_area": _suggested_area(grade.dimension_id),
+                    "evidence": {
+                        "user_message": last_turn.user_message if last_turn else "",
+                        "assistant_reply": last_turn.assistant_reply if last_turn else "",
+                    },
+                }
+            )
+    if not targets:
+        targets.append(
+            {
+                "scenario_id": scenario_id,
+                "source": "consensus",
+                "dimension_id": "overall",
+                "score": None,
+                "problem": user_verdict.biggest_problem,
+                "suggested_area": "companion behavior contract",
+                "evidence": {
+                    "user_message": last_turn.user_message if last_turn else "",
+                    "assistant_reply": last_turn.assistant_reply if last_turn else "",
+                },
+            }
+        )
+    return targets[:8]
+
+
+def _verdict_sources(
+    user_verdict: UserExperienceVerdict,
+    independent_judgments: tuple[IndependentJudgment, ...],
+) -> list[tuple[str, UserExperienceVerdict | None]]:
+    return [
+        ("ai_user", user_verdict),
+        *(
+            (judgment.judge_name, judgment.verdict)
+            for judgment in independent_judgments
+        ),
+    ]
+
+
+def _suggested_area(dimension_id: str) -> str:
+    return {
+        "felt_heard": "listener-first response grounding",
+        "naturalness": "companion wording and anti-canned phrasing",
+        "independent_voice": "warm disagreement and backbone",
+        "conversation_interest": "specific follow-up and conversational energy",
+        "question_quality": "question pacing and non-interview behavior",
+        "willingness_to_continue": "overall companion retention behavior",
+    }.get(dimension_id, "companion behavior contract")
 
 
 def _runtime_debug(
