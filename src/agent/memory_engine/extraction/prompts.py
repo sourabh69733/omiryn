@@ -13,6 +13,8 @@ Use this shape:
       "label": "Values mutual respect",
       "value": {"kind": "mutual_respect", "detail": "Short detail"},
       "confidence": 0.72,
+      "fact_type": "matching_fact",
+      "confidence_state": "active",
       "evidence": "Short user quote or paraphrase"
     }
   ]
@@ -22,6 +24,10 @@ Rules:
   repeated acknowledgements, or no durable user signal, return:
   {"decision":"no_useful_data","reason":"...","facts":[]}
 - Extract only facts about the user, not the assistant or other people.
+- Classify fact_type as profile_fact for identity/logistics facts
+  (location, age, gender, languages), matching_fact for preferences/values/
+  dealbreakers/relationship intent, chat_context_fact for future-chat context,
+  and style_fact for communication-style adaptation.
 - Prefer many small facts over broad summaries.
 - Useful categories: dating_intent, values, lifestyle, communication, conflict_style,
   attachment_style, emotional_patterns, family_context, partner_preferences,
@@ -48,6 +54,8 @@ Use this shape:
       "meaning": "Why this will be useful later",
       "value": {"kind": "short_snake_case_key", "detail": "Short structured detail"},
       "confidence": 0.72,
+      "fact_type": "chat_context_fact",
+      "confidence_state": "active",
       "evidence": ["Short quote or paraphrase"],
       "used_for_chat_context": true,
       "used_for_matching": false,
@@ -61,6 +69,7 @@ Rules:
   return {"decision":"no_useful_data","reason":"...","data_points":[]}.
 - Extract meaning, not keywords. Do not create points like "talked about location".
 - Only include points that would be useful in a future chat, matching, or style adaptation.
+- Classify fact_type as profile_fact, matching_fact, chat_context_fact, or style_fact.
 - For relationship_intent/dating_intent, only include a specific outcome or
   seriousness. Skip obvious dating-app defaults like looking for someone,
   wanting a partner, or being open to dating.
@@ -95,6 +104,8 @@ Use this shape:
         "label": "Short meaningful memory",
         "meaning": "Why this will be useful later",
         "value": {"kind": "short_snake_case_key", "detail": "Short structured detail"},
+        "fact_type": "chat_context_fact",
+        "confidence_state": "active",
         "privacy_level": "normal"
       },
       "rejection_reason": null
@@ -117,6 +128,9 @@ Review questions:
 - Should it be used for chat, matching, style, or debug only?
 Rules:
 - Judge meaning, not keywords.
+- Choose the safest fact_type: profile_fact for identity/logistics facts,
+  matching_fact for compatibility preferences/signals, chat_context_fact for
+  future-chat memory, style_fact for adaptation.
 - Reject generic points like "talked about location" unless rewritten into useful memory.
 - Every approved/rewrite/merge review needs evidence.
 - Do not invent evidence or facts outside the supplied source text.
