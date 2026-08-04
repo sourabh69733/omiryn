@@ -146,7 +146,7 @@ def _ensure_runtime_columns() -> None:
         "draft_profiles": ("user_id",),
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
-        "profile_facts": ("used_for_chat_context",),
+        "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
         "agent_conversations": (
             "user_id",
             "agent_provider",
@@ -168,6 +168,10 @@ def _ensure_runtime_columns() -> None:
                     if column_name in {"profile_photo_urls", "profile_photo_file_names"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
+                    if column_name == "fact_type":
+                        default = " DEFAULT 'matching_fact'"
+                    if column_name == "confidence_state":
+                        default = " DEFAULT 'active'"
                     connection.execute(
                         text(
                             f"ALTER TABLE {table_name} "

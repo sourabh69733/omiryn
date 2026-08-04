@@ -345,6 +345,8 @@ def _profile_fact_payload(fact: dict[str, Any]) -> dict[str, Any]:
         "value_json": fact.get("value") or fact.get("value_json") or {},
         "label": fact["label"],
         "confidence": _bounded_confidence(fact.get("confidence", 0.5)),
+        "fact_type": _normalize_fact_type(fact.get("fact_type"), category),
+        "confidence_state": _normalize_confidence_state(fact.get("confidence_state")),
         "source_kind": fact.get("source_kind") or "agent_chat",
         "source_id": fact.get("source_id"),
         "evidence_json": _normalize_evidence_items(
@@ -390,6 +392,8 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
             "value_json": incoming["value_json"],
             "label": incoming["label"],
             "confidence": min(existing["confidence"] or 0, incoming["confidence"], 0.2),
+            "fact_type": incoming["fact_type"] or existing["fact_type"],
+            "confidence_state": "rejected",
             "source_kind": incoming["source_kind"],
             "source_id": incoming["source_id"] or existing["source_id"],
             "evidence_json": evidence,
@@ -402,6 +406,8 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
         "value_json": incoming["value_json"],
         "label": incoming["label"],
         "confidence": max(existing["confidence"] or 0, incoming["confidence"]),
+        "fact_type": incoming["fact_type"] or existing["fact_type"],
+        "confidence_state": incoming["confidence_state"] or existing["confidence_state"],
         "source_kind": incoming["source_kind"],
         "source_id": incoming["source_id"] or existing["source_id"],
         "evidence_json": evidence,
@@ -581,6 +587,25 @@ def _bounded_confidence(value: Any) -> float:
     return max(0.0, min(1.0, confidence))
 
 
+def _normalize_fact_type(value: Any, category: Any) -> str:
+    clean = str(value or "").strip().lower()
+    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
+        return clean
+    category_key = str(category or "").strip().lower()
+    if category_key in {"location", "age", "gender", "languages"}:
+        return "profile_fact"
+    if category_key.startswith("whatsapp_"):
+        return "chat_context_fact"
+    return "matching_fact"
+
+
+def _normalize_confidence_state(value: Any) -> str:
+    clean = str(value or "active").strip().lower()
+    if clean in {"candidate", "active", "confirmed", "rejected", "contradicted"}:
+        return clean
+    return "active"
+
+
 def _profile_fact_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -590,6 +615,8 @@ def _profile_fact_from_row(row: Any) -> dict[str, Any]:
         "value": row["value_json"],
         "label": row["label"],
         "confidence": row["confidence"],
+        "fact_type": row["fact_type"],
+        "confidence_state": row["confidence_state"],
         "source_kind": row["source_kind"],
         "source_id": row["source_id"],
         "evidence": row["evidence_json"],

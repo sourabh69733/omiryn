@@ -318,6 +318,8 @@ profile_facts = Table(
     Column("value_json", JSON, nullable=False),
     Column("label", String, nullable=False),
     Column("confidence", Float, nullable=False),
+    Column("fact_type", String, nullable=False, default="matching_fact"),
+    Column("confidence_state", String, nullable=False, default="active"),
     Column("source_kind", String, nullable=False),
     Column("source_id", String, nullable=True),
     Column("evidence_json", JSON, nullable=False),
