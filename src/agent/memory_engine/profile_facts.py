@@ -33,7 +33,7 @@ INTENT_PATTERNS = [
     ),
     (
         "casual",
-        r"\b(casual|not serious|no commitment)\b",
+        r"\b(casual|short[- ]?term|open to casual)\b",
         "Is open to casual dating",
         0.72,
     ),
@@ -65,6 +65,10 @@ LIFESTYLE_PATTERNS = [
     ("reading", r"\b(reading|books|book)\b", "Enjoys reading"),
     ("balanced_work", r"\b(work[- ]?life|balanced work|balance)\b", "Values work-life balance"),
     ("vegetarian", r"\b(vegetarian|veg)\b", "Prefers a vegetarian lifestyle"),
+]
+
+FOOD_PREFERENCE_PATTERNS = [
+    ("spicy_food", r"\b(spicy|teekha|teekhi|masaledar)\b", "Prefers spicy food"),
 ]
 
 COMMUNICATION_PATTERNS = [
@@ -117,7 +121,8 @@ def extract_profile_facts_from_message(
     facts: list[dict[str, Any]] = []
 
     for value, pattern, label, confidence in INTENT_PATTERNS:
-        if re.search(pattern, lowered):
+        match = re.search(pattern, lowered)
+        if match and not _is_blocked_fact_context(lowered, match.start(), match.end()):
             facts.append(
                 _fact(
                     user_id,
@@ -128,6 +133,7 @@ def extract_profile_facts_from_message(
                     confidence,
                     evidence,
                     conversation_id,
+                    fact_type="matching_fact",
                 )
             )
             break
@@ -144,6 +150,8 @@ def extract_profile_facts_from_message(
                 0.7,
                 evidence,
                 conversation_id,
+                fact_type="profile_fact",
+                used_for_matching=False,
             )
         )
 
@@ -152,6 +160,16 @@ def extract_profile_facts_from_message(
     )
     facts.extend(
         _pattern_facts(user_id, "lifestyle", LIFESTYLE_PATTERNS, lowered, evidence, conversation_id)
+    )
+    facts.extend(
+        _pattern_facts(
+            user_id,
+            "food_preferences",
+            FOOD_PREFERENCE_PATTERNS,
+            lowered,
+            evidence,
+            conversation_id,
+        )
     )
     facts.extend(
         _pattern_facts(
@@ -201,7 +219,8 @@ def _pattern_facts(
 ) -> list[dict[str, Any]]:
     facts = []
     for key, pattern, label in patterns:
-        if re.search(pattern, text):
+        match = re.search(pattern, text)
+        if match and not _is_blocked_fact_context(text, match.start(), match.end()):
             facts.append(
                 _fact(
                     user_id,
@@ -219,13 +238,68 @@ def _pattern_facts(
 
 def _extract_city(text: str) -> str | None:
     for alias, city in CITY_ALIASES.items():
-        if re.search(rf"\b{re.escape(alias)}\b", text):
+        if re.search(
+            rf"\b(live|lives|living|stay|stays|staying|based|settled|from)\s+"
+            rf"(in\s+)?{re.escape(alias)}\b",
+            text,
+        ):
+            return city
+    for alias, city in CITY_ALIASES.items():
+        match = re.search(rf"\b{re.escape(alias)}\b", text)
+        if match and not _is_temporary_location_context(text, match.start(), match.end()):
             return city
     return None
 
 
 def _has_dealbreaker_language(text: str) -> bool:
     return bool(re.search(r"\b(dealbreaker|deal breaker|cannot accept|can't accept|avoid|hate)\b", text))
+
+
+def _is_blocked_fact_context(text: str, start: int, end: int) -> bool:
+    before = text[max(0, start - 70) : start]
+    after = text[end : min(len(text), end + 40)]
+    local = f"{before} {text[start:end]} {after}"
+    if _has_third_person_owner(before):
+        return True
+    if _has_negation_near_match(before, after, local):
+        return True
+    return False
+
+
+def _has_negation_near_match(before: str, after: str, local: str) -> bool:
+    before_tail = before[-45:]
+    after_head = after[:25]
+    return bool(
+        re.search(
+            r"\b(no|not|never|dont|don't|doesnt|doesn't|didnt|didn't|can't|cannot|nahi|nhi|mat)\b",
+            before_tail,
+        )
+        or re.search(r"\b(abhi|right now)\s+(nahi|not)\b", local)
+        or re.search(r"\b(nahi|nhi|not)\s+(chahiye|want|looking|ready|into)\b", local)
+        or re.search(r"\b(chahiye|want|looking|ready|into)\s+(nahi|nhi|not)\b", local)
+        or re.search(r"\b(no longer|used to)\b", before_tail)
+        or re.search(r"\b(nahi|nhi|not)\b", after_head)
+    )
+
+
+def _has_third_person_owner(before: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(my|mere|meri|mera)\s+"
+            r"(friend|dost|ex|parents?|mom|dad|mother|father|brother|sister|cousin|roommate)\b",
+            before[-70:],
+        )
+    )
+
+
+def _is_temporary_location_context(text: str, start: int, end: int) -> bool:
+    local = text[max(0, start - 45) : min(len(text), end + 45)]
+    return bool(
+        re.search(
+            r"\b(visited|visit|trip|travelled|traveled|went|office|work|vacation|once|for a few days)\b",
+            local,
+        )
+    )
 
 
 def _fact(
@@ -237,6 +311,8 @@ def _fact(
     confidence: float,
     evidence: list[dict[str, Any]],
     conversation_id: str,
+    fact_type: str = "matching_fact",
+    used_for_matching: bool = True,
 ) -> dict[str, Any]:
     return {
         "user_id": user_id,
@@ -245,12 +321,14 @@ def _fact(
         "value": value,
         "label": label,
         "confidence": confidence,
+        "fact_type": fact_type,
+        "confidence_state": "active",
         "source_kind": "agent_chat",
         "source_id": conversation_id,
         "evidence": evidence,
         "status": "active",
         "visibility": "internal",
-        "used_for_matching": True,
+        "used_for_matching": used_for_matching,
     }
 
 

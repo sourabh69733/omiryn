@@ -493,6 +493,8 @@ def _normalize_llm_data_point(
         "value": value,
         "label": label,
         "confidence": confidence,
+        "fact_type": _fact_type(raw.get("fact_type"), category),
+        "confidence_state": _confidence_state(raw.get("confidence_state")),
         "source_kind": source_kind,
         "source_id": source_id,
         "evidence": [
@@ -681,6 +683,8 @@ def _profile_fact_candidate(
         "meaning": meaning,
         "value": value,
         "confidence": fact.get("confidence") or 0.55,
+        "fact_type": fact.get("fact_type"),
+        "confidence_state": fact.get("confidence_state"),
         "evidence": evidence[:5],
         "usage": {
             "chat_context": bool(fact.get("used_for_chat_context", True)),
@@ -723,6 +727,8 @@ def _compact_existing_data_points(user_id: str) -> list[dict[str, Any]]:
                 "label": fact.get("label"),
                 "meaning": value.get("meaning") or value.get("detail"),
                 "confidence": fact.get("confidence"),
+                "fact_type": fact.get("fact_type"),
+                "confidence_state": fact.get("confidence_state"),
             }
         )
     return points[:25]
@@ -902,6 +908,25 @@ def _confidence(value: Any, *, default: float) -> float:
 def _privacy_level(value: Any) -> str:
     level = str(value or "normal").strip().lower()
     return level if level in {"normal", "private", "sensitive"} else "normal"
+
+
+def _fact_type(value: Any, category: Any) -> str:
+    clean = str(value or "").strip().lower()
+    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
+        return clean
+    category_key = _snake_key(str(category or ""))
+    if category_key in {"location", "age", "gender", "languages"}:
+        return "profile_fact"
+    if category_key.startswith("whatsapp_"):
+        return "chat_context_fact"
+    return "matching_fact"
+
+
+def _confidence_state(value: Any) -> str:
+    clean = str(value or "active").strip().lower()
+    if clean in {"candidate", "active", "confirmed", "rejected", "contradicted"}:
+        return clean
+    return "active"
 
 
 def _snake_key(value: str) -> str:

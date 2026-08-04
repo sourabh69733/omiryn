@@ -13,6 +13,8 @@ class DataPoint:
     value: dict[str, Any]
     label: str
     confidence: float = 0.5
+    fact_type: str = "matching_fact"
+    confidence_state: str = "active"
     source_kind: str = "agent_chat"
     source_id: str | None = None
     evidence: list[dict[str, Any]] = field(default_factory=list)
@@ -30,6 +32,8 @@ def normalize_data_point(raw: dict[str, Any]) -> dict[str, Any]:
         value=_normalize_value(raw.get("value") or raw.get("value_json") or {}),
         label=str(raw["label"]).strip()[:160],
         confidence=_bounded_confidence(raw.get("confidence", 0.5)),
+        fact_type=_normalize_fact_type(raw.get("fact_type"), raw.get("category")),
+        confidence_state=_normalize_confidence_state(raw.get("confidence_state")),
         source_kind=str(raw.get("source_kind") or "agent_chat"),
         source_id=raw.get("source_id"),
         evidence=_normalize_evidence(raw.get("evidence") or raw.get("evidence_json") or []),
@@ -45,6 +49,8 @@ def normalize_data_point(raw: dict[str, Any]) -> dict[str, Any]:
         "value": point.value,
         "label": point.label,
         "confidence": point.confidence,
+        "fact_type": point.fact_type,
+        "confidence_state": point.confidence_state,
         "source_kind": point.source_kind,
         "source_id": point.source_id,
         "evidence": point.evidence,
@@ -114,6 +120,25 @@ def _bounded_confidence(value: Any) -> float:
     except (TypeError, ValueError):
         confidence = 0.5
     return max(0.0, min(1.0, confidence))
+
+
+def _normalize_fact_type(value: Any, category: Any) -> str:
+    clean = str(value or "").strip().lower()
+    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
+        return clean
+    category_key = _snake_key(str(category or ""))
+    if category_key in {"location", "age", "gender", "languages"}:
+        return "profile_fact"
+    if category_key.startswith("whatsapp_"):
+        return "chat_context_fact"
+    return "matching_fact"
+
+
+def _normalize_confidence_state(value: Any) -> str:
+    clean = str(value or "active").strip().lower()
+    if clean in {"candidate", "active", "confirmed", "rejected", "contradicted"}:
+        return clean
+    return "active"
 
 
 def _snake_key(value: str) -> str:
