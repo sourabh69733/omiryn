@@ -64,6 +64,8 @@ def _normalize_deep_profile_fact(
         "value": value,
         "label": label[:160],
         "confidence": confidence,
+        "fact_type": _normalize_fact_type(raw_fact.get("fact_type"), category),
+        "confidence_state": _normalize_confidence_state(raw_fact.get("confidence_state")),
         "source_kind": "agent_deep_memory",
         "source_id": conversation_id,
         "evidence": [
@@ -87,3 +89,20 @@ def _safe_confidence(value: Any, fallback: float) -> float:
     except (TypeError, ValueError):
         confidence = fallback
     return max(0.0, min(0.95, confidence))
+
+
+def _normalize_fact_type(value: Any, category: Any) -> str:
+    clean = str(value or "").strip().lower()
+    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
+        return clean
+    category_key = _snake_key(str(category or ""))
+    if category_key in {"location", "age", "gender", "languages"}:
+        return "profile_fact"
+    return "matching_fact"
+
+
+def _normalize_confidence_state(value: Any) -> str:
+    clean = str(value or "active").strip().lower()
+    if clean in {"candidate", "active", "confirmed", "rejected", "contradicted"}:
+        return clean
+    return "active"
