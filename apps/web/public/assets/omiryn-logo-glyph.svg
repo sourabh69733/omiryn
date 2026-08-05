@@ -1,0 +1,15 @@
+<svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Omiryn glyph</title>
+  <desc id="desc">Minimal Omiryn circular glyph.</desc>
+  <defs>
+    <linearGradient id="glyphGradient" x1="8" y1="8" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FD7C9"/>
+      <stop offset="0.52" stop-color="#2E7B73"/>
+      <stop offset="1" stop-color="#D18368"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="52" height="52" rx="16" fill="#101416"/>
+  <path d="M28 11C37.39 11 45 18.61 45 28C45 37.39 37.39 45 28 45C18.61 45 11 37.39 11 28C11 18.61 18.61 11 28 11ZM28 18.1C22.53 18.1 18.1 22.53 18.1 28C18.1 33.47 22.53 37.9 28 37.9C33.47 37.9 37.9 33.47 37.9 28C37.9 22.53 33.47 18.1 28 18.1Z" fill="url(#glyphGradient)"/>
+  <path d="M31.5 18.82C35.27 20.25 37.9 23.83 37.9 28C37.9 33.47 33.47 37.9 28 37.9C24.06 37.9 20.66 35.6 19.07 32.27" stroke="#FFF8E8" stroke-width="2.25" stroke-linecap="round"/>
+  <circle cx="38.8" cy="17.2" r="3.4" fill="#E9C575"/>
+</svg>
