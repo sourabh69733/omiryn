@@ -4,6 +4,7 @@ import logging
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -12,8 +13,7 @@ from security.auth import current_user, production_runtime_enabled, validate_pro
 from storage import init_db, validate_private_data_ownership
 
 from .config import (
-    APP_SHELL_HEADERS,
-    FRONTEND_DIST_DIR,
+    CORS_ALLOWED_ORIGINS,
     PROFILE_PHOTO_GCS_BUCKET,
     PROFILE_PHOTO_GCS_PREFIX,
     PROFILE_PHOTO_GCS_PUBLIC_BASE_URL,
@@ -30,6 +30,15 @@ app = FastAPI(
 )
 
 logger = logging.getLogger(__name__)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(CORS_ALLOWED_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
+)
 
 
 class NoCacheStaticFiles(StaticFiles):
@@ -59,7 +68,6 @@ async def request_monitoring_middleware(request, call_next):
     return response
 
 
-app.mount("/app-static", NoCacheStaticFiles(directory=FRONTEND_DIST_DIR), name="app-static")
 PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     "/uploads/profile_photos",
@@ -84,8 +92,7 @@ def startup() -> None:
 
 
 __all__ = [
-    "APP_SHELL_HEADERS",
-    "FRONTEND_DIST_DIR",
+    "CORS_ALLOWED_ORIGINS",
     "NoCacheStaticFiles",
     "PROFILE_PHOTO_GCS_BUCKET",
     "PROFILE_PHOTO_GCS_PREFIX",

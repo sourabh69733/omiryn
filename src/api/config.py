@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CORS_ORIGINS = "https://omiryn.com,https://www.omiryn.com,https://app.omiryn.com"
 
 try:
     from dotenv import load_dotenv
@@ -18,9 +19,12 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional outside GCP/photo uploads
     gcs_storage = None
 
-FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
-APP_SHELL_HEADERS = {"Cache-Control": "no-store"}
+CORS_ALLOWED_ORIGINS = tuple(
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
+    if origin.strip()
+)
 
 
 def _int_env(name: str, default: int) -> int:

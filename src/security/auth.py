@@ -159,6 +159,13 @@ def validate_production_security_config() -> None:
         failures.append("PROFILE_PHOTO_GCS_BUCKET is required for durable production photo storage")
     if not _valid_profile_photo_max_mb():
         failures.append("PROFILE_PHOTO_MAX_MB must be greater than 0 and no more than 10")
+    cors_origins = _configured_values("CORS_ALLOWED_ORIGINS")
+    if not cors_origins:
+        failures.append("CORS_ALLOWED_ORIGINS must configure at least one web origin")
+    elif "*" in cors_origins:
+        failures.append("CORS_ALLOWED_ORIGINS must not contain a wildcard")
+    elif any(not origin.startswith("https://") for origin in cors_origins):
+        failures.append("CORS_ALLOWED_ORIGINS must use HTTPS origins in production")
 
     if failures:
         raise ProductionSecurityConfigError(
