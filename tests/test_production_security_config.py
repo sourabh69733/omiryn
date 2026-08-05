@@ -36,6 +36,7 @@ class ProductionSecurityConfigTest(unittest.TestCase):
                 "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "false",
                 "PROFILE_PHOTO_GCS_BUCKET": "omiryn-profile-photos",
                 "PROFILE_PHOTO_MAX_MB": "10",
+                "CORS_ALLOWED_ORIGINS": "https://omiryn.com,https://app.omiryn.com",
             },
             clear=True,
         ):
@@ -59,6 +60,7 @@ class ProductionSecurityConfigTest(unittest.TestCase):
                 "ADMIN_USER_IDS": "",
                 "PROFILE_PHOTO_GCS_BUCKET": "",
                 "PROFILE_PHOTO_MAX_MB": "25",
+                "CORS_ALLOWED_ORIGINS": "*",
             },
             clear=True,
         ):
@@ -74,6 +76,29 @@ class ProductionSecurityConfigTest(unittest.TestCase):
         self.assertIn("ADMIN_EMAILS or ADMIN_USER_IDS", message)
         self.assertIn("PROFILE_PHOTO_GCS_BUCKET is required", message)
         self.assertIn("PROFILE_PHOTO_MAX_MB must be greater than 0 and no more than 10", message)
+        self.assertIn("CORS_ALLOWED_ORIGINS must not contain a wildcard", message)
+
+    def test_production_runtime_rejects_non_https_cors_origin(self) -> None:
+        secure_environment = {
+            "APP_ENV": "production",
+            "AUTH_REQUIRED": "true",
+            "AUTH_PROVIDER": "supabase",
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_ANON_KEY": "anon-public-key",
+            "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/omiryn",
+            "ENCRYPTION_MASTER_KEY": _valid_master_key(),
+            "SECRET_KEY": "x" * 32,
+            "ADMIN_EMAILS": "admin@example.com",
+            "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "false",
+            "PROFILE_PHOTO_GCS_BUCKET": "omiryn-profile-photos",
+            "PROFILE_PHOTO_MAX_MB": "10",
+            "CORS_ALLOWED_ORIGINS": "http://app.omiryn.com",
+        }
+        with patch.dict(os.environ, secure_environment, clear=True):
+            with self.assertRaises(ProductionSecurityConfigError) as error:
+                validate_production_security_config()
+
+        self.assertIn("must use HTTPS origins", str(error.exception))
 
     def test_cloud_run_environment_is_treated_as_production(self) -> None:
         with patch.dict(

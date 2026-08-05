@@ -2507,31 +2507,25 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Omiryn Admin", requests_response.text)
         self.assertIn("admin-requests-dashboard", requests_response.text)
 
-    def test_backend_does_not_serve_landing_pages(self) -> None:
-        for path in ("/", "/about", "/how-it-works", "/safety", "/privacy", "/terms", "/contact"):
+    def test_backend_does_not_serve_frontend_pages(self) -> None:
+        for path in (
+            "/",
+            "/about",
+            "/how-it-works",
+            "/safety",
+            "/privacy",
+            "/terms",
+            "/contact",
+            "/app",
+            "/app/contact",
+            "/app-react",
+            "/matches",
+            "/style",
+            "/profile",
+            "/usage",
+        ):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
-
-    def test_app_shell_links_brand_to_app_route(self) -> None:
-        response = self.client.get("/app")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('<div id="root"></div>', response.text)
-        self.assertIn("/app-static/assets/index-", response.text)
-
-    def test_app_contact_route_serves_app_shell(self) -> None:
-        response = self.client.get("/app/contact")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('<div id="root"></div>', response.text)
-        self.assertIn("/app-static/assets/index-", response.text)
-
-    def test_react_app_preview_serves_built_shell(self) -> None:
-        response = self.client.get("/app-react")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('<div id="root"></div>', response.text)
-        self.assertIn("/app-static/assets/index-", response.text)
 
     def test_admin_dev_bypass_serves_shell_when_auth_required(self) -> None:
         with patch.dict(
@@ -4067,13 +4061,6 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(
             {person.sender for person in structured.people}, {"Sourabh sahu", "abhishek"}
         )
-
-    def test_usage_page_is_served(self) -> None:
-        response = self.client.get("/usage")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('<div id="root"></div>', response.text)
-        self.assertIn("/app-static/assets/index-", response.text)
 
     def _create_draft(self) -> str:
         response = self.client.post("/api/agent-submissions/profile", json=sample_submission())
