@@ -16,13 +16,12 @@ export PYTHONPATH="${PYTHONPATH:-src}"
 MODE="${START_MODE:-development}"
 BACKEND_HOST="${APP_HOST:-127.0.0.1}"
 BACKEND_PORT="${APP_PORT:-8001}"
-FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
-FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+WEB_HOST="${WEB_HOST:-127.0.0.1}"
+WEB_PORT="${WEB_PORT:-5173}"
 LANDING_HOST="${LANDING_HOST:-127.0.0.1}"
 LANDING_PORT="${LANDING_PORT:-5174}"
 
 if [ "$MODE" = "production" ]; then
-  npm run frontend:build
   exec python -m uvicorn api.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT"
 fi
 
@@ -62,17 +61,17 @@ python -m uvicorn api.main:app \
 api_pid=$!
 
 VITE_API_PROXY_TARGET="http://127.0.0.1:${BACKEND_PORT}" \
-  npm run frontend:dev -- --host "$FRONTEND_HOST" --port "$FRONTEND_PORT" &
+  npm run web:dev -- --host "$WEB_HOST" --port "$WEB_PORT" &
 web_pid=$!
 
 VITE_API_PROXY_TARGET="http://127.0.0.1:${BACKEND_PORT}" \
-  VITE_APP_DEV_ORIGIN="http://${FRONTEND_HOST}:${FRONTEND_PORT}" \
+  VITE_APP_DEV_ORIGIN="http://${WEB_HOST}:${WEB_PORT}" \
   npm run landing:dev -- --host "$LANDING_HOST" --port "$LANDING_PORT" &
 landing_pid=$!
 
 echo "Omiryn development server"
 echo "Landing: http://${LANDING_HOST}:${LANDING_PORT}/"
-echo "App: http://${FRONTEND_HOST}:${FRONTEND_PORT}/app"
+echo "App: http://${WEB_HOST}:${WEB_PORT}/app"
 echo "API: http://${BACKEND_HOST}:${BACKEND_PORT}"
 echo "Landing and React changes use Vite HMR; Python changes restart Uvicorn."
 
