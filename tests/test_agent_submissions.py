@@ -2507,13 +2507,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Omiryn Admin", requests_response.text)
         self.assertIn("admin-requests-dashboard", requests_response.text)
 
-    def test_root_serves_landing_page(self) -> None:
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Stop swiping.", response.text)
-        self.assertIn("/static/landing.css", response.text)
-        self.assertIn("/app", response.text)
+    def test_backend_does_not_serve_landing_pages(self) -> None:
+        for path in ("/", "/about", "/how-it-works", "/safety", "/privacy", "/terms", "/contact"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
 
     def test_app_shell_links_brand_to_app_route(self) -> None:
         response = self.client.get("/app")
@@ -2528,28 +2525,6 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('<div id="root"></div>', response.text)
         self.assertIn("/app-static/assets/index-", response.text)
-
-    def test_public_contact_route_stays_public_contact_page(self) -> None:
-        response = self.client.get("/contact")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Contact Omiryn", response.text)
-        self.assertIn("Write your question or feedback", response.text)
-        self.assertNotIn('<div id="root"></div>', response.text)
-
-    def test_privacy_page_mentions_activity_events_and_feedback(self) -> None:
-        response = self.client.get("/privacy")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("in-app activity events", response.text)
-        self.assertIn("invite requests", response.text)
-        self.assertIn("We do not intentionally store full chat message text", response.text)
-
-    def test_landing_static_assets_are_served(self) -> None:
-        response = self.client.get("/static/landing.css")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(".hero", response.text)
 
     def test_react_app_preview_serves_built_shell(self) -> None:
         response = self.client.get("/app-react")
