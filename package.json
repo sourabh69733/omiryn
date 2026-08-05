@@ -9,11 +9,11 @@
     "landing:dev": "vite --config apps/landing/vite.config.js",
     "landing:build": "vite build --config apps/landing/vite.config.js",
     "landing:preview": "vite preview --config apps/landing/vite.config.js",
-    "frontend:dev": "vite --config frontend/vite.config.js",
-    "frontend:build": "vite build --config frontend/vite.config.js",
-    "frontend:preview": "vite preview --config frontend/vite.config.js",
-    "frontend:check": "tsc -p frontend/tsconfig.json --noEmit",
-    "build": "npm run landing:build && npm run frontend:build"
+    "web:dev": "vite --config apps/web/vite.config.js",
+    "web:build": "vite build --config apps/web/vite.config.js",
+    "web:preview": "vite preview --config apps/web/vite.config.js",
+    "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
+    "build": "npm run landing:build && npm run web:build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
