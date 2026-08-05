@@ -2,6 +2,9 @@
 	// Opt into backwards-incompatible changes through April 5, 2022.
 	"name": "omiryn-landing",
 	"compatibility_date": "2026-08-05",
+	"assets": {
+		"directory": "./apps/landing/dist"
+	},
 	"observability": {
 		"enabled": true
 	}
