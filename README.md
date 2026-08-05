@@ -20,7 +20,7 @@ users remain in control.
 ## Repository Structure
 
 - `apps/landing/` - independently built public and legal pages
-- `frontend/` - signed-in React web application
+- `apps/web/` - independently built signed-in React web application
 - [docs/architecture.md](/Users/sourabh/nexus/work/p1/quack/omiryn/docs/architecture.md) - system architecture and service boundaries
 - [docs/mvp-roadmap.md](/Users/sourabh/nexus/work/p1/quack/omiryn/docs/mvp-roadmap.md) - staged product build plan
 - [db/schema.sql](/Users/sourabh/nexus/work/p1/quack/omiryn/db/schema.sql) - initial relational data model
@@ -52,11 +52,15 @@ App:     http://127.0.0.1:5173/app
 API:     http://127.0.0.1:8001
 ```
 
-Use `npm run landing:build` or `npm run frontend:build` for an individual
+Use `npm run landing:build` or `npm run web:build` for an individual
 artifact. `npm run build` builds both.
 
 The landing artifact is deployed independently. FastAPI does not serve landing
 HTML or `/static` landing assets.
+
+The signed-in web artifact is also deployed independently. Set
+`VITE_API_BASE_URL` in its Cloudflare build environment to the public Cloud Run
+service URL. FastAPI does not serve web HTML or web assets.
 
 ## Database
 

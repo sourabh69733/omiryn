@@ -75,8 +75,8 @@ This checklist tracks the privacy and security layer required before a real publ
 
 ## Launch Gate
 
-- [x] `npm run frontend:check` passes.
-- [x] `npm run frontend:build` passes.
+- [x] `npm run web:check` passes.
+- [x] `npm run web:build` passes.
 - [x] Backend tests pass.
 - [ ] Public pages render on mobile and desktop.
 - [ ] Sign-in, chat, memory import, deletion request, and contact flows are manually tested.
