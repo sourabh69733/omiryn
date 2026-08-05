@@ -71,7 +71,7 @@ landing_pid=$!
 
 echo "Omiryn development server"
 echo "Landing: http://${LANDING_HOST}:${LANDING_PORT}/"
-echo "App: http://${WEB_HOST}:${WEB_PORT}/app"
+echo "App: http://${WEB_HOST}:${WEB_PORT}/"
 echo "API: http://${BACKEND_HOST}:${BACKEND_PORT}"
 echo "Landing and React changes use Vite HMR; Python changes restart Uvicorn."
 

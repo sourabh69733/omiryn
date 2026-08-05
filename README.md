@@ -48,7 +48,7 @@ The development command starts each surface separately:
 
 ```text
 Landing: http://127.0.0.1:5174/
-App:     http://127.0.0.1:5173/app
+App:     http://127.0.0.1:5173/
 API:     http://127.0.0.1:8001
 ```
 

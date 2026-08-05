@@ -67,9 +67,9 @@ function appUrl() {
   if (isLoopback || isLocalTunnel) {
     const localOrigin = configuredLocalOrigin
       || (isLocalTunnel ? window.location.origin : `${window.location.protocol}//${window.location.hostname}:${localAppPort}`);
-    return new URL("/app", localOrigin).toString();
+    return new URL("/", localOrigin).toString();
   }
-  return new URL("/app", appOrigin).toString();
+  return new URL("/", appOrigin).toString();
 }
 
 function isAuthCallbackHash() {

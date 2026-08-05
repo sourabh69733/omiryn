@@ -330,7 +330,7 @@ export function ProfileSetupWizard() {
       const conversation = await response.json();
       window.localStorage.removeItem(STORAGE_KEY);
       window.localStorage.removeItem("omiryn-first-conversation");
-      const nextUrl = new URL("/app", window.location.origin);
+      const nextUrl = new URL("/", window.location.origin);
       nextUrl.searchParams.set("conversation_id", conversation.id);
       window.location.replace(nextUrl.toString());
     } catch (error) {

@@ -105,7 +105,7 @@ type ConversationUsage = {
 const canShowUsage = import.meta.env.DEV;
 
 const pageFromPath = (): Page => {
-  if (window.location.pathname.startsWith("/app/contact")) return "contact";
+  if (window.location.pathname.startsWith("/contact")) return "contact";
   if (window.location.pathname.startsWith("/style")) return "style";
   if (window.location.pathname.startsWith("/matches")) return "matches";
   if (window.location.pathname.startsWith("/profile")) return "profile";
@@ -113,11 +113,11 @@ const pageFromPath = (): Page => {
 };
 
 const pathForPage: Record<Page, string> = {
-  chat: "/app",
+  chat: "/",
   style: "/style",
   matches: "/matches",
   profile: "/profile",
-  contact: "/app/contact"
+  contact: "/contact"
 };
 
 const assetUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`;
@@ -132,7 +132,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   useEffect(() => {
     initAppLogger();
     if (!canShowUsage && window.location.pathname.startsWith("/usage")) {
-      window.history.replaceState({}, "", "/app");
+      window.history.replaceState({}, "", "/");
     }
     apiFetch("/api/auth/me").then((response) => response.ok ? response.json() : null).then(setUser).catch(() => undefined);
     apiFetch("/api/me/profile")
@@ -278,7 +278,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
         setContextSources(contextData.available_sources || []);
       }
       window.localStorage.setItem("omiryn.activeConversationId", data.id);
-      const url = new URL("/app", window.location.origin);
+      const url = new URL("/", window.location.origin);
       url.searchParams.set("conversation_id", data.id);
       window.history.replaceState({}, "", url);
       setHistoryOpen(false);
@@ -503,7 +503,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     const rows = await fetchSummaries();
     if (conversation?.id === id) {
       window.localStorage.removeItem("omiryn.activeConversationId");
-      window.history.replaceState({}, "", "/app");
+      window.history.replaceState({}, "", "/");
       setConversation(null);
       setContextSources([]);
       setUsage(null);
@@ -1221,7 +1221,7 @@ function evidenceHref(fact: ProfileFact, item: unknown) {
   const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
   const conversationId = String(row.conversation_id || (fact.source_kind === "agent_chat" ? fact.source_id || "" : ""));
   if (!conversationId) return "";
-  const url = new URL("/app", window.location.origin);
+  const url = new URL("/", window.location.origin);
   url.searchParams.set("conversation_id", conversationId);
   const messageIndex = row.message_index;
   if (typeof messageIndex === "number" || typeof messageIndex === "string") {
