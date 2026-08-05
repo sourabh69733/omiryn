@@ -27,7 +27,6 @@ secret_args=(
   "$(optional_secret_arg ENCRYPTION_MASTER_KEY "$ENCRYPTION_MASTER_KEY_SECRET")"
   "$(optional_secret_arg SUPABASE_URL "${SUPABASE_URL_SECRET:-}")"
   "$(optional_secret_arg SUPABASE_ANON_KEY "${SUPABASE_ANON_KEY_SECRET:-}")"
-  "$(optional_secret_arg SECRET_KEY "${SECRET_KEY_SECRET:-}")"
   "$(optional_secret_arg GROQ_API_KEY "${GROQ_API_KEY_SECRET:-}")"
   # "$(optional_secret_arg DEEPINFRA_API_KEY "${DEEPINFRA_API_KEY_SECRET:-}")"
   "$(optional_secret_arg FIREWORKS_API_KEY "${FIREWORKS_API_KEY_SECRET:-}")"

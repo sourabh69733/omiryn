@@ -30,7 +30,7 @@ This checklist tracks the privacy and security layer required before a real publ
 ## Auth And Access Control
 
 - [x] Production startup fails unless `AUTH_REQUIRED=true`.
-- [x] Production startup fails unless Supabase, admin allowlist, strong `SECRET_KEY`, encryption key, Postgres URL, and durable photo storage are configured.
+- [x] Production startup fails unless Supabase, admin allowlist, encryption key, Postgres URL, and durable photo storage are configured.
 - [ ] Production env uses Supabase Auth with production redirect URLs.
 - [x] All private user-data routes require signed-in auth.
 - [x] Admin routes allow only configured admin emails or user IDs.

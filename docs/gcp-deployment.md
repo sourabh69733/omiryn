@@ -130,8 +130,7 @@ Sync every configured secret from `.gcp.env`:
 ```
 
 Required values are `DATABASE_URL`, `ENCRYPTION_MASTER_KEY`, `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, and `SECRET_KEY`. Optional provider keys are skipped when
-empty.
+and `SUPABASE_ANON_KEY`. Optional provider keys are skipped when empty.
 
 Examples:
 
@@ -148,8 +147,6 @@ SUPABASE_URL='https://...' \
 SUPABASE_ANON_KEY='...' \
   ./scripts/gcp-set-secret.sh omiryn-supabase-anon-key SUPABASE_ANON_KEY
 
-SECRET_KEY='at-least-32-random-characters' \
-  ./scripts/gcp-set-secret.sh omiryn-secret-key SECRET_KEY
 ```
 
 Production deploys also require:

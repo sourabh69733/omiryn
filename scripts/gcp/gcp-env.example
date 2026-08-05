@@ -63,7 +63,6 @@ DATABASE_URL_SECRET=omiryn-database-url
 ENCRYPTION_MASTER_KEY_SECRET=omiryn-encryption-master-key
 SUPABASE_URL_SECRET=omiryn-supabase-url
 SUPABASE_ANON_KEY_SECRET=omiryn-supabase-anon-key
-SECRET_KEY_SECRET=omiryn-secret-key
 
 # Optional AI provider secret names.
 GROQ_API_KEY_SECRET=
@@ -77,8 +76,6 @@ DATABASE_URL=
 ENCRYPTION_MASTER_KEY=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
-# Required. Use a random value with at least 32 characters.
-SECRET_KEY=
 GROQ_API_KEY=
 DEEPINFRA_API_KEY=
 FIREWORKS_API_KEY=
