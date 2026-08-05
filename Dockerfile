@@ -1,13 +1,3 @@
-FROM node:22-slim AS frontend-build
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
-COPY frontend ./frontend
-RUN npm run frontend:build
-
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -28,6 +18,5 @@ COPY src ./src
 COPY api ./api
 COPY db ./db
 COPY scripts ./scripts
-COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
