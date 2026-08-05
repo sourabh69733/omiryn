@@ -3,49 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from ..config import APP_SHELL_HEADERS, FRONTEND_DIST_DIR, LANDING_PAGE_FILE
+from ..config import APP_SHELL_HEADERS, FRONTEND_DIST_DIR
 
 router = APIRouter()
-
-
-@router.get("/")
-def root() -> FileResponse:
-    return FileResponse(LANDING_PAGE_FILE, headers=APP_SHELL_HEADERS)
-
-
-@router.get("/about")
-def about_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "about.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/how-it-works")
-def how_it_works_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "how-it-works.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/safety")
-def safety_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "safety.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/ai-disclosure")
-def ai_disclosure_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "ai-disclosure.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/privacy")
-def privacy_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "privacy.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/terms")
-def terms_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "terms.html", headers=APP_SHELL_HEADERS)
-
-
-@router.get("/contact")
-def contact_page() -> FileResponse:
-    return FileResponse(FRONTEND_DIST_DIR / "contact.html", headers=APP_SHELL_HEADERS)
 
 
 @router.get("/app")
