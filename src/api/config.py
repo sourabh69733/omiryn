@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from security.config import configured_cors_origins
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CORS_ORIGINS = "https://omiryn.com,https://www.omiryn.com,https://app.omiryn.com"
 
 try:
     from dotenv import load_dotenv
@@ -20,11 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional outside GCP/photo upl
     gcs_storage = None
 
 PROFILE_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "profile_photos"
-CORS_ALLOWED_ORIGINS = tuple(
-    origin.strip().rstrip("/")
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", DEFAULT_CORS_ORIGINS).split(",")
-    if origin.strip()
-)
+CORS_ALLOWED_ORIGINS = configured_cors_origins()
 
 
 def _int_env(name: str, default: int) -> int:

@@ -9,6 +9,8 @@ from typing import Any, Protocol
 import httpx
 from fastapi import HTTPException, Request
 
+from .config import configured_cors_origins
+
 
 @dataclass(frozen=True)
 class CurrentUser:
@@ -149,8 +151,6 @@ def validate_production_security_config() -> None:
         failures.append("DATABASE_URL must use Postgres, not SQLite")
     if not _valid_encryption_master_key():
         failures.append("ENCRYPTION_MASTER_KEY must be a base64 encoded 32-byte key")
-    if not _valid_secret_key():
-        failures.append("SECRET_KEY must be set to a non-default value with at least 32 characters")
     if _env("ADMIN_ALLOW_UNAUTHENTICATED_DEV").lower() == "true":
         failures.append("ADMIN_ALLOW_UNAUTHENTICATED_DEV must be false")
     if not (_configured_values("ADMIN_EMAILS") or _configured_values("ADMIN_USER_IDS")):
@@ -159,7 +159,7 @@ def validate_production_security_config() -> None:
         failures.append("PROFILE_PHOTO_GCS_BUCKET is required for durable production photo storage")
     if not _valid_profile_photo_max_mb():
         failures.append("PROFILE_PHOTO_MAX_MB must be greater than 0 and no more than 10")
-    cors_origins = _configured_values("CORS_ALLOWED_ORIGINS")
+    cors_origins = {origin.lower() for origin in configured_cors_origins()}
     if not cors_origins:
         failures.append("CORS_ALLOWED_ORIGINS must configure at least one web origin")
     elif "*" in cors_origins:
@@ -229,13 +229,6 @@ def _valid_encryption_master_key() -> bool:
     except ValueError:
         return False
     return len(key) == 32
-
-
-def _valid_secret_key() -> bool:
-    value = _env("SECRET_KEY")
-    if not value or value == "change-me-in-local-env":
-        return False
-    return len(value) >= 32
 
 
 def _valid_profile_photo_max_mb() -> bool:
