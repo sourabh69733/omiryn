@@ -14,7 +14,6 @@ require_var DATABASE_URL_SECRET
 require_var ENCRYPTION_MASTER_KEY_SECRET
 require_var SUPABASE_URL_SECRET
 require_var SUPABASE_ANON_KEY_SECRET
-require_var SECRET_KEY_SECRET
 require_var PROFILE_PHOTO_GCS_BUCKET
 require_artifact_repository_name
 
