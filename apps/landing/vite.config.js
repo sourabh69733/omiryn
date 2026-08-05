@@ -5,7 +5,7 @@ const landingRoot = path.resolve("apps/landing");
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? `http://127.0.0.1:${process.env.APP_PORT ?? "8001"}`;
 const appDevOrigin = process.env.VITE_APP_DEV_ORIGIN ?? "http://127.0.0.1:5173";
 const pages = [
-  "landing",
+  "index",
   "about",
   "how-it-works",
   "safety",
@@ -16,7 +16,7 @@ const pages = [
 ];
 
 function landingRoutesPlugin() {
-  const publicPages = new Set(pages.filter((page) => page !== "landing"));
+  const publicPages = new Set(pages.filter((page) => page !== "index"));
   return {
     name: "omiryn-landing-routes",
     transformIndexHtml: {
@@ -29,7 +29,7 @@ function landingRoutesPlugin() {
     configureServer(server) {
       server.middlewares.use((request, _response, next) => {
         const pathname = new URL(request.url || "/", "http://127.0.0.1").pathname;
-        if (pathname === "/") request.url = "/landing.html";
+        if (pathname === "/") request.url = "/index.html";
         else if (publicPages.has(pathname.slice(1))) request.url = `${pathname}.html`;
         next();
       });
