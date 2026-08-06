@@ -14,6 +14,12 @@ from agent.runtime.providers import (
 from agent.runtime.replies import split_assistant_reply
 from agent.context_engine.turn_state import assistant_turn_state
 from agent.runtime.turn_policy import direct_turn_reply
+from agent.runtime.turn_output import (
+    capture_turn_output_data_points,
+    parse_turn_output_v2,
+    turn_output_v2_enabled,
+    with_turn_output_v2_instruction,
+)
 from storage import (
     finish_agent_trace,
     save_agent_context_snapshot,
@@ -152,6 +158,10 @@ async def run_agent_turn(
         user_message_index=len(updated_messages) - 1,
         assistant_message_index=len(updated_messages),
     )
+    turn_output_v2 = turn_output_v2_enabled()
+    system_prompt = context_package.system_prompt
+    if turn_output_v2:
+        system_prompt = with_turn_output_v2_instruction(system_prompt)
     save_agent_trace_step(
         {
             "trace_id": trace_id,
@@ -174,9 +184,9 @@ async def run_agent_turn(
     provider_messages = _provider_messages(updated_messages)
     if context_snapshot:
         context_snapshot.setdefault("context", {})["prompt"] = {
-            "system_prompt": context_package.system_prompt,
+            "system_prompt": system_prompt,
             "provider_messages": provider_messages,
-            "prompt_debug": _prompt_debug(context_package.system_prompt, provider_messages),
+            "prompt_debug": _prompt_debug(system_prompt, provider_messages),
         }
     save_agent_trace_step(
         {
@@ -199,8 +209,25 @@ async def run_agent_turn(
             agent_name=agent_name,
             context_sources=context_package.context_sources,
             user_profile=context_package.user_profile,
-            system_prompt=context_package.system_prompt,
+            system_prompt=system_prompt,
         )
+        turn_output_summary = None
+        if turn_output_v2:
+            parsed_output = parse_turn_output_v2(reply, user_text=user_text)
+            reply = parsed_output.reply
+            turn_output_summary = capture_turn_output_data_points(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                user_text=user_text,
+                message_index=len(updated_messages) - 1,
+                data_points=parsed_output.data_points,
+            )
+            turn_output_summary.update(
+                {
+                    "parsed": parsed_output.parsed,
+                    "error": parsed_output.error,
+                }
+            )
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -238,6 +265,7 @@ async def run_agent_turn(
                 "prompt_version": context_package.prompt_version,
                 "agent_mode": agent_mode,
                 "agent_tone": agent_tone,
+                "turn_output_v2": turn_output_summary if turn_output_v2 else None,
             },
         }
         )
