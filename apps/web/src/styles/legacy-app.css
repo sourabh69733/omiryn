@@ -4218,6 +4218,32 @@ p {
   line-height: 1.5;
 }
 
+.chat-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.chat-empty-actions button {
+  min-height: 42px;
+  border: 1px solid rgba(180, 154, 255, 0.18);
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6a46ff, #ff7eb3);
+  padding: 0 16px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.agentic-chat .chat-empty-actions .secondary-button {
+  color: #2f294a;
+  background: rgba(255, 255, 255, 0.78);
+}
+
 .message {
   max-width: min(78%, calc(100% - 48px));
   border-radius: 16px;

@@ -581,14 +581,14 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
           <div className="card-heading">
             <div className="chat-title-lockup"><span className="terminal-mark"><img src={avatar} alt="" /></span><div><h2>{agentName}</h2><p className="agent-status">{runtime.provider || "Agent"} · {conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
-              <button className="secondary-button mobile-history-button" type="button" onClick={() => setHistoryOpen(true)}>History</button>
+              <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
               <div className="model-picker context-multiselect chat-context-control"><span>Context</span><button className="context-picker-button" type="button" onClick={() => setContextMenuOpen((value) => !value)} aria-expanded={contextMenuOpen}>{contextSources.filter((source) => source.attached).length ? `${contextSources.filter((source) => source.attached).length} context` : "No context"}</button>{contextMenuOpen ? <div className="context-picker-menu">{contextSources.length ? contextSources.map((source) => <label className="context-picker-option" key={source.id}><input type="checkbox" checked={Boolean(source.attached)} onChange={() => void toggleContext(source.id)} /><span><strong>{source.title}</strong><small>{source.source_type}</small></span></label>) : <div className="context-picker-empty">Save memories from Style first.</div>}</div> : null}</div>
               <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
             </div>
           </div>
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
-            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose a conversation from History or start a new chat.</span></div> : null}
+            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
             {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
