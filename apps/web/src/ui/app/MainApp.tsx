@@ -329,6 +329,18 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
     });
   }, []);
 
+  useLayoutEffect(() => {
+    if (!conversation || !window.location.hash.startsWith("#message-")) return;
+    const targetId = window.location.hash.slice(1);
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.scrollIntoView({ block: "center" });
+      target.classList.add("evidence-highlight");
+      window.setTimeout(() => target.classList.remove("evidence-highlight"), 2400);
+    });
+  }, [conversation?.id, conversation?.messages.length]);
+
   function isLogNearBottom() {
     const log = logRef.current;
     if (!log) return true;
@@ -588,7 +600,7 @@ function ChatPage({ initialConversationId, userAvatar }: { initialConversationId
           </div>
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
-            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
+            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
             {!loading && conversation?.messages.map((message, index) => {
               const agent = message.role === "assistant";
@@ -820,11 +832,11 @@ function StylePage() {
   const coreFacts = reviewRemainingFacts.filter((fact) => !hiddenIds.has(fact.id) && !matchingIds.has(fact.id) && !chatIds.has(fact.id));
   const notUsedFacts = [...hiddenFacts, ...rejectedFacts];
   const factSections: Array<{ id: string; title: string; summary: string; rows: ProfileFact[] }> = [
-    { id: "review", title: "Needs review", summary: "Low-confidence AI signals that benefit from your feedback.", rows: needsReviewFacts },
+    { id: "review", title: "Review these signals", summary: "Tell Omiryn if these are right or wrong. This improves what it remembers about you.", rows: needsReviewFacts },
     { id: "matching", title: "Used for matching", summary: "Signals that can affect future compatibility suggestions.", rows: matchingFacts },
-    { id: "chat", title: "Used in chat", summary: "Signals Omiryn can use to personalize replies.", rows: chatFacts },
+    { id: "chat", title: "Used for personalization", summary: "Signals Omiryn can use to make conversations feel more relevant.", rows: chatFacts },
     { id: "core", title: "Core understanding", summary: "Other active signals Omiryn has learned about your style.", rows: coreFacts },
-    { id: "not-used", title: "Not used by Omiryn", summary: "Signals you turned off or marked wrong. Omiryn will not use them for chat or matching.", rows: notUsedFacts }
+    { id: "not-used", title: "Not used by Omiryn", summary: "Signals you turned off or marked wrong. Omiryn will not use them for personalization or matching.", rows: notUsedFacts }
   ].filter((section) => section.rows.length);
 
   async function importContext(event: FormEvent) {
@@ -881,10 +893,10 @@ function StylePage() {
     }
   }
 
-  function openFeedbackFlow(fact: ProfileFact) {
+  function openFeedbackFlow(fact: ProfileFact, initialRating?: "agree" | "disagree") {
     setReviewFact(fact);
     setReviewMode("feedback");
-    setFeedbackRating(fact.feedback?.rating === "disagree" ? "disagree" : "agree");
+    setFeedbackRating(initialRating || (fact.feedback?.rating === "disagree" ? "disagree" : "agree"));
     setReviewReason("");
     setError("");
   }
@@ -898,29 +910,21 @@ function StylePage() {
     setError("");
   }
 
-  async function submitFeedbackFlow(event: FormEvent) {
-    event.preventDefault();
-    if (!reviewFact) return;
-    if (feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 && reviewReason.trim().length < 8) {
-      setError("Add a short reason so Omiryn can correct a high-confidence signal.");
-      return;
-    }
-    setSavingFactId(reviewFact.id);
+  async function saveSignalFeedback(fact: ProfileFact, rating: "agree" | "disagree", comment = "") {
+    setSavingFactId(fact.id);
     setError("");
     try {
-      const response = await apiFetch(`/api/me/profile-facts/${reviewFact.id}/feedback`, {
+      const response = await apiFetch(`/api/me/profile-facts/${fact.id}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rating: feedbackRating,
-          reason: feedbackRating === "disagree"
-            ? ((reviewFact.confidence || 0) >= 0.9 ? "high_confidence_wrong" : "wrong")
-            : "feels_right",
-          comment: reviewReason.trim() || null
+          rating,
+          reason: rating === "disagree" ? "wrong" : "feels_right",
+          comment: comment.trim() || null
         })
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save feedback."));
-      trackAppEvent("learned_signal_feedback_sent", { fact_category: reviewFact.category || "unknown", rating: feedbackRating }, { page: "style", target_type: "profile_fact", target_id: reviewFact.id });
+      trackAppEvent("learned_signal_feedback_sent", { fact_category: fact.category || "unknown", rating }, { page: "style", target_type: "profile_fact", target_id: fact.id });
       setReviewFact(null);
       setReviewMode(null);
       setReviewReason("");
@@ -930,6 +934,16 @@ function StylePage() {
     } finally {
       setSavingFactId(null);
     }
+  }
+
+  async function submitFeedbackFlow(event: FormEvent) {
+    event.preventDefault();
+    if (!reviewFact) return;
+    if (feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 && reviewReason.trim().length < 8) {
+      setError("Add a short reason so Omiryn can correct a high-confidence signal.");
+      return;
+    }
+    await saveSignalFeedback(reviewFact, feedbackRating, reviewReason);
   }
 
   async function submitPrivacyFlow(event: FormEvent) {
@@ -946,7 +960,7 @@ function StylePage() {
     );
   }
 
-  function renderSignalCard(fact: ProfileFact) {
+  function renderSignalCard(fact: ProfileFact, sectionId = "") {
     const confidence = Math.round((fact.confidence || 0) * 100);
     const hasEvidence = Boolean(fact.evidence?.length);
     const isSaving = savingFactId === fact.id;
@@ -970,8 +984,15 @@ function StylePage() {
         <div className="signal-card-actions">
           {!wasRejected ? (
             <>
-              <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(fact)}>Feedback</button>
-              <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(fact)}>Privacy</button>
+              {sectionId === "review" ? (
+                <>
+                  <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => void saveSignalFeedback(fact, "agree")}>Looks right</button>
+                  <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(fact, "disagree")}>Correct / mark wrong</button>
+                </>
+              ) : (
+                <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(fact)}>Review accuracy</button>
+              )}
+              <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(fact)}>Usage</button>
             </>
           ) : (
             <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void patchFact(fact, { status: "active", confirmed: false }, "learned_signal_restored")}>Restore</button>
@@ -996,7 +1017,7 @@ function StylePage() {
           <span>{section.rows.length}</span>
         </div>
         <div className="profile-fact-list">
-          {visibleRows.map(renderSignalCard)}
+          {visibleRows.map((fact) => renderSignalCard(fact, section.id))}
         </div>
         {section.rows.length > 5 || isCollapsedArchive ? (
           <button
@@ -1030,7 +1051,7 @@ function StylePage() {
           <small>Available for personalization</small>
         </div>
         <div className="style-snapshot-card">
-          <span>Needs review</span>
+          <span>To review</span>
           <strong>{needsReviewFacts.length}</strong>
           <small>Low-confidence or unconfirmed</small>
         </div>
@@ -1040,7 +1061,7 @@ function StylePage() {
           <small>Can affect future suggestions</small>
         </div>
         <div className="style-snapshot-card">
-          <span>Used in chat</span>
+          <span>Personalization</span>
           <strong>{chatFacts.length}</strong>
           <small>Can shape Omiryn's replies</small>
         </div>
@@ -1051,8 +1072,8 @@ function StylePage() {
             <div>
               <p className="eyebrow">AI signals</p>
               <h2>Review what Omiryn thinks</h2>
-              <p>Each point is an AI inference, not a permanent label. Confirm it, mark it wrong, or decide where Omiryn may use it.</p>
-              <p className="privacy-note">Marked-wrong signals are not used for chat or matching. High-confidence rejections ask for a reason to help the AI correct itself.</p>
+              <p>Each point is an AI inference, not a permanent label. Use “Looks right” or “Correct / mark wrong” to teach Omiryn.</p>
+              <p className="privacy-note">Marked-wrong signals are not used for personalization or matching. High-confidence rejections ask for a correction to help the AI improve.</p>
             </div>
             <span className="profile-fact-total">{facts.length} signals</span>
           </div>
@@ -1103,8 +1124,8 @@ function StylePage() {
         <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewFact.id) { setReviewFact(null); setReviewMode(null); setError(""); } }}>
           <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title">
             <div className="confirm-copy">
-              <p className="eyebrow">{reviewMode === "feedback" ? "Feedback" : "Privacy"}</p>
-              <h2 id="signal-review-title">{reviewMode === "feedback" ? "How accurate is this signal?" : "Where can Omiryn use this?"}</h2>
+              <p className="eyebrow">{reviewMode === "feedback" ? "Review signal" : "Usage control"}</p>
+              <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omiryn use this?"}</h2>
               <p>{reviewFact.label || reviewFact.key}</p>
             </div>
             {reviewMode === "feedback" ? (
@@ -1119,7 +1140,7 @@ function StylePage() {
                     <span><strong>Not true</strong><small>Omiryn should stop using this.</small></span>
                   </label>
                 </div>
-                <p className="privacy-note">{feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 ? "This is a high-confidence signal, so a short reason is required." : "Add a note if you want to give Omiryn more context."}</p>
+                <p className="privacy-note">{feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 ? "This is a high-confidence signal, so a short correction is required." : "Optional: add a correction or context, especially if the signal is only partly right."}</p>
                 <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder={feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 ? "Required: what did Omiryn get wrong?" : "Optional note"} />
                 {error ? <p className="legacy-inline-error">{error}</p> : null}
                 <div className="confirm-actions">
@@ -1129,10 +1150,10 @@ function StylePage() {
               </form>
             ) : (
               <form className="signal-review-form" onSubmit={(event) => void submitPrivacyFlow(event)}>
-                <p className="privacy-note">Privacy here means usage control. The signal can stay stored while you decide whether Omiryn may use it in chat or future matching.</p>
+                <p className="privacy-note">This controls where the saved signal may be used. Turning both off keeps it stored but prevents Omiryn from using it.</p>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForChat} onChange={(event) => setPrivacyForChat(event.target.checked)} />
-                  <span><strong>Use in chat</strong><small>Lets Omiryn personalize replies with this signal.</small></span>
+                  <span><strong>Use for personalization</strong><small>Lets Omiryn use this signal to make replies more relevant.</small></span>
                 </label>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForMatching} onChange={(event) => setPrivacyForMatching(event.target.checked)} />
@@ -1213,13 +1234,15 @@ function evidenceSourceLabel(fact: ProfileFact, item: unknown) {
   if (!item || typeof item !== "object") return humanizeLabel(fact.source_kind || "source");
   const row = item as Record<string, unknown>;
   if (row.conversation_id || fact.source_kind === "agent_chat") return "User message";
-  if (row.context_source_id || fact.source_kind === "whatsapp_import") return "Imported memory";
+  if (fact.source_kind === "whatsapp_import") return "WhatsApp import";
+  if (row.context_source_id) return "Saved memory";
+  if (fact.source_kind === "agent_deep_memory") return "Conversation memory";
   return humanizeLabel(String(row.source_kind || fact.source_kind || "source"));
 }
 
 function evidenceHref(fact: ProfileFact, item: unknown) {
   const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
-  const conversationId = String(row.conversation_id || (fact.source_kind === "agent_chat" ? fact.source_id || "" : ""));
+  const conversationId = String(row.conversation_id || (["agent_chat", "agent_deep_memory", "agent_conversation"].includes(String(fact.source_kind)) ? fact.source_id || "" : ""));
   if (!conversationId) return "";
   const url = new URL("/", window.location.origin);
   url.searchParams.set("conversation_id", conversationId);

@@ -4244,6 +4244,10 @@ p {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.mobile-empty-history-button {
+  display: none;
+}
+
 .message {
   max-width: min(78%, calc(100% - 48px));
   border-radius: 16px;
@@ -8135,6 +8139,12 @@ p {
     background: rgba(92, 219, 199, 0.1);
     padding: 0 9px;
     font-size: 11px;
+  }
+
+  .mobile-empty-history-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .chat-context-control {
