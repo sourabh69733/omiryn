@@ -48,10 +48,8 @@ VALID_REVIEW_DECISIONS = {"approve", "rewrite", "merge", "reject", "duplicate_of
 
 
 def data_point_extractor_mode() -> str:
-    mode = os.getenv("DATA_POINT_EXTRACTOR", "rules").strip().lower()
-    if mode in {"llm", "hybrid", "rules"}:
-        return mode
-    return "rules"
+    mode = os.getenv("DATA_POINT_EXTRACTOR", "hybrid").strip().lower()
+    return mode
 
 
 def should_run_llm_data_point_extraction() -> bool:
