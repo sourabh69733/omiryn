@@ -295,7 +295,7 @@ export function StylePage() {
           </div>
         </section>
 
-        <section className="profile-panel profile-panel-wide style-context-panel">
+        {/* <section className="profile-panel profile-panel-wide style-context-panel">
           <div className="style-section-heading">
             <div>
               <p className="eyebrow">Memories</p>
@@ -331,7 +331,7 @@ export function StylePage() {
             )) : <div className="table-empty">No saved memories yet.</div>}
           </div>
           {error ? <p className="legacy-inline-error">{error}</p> : null}
-        </section>
+        </section> */}
       </div>
       {reviewFact && reviewMode ? (
         <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewFact.id) { setReviewFact(null); setReviewMode(null); setError(""); } }}>
