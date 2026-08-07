@@ -15,10 +15,11 @@ from agent.runtime.replies import split_assistant_reply
 from agent.context_engine.turn_state import assistant_turn_state
 from agent.runtime.turn_policy import direct_turn_reply
 from agent.runtime.turn_output import (
+    TURN_OUTPUT_V2_TOOL_CHOICE,
+    TURN_OUTPUT_V2_TOOLS,
     capture_turn_output_data_points,
     parse_turn_output_v2,
     turn_output_v2_enabled,
-    with_turn_output_v2_instruction,
 )
 from storage import (
     finish_agent_trace,
@@ -160,8 +161,6 @@ async def run_agent_turn(
     )
     turn_output_v2 = turn_output_v2_enabled()
     system_prompt = context_package.system_prompt
-    if turn_output_v2:
-        system_prompt = with_turn_output_v2_instruction(system_prompt)
     save_agent_trace_step(
         {
             "trace_id": trace_id,
@@ -210,6 +209,8 @@ async def run_agent_turn(
             context_sources=context_package.context_sources,
             user_profile=context_package.user_profile,
             system_prompt=system_prompt,
+            tools=TURN_OUTPUT_V2_TOOLS if turn_output_v2 else None,
+            tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
         )
         turn_output_summary = None
         if turn_output_v2:
