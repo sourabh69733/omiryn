@@ -35,7 +35,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const response = await apiFetch("/api/agent/conversations");
     if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load chat history."));
     const data = await response.json();
-    const rows = (data.conversations || []) as ConversationSummary[];
+    const rows = sortConversationSummaries((data.conversations || []) as ConversationSummary[]);
     setSummaries(rows);
     return rows;
   }
@@ -116,9 +116,12 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       fetchSummaries()
     ]).then(([status, rows]) => {
       setRuntime(status);
+      const urlConversationId = new URLSearchParams(window.location.search).get("conversation_id");
       const saved = window.localStorage.getItem("omiryn.activeConversationId");
-      const preferred = initialConversationId || saved || rows[0]?.id;
+      const availableIds = new Set(rows.map((row) => row.id));
+      const preferred = [urlConversationId, saved, initialConversationId, rows[0]?.id].find((id) => id && availableIds.has(id));
       if (preferred) return openConversation(preferred);
+      window.localStorage.removeItem("omiryn.activeConversationId");
       setConversation(null);
       setLoading(false);
     }).catch((caught) => {
@@ -312,14 +315,19 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     }
     const rows = await fetchSummaries();
     if (conversation?.id === id) {
-      window.localStorage.removeItem("omiryn.activeConversationId");
-      window.history.replaceState({}, "", "/");
-      setConversation(null);
-      setContextSources([]);
-      setUsage(null);
-      setUsageError("");
-      setSidePanel("history");
-      setLoading(false);
+      const nextConversation = rows[0];
+      if (nextConversation) {
+        await openConversation(nextConversation.id);
+      } else {
+        window.localStorage.removeItem("omiryn.activeConversationId");
+        window.history.replaceState({}, "", "/");
+        setConversation(null);
+        setContextSources([]);
+        setUsage(null);
+        setUsageError("");
+        setSidePanel("history");
+        setLoading(false);
+      }
     }
     setPendingDelete(null);
     setDeleting(false);
@@ -442,6 +450,15 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
+}
+
+function sortConversationSummaries(rows: ConversationSummary[]) {
+  return [...rows].sort((left, right) => conversationSortTime(right) - conversationSortTime(left));
+}
+
+function conversationSortTime(row: ConversationSummary) {
+  const parsed = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function friendlyQuotaMessage(detail: string) {
@@ -587,4 +604,3 @@ function averageChatUsage(events: UsageEvent[], summary: UsageSummary = {}) {
     completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
   };
 }
-
