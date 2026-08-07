@@ -94,8 +94,8 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
 
     label = str(raw_point.get("label") or "").strip()
     category = _snake_key(str(raw_point.get("category") or "other")) or "other"
-    evidence = _evidence_text(raw_point.get("evidence"))
-    if not label or not evidence or not _is_user_evidence(evidence, user_text):
+    evidence = str(user_text or "").strip()
+    if not label or not evidence:
         return None
 
     return {
@@ -107,20 +107,6 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
         "evidence": evidence[:320],
         "confidence": _bounded_confidence(raw_point.get("confidence")),
     }
-
-
-def _evidence_text(raw_evidence: Any) -> str:
-    if isinstance(raw_evidence, str):
-        return raw_evidence.strip()
-    if isinstance(raw_evidence, dict):
-        return str(raw_evidence.get("text") or raw_evidence.get("quote") or "").strip()
-    return ""
-
-
-def _is_user_evidence(evidence: str, user_text: str) -> bool:
-    clean_evidence = _compact_text(evidence)
-    clean_user_text = _compact_text(user_text)
-    return bool(clean_evidence and clean_evidence in clean_user_text)
 
 
 def _normalize_value(value: Any, label: str) -> dict[str, Any]:
@@ -137,10 +123,6 @@ def _bounded_confidence(value: Any) -> float:
     except (TypeError, ValueError):
         confidence = 0.5
     return max(0.0, min(1.0, confidence))
-
-
-def _compact_text(text: str) -> str:
-    return re.sub(r"\s+", " ", str(text or "").strip().lower())
 
 
 def _snake_key(value: str) -> str:
