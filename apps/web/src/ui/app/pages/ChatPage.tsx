@@ -133,7 +133,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }, []);
 
   useLayoutEffect(() => {
-    if (!conversation || !window.location.hash.startsWith("#message-")) return;
+    if (loading || !conversation || !window.location.hash.startsWith("#message-")) return;
     const targetId = window.location.hash.slice(1);
     window.requestAnimationFrame(() => {
       const target = document.getElementById(targetId);
@@ -142,7 +142,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       target.classList.add("evidence-highlight");
       window.setTimeout(() => target.classList.remove("evidence-highlight"), 2400);
     });
-  }, [conversation?.id, conversation?.messages.length]);
+  }, [conversation?.id, conversation?.messages.length, loading]);
 
   function isLogNearBottom() {
     const log = logRef.current;

@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { ContextSource, ProfileFact, ProfileResponse } from "../types";
@@ -439,7 +439,7 @@ export function StylePage() {
                       <blockquote>{evidenceText(item)}</blockquote>
                       <p>
                         {evidenceSourceLabel(evidenceFact, item)}
-                        {href ? <> · <a className="evidence-chat-link" href={href}>Open source</a></> : null}
+                        {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open source</a></> : null}
                       </p>
                     </div>
                   </article>
@@ -496,6 +496,14 @@ function evidenceHref(fact: ProfileFact, item: unknown) {
     url.hash = `message-${messageIndex}`;
   }
   return url.toString();
+}
+
+function openEvidenceSource(event: MouseEvent<HTMLAnchorElement>, href: string) {
+  const target = new URL(href);
+  if (target.origin !== window.location.origin) return;
+  event.preventDefault();
+  window.history.pushState({}, "", `${target.pathname}${target.search}${target.hash}`);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 function dataPointType(fact: ProfileFact) {
