@@ -81,7 +81,7 @@ def capture_turn_output_data_points(
                     "category": point["category"],
                     "key": point["key"],
                     "label": point["label"],
-                    "value": point.get("value") or {"detail": point["label"]},
+                    "value": _value_with_data_point_type(point.get("value"), point["label"], point_type),
                     "confidence": point.get("confidence", 0.5),
                     "fact_type": policy["fact_type"],
                     "confidence_state": policy["confidence_state"],
@@ -119,6 +119,12 @@ def capture_turn_output_data_points(
         "saved_count": saved_count,
         "skipped_count": skipped_count,
     }
+
+
+def _value_with_data_point_type(value: Any, label: str, point_type: str) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return {**value, "_data_point_type": point_type}
+    return {"detail": str(value or label), "_data_point_type": point_type}
 
 
 def _save_debug(

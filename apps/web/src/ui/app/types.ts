@@ -46,7 +46,10 @@ export type ProfileFact = {
   label?: string;
   key?: string;
   category?: string;
+  value?: Record<string, unknown>;
   confidence?: number;
+  fact_type?: string;
+  confidence_state?: string;
   status?: string;
   evidence?: unknown[];
   source_kind?: string;

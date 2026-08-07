@@ -36,21 +36,29 @@ export function StylePage() {
   const needsReviewFacts = activeFacts.filter((fact) => !fact.feedback && (fact.confidence || 0) < 0.75);
   const needsReviewIds = new Set(needsReviewFacts.map((fact) => fact.id));
   const reviewRemainingFacts = activeFacts.filter((fact) => !needsReviewIds.has(fact.id));
-  const hiddenFacts = reviewRemainingFacts.filter((fact) => !fact.used_for_matching && !fact.used_for_chat_context);
-  const hiddenIds = new Set(hiddenFacts.map((fact) => fact.id));
-  const matchingFacts = reviewRemainingFacts.filter((fact) => !hiddenIds.has(fact.id) && fact.used_for_matching);
+  const confirmationFacts = reviewRemainingFacts.filter((fact) => dataPointType(fact) === "needs_confirmation");
+  const confirmationIds = new Set(confirmationFacts.map((fact) => fact.id));
+  const typedFacts = reviewRemainingFacts.filter((fact) => !confirmationIds.has(fact.id));
+  const profileFacts = typedFacts.filter((fact) => dataPointType(fact) === "profile_fact");
+  const profileIds = new Set(profileFacts.map((fact) => fact.id));
+  const matchingFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && dataPointType(fact) === "matching_fact");
   const matchingIds = new Set(matchingFacts.map((fact) => fact.id));
-  const chatFacts = reviewRemainingFacts.filter((fact) => !hiddenIds.has(fact.id) && !matchingIds.has(fact.id) && fact.used_for_chat_context);
-  const chatIds = new Set(chatFacts.map((fact) => fact.id));
-  const coreFacts = reviewRemainingFacts.filter((fact) => !hiddenIds.has(fact.id) && !matchingIds.has(fact.id) && !chatIds.has(fact.id));
-  const notUsedFacts = [...hiddenFacts, ...rejectedFacts];
+  const temporaryFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && !matchingIds.has(fact.id) && dataPointType(fact) === "temporary_context");
+  const temporaryIds = new Set(temporaryFacts.map((fact) => fact.id));
+  const chatFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && !matchingIds.has(fact.id) && !temporaryIds.has(fact.id) && dataPointType(fact) === "chat_learning");
+  const typedIds = new Set([...profileIds, ...matchingIds, ...temporaryIds, ...chatFacts.map((fact) => fact.id)]);
+  const otherFacts = typedFacts.filter((fact) => !typedIds.has(fact.id));
+  const notUsedFacts = rejectedFacts;
   const factSections: Array<{ id: string; title: string; summary: string; rows: ProfileFact[] }> = [
     { id: "review", title: "Review these signals", summary: "Tell Omiryn if these are right or wrong. This improves what it remembers about you.", rows: needsReviewFacts },
-    { id: "matching", title: "Used for matching", summary: "Signals that can affect future compatibility suggestions.", rows: matchingFacts },
-    { id: "chat", title: "Used for personalization", summary: "Signals Omiryn can use to make conversations feel more relevant.", rows: chatFacts },
-    { id: "core", title: "Core understanding", summary: "Other active signals Omiryn has learned about your style.", rows: coreFacts },
-    { id: "not-used", title: "Not used by Omiryn", summary: "Signals you turned off or marked wrong. Omiryn will not use them for personalization or matching.", rows: notUsedFacts }
+    { id: "profile", title: "Profile facts", summary: "Stable basics about you, like location, language, identity, or life background.", rows: profileFacts },
+    { id: "matching", title: "Matching facts", summary: "Preferences, values, boundaries, relationship intent, lifestyle, and compatibility signals.", rows: matchingFacts },
+    { id: "chat", title: "Chat learning", summary: "How Omiryn should talk with you: tone, pacing, question style, humor, and sensitivities.", rows: chatFacts },
+    { id: "temporary", title: "Temporary context", summary: "Short-lived context from the current phase of life or current conversation.", rows: temporaryFacts },
+    { id: "confirmation", title: "Needs confirmation", summary: "Possible signals Omiryn should ask about before trusting or using strongly.", rows: confirmationFacts },
+    { id: "other", title: "Other saved signals", summary: "Older or imported signals that do not yet map cleanly to the V2 types.", rows: otherFacts }
   ].filter((section) => section.rows.length);
+  const showNotUsed = visibleSectionCounts["not-used"] !== undefined;
 
   async function importContext(event: FormEvent) {
     event.preventDefault();
@@ -185,6 +193,9 @@ export function StylePage() {
             <strong>{fact.label || fact.key}</strong>
             <div className="profile-fact-meta">
               <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{confidenceLabel(fact.confidence)} · {confidence}%</span>
+              <span className="fact-tag fact-tag-type">{humanizeDataPointType(dataPointType(fact))}</span>
+              {fact.category ? <span className="fact-tag fact-tag-key">{humanizeLabel(fact.category)}</span> : null}
+              {fact.confidence_state && fact.confidence_state !== "active" ? <span className="fact-tag fact-tag-status">{humanizeLabel(fact.confidence_state)}</span> : null}
               {hasEvidence ? (
                 <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceFact(fact)}>
                   {fact.evidence?.length} evidence
@@ -216,8 +227,7 @@ export function StylePage() {
   }
 
   function renderFactSection(section: { id: string; title: string; summary: string; rows: ProfileFact[] }) {
-    const isCollapsedArchive = section.id === "not-used" && visibleSectionCounts[section.id] === undefined;
-    const visibleCount = isCollapsedArchive ? 0 : (visibleSectionCounts[section.id] || 5);
+    const visibleCount = visibleSectionCounts[section.id] || 5;
     const visibleRows = section.rows.slice(0, visibleCount);
     const hasMore = visibleCount < section.rows.length;
     return (
@@ -232,7 +242,7 @@ export function StylePage() {
         <div className="profile-fact-list">
           {visibleRows.map((fact) => renderSignalCard(fact, section.id))}
         </div>
-        {section.rows.length > 5 || isCollapsedArchive ? (
+        {section.rows.length > 5 ? (
           <button
             className="secondary-button signal-show-more"
             type="button"
@@ -241,7 +251,7 @@ export function StylePage() {
               [section.id]: hasMore ? visibleCount + 5 : 5
             }))}
           >
-            {hasMore ? (visibleCount === 0 ? `Show ${section.rows.length} signals` : `Show ${Math.min(5, section.rows.length - visibleCount)} more`) : "Show less"}
+            {hasMore ? `Show ${Math.min(5, section.rows.length - visibleCount)} more` : "Show less"}
           </button>
         ) : null}
       </section>
@@ -274,7 +284,7 @@ export function StylePage() {
           <small>Can affect future suggestions</small>
         </div>
         <div className="style-snapshot-card">
-          <span>Personalization</span>
+          <span>Chat learning</span>
           <strong>{chatFacts.length}</strong>
           <small>Can shape Omiryn's replies</small>
         </div>
@@ -285,13 +295,36 @@ export function StylePage() {
             <div>
               <p className="eyebrow">AI signals</p>
               <h2>Review what Omiryn thinks</h2>
-              <p>Each point is an AI inference, not a permanent label. Use “Looks right” or “Correct / mark wrong” to teach Omiryn.</p>
+              <p>Each point is an AI inference, not a permanent label. Sections show the saved data-point type Omiryn is using internally.</p>
               <p className="privacy-note">Marked-wrong signals are not used for personalization or matching. High-confidence rejections ask for a correction to help the AI improve.</p>
+              <p className="privacy-note">“Do not store” points are intentionally skipped, so they do not appear here.</p>
             </div>
             <span className="profile-fact-total">{facts.length} signals</span>
           </div>
           <div className="profile-fact-groups">
             {facts.length ? factSections.map(renderFactSection) : <div className="profile-facts-empty"><strong>No learned signals yet.</strong><span>Chat naturally with Omiryn and this section will fill up.</span></div>}
+            {notUsedFacts.length ? (
+              <div className="signal-archive-toggle-row">
+                <button
+                  className="secondary-button signal-show-more"
+                  type="button"
+                  onClick={() => setVisibleSectionCounts((current) => {
+                    const next = { ...current };
+                    if (showNotUsed) delete next["not-used"];
+                    else next["not-used"] = 5;
+                    return next;
+                  })}
+                >
+                  {showNotUsed ? "Hide not used signals" : `Show not used signals (${notUsedFacts.length})`}
+                </button>
+              </div>
+            ) : null}
+            {showNotUsed ? renderFactSection({
+              id: "not-used",
+              title: "Not used by Omiryn",
+              summary: "Signals you turned off or marked wrong. Omiryn will not use them for personalization or matching.",
+              rows: notUsedFacts
+            }) : null}
           </div>
         </section>
 
@@ -466,7 +499,26 @@ function evidenceHref(fact: ProfileFact, item: unknown) {
   return url.toString();
 }
 
+function dataPointType(fact: ProfileFact) {
+  const savedType = typeof fact.value?._data_point_type === "string" ? fact.value._data_point_type : "";
+  if (savedType) return savedType;
+  if (fact.confidence_state === "candidate" && !fact.used_for_matching && !fact.used_for_chat_context) return "needs_confirmation";
+  if (fact.fact_type === "profile_fact") return "profile_fact";
+  if (fact.fact_type === "chat_context_fact" || fact.fact_type === "style_fact" || fact.used_for_chat_context) return "chat_learning";
+  if (fact.fact_type === "matching_fact" || fact.used_for_matching) return "matching_fact";
+  return "other";
+}
+
+function humanizeDataPointType(value: string) {
+  if (value === "profile_fact") return "Profile fact";
+  if (value === "matching_fact") return "Matching fact";
+  if (value === "chat_learning") return "Chat learning";
+  if (value === "temporary_context") return "Temporary context";
+  if (value === "needs_confirmation") return "Needs confirmation";
+  if (value === "do_not_store") return "Do not store";
+  return humanizeLabel(value || "Other");
+}
+
 function humanizeLabel(value?: string) {
   return (value || "").replaceAll("_", " ");
 }
-

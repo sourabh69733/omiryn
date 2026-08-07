@@ -6657,6 +6657,11 @@ p {
   color: #6d4e58;
 }
 
+.signal-archive-toggle-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .fact-icon-button {
   display: inline-grid;
   place-items: center;
@@ -6796,6 +6801,12 @@ p {
 .fact-tag-key {
   color: #495b62;
   background: #ffffff;
+}
+
+.fact-tag-type {
+  border-color: #d9ccff;
+  color: #6546a3;
+  background: #f7f3ff;
 }
 
 .fact-tag-status {

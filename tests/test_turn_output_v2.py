@@ -139,9 +139,11 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(facts), 2)
         by_key = {fact["key"]: fact for fact in facts}
         self.assertTrue(by_key["likes_spicy_food"]["used_for_matching"])
+        self.assertEqual(by_key["likes_spicy_food"]["value"]["_data_point_type"], "matching_fact")
         self.assertFalse(by_key["prefers_less_interview"]["used_for_matching"])
         self.assertTrue(by_key["prefers_less_interview"]["used_for_chat_context"])
         self.assertEqual(by_key["prefers_less_interview"]["fact_type"], "chat_context_fact")
+        self.assertEqual(by_key["prefers_less_interview"]["value"]["_data_point_type"], "chat_learning")
         self.assertEqual(len(list_data_point_extraction_debug("user-a")), 3)
 
     async def test_orchestrator_v2_displays_reply_and_saves_hidden_data_points(self) -> None:
