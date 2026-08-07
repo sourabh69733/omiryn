@@ -424,7 +424,7 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
             "used_for_chat_context": False,
         }
     return {
-        "value_json": incoming["value_json"],
+        "value_json": _merge_fact_values(existing["value_json"], incoming["value_json"]),
         "label": incoming["label"],
         "confidence": max(existing["confidence"] or 0, incoming["confidence"]),
         "fact_type": incoming["fact_type"] or existing["fact_type"],
@@ -437,6 +437,42 @@ def _merge_profile_fact(existing: Any, incoming: dict[str, Any]) -> dict[str, An
         "used_for_matching": incoming["used_for_matching"],
         "used_for_chat_context": incoming["used_for_chat_context"],
     }
+
+
+def _merge_fact_values(existing: Any, incoming: Any) -> Any:
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        merged = dict(existing)
+        for key, value in incoming.items():
+            merged[key] = _merge_fact_values(merged[key], value) if key in merged else value
+        return merged
+    if isinstance(existing, list) and isinstance(incoming, list):
+        return _dedupe_value_list([*existing, *incoming])
+    if isinstance(existing, list):
+        return _dedupe_value_list([*existing, incoming])
+    if isinstance(incoming, list):
+        return _dedupe_value_list([existing, *incoming])
+    if isinstance(existing, str) and isinstance(incoming, str):
+        if _normalized_value_identity(existing) == _normalized_value_identity(incoming):
+            return existing
+    return incoming
+
+
+def _dedupe_value_list(values: list[Any]) -> list[Any]:
+    deduped: list[Any] = []
+    seen: set[str] = set()
+    for value in values:
+        identity = _normalized_value_identity(value)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(value)
+    return deduped
+
+
+def _normalized_value_identity(value: Any) -> str:
+    if isinstance(value, str):
+        return " ".join(value.casefold().split())
+    return repr(value)
 
 
 def _data_point_feedback_metadata(
@@ -536,6 +572,7 @@ def _merge_profile_fact_dict(existing: dict[str, Any], incoming: dict[str, Any])
         float(existing.get("confidence") or 0),
         float(incoming.get("confidence") or 0),
     )
+    base["value"] = _merge_fact_values(existing.get("value"), incoming.get("value"))
     base["evidence"] = _dedupe_evidence(
         list(existing.get("evidence") or []) + list(incoming.get("evidence") or [])
     )
