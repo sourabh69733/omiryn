@@ -6616,6 +6616,14 @@ p {
   text-transform: capitalize;
 }
 
+.profile-fact-card p.profile-fact-values {
+  margin: 5px 0 0;
+  color: #655d78;
+  font-size: 13px;
+  font-weight: 720;
+  text-transform: none;
+}
+
 .fact-card-actions {
   display: flex;
   justify-content: flex-end;

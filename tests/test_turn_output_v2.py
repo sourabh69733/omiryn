@@ -73,7 +73,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.reply, "Noted.")
         self.assertEqual(parsed.data_points[0]["value"]["city"], "Bengaluru")
 
-    def test_parser_uses_current_user_message_as_evidence(self) -> None:
+    def test_parser_rejects_data_point_when_value_is_not_grounded_in_user_message(self) -> None:
         parsed = parse_turn_output_v2(
             """
             {
@@ -93,8 +93,36 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(parsed.parsed)
+        self.assertEqual(parsed.data_points, [])
+
+    def test_parser_keeps_grounded_value_items_and_removes_hallucinated_items(self) -> None:
+        parsed = parse_turn_output_v2(
+            """
+            {
+              "reply": "Solid choices.",
+              "data_points": [
+                {
+                  "type": "matching_fact",
+                  "category": "vehicles",
+                  "label": "Favorite cars",
+                  "value": {
+                    "liked_items": ["Toyota", "Hilux", "Fortuner", "BMW"]
+                  },
+                  "confidence": 0.91
+                }
+              ]
+            }
+            """,
+            user_text="Toyota, hilux and fortuner",
+        )
+
+        self.assertTrue(parsed.parsed)
         self.assertEqual(len(parsed.data_points), 1)
-        self.assertEqual(parsed.data_points[0]["evidence"], "I am just testing today")
+        self.assertEqual(
+            parsed.data_points[0]["value"],
+            {"liked_items": ["Toyota", "Hilux", "Fortuner"]},
+        )
+        self.assertEqual(parsed.data_points[0]["evidence"], "Toyota, hilux and fortuner")
 
     def test_parser_preserves_model_extracted_label_category_and_value(self) -> None:
         parsed = parse_turn_output_v2(

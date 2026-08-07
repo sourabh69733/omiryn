@@ -1200,6 +1200,34 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(facts[0]["label"], "Favorite cars")
         self.assertEqual(len(facts[0]["evidence"]), 1)
 
+    def test_duplicate_profile_fact_merges_unique_structured_value_items(self) -> None:
+        first = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "vehicles",
+                "key": "favorite_cars",
+                "value": {"liked_items": ["Toyota", "Hilux"]},
+                "label": "Favorite cars",
+                "confidence": 0.8,
+            }
+        )
+        second = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "preferences",
+                "key": "cars_liked",
+                "value": {"liked_items": ["toyota", "Fortuner"]},
+                "label": "favorite cars",
+                "confidence": 0.9,
+            }
+        )
+
+        self.assertEqual(second["id"], first["id"])
+        self.assertEqual(
+            second["value"]["liked_items"],
+            ["Toyota", "Hilux", "Fortuner"],
+        )
+
     def test_profile_fact_aliases_merge_at_write_time(self) -> None:
         first = upsert_profile_fact(
             {

@@ -186,11 +186,13 @@ export function StylePage() {
     const hasEvidence = Boolean(fact.evidence?.length);
     const isSaving = savingFactId === fact.id;
     const wasRejected = fact.status === "rejected";
+    const values = signalValues(fact);
     return (
       <article className={`profile-fact-card signal-review-card ${wasRejected ? "is-rejected" : ""}`} key={fact.id}>
         <div className="profile-fact-card-top">
           <div>
             <strong>{fact.label || fact.key}</strong>
+            {values.length ? <p className="profile-fact-values">{values.join(" · ")}</p> : null}
             <div className="profile-fact-meta">
               <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{confidenceLabel(fact.confidence)} · {confidence}%</span>
               <span className="fact-tag fact-tag-type">{humanizeDataPointType(dataPointType(fact))}</span>
@@ -466,6 +468,72 @@ function confidenceLabel(confidence?: number) {
   if (value >= 0.75) return "Good";
   if (value >= 0.45) return "Learning";
   return "Weak";
+}
+
+function signalValues(fact: ProfileFact) {
+  const values: string[] = [];
+  const fallbackValues: string[] = [];
+  collectSignalValues(fact.value, values, fallbackValues);
+  const selectedValues = (values.length ? values : fallbackValues.slice(0, 1))
+    .flatMap(expandSerializedSignalList);
+  const label = String(fact.label || fact.key || "").trim().toLocaleLowerCase();
+  const seen = new Set<string>();
+  return selectedValues.filter((value) => {
+    const identity = value.trim().toLocaleLowerCase();
+    if (!identity || identity === label || seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  }).slice(0, 8);
+}
+
+function expandSerializedSignalList(value: string) {
+  const text = value.trim();
+  if (!text.startsWith("[") || !text.endsWith("]")) return [text];
+  const quotedItems = [...text.matchAll(/["']([^"']+)["']/g)]
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+  return quotedItems.length ? quotedItems : [text];
+}
+
+const internalSignalValueKeys = new Set([
+  "category", "confidence", "confidence_state", "context_source_id", "evidence",
+  "extractor", "fact_type", "import_id", "key", "kind", "llm_review",
+  "privacy_level", "rule_candidate", "source_id", "source_kind", "status", "title",
+  "usage", "used_for_style", "visibility"
+]);
+
+const fallbackSignalValueKeys = new Set([
+  "description", "detail", "explanation", "meaning", "reason", "summary",
+  "what_we_learned", "why_it_matters"
+]);
+
+function collectSignalValues(
+  value: unknown,
+  output: string[],
+  fallbackOutput: string[],
+  key = ""
+) {
+  if (
+    key.startsWith("_")
+    || internalSignalValueKeys.has(key)
+    || value === null
+    || value === undefined
+    || typeof value === "boolean"
+  ) return;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectSignalValues(item, output, fallbackOutput));
+    return;
+  }
+  if (typeof value === "object") {
+    Object.entries(value as Record<string, unknown>).forEach(([childKey, item]) => {
+      collectSignalValues(item, output, fallbackOutput, childKey);
+    });
+    return;
+  }
+  const text = String(value).trim();
+  if (!text) return;
+  if (fallbackSignalValueKeys.has(key)) fallbackOutput.push(text);
+  else output.push(text);
 }
 
 function evidenceText(item: unknown) {
