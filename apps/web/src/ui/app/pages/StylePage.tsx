@@ -297,7 +297,6 @@ export function StylePage() {
               <h2>Review what Omiryn thinks</h2>
               <p>Each point is an AI inference, not a permanent label. Sections show the saved data-point type Omiryn is using internally.</p>
               <p className="privacy-note">Marked-wrong signals are not used for personalization or matching. High-confidence rejections ask for a correction to help the AI improve.</p>
-              <p className="privacy-note">“Do not store” points are intentionally skipped, so they do not appear here.</p>
             </div>
             <span className="profile-fact-total">{facts.length} signals</span>
           </div>
