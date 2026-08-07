@@ -95,7 +95,7 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
     label = str(raw_point.get("label") or "").strip()
     category = _snake_key(str(raw_point.get("category") or "other")) or "other"
     evidence = str(user_text or "").strip()
-    if not label or not evidence:
+    if not label or not evidence or not value:
         return None
 
     return {
@@ -103,18 +103,64 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
         "category": category[:80],
         "key": _snake_key(str(raw_point.get("key") or label))[:120] or "data_point",
         "label": label[:160],
-        "value": _normalize_value(raw_point.get("value"), label),
+        "value": _normalize_value(raw_point.get("value"), user_text=user_text),
         "evidence": evidence[:320],
         "confidence": _bounded_confidence(raw_point.get("confidence")),
     }
 
 
-def _normalize_value(value: Any, label: str) -> dict[str, Any]:
+def _normalize_value(value: Any, *, user_text: str) -> dict[str, Any] | None:
+    grounded = _ground_value(value, user_text=user_text)
+    if grounded is None:
+        return None
+    if isinstance(grounded, dict):
+        return grounded
+    return {"detail": grounded}
+
+
+def _ground_value(value: Any, *, user_text: str) -> Any | None:
     if isinstance(value, dict):
-        return value
-    if value is None or value == "":
-        return {"detail": label}
-    return {"detail": str(value)}
+        grounded = {
+            str(key): grounded_value
+            for key, item in value.items()
+            if (grounded_value := _ground_value(item, user_text=user_text)) is not None
+        }
+        return grounded or None
+    if isinstance(value, list):
+        grounded_items = [
+            grounded
+            for item in value
+            if (grounded := _ground_value(item, user_text=user_text)) is not None
+        ]
+        return _dedupe_grounded_values(grounded_items) or None
+    if isinstance(value, bool) or value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized_value = _grounding_text(text)
+    normalized_user = _grounding_text(user_text)
+    if not normalized_value or f" {normalized_value} " not in f" {normalized_user} ":
+        return None
+    return value
+
+
+def _dedupe_grounded_values(values: list[Any]) -> list[Any]:
+    deduped: list[Any] = []
+    seen: set[str] = set()
+    for value in values:
+        identity = _grounding_text(str(value))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(value)
+    return deduped
+
+
+def _grounding_text(value: str) -> str:
+    return " ".join(
+        "".join(character.casefold() if character.isalnum() else " " for character in value).split()
+    )
 
 
 def _bounded_confidence(value: Any) -> float:
