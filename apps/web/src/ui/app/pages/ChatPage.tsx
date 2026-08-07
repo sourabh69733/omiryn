@@ -59,7 +59,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   async function openConversation(id: string) {
     setLoading(true);
     setError("");
-    shouldStickToBottomRef.current = true;
+    const targetHash = window.location.hash.startsWith("#message-") ? window.location.hash : "";
+    shouldStickToBottomRef.current = !targetHash;
     setUsage(null);
     setUsageError("");
     try {
@@ -68,7 +69,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       const data = (await response.json()) as Conversation;
       setConversation(data);
       trackAppEvent("chat_opened", { conversation_id: data.id }, { page: "chat", target_type: "conversation", target_id: data.id });
-      syncChatToBottomAfterRender();
+      if (!targetHash) syncChatToBottomAfterRender();
       void loadConversationUsage(data.id);
       const contextResponse = await apiFetch(`/api/agent/conversations/${data.id}/context-sources`);
       if (contextResponse.ok) {
@@ -78,6 +79,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       window.localStorage.setItem("omiryn.activeConversationId", data.id);
       const url = new URL("/", window.location.origin);
       url.searchParams.set("conversation_id", data.id);
+      url.hash = targetHash;
       window.history.replaceState({}, "", url);
       setHistoryOpen(false);
     } catch (caught) {
@@ -119,7 +121,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       const urlConversationId = new URLSearchParams(window.location.search).get("conversation_id");
       const saved = window.localStorage.getItem("omiryn.activeConversationId");
       const availableIds = new Set(rows.map((row) => row.id));
-      const preferred = [urlConversationId, saved, initialConversationId, rows[0]?.id].find((id) => id && availableIds.has(id));
+      const preferred = urlConversationId || [saved, initialConversationId, rows[0]?.id].find((id) => id && availableIds.has(id));
       if (preferred) return openConversation(preferred);
       window.localStorage.removeItem("omiryn.activeConversationId");
       setConversation(null);
