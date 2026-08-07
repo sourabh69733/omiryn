@@ -1157,6 +1157,49 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("I am using dating apps right now.", evidence_quotes)
         self.assertIn("I am using dating apps right now.", evidence_texts)
 
+    def test_profile_fact_label_case_dedupes_across_model_categories_at_write_time(self) -> None:
+        first = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "conversation_context",
+                "key": "favorite_cars",
+                "value": {"detail": "favorite cars"},
+                "label": "Favorite cars",
+                "confidence": 0.92,
+                "evidence": [
+                    {
+                        "conversation_id": "conversation-a",
+                        "message_index": 4,
+                        "text": "I really like cars.",
+                    }
+                ],
+            }
+        )
+        second = upsert_profile_fact(
+            {
+                "user_id": "user-a",
+                "category": "vehicles",
+                "key": "cars_favorite",
+                "value": {"preference": "cars"},
+                "label": "favorite cars",
+                "confidence": 0.8,
+                "evidence": [
+                    {
+                        "conversation_id": "conversation-a",
+                        "message_index": 4,
+                        "text": "I really like cars.",
+                    }
+                ],
+            }
+        )
+
+        facts = list_profile_facts("user-a")
+
+        self.assertEqual(second["id"], first["id"])
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0]["label"], "Favorite cars")
+        self.assertEqual(len(facts[0]["evidence"]), 1)
+
     def test_profile_fact_aliases_merge_at_write_time(self) -> None:
         first = upsert_profile_fact(
             {

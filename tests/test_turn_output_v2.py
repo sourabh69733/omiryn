@@ -73,7 +73,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.reply, "Noted.")
         self.assertEqual(parsed.data_points[0]["value"]["city"], "Bengaluru")
 
-    def test_parser_rejects_data_point_without_user_message_evidence(self) -> None:
+    def test_parser_uses_current_user_message_as_evidence(self) -> None:
         parsed = parse_turn_output_v2(
             """
             {
@@ -84,7 +84,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                   "category": "values",
                   "label": "Likes honesty",
                   "value": {"value": "honesty"},
-                  "evidence": "Honesty matters",
                   "confidence": 0.9
                 }
               ]
@@ -94,7 +93,34 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(parsed.parsed)
-        self.assertEqual(parsed.data_points, [])
+        self.assertEqual(len(parsed.data_points), 1)
+        self.assertEqual(parsed.data_points[0]["evidence"], "I am just testing today")
+
+    def test_parser_preserves_model_extracted_label_category_and_value(self) -> None:
+        parsed = parse_turn_output_v2(
+            """
+            {
+              "reply": "That is a strong signal.",
+              "data_points": [
+                {
+                  "type": "matching_fact",
+                  "category": "partner_location_preference",
+                  "label": "Prefers dating someone from a specific region",
+                  "value": {"preference": "date someone from a specific region"},
+                  "evidence": "I want to date someone from a specific region",
+                  "confidence": 0.82
+                }
+              ]
+            }
+            """,
+            user_text="I want to date someone from a specific region",
+        )
+
+        point = parsed.data_points[0]
+        self.assertEqual(point["type"], "matching_fact")
+        self.assertEqual(point["category"], "partner_location_preference")
+        self.assertEqual(point["label"], "Prefers dating someone from a specific region")
+        self.assertEqual(point["value"]["preference"], "date someone from a specific region")
 
     def test_writer_saves_supported_types_and_skips_do_not_store(self) -> None:
         result = capture_turn_output_data_points(
@@ -196,7 +222,20 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(result.messages[-1]["content"], "Nice, spicy food gives me a small but useful signal.")
-        self.assertIn("Return ONLY one JSON object", model_call.call_args.kwargs["system_prompt"])
+        self.assertEqual(model_call.call_args.kwargs["system_prompt"], "system prompt")
+        self.assertNotIn("response_format", model_call.call_args.kwargs)
+        tools = model_call.call_args.kwargs["tools"]
+        self.assertEqual(tools[0]["function"]["name"], "return_companion_response")
+        self.assertNotIn(
+            "evidence",
+            tools[0]["function"]["parameters"]["properties"]["data_points"]["items"][
+                "properties"
+            ],
+        )
+        self.assertEqual(
+            model_call.call_args.kwargs["tool_choice"],
+            {"type": "function", "function": {"name": "return_companion_response"}},
+        )
         facts = list_profile_facts("user-a")
         self.assertEqual(len(facts), 1)
         self.assertEqual(facts[0]["label"], "Likes spicy food")

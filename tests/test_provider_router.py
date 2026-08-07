@@ -39,6 +39,9 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
                 request_kind="test_kind",
                 model="model-a",
                 timeout_seconds=91,
+                response_format={"type": "json_object"},
+                tools=[{"type": "function"}],
+                tool_choice="required",
             )
 
         self.assertEqual(result, "reply")
@@ -51,6 +54,9 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             conversation_id="conversation",
             request_kind="test_kind",
             model="model-a",
+            response_format={"type": "json_object"},
+            tools=[{"type": "function"}],
+            tool_choice="required",
         )
 
     async def test_routes_groq_without_changing_request_fields(self) -> None:
@@ -74,6 +80,8 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             conversation_id=None,
             request_kind="chat_reply",
             model=None,
+            tools=None,
+            tool_choice=None,
         )
 
     async def test_routes_ollama_without_unsupported_timeout_argument(self) -> None:
@@ -175,6 +183,156 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["payload"]["model"], "gpt-test-model")
         self.assertEqual(captured["payload"]["messages"][0]["role"], "system")
         self.assertEqual(usage.call_args.kwargs["provider"], "openai")
+
+    async def test_openai_compatible_request_can_use_json_response_format(self) -> None:
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["payload"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": '{"reply":"ok","data_points":[]}'}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18},
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+        ):
+            result = await _openai_compatible_chat(
+                "deepinfra",
+                "system prompt",
+                [{"role": "user", "content": "hello"}],
+                response_format={"type": "json_object"},
+            )
+
+        self.assertEqual(result, '{"reply":"ok","data_points":[]}')
+        self.assertEqual(captured["payload"]["response_format"], {"type": "json_object"})
+
+    async def test_json_schema_response_bypasses_plain_chat_compaction(self) -> None:
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "turn_output",
+                "schema": {"type": "object"},
+            },
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": '{"reply":"ok","data_points":[]}'}}],
+                    "usage": {},
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch(
+                "agent.runtime.providers.clients._compact_chat_reply",
+                side_effect=AssertionError("structured output must not be compacted"),
+            ),
+        ):
+            result = await _openai_compatible_chat(
+                "deepinfra",
+                "system prompt",
+                [{"role": "user", "content": "hello"}],
+                request_kind="chat_reply",
+                response_format=response_format,
+            )
+
+        self.assertEqual(result, '{"reply":"ok","data_points":[]}')
+
+    async def test_forced_tool_call_returns_arguments_without_chat_compaction(self) -> None:
+        captured: dict = {}
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "return_companion_response",
+                    "parameters": {"type": "object"},
+                },
+            }
+        ]
+        tool_choice = {
+            "type": "function",
+            "function": {"name": "return_companion_response"},
+        }
+        arguments = '{"reply":"Visible reply","data_points":[]}'
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["payload"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "type": "function",
+                                        "function": {
+                                            "name": "return_companion_response",
+                                            "arguments": arguments,
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ],
+                    "usage": {},
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch(
+                "agent.runtime.providers.clients._compact_chat_reply",
+                side_effect=AssertionError("tool arguments must not be compacted"),
+            ),
+        ):
+            result = await _openai_compatible_chat(
+                "deepinfra",
+                "normal companion prompt",
+                [{"role": "user", "content": "hello"}],
+                tools=tools,
+                tool_choice=tool_choice,
+            )
+
+        self.assertEqual(result, arguments)
+        self.assertEqual(captured["payload"]["tools"], tools)
+        self.assertEqual(captured["payload"]["tool_choice"], tool_choice)
+        self.assertNotIn("response_format", captured["payload"])
 
     async def test_one_compatible_registry_entry_is_enough_for_shared_routing(self) -> None:
         spec = ProviderSpec(

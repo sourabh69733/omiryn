@@ -7,6 +7,13 @@ from api.models import AgentConversation
 
 
 class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self.turn_output_patch = patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v1"})
+        self.turn_output_patch.start()
+
+    def tearDown(self) -> None:
+        self.turn_output_patch.stop()
+
     def test_agent_conversation_accepts_message_metadata(self) -> None:
         conversation = AgentConversation.model_validate(
             {
