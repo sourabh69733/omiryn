@@ -95,6 +95,7 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
     label = str(raw_point.get("label") or "").strip()
     category = _snake_key(str(raw_point.get("category") or "other")) or "other"
     evidence = str(user_text or "").strip()
+    value = _normalize_value(raw_point.get("value"), user_text=user_text)
     if not label or not evidence or not value:
         return None
 
@@ -103,7 +104,7 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
         "category": category[:80],
         "key": _snake_key(str(raw_point.get("key") or label))[:120] or "data_point",
         "label": label[:160],
-        "value": _normalize_value(raw_point.get("value"), user_text=user_text),
+        "value": value,
         "evidence": evidence[:320],
         "confidence": _bounded_confidence(raw_point.get("confidence")),
     }
