@@ -56,7 +56,14 @@ TURN_OUTPUT_V2_TOOLS = [
                                         "A concrete, literal description of what the user revealed."
                                     ),
                                 },
-                                "value": {},
+                                "value": {
+                                    "description": (
+                                        "Structured useful details. Preserve explicit names, places, "
+                                        "items, and preferences using the exact words from the latest "
+                                        "user message. Use arrays when several values are stated. Do "
+                                        "not add inferred or normalized values that the user did not say."
+                                    )
+                                },
                                 "confidence": {
                                     "type": "number",
                                     "minimum": 0,
