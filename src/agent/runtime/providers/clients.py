@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from time import perf_counter
@@ -32,6 +33,9 @@ async def _openai_compatible_chat(
     request_kind: str = "chat_reply",
     model: str | None = None,
     timeout_seconds: float | None = None,
+    response_format: dict[str, Any] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
 ) -> str:
     config = _openai_compatible_provider_config(provider, model)
     provider_messages = _provider_messages(messages)
@@ -40,6 +44,12 @@ async def _openai_compatible_chat(
         "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
         "temperature": temperature,
     }
+    if response_format:
+        payload["response_format"] = response_format
+    if tools:
+        payload["tools"] = tools
+    if tool_choice is not None:
+        payload["tool_choice"] = tool_choice
     prompt_debug = _prompt_debug(system_prompt, provider_messages)
     _emit_prompt_debug(provider, str(config["model"]), request_kind, prompt_debug)
     headers = {
@@ -83,7 +93,15 @@ async def _openai_compatible_chat(
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
-            content = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            tool_arguments = _selected_tool_arguments(message, tool_choice)
+            if tool_arguments is not None:
+                return tool_arguments
+            content = str(message.get("content") or "")
+
+            # Structured outputs must stay raw JSON; chat compaction can break parsing.
+            if response_format and response_format.get("type") in {"json_object", "json_schema"}:
+                return content
             if request_kind == CHAT_REPLY:
                 return _compact_chat_reply(content, messages)
             return content
@@ -176,6 +194,8 @@ async def _groq_chat(
     request_kind: str = "chat_reply",
     model: str | None = None,
     timeout_seconds: float | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -187,6 +207,10 @@ async def _groq_chat(
         "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
         "temperature": temperature,
     }
+    if tools:
+        payload["tools"] = tools
+    if tool_choice is not None:
+        payload["tool_choice"] = tool_choice
     prompt_debug = _prompt_debug(system_prompt, provider_messages)
     _emit_prompt_debug("groq", payload["model"], request_kind, prompt_debug)
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -227,7 +251,11 @@ async def _groq_chat(
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
-            content = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            tool_arguments = _selected_tool_arguments(message, tool_choice)
+            if tool_arguments is not None:
+                return tool_arguments
+            content = str(message.get("content") or "")
             if request_kind == "chat_reply":
                 return _compact_chat_reply(content, messages)
             return content
@@ -275,6 +303,36 @@ def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
         for name in header_names
         if name in response.headers
     }
+
+
+def _selected_tool_arguments(
+    message: dict[str, Any],
+    tool_choice: dict[str, Any] | str | None,
+) -> str | None:
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return None
+
+    expected_name = None
+    if isinstance(tool_choice, dict):
+        function = tool_choice.get("function")
+        if isinstance(function, dict):
+            expected_name = str(function.get("name") or "").strip() or None
+
+    for tool_call in tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        if expected_name and function.get("name") != expected_name:
+            continue
+        arguments = function.get("arguments")
+        if isinstance(arguments, str):
+            return arguments
+        if isinstance(arguments, dict):
+            return json.dumps(arguments)
+    return None
 
 async def _ollama_chat(
     system_prompt: str,

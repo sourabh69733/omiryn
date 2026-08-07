@@ -26,6 +26,9 @@ async def generate_agent_reply(
     context_sources: list[dict[str, Any]] | None = None,
     user_profile: dict[str, Any] | None = None,
     system_prompt: str | None = None,
+    response_format: dict[str, Any] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -66,4 +69,7 @@ async def generate_agent_reply(
         conversation_id=conversation_id,
         request_kind=CHAT_REPLY,
         model=model,
+        response_format=response_format,
+        tools=tools,
+        tool_choice=tool_choice,
     )
