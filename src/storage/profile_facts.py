@@ -21,7 +21,28 @@ def upsert_profile_fact(fact: dict[str, Any]) -> dict[str, Any]:
                 profile_facts.c.key == payload["key"],
             )
         ).mappings().first()
+        if not existing:
+            same_user_rows = connection.execute(
+                select(profile_facts).where(
+                    profile_facts.c.user_id == payload["user_id"],
+                )
+            ).mappings().all()
+            incoming_label = _normalized_fact_terms(str(payload.get("label") or ""))
+            if incoming_label:
+                existing = next(
+                    (
+                        row
+                        for row in same_user_rows
+                        if _normalized_fact_terms(str(row.get("label") or ""))
+                        == incoming_label
+                    ),
+                    None,
+                )
         if existing:
+            if _normalized_fact_terms(str(existing.get("label") or "")) == _normalized_fact_terms(
+                str(payload.get("label") or "")
+            ):
+                payload["label"] = existing["label"]
             merged = _merge_profile_fact(existing, payload)
             connection.execute(
                 profile_facts.update()
@@ -523,11 +544,13 @@ def _merge_profile_fact_dict(existing: dict[str, Any], incoming: dict[str, Any])
 
 def _profile_fact_identity(fact: dict[str, Any]) -> tuple[str, str]:
     user_id = str(fact.get("user_id") or "")
-    category = _normalized_fact_terms(str(fact.get("category") or ""))
     label_terms = _normalized_fact_terms(str(fact.get("label") or ""))
+    category = _normalized_fact_terms(str(fact.get("category") or ""))
     value_terms = _normalized_fact_terms(_fact_value_text(fact.get("value")))
     key_terms = _normalized_fact_terms(str(fact.get("key") or ""))
-    meaning = label_terms or value_terms or key_terms
+    if label_terms:
+        return user_id, f"label:{label_terms}"
+    meaning = value_terms or key_terms
     return user_id, f"{category}:{meaning}"
 
 
