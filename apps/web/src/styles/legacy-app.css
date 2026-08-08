@@ -4373,14 +4373,23 @@ p {
 }
 
 .message-content {
+  font-size: 1.1em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .message.agent {
+  padding: 0.5em 1em;
   align-self: flex-start;
   border: 1px solid #e8e1f5;
   background: #f7f2ff;
+}
+
+.message.user {
+  padding: 0.5em 1em;
+  align-self: flex-end;
+  border: 1px solid #e8e1f5;
+  background: #ffffff;
 }
 
 .agentic-chat .message.agent {
@@ -4483,12 +4492,6 @@ p {
     opacity: 1;
     transform: translateY(-3px);
   }
-}
-
-.message.user {
-  align-self: flex-end;
-  border: 1px solid #e8e1f5;
-  background: #ffffff;
 }
 
 .agentic-chat .message.user {
