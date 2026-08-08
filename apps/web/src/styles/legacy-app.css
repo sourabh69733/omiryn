@@ -154,7 +154,7 @@ textarea {
   font: inherit;
 }
 
-button {
+button:not(:where(.epr-btn)) {
   min-height: 42px;
   border: 0;
   border-radius: 8px;
@@ -165,11 +165,11 @@ button {
   font-weight: 560;
 }
 
-button:hover {
+button:not(:where(.epr-btn)):hover {
   background: var(--primary-dark);
 }
 
-button:disabled {
+button:not(:where(.epr-btn)):disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -4838,7 +4838,8 @@ p {
 }
 
 .agentic-chat .composer {
-  grid-template-columns: 1fr 48px;
+  position: relative;
+  grid-template-columns: 48px 1fr 48px;
   border-top-color: rgba(180, 154, 255, 0.12);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.3)),
@@ -4900,8 +4901,8 @@ p {
   margin: 0 0 10px;
 }
 
-.composer input,
-.composer textarea,
+.composer > input,
+.composer > textarea,
 .draft-form input,
 .draft-form textarea {
   width: 100%;
@@ -4912,8 +4913,8 @@ p {
   outline: none;
 }
 
-.agentic-chat .composer input,
-.agentic-chat .composer textarea {
+.agentic-chat .composer > input,
+.agentic-chat .composer > textarea {
   border-color: rgba(180, 154, 255, 0.16);
   color: var(--ink);
   background:
@@ -4923,12 +4924,13 @@ p {
   letter-spacing: 0;
 }
 
-.agentic-chat .composer input::placeholder,
-.agentic-chat .composer textarea::placeholder {
+.agentic-chat .composer > input::placeholder,
+.agentic-chat .composer > textarea::placeholder {
   color: #9189a6;
 }
 
-.agentic-chat .composer button {
+.agentic-chat .composer > button,
+.agentic-chat .composer .emoji-trigger-button {
   display: grid;
   align-self: end;
   place-items: center;
@@ -4953,7 +4955,8 @@ p {
   padding: 0;
 }
 
-.agentic-chat .composer button:hover {
+.agentic-chat .composer > button:hover,
+.agentic-chat .composer .emoji-trigger-button:hover {
   background:
     radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.38), transparent 34%),
     linear-gradient(135deg, #5c38f2 0%, #a98fff 48%, #f06fa9 100%);
@@ -4961,6 +4964,70 @@ p {
     0 16px 34px rgba(106, 70, 255, 0.25),
     0 9px 20px rgba(255, 126, 179, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.emoji-picker-anchor {
+  position: relative;
+  align-self: end;
+}
+
+.agentic-chat .composer .emoji-trigger-button {
+  color: #3a3158;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
+    rgba(247, 241, 255, 0.92);
+  box-shadow:
+    0 10px 22px rgba(64, 45, 118, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.agentic-chat .composer .emoji-trigger-button:hover,
+.agentic-chat .composer .emoji-trigger-button[aria-expanded="true"] {
+  color: #2f294a;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.64)),
+    rgba(226, 218, 255, 0.95);
+}
+
+.emoji-picker-popover {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  z-index: 20;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 180px));
+}
+
+.emoji-picker-popover .EmojiPickerReact {
+  max-height: min(360px, calc(100vh - 180px));
+}
+
+.emoji-picker-popover .EmojiPickerReact button {
+  box-shadow: none;
+}
+
+.emoji-picker-popover .EmojiPickerReact button:hover {
+  box-shadow: none;
+}
+
+.emoji-picker-popover .EmojiPickerReact .epr-body {
+  overflow-y: auto !important;
+}
+
+.emoji-picker-popover .EmojiPickerReact .epr-skin-tone-select,
+.emoji-picker-popover .EmojiPickerReact .epr-skin-tones {
+  display: none !important;
+}
+
+.emoji-picker-loading {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #6f6685;
+  font-size: 13px;
+  font-weight: 620;
 }
 
 .send-message-icon {
@@ -4976,30 +5043,30 @@ p {
   stroke-linejoin: round;
 }
 
-.composer input,
-.composer textarea {
+.composer > input,
+.composer > textarea {
   min-width: 0;
   min-height: 46px;
   padding: 12px 14px;
 }
 
-.composer textarea {
+.composer > textarea {
   max-height: 140px;
   resize: none;
   overflow-y: auto;
   line-height: 1.45;
 }
 
-.composer input:focus,
-.composer textarea:focus,
+.composer > input:focus,
+.composer > textarea:focus,
 .draft-form input:focus,
 .draft-form textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(31, 95, 91, 0.12);
 }
 
-.agentic-chat .composer input:focus,
-.agentic-chat .composer textarea:focus {
+.agentic-chat .composer > input:focus,
+.agentic-chat .composer > textarea:focus {
   border-color: rgba(180, 154, 255, 0.56);
   box-shadow:
     0 0 0 3px rgba(180, 154, 255, 0.16),
@@ -8244,6 +8311,12 @@ p {
     max-width: min(88%, calc(100% - 46px));
   }
 
+  .emoji-picker-popover {
+    right: auto;
+    left: -6px;
+    width: min(320px, calc(100vw - 28px));
+  }
+
   .agentic-chat .message.has-feedback {
     margin-bottom: 10px;
   }
@@ -8300,12 +8373,13 @@ p {
     padding: 10px;
   }
 
-  .agentic-chat .composer input,
-  .agentic-chat .composer textarea {
+  .agentic-chat .composer > input,
+  .agentic-chat .composer > textarea {
     min-height: 46px;
   }
 
-  .agentic-chat .composer button {
+  .agentic-chat .composer > button,
+  .agentic-chat .composer .emoji-trigger-button {
     width: 46px;
     min-width: 46px;
     height: 46px;

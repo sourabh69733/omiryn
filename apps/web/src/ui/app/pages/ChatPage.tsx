@@ -1,8 +1,11 @@
-import { Fragment, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { assetUrl, canShowUsage } from "../appUtils";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, UsageEvent, UsageSummary } from "../types";
+
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
 export function ChatPage({ initialConversationId, userAvatar }: { initialConversationId?: string | null; userAvatar?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
@@ -23,9 +26,11 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [usageError, setUsageError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const composerPauseTimerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
@@ -181,6 +186,24 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }, []);
 
   useEffect(() => {
+    if (!emojiPickerOpen) return;
+    const closePicker = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && emojiPickerRef.current?.contains(target)) return;
+      setEmojiPickerOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEmojiPickerOpen(false);
+    };
+    window.addEventListener("mousedown", closePicker);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closePicker);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [emojiPickerOpen]);
+
+  useEffect(() => {
     if (!composerLimit?.until) return;
     if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
     composerPauseTimerRef.current = window.setInterval(() => {
@@ -203,6 +226,20 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
 
   function handleChatScroll() {
     shouldStickToBottomRef.current = isLogNearBottom();
+  }
+
+  function insertEmoji(emojiData: EmojiClickData) {
+    const emoji = emojiData.emoji;
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? draft.length;
+    const nextDraft = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+    setDraft(nextDraft);
+    window.requestAnimationFrame(() => {
+      input?.focus();
+      const nextCursor = start + emoji.length;
+      input?.setSelectionRange(nextCursor, nextCursor);
+    });
   }
 
   async function sendMessage(event: FormEvent) {
@@ -439,6 +476,26 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
           <form className={`composer ${composerBlocked ? "is-paused" : ""}`} onSubmit={sendMessage}>
+            <div className="emoji-picker-anchor" ref={emojiPickerRef}>
+              <button className="emoji-trigger-button" type="button" disabled={!conversation || sending || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}>☺</button>
+              {emojiPickerOpen ? (
+                <div className="emoji-picker-popover">
+                  <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
+                    <EmojiPicker
+                      height={360}
+                      emojiStyle={"native" as EmojiStyle}
+                      lazyLoadEmojis
+                      previewConfig={{ showPreview: false }}
+                      searchPlaceHolder="Search emoji"
+                      skinTonesDisabled
+                      theme={"light" as Theme}
+                      width="100%"
+                      onEmojiClick={insertEmoji}
+                    />
+                  </Suspense>
+                </div>
+              ) : null}
+            </div>
             <textarea ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} readOnly={sending} aria-describedby={composerBlocked ? "composer-pause-note" : undefined} />
             <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
