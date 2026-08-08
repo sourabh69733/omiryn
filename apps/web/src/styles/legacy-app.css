@@ -4372,7 +4372,7 @@ p {
   letter-spacing: 0;
 }
 
-.message-content.agent {
+.message-content {
   font-size: 1.1em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -4380,9 +4380,6 @@ p {
 
 .message-content.user {
   color: white;
-  font-size: 1.1em;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 .message.agent {
