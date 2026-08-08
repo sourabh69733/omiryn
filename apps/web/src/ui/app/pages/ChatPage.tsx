@@ -464,7 +464,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                   <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""}`} id={`message-${index}`} data-message-index={index}>
                     {agent ? showAvatar ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
-                      <div className="message-content">{message.content}</div>
+                      <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
                     </div>
                     {!agent ? showAvatar ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>

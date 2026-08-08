@@ -4372,7 +4372,14 @@ p {
   letter-spacing: 0;
 }
 
-.message-content {
+.message-content.agent {
+  font-size: 1.1em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-content.user {
+  color: white;
   font-size: 1.1em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -4498,13 +4505,14 @@ p {
   position: relative;
   border-color: rgba(180, 154, 255, 0.28);
   color: var(--ink);
-  background:
+  background: #7764F6;
+  /* background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
     linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.15), rgba(94, 234, 212, 0.13)),
-    rgba(247, 241, 255, 0.92);
-  box-shadow:
+    rgba(247, 241, 255, 0.92); */
+  /* box-shadow:
     0 12px 30px rgba(64, 45, 118, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+    inset 0 1px 0 rgba(255, 255, 255, 0.66); */
   backdrop-filter: blur(14px) saturate(1.1);
   -webkit-backdrop-filter: blur(14px) saturate(1.1);
 }
