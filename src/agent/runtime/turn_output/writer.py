@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from agent.memory_engine.data_points import normalize_data_point
+from data_point_taxonomy import canonical_turn_data_point_type
 from storage import save_data_point_extraction_debug, upsert_profile_fact
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,10 @@ def capture_turn_output_data_points(
     saved_count = 0
     skipped_count = 0
     for point in data_points:
-        point_type = str(point.get("type") or "").strip().lower()
+        point_type = canonical_turn_data_point_type(
+            point.get("type"),
+            point.get("category"),
+        )
         if point_type == "do_not_store":
             skipped_count += 1
             _save_debug(

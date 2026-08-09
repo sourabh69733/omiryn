@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 
 from security.encryption import decrypt_json, maybe_encrypt_json
+from data_point_taxonomy import canonical_fact_type
 
 from .database import ENGINE
 from .schema import data_point_extraction_debug, data_point_feedback, profile_facts
@@ -648,15 +649,7 @@ def _bounded_confidence(value: Any) -> float:
 
 
 def _normalize_fact_type(value: Any, category: Any) -> str:
-    clean = str(value or "").strip().lower()
-    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
-        return clean
-    category_key = str(category or "").strip().lower()
-    if category_key in {"location", "age", "gender", "languages"}:
-        return "profile_fact"
-    if category_key.startswith("whatsapp_"):
-        return "chat_context_fact"
-    return "matching_fact"
+    return canonical_fact_type(value, category)
 
 
 def _normalize_confidence_state(value: Any) -> str:
@@ -667,15 +660,22 @@ def _normalize_confidence_state(value: Any) -> str:
 
 
 def _profile_fact_from_row(row: Any) -> dict[str, Any]:
+    fact_type = canonical_fact_type(row["fact_type"], row["category"])
+    value = row["value_json"]
+    if isinstance(value, dict) and value.get("_data_point_type") in {
+        "profile_fact",
+        "matching_fact",
+    }:
+        value = {**value, "_data_point_type": fact_type}
     return {
         "id": row["id"],
         "user_id": row["user_id"],
         "category": row["category"],
         "key": row["key"],
-        "value": row["value_json"],
+        "value": value,
         "label": row["label"],
         "confidence": row["confidence"],
-        "fact_type": row["fact_type"],
+        "fact_type": fact_type,
         "confidence_state": row["confidence_state"],
         "source_kind": row["source_kind"],
         "source_id": row["source_id"],

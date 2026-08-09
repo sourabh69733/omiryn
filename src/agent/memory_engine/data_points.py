@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from data_point_taxonomy import canonical_fact_type
+
 
 @dataclass(frozen=True)
 class DataPoint:
@@ -123,15 +125,7 @@ def _bounded_confidence(value: Any) -> float:
 
 
 def _normalize_fact_type(value: Any, category: Any) -> str:
-    clean = str(value or "").strip().lower()
-    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
-        return clean
-    category_key = _snake_key(str(category or ""))
-    if category_key in {"location", "age", "gender", "languages"}:
-        return "profile_fact"
-    if category_key.startswith("whatsapp_"):
-        return "chat_context_fact"
-    return "matching_fact"
+    return canonical_fact_type(value, category)
 
 
 def _normalize_confidence_state(value: Any) -> str:

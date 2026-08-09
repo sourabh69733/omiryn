@@ -8,6 +8,8 @@ import json
 
 import httpx
 
+from data_point_taxonomy import canonical_fact_type
+
 from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.utils import conversation_extraction_window
 from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_point_candidates
@@ -909,15 +911,7 @@ def _privacy_level(value: Any) -> str:
 
 
 def _fact_type(value: Any, category: Any) -> str:
-    clean = str(value or "").strip().lower()
-    if clean in {"profile_fact", "matching_fact", "chat_context_fact", "style_fact"}:
-        return clean
-    category_key = _snake_key(str(category or ""))
-    if category_key in {"location", "age", "gender", "languages"}:
-        return "profile_fact"
-    if category_key.startswith("whatsapp_"):
-        return "chat_context_fact"
-    return "matching_fact"
+    return canonical_fact_type(value, category)
 
 
 def _confidence_state(value: Any) -> str:
