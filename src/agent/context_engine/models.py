@@ -87,6 +87,28 @@ class ConversationPlan:
 
 
 @dataclass(frozen=True)
+class MatchingDimensionProgress:
+    id: str
+    depth: str = "unknown"
+    fact_count: int = 0
+    evidence_count: int = 0
+    confidence: float = 0.0
+
+
+@dataclass(frozen=True)
+class MatchingUnderstanding:
+    level: str = "starting"
+    breadth_percent: int = 0
+    depth_percent: int = 0
+    foundation_covered: int = 0
+    foundation_total: int = 0
+    dimensions: tuple[MatchingDimensionProgress, ...] = ()
+    known_dimensions: tuple[str, ...] = ()
+    unexplored_dimensions: tuple[str, ...] = ()
+    can_deepen_dimensions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ModelContextPackage:
     system_prompt: str
     context_sources: list[dict[str, Any]]
@@ -94,4 +116,5 @@ class ModelContextPackage:
     prompt_version: str | None = None
     prompt_version_name: str | None = None
     query_intent: ContextQueryIntent | None = None
+    matching_understanding: MatchingUnderstanding | None = None
     snapshot: dict[str, Any] | None = None
