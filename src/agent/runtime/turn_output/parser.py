@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from data_point_taxonomy import canonical_turn_data_point_type
+
 
 ALLOWED_DATA_POINT_TYPES = {
     "profile_fact",
@@ -94,6 +96,7 @@ def _normalize_data_point(raw_point: dict[str, Any], *, user_text: str) -> dict[
 
     label = str(raw_point.get("label") or "").strip()
     category = _snake_key(str(raw_point.get("category") or "other")) or "other"
+    point_type = canonical_turn_data_point_type(point_type, category)
     evidence = str(user_text or "").strip()
     value = _normalize_value(raw_point.get("value"), user_text=user_text)
     if not label or not evidence or not value:

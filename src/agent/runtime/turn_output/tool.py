@@ -34,8 +34,11 @@ TURN_OUTPUT_V2_TOOLS = [
                                 "type": {
                                     "type": "string",
                                     "description": (
-                                        "profile_fact describes the user; matching_fact affects "
-                                        "compatibility or partner preferences; chat_learning "
+                                        "profile_fact is only a stable identity or logistics fact "
+                                        "such as age, location, language, education, or occupation. "
+                                        "matching_fact covers all tastes, interests, preferences, "
+                                        "values, lifestyle signals, boundaries, relationship intent, "
+                                        "or partner preferences. chat_learning "
                                         "describes how to converse with the user; temporary_context "
                                         "is short-lived; needs_confirmation is useful but unclear; "
                                         "do_not_store marks information the user does not want saved."
