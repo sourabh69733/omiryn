@@ -67,7 +67,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prompt-version",
         default="v3",
-        choices=("v1", "v2", "v3"),
+        choices=("v1", "v2", "v3", "v3-1"),
         help="Prompt behavior version under evaluation.",
     )
     parser.add_argument(

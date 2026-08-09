@@ -178,10 +178,14 @@ class AgentControlFrameworkTest(unittest.TestCase):
     def test_prompt_versions_are_independently_selectable(self) -> None:
         versions = {version.version_id: version for version in available_prompt_versions()}
 
-        self.assertEqual(set(versions), {"v1", "v2", "v3"})
+        self.assertEqual(set(versions), {"v1", "v2", "v3", "v3-1"})
         self.assertEqual(get_prompt_behavior_version("v1").name, "v1_companion_basic")
         self.assertEqual(get_prompt_behavior_version("v2").name, "v2_structured_context_companion")
         self.assertEqual(get_prompt_behavior_version("v3").name, "v3_listener_first_companion")
+        self.assertEqual(
+            get_prompt_behavior_version("v3-1").name,
+            "v3_1_matching_discovery_companion",
+        )
 
     def test_configured_prompt_version_can_switch_without_changing_default(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
