@@ -66,7 +66,9 @@ REQUEST_OR_CONTENT_TOKENS = {
     "what",
     "why",
 }
-SINGLE_TOKEN_ACCEPTANCE_ACKS = {"ok", "okay", "sure", "cool", "done", "fine"}
+SINGLE_TOKEN_ACCEPTANCE_ACKS = {
+    "ok", "okay", "sure", "cool", "done", "fine"
+    }
 
 
 def direct_turn_reply(user_text: str, messages: list[dict[str, Any]]) -> DirectTurnReply | None:
@@ -75,12 +77,12 @@ def direct_turn_reply(user_text: str, messages: list[dict[str, Any]]) -> DirectT
     normalized = normalized_memory_text(user_text)
     if not normalized:
         return None
-    if is_confirmation_to_pending_turn(user_text, active_turn_state(messages[:-1])):
-        return None
-    if _is_thanks(normalized):
-        return DirectTurnReply(reply="welcome", reason="gratitude_acknowledgement", confidence=0.95)
-    if _is_acceptance_acknowledgement(normalized):
-        return DirectTurnReply(reply="okay", reason="acceptance_acknowledgement", confidence=0.86)
+    # if is_confirmation_to_pending_turn(user_text, active_turn_state(messages[:-1])):
+    #     return None
+    # if _is_thanks(normalized):
+    #     return DirectTurnReply(reply="welcome", reason="gratitude_acknowledgement", confidence=0.95)
+    # if _is_acceptance_acknowledgement(normalized):
+    #     return DirectTurnReply(reply="okay", reason="acceptance_acknowledgement", confidence=0.86)
     return None
 
 
