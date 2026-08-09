@@ -103,3 +103,17 @@ class DataPointExtractionSafetyTest(unittest.TestCase):
         self.assertEqual(spicy["fact_type"], "matching_fact")
         self.assertEqual(location["confidence_state"], "active")
         self.assertEqual(spicy["confidence_state"], "active")
+
+    def test_normalizer_does_not_allow_preferences_to_be_profile_facts(self) -> None:
+        movie = normalize_data_point(
+            {
+                "user_id": "user-a",
+                "category": "movie_preference",
+                "key": "favorite_movie",
+                "label": "Favorite movie",
+                "value": {"movie": "Her"},
+                "fact_type": "profile_fact",
+            }
+        )
+
+        self.assertEqual(movie["fact_type"], "matching_fact")

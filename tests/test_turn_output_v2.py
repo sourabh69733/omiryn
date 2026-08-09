@@ -5,7 +5,13 @@ from agent.context_engine.models import ModelContextPackage
 from agent.runtime.orchestrator import run_agent_turn
 from agent.runtime.turn_output import parse_turn_output_v2
 from agent.runtime.turn_output.writer import capture_turn_output_data_points
-from storage import list_data_point_extraction_debug, list_profile_facts, reset_db
+from storage import (
+    ENGINE,
+    list_data_point_extraction_debug,
+    list_profile_facts,
+    profile_facts,
+    reset_db,
+)
 
 
 class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
@@ -47,6 +53,17 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.reply, "Normal assistant reply.")
         self.assertEqual(parsed.data_points, [])
 
+    def test_parser_never_exposes_textual_function_wrapper_as_reply(self) -> None:
+        parsed = parse_turn_output_v2(
+            '<function(return_companion_response){"reply":"Want to talk about something else?",'
+            '"data_points":[]}</function>',
+            user_text="okay",
+        )
+
+        self.assertTrue(parsed.parsed)
+        self.assertEqual(parsed.reply, "Want to talk about something else?")
+        self.assertNotIn("<function", parsed.reply)
+
     def test_parser_accepts_fenced_json_with_nested_value_objects(self) -> None:
         parsed = parse_turn_output_v2(
             """
@@ -72,6 +89,27 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(parsed.parsed)
         self.assertEqual(parsed.reply, "Noted.")
         self.assertEqual(parsed.data_points[0]["value"]["city"], "Bengaluru")
+
+    def test_parser_corrects_movie_preference_misclassified_as_profile_fact(self) -> None:
+        parsed = parse_turn_output_v2(
+            """
+            {
+              "reply": "Her is a thoughtful choice.",
+              "data_points": [
+                {
+                  "type": "profile_fact",
+                  "category": "movie_preference",
+                  "label": "Favorite movie",
+                  "value": {"movie": "Her"},
+                  "confidence": 0.96
+                }
+              ]
+            }
+            """,
+            user_text="My favorite movie is Her",
+        )
+
+        self.assertEqual(parsed.data_points[0]["type"], "matching_fact")
 
     def test_parser_rejects_data_point_when_value_is_not_grounded_in_user_message(self) -> None:
         parsed = parse_turn_output_v2(
@@ -199,6 +237,62 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(by_key["prefers_less_interview"]["fact_type"], "chat_context_fact")
         self.assertEqual(by_key["prefers_less_interview"]["value"]["_data_point_type"], "chat_learning")
         self.assertEqual(len(list_data_point_extraction_debug("user-a")), 3)
+
+    def test_writer_corrects_preference_type_even_without_parser(self) -> None:
+        capture_turn_output_data_points(
+            conversation_id="conversation-a",
+            user_id="user-a",
+            user_text="I mostly enjoy sci-fi",
+            message_index=2,
+            data_points=[
+                {
+                    "type": "profile_fact",
+                    "category": "movie_preference",
+                    "key": "favorite_genre",
+                    "label": "Favorite movie genre",
+                    "value": {"genre": "sci-fi"},
+                    "evidence": "I mostly enjoy sci-fi",
+                    "confidence": 0.94,
+                }
+            ],
+        )
+
+        fact = list_profile_facts("user-a")[0]
+        self.assertEqual(fact["fact_type"], "matching_fact")
+        self.assertEqual(fact["value"]["_data_point_type"], "matching_fact")
+
+    def test_legacy_misclassified_preference_is_corrected_when_read(self) -> None:
+        capture_turn_output_data_points(
+            conversation_id="conversation-a",
+            user_id="user-a",
+            user_text="My favorite movie is Her",
+            message_index=2,
+            data_points=[
+                {
+                    "type": "matching_fact",
+                    "category": "movies",
+                    "key": "favorite_movie",
+                    "label": "Favorite movie",
+                    "value": {"movie": "Her"},
+                    "evidence": "My favorite movie is Her",
+                    "confidence": 1.0,
+                }
+            ],
+        )
+        fact_id = list_profile_facts("user-a")[0]["id"]
+        with ENGINE.begin() as connection:
+            connection.execute(
+                profile_facts.update()
+                .where(profile_facts.c.id == fact_id)
+                .values(
+                    fact_type="profile_fact",
+                    value_json={"movie": "Her", "_data_point_type": "profile_fact"},
+                )
+            )
+
+        corrected = list_profile_facts("user-a")[0]
+        self.assertEqual(corrected["fact_type"], "matching_fact")
+        self.assertEqual(corrected["value"]["_data_point_type"], "matching_fact")
 
     async def test_orchestrator_v2_displays_reply_and_saves_hidden_data_points(self) -> None:
         with (

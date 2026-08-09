@@ -168,11 +168,11 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(parts[1], "Samajh gayi, ab hum dono milke plan banate hain.")
         self.assertFalse(any(part.startswith(("Rahul:", "Siya:")) for part in parts))
 
-    def test_prompt_version_registry_defaults_to_v1(self) -> None:
+    def test_prompt_version_registry_defaults_to_v3_1(self) -> None:
         version = get_prompt_behavior_version("unknown-version")
 
-        self.assertEqual(version.version_id, "v1")
-        self.assertEqual(version.name, "v1_companion_basic")
+        self.assertEqual(version.version_id, "v3-1")
+        self.assertEqual(version.name, "v3_1_matching_discovery_companion")
         self.assertIn("relationship_intent", version.data_point_targets)
 
     def test_prompt_versions_are_independently_selectable(self) -> None:
@@ -189,8 +189,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
     def test_configured_prompt_version_can_switch_without_changing_default(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
-            self.assertEqual(configured_prompt_version_id(), "v1")
-            self.assertEqual(get_prompt_behavior_version().version_id, "v1")
+            self.assertEqual(configured_prompt_version_id(), "v3-1")
+            self.assertEqual(get_prompt_behavior_version().version_id, "v3-1")
 
         with patch.dict("os.environ", {"AGENT_BEHAVIOR_VERSION": "v3"}, clear=True):
             self.assertEqual(configured_prompt_version_id(), "v3")
