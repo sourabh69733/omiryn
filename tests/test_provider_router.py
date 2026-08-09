@@ -334,6 +334,101 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["payload"]["tool_choice"], tool_choice)
         self.assertNotIn("response_format", captured["payload"])
 
+    async def test_textual_forced_tool_call_wrapper_returns_arguments_without_leaking_markup(self) -> None:
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "return_companion_response",
+                    "parameters": {"type": "object"},
+                },
+            }
+        ]
+        tool_choice = {
+            "type": "function",
+            "function": {"name": "return_companion_response"},
+        }
+        wrapped = (
+            '<function(return_companion_response){"reply":"Want to talk about something else?",'
+            '"data_points":[]}</function>'
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": wrapped}}],
+                    "usage": {},
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch(
+                "agent.runtime.providers.clients._compact_chat_reply",
+                side_effect=AssertionError("textual tool calls must not be shown or compacted"),
+            ),
+        ):
+            result = await _openai_compatible_chat(
+                "deepinfra",
+                "normal companion prompt",
+                [{"role": "user", "content": "hello"}],
+                tools=tools,
+                tool_choice=tool_choice,
+            )
+
+        self.assertEqual(
+            json.loads(result),
+            {"reply": "Want to talk about something else?", "data_points": []},
+        )
+        self.assertNotIn("<function", result)
+
+    async def test_textual_tool_wrapper_is_removed_even_without_tool_choice(self) -> None:
+        wrapped = (
+            'Life, maybe? <function(return_companion_response){"reply":"Life, maybe?",'
+            '"data_points":[]}</function>'
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": wrapped}}], "usage": {}},
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch(
+                "agent.runtime.providers.clients._compact_chat_reply",
+                side_effect=AssertionError("textual tool wrappers must never reach chat output"),
+            ),
+        ):
+            result = await _openai_compatible_chat(
+                "deepinfra",
+                "normal companion prompt",
+                [{"role": "user", "content": "hello"}],
+            )
+
+        self.assertEqual(json.loads(result), {"reply": "Life, maybe?", "data_points": []})
+        self.assertNotIn("<function", result)
+
     async def test_one_compatible_registry_entry_is_enough_for_shared_routing(self) -> None:
         spec = ProviderSpec(
             name="future-provider",
