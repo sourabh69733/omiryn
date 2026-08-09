@@ -5,6 +5,7 @@ from typing import Any
 from agent.context_engine.context_snapshot import build_context_snapshot, build_context_snapshot_v2
 from agent.context_engine.conversation_planner import build_conversation_plan
 from agent.context_engine.emotion_engine import detect_emotion_state
+from agent.context_engine.matching_understanding import build_matching_understanding
 from agent.context_engine.models import ModelContextPackage
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
@@ -34,7 +35,12 @@ def build_model_context_package(
     prompt_version_id: str | None = None,
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
-    listener_first = prompt_version.version_id == "v3"
+    listener_first = prompt_version.version_id in {"v3", "v3-1"}
+    matching_understanding = (
+        build_matching_understanding(user_id=user_id, user_profile=user_profile)
+        if prompt_version.version_id == "v3-1"
+        else None
+    )
     reply_context = build_reply_context(
         conversation_id,
         user_text,
@@ -43,7 +49,7 @@ def build_model_context_package(
         style_source_id=style_source_id,
         strict_intent=listener_first,
     )
-    if prompt_version.version_id in {"v2", "v3"}:
+    if prompt_version.version_id in {"v2", "v3", "v3-1"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
         turn_understanding = None
@@ -98,12 +104,19 @@ def build_model_context_package(
             style_source_id=style_source_id,
             prompt_version=prompt_version.version_id,
             prompt_version_name=prompt_version.name,
-            engine_version="context_v3" if listener_first else "context_v2",
+            engine_version=(
+                "context_v3_1"
+                if prompt_version.version_id == "v3-1"
+                else "context_v3"
+                if listener_first
+                else "context_v2"
+            ),
             query_intent=query_intent,
             emotion_state=emotion_state,
             topic_states=topic_states,
             conversation_plan=conversation_plan,
             turn_understanding=turn_understanding,
+            matching_understanding=matching_understanding,
         )
     else:
         query_intent = context_query_intent(user_text)
@@ -133,6 +146,7 @@ def build_model_context_package(
         prompt_version=prompt_version.version_id,
         prompt_version_name=prompt_version.name,
         query_intent=query_intent,
+        matching_understanding=matching_understanding,
         snapshot=snapshot,
     )
 

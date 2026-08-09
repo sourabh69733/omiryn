@@ -9,6 +9,7 @@ from agent.context_engine.models import (
     ContextQueryIntent,
     ConversationPlan,
     EmotionState,
+    MatchingUnderstanding,
     TopicState,
 )
 from agent.context_engine.turn_understanding.contract import TurnUnderstanding
@@ -84,6 +85,7 @@ def build_context_snapshot_v2(
     conversation_plan: ConversationPlan,
     engine_version: str = "context_v2",
     turn_understanding: TurnUnderstanding | None = None,
+    matching_understanding: MatchingUnderstanding | None = None,
 ) -> dict[str, Any]:
     budgeted_sources = budget_context_sources(context_sources)
     included_ids = {
@@ -169,6 +171,19 @@ def build_context_snapshot_v2(
             }
         )
         context["turn_understanding"] = _turn_understanding_snapshot(turn_understanding)
+    if matching_understanding is not None:
+        summary.update(
+            {
+                "matching_understanding_level": matching_understanding.level,
+                "matching_understanding_breadth_percent": matching_understanding.breadth_percent,
+                "matching_understanding_depth_percent": matching_understanding.depth_percent,
+                "matching_foundation_covered": matching_understanding.foundation_covered,
+                "matching_foundation_total": matching_understanding.foundation_total,
+            }
+        )
+        context["matching_understanding"] = _matching_understanding_snapshot(
+            matching_understanding
+        )
 
     return {
         "user_id": user_id,
@@ -176,6 +191,31 @@ def build_context_snapshot_v2(
         "message_index": assistant_message_index,
         "summary": summary,
         "context": context,
+    }
+
+
+def _matching_understanding_snapshot(
+    understanding: MatchingUnderstanding,
+) -> dict[str, Any]:
+    return {
+        "level": understanding.level,
+        "breadth_percent": understanding.breadth_percent,
+        "depth_percent": understanding.depth_percent,
+        "foundation_covered": understanding.foundation_covered,
+        "foundation_total": understanding.foundation_total,
+        "known_dimensions": list(understanding.known_dimensions),
+        "unexplored_dimensions": list(understanding.unexplored_dimensions),
+        "can_deepen_dimensions": list(understanding.can_deepen_dimensions),
+        "dimensions": [
+            {
+                "id": dimension.id,
+                "depth": dimension.depth,
+                "fact_count": dimension.fact_count,
+                "evidence_count": dimension.evidence_count,
+                "confidence": dimension.confidence,
+            }
+            for dimension in understanding.dimensions
+        ],
     }
 
 
