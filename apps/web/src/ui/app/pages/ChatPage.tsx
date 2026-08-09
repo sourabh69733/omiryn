@@ -2,6 +2,7 @@ import { Fragment, lazy, Suspense, type FormEvent, useEffect, useLayoutEffect, u
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
+import { AvatarImage } from "../AvatarImage";
 import { assetUrl, canShowUsage } from "../appUtils";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, UsageEvent, UsageSummary } from "../types";
 
@@ -466,7 +467,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
                     </div>
-                    {!agent ? showAvatar ? <span className="chat-avatar user">{userAvatar ? <img src={userAvatar} alt="" /> : "You"}</span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
                 </Fragment>
               );

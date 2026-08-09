@@ -6,6 +6,7 @@ import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { StylePage } from "./pages/StylePage";
+import { AvatarImage } from "./AvatarImage";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import type { AuthUser, Page, Profile, ProfileResponse } from "./types";
 
@@ -70,7 +71,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
           </button>
           <div className="auth-control">
             <button className="auth-user" type="button" onClick={() => setAccountOpen((value) => !value)} aria-expanded={accountOpen}>
-              <span className="auth-avatar">{profileAvatar ? <img src={profileAvatar} alt="" /> : initial}</span>
+              <span className="auth-avatar"><AvatarImage src={profileAvatar} fallback={initial} /></span>
               <span className="auth-email">{displayName}</span>
             </button>
             {accountOpen ? (
