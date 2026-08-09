@@ -8,7 +8,7 @@ import type { ContextSource, Conversation, ConversationSummary, ConversationUsag
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
-export function ChatPage({ initialConversationId, userAvatar }: { initialConversationId?: string | null; userAvatar?: string | null }) {
+export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { initialConversationId?: string | null; userAvatar?: string | null, interestedIn?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -374,7 +374,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }
 
   const agentName = conversation?.agent_name || "Omiryn";
-  const avatar = assetUrl("agent_avatar/saree_female.png");
+  const avatar = assetUrl(agentAvatarPath(interestedIn));
   const usageSummary = usage?.summary || {};
   const usageEvents = usage?.events || [];
   const averageUsage = averageChatUsage(usageEvents, usageSummary);
@@ -643,6 +643,14 @@ function usageRequestKindLabel(kind?: string) {
   };
   if (!kind) return "Agent call";
   return labels[kind] || titleize(String(kind).replaceAll("_", " "));
+}
+
+function agentAvatarPath(interestedIn?: string | null) {
+  if (interestedIn == "men") {
+    return "agent_avatar/jacket_male.png"
+  } else {
+    return "agent_avatar/suite_female.png";
+  }
 }
 
 function averageChatUsage(events: UsageEvent[], summary: UsageSummary = {}) {
