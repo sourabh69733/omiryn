@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
 
-from agent.context_engine.context import (
+from agent.context_engine.assembly import (
     STYLE_CONTEXT_SOURCE_TYPES,
     build_profile_extraction_context_sources,
     build_reply_context_sources,

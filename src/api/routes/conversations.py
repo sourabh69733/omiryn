@@ -7,12 +7,12 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from agent.feedback import normalize_message_feedback
-from agent.memory_engine.memory import (
+from agent.memory_engine.engine import (
     capture_deep_profile_facts_from_conversation,
     should_run_conversation_data_point_extraction,
 )
 from agent.runtime.orchestrator import run_agent_turn
-from agent.runtime.providers import AgentProviderError, agent_runtime_status, extract_profile
+from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from security.auth import CurrentUser, require_user
 from storage import (
     delete_conversation as storage_delete_conversation,

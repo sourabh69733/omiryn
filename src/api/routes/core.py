@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agent.runtime.providers import agent_runtime_status
+from agent.providers import agent_runtime_status
 from security.auth import CurrentUser, current_user, public_auth_config
 
 from ..helpers import _auth_user_payload, _profile_debug_data_enabled
@@ -33,4 +33,3 @@ async def auth_me(user: CurrentUser | None = Depends(current_user)) -> dict[str,
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     return _auth_user_payload(user)
-

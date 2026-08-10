@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 
 from security.encryption import decrypt_json, maybe_encrypt_json
-from data_point_taxonomy import canonical_fact_type
+from agent.memory_engine.data_points import canonical_fact_type
 
 from .database import ENGINE
 from .schema import data_point_extraction_debug, data_point_feedback, profile_facts

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from agent.memory_engine.data_point_extraction import (
+from agent.memory_engine.data_points.extraction.service import (
     capture_hybrid_whatsapp_data_points,
     capture_llm_whatsapp_data_points,
     data_point_extractor_mode,
@@ -10,7 +10,7 @@ from agent.memory_engine.data_point_extraction import (
     should_run_llm_data_point_extraction,
 )
 from agent.memory_engine.data_points import normalize_data_point
-from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_points
+from agent.memory_engine.data_points.extraction.whatsapp_rules import extract_whatsapp_data_points
 from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_style_summary
 from security.auth import CurrentUser, require_user
 from storage import (
