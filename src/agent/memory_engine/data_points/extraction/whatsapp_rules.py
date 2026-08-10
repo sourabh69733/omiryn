@@ -1,3 +1,5 @@
+"""Generates deterministic legacy candidates from structured WhatsApp imports."""
+
 from __future__ import annotations
 
 import re

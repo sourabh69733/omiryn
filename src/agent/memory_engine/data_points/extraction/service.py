@@ -1,3 +1,5 @@
+"""Coordinates background LLM extraction and hybrid candidate review workflows."""
+
 from __future__ import annotations
 
 import logging
@@ -8,12 +10,12 @@ import json
 
 import httpx
 
-from data_point_taxonomy import canonical_fact_type
-
-from agent.memory_engine.data_points import normalize_data_point
-from agent.memory_engine.utils import conversation_extraction_window
-from agent.memory_engine.whatsapp_data_points import extract_whatsapp_data_point_candidates
-from agent.runtime.providers import (
+from agent.memory_engine.data_points import canonical_fact_type, normalize_data_point
+from agent.memory_engine.shared.window import conversation_extraction_window
+from agent.memory_engine.data_points.extraction.whatsapp_rules import (
+    extract_whatsapp_data_point_candidates,
+)
+from agent.providers import (
     extract_deep_profile_facts,
     extract_llm_data_point_candidates,
     review_llm_data_point_candidates,
@@ -129,8 +131,6 @@ async def capture_hybrid_conversation_data_points(
     conversation_id: str,
     model: str | None = None,
 ) -> None:
-    if not should_run_hybrid_data_point_review():
-        return
     try:
         proposed_facts = await extract_deep_profile_facts(
             messages,  # type: ignore[arg-type]

@@ -1,3 +1,5 @@
+"""Retrieves approved user-taught behavior rules for prompt context."""
+
 from __future__ import annotations
 
 from storage import list_agent_behavior_rules

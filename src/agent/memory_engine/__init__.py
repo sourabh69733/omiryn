@@ -1,1 +1,1 @@
-"""Persistent user memory, profile facts, and data-point extraction."""
+"""Persistent agent memory for data points and learned companion behavior."""

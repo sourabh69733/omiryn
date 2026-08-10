@@ -1,3 +1,5 @@
+"""Normalizes user review decisions for stored data points."""
+
 from __future__ import annotations
 
 from typing import Any

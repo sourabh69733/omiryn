@@ -1,3 +1,5 @@
+"""Selects bounded conversation windows for memory extraction."""
+
 from __future__ import annotations
 
 

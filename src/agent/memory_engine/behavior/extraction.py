@@ -1,9 +1,11 @@
+"""Extracts explicit user-taught behavior rules for the companion."""
+
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from agent.context_engine.utils import normalized_memory_text
+from agent.context_engine.shared.text import normalized_memory_text
 
 
 CORRECTION_PATTERNS = (

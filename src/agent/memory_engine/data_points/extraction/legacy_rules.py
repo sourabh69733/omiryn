@@ -1,3 +1,5 @@
+"""Legacy keyword-based conversation extractor retained as an explicit strategy."""
+
 from __future__ import annotations
 
 import re

@@ -1,3 +1,5 @@
+"""Retrieves relevant profile and matching data points for model context."""
+
 from __future__ import annotations
 
 from typing import Any

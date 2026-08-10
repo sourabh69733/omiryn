@@ -1,3 +1,5 @@
+"""System instructions and review contracts for data-point extraction models."""
+
 from __future__ import annotations
 
 DEEP_FACT_EXTRACTION_SYSTEM_PROMPT = """Extract private Omiryn matching memory facts from the conversation.

@@ -1,3 +1,5 @@
+"""Retrieves WhatsApp-derived data points and style context for turns."""
+
 from __future__ import annotations
 
 from typing import Any

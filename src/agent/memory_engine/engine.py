@@ -1,17 +1,21 @@
+"""Public memory-engine coordinator for immediate and background writes."""
+
 from __future__ import annotations
 
 import logging
 import os
 
-from agent.memory_engine.data_point_extraction import (
+from agent.memory_engine.data_points.extraction.service import (
     capture_hybrid_conversation_data_points,
-    should_run_hybrid_data_point_review,
 )
-from agent.memory_engine.agent_behavior import extract_agent_behavior_rules_from_message
+from agent.memory_engine.data_points.extraction.legacy_rules import (
+    extract_profile_facts_from_message,
+)
+from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
+from agent.memory_engine.behavior.extraction import extract_agent_behavior_rules_from_message
 from agent.memory_engine.data_points import normalize_data_point
-from agent.memory_engine.profile_facts import extract_profile_facts_from_message
-from agent.memory_engine.utils import conversation_extraction_window
-from agent.runtime.providers import extract_deep_profile_facts
+from agent.memory_engine.shared.window import conversation_extraction_window
+from agent.providers import extract_deep_profile_facts
 from storage import (
     list_data_point_extraction_debug,
     save_data_point_extraction_debug,
@@ -40,14 +44,16 @@ def capture_profile_facts_from_user_message(
     if not user_id or not quality_valid:
         return
 
-    facts = extract_profile_facts_from_message(
-        user_id,
-        conversation_id,
-        message,
-        message_index,
-    )
-    for fact in facts:
-        upsert_profile_fact(normalize_data_point(fact))
+    policy = data_point_capture_policy()
+    if policy.immediate_rules:
+        facts = extract_profile_facts_from_message(
+            user_id,
+            conversation_id,
+            message,
+            message_index,
+        )
+        for fact in facts:
+            upsert_profile_fact(normalize_data_point(fact))
     for rule in extract_agent_behavior_rules_from_message(
         user_id=user_id,
         conversation_id=conversation_id,
@@ -76,6 +82,8 @@ def should_run_conversation_data_point_extraction(
     messages: list[dict[str, object]],
     quality_valid: bool,
 ) -> bool:
+    if data_point_capture_policy().background_mode is None:
+        return False
     interval = deep_fact_extraction_interval()
     if not user_id or not quality_valid or interval <= 0:
         return False
@@ -134,6 +142,9 @@ async def capture_deep_profile_facts_from_conversation(
     model: str | None,
 ) -> None:
     try:
+        policy = data_point_capture_policy()
+        if policy.background_mode is None:
+            return
         pending_messages = pending_data_point_messages(
             conversation_id=conversation_id,
             user_id=user_id,
@@ -141,7 +152,7 @@ async def capture_deep_profile_facts_from_conversation(
         )
         if not pending_messages:
             return
-        if should_run_hybrid_data_point_review():
+        if policy.background_mode == "hybrid":
             await capture_hybrid_conversation_data_points(
                 pending_messages,
                 user_id=user_id,
