@@ -201,6 +201,49 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         finish_trace.assert_called_once()
         self.assertEqual(finish_trace.call_args.kwargs["summary"]["reply_part_count"], 2)
 
+    async def test_orchestrator_never_exposes_a_textual_function_wrapper_without_inline_capture(
+        self,
+    ) -> None:
+        wrapped = (
+            '<function(return_companion_response){"reply":"Location is no longer a priority for you",'
+            '"data_points":[{"type":"profile_fact"}]}</function>'
+        )
+        with (
+            patch.dict("os.environ", {"DATA_POINT_CAPTURE_STRATEGY": "legacy_rules"}),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-1"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "message_index": 2,
+                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
+                },
+            )
+            model_call.return_value = wrapped
+
+            result = await run_agent_turn(
+                conversation_id="conversation-1",
+                messages=[{"role": "assistant", "content": "Tell me more."}],
+                user_text="Location is not important anymore.",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(result.messages[-1]["content"], "Location is no longer a priority for you")
+        self.assertNotIn("<function", result.messages[-1]["content"])
+
     async def test_orchestrator_skips_model_for_simple_acceptance_acknowledgement(self) -> None:
         with (
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),

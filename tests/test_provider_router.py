@@ -21,9 +21,21 @@ from agent.providers.gateway.registry import (
 from agent.providers.shared.errors import AgentProviderError
 from agent.providers.extraction.service import extract_profile
 from agent.providers.gateway.router import provider_chat
+from agent.providers.shared.structured_output import structured_companion_reply
 
 
 class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
+    def test_structured_companion_reply_unwraps_textual_function_envelope(self) -> None:
+        wrapped = (
+            '<function(return_companion_response){"reply":"Location is no longer a priority for you",'
+            '"data_points":[]}</function>'
+        )
+
+        self.assertEqual(
+            structured_companion_reply(wrapped),
+            "Location is no longer a priority for you",
+        )
+
     async def test_routes_openai_compatible_provider_with_all_request_fields(self) -> None:
         with patch(
             "agent.providers.gateway.router._openai_compatible_chat",

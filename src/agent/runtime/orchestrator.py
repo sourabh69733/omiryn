@@ -14,6 +14,7 @@ from agent.providers import (
     assess_user_message_quality,
     generate_agent_reply,
 )
+from agent.providers.shared.structured_output import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOL_CHOICE,
@@ -214,9 +215,14 @@ async def run_agent_turn(
             tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
         )
         turn_output_summary = None
+        sanitized_structured_reply = structured_companion_reply(reply)
         if turn_output_v2:
             parsed_output = parse_turn_output_v2(reply, user_text=user_text)
-            reply = parsed_output.reply
+            reply = (
+                parsed_output.reply
+                if parsed_output.parsed
+                else sanitized_structured_reply or parsed_output.reply
+            )
             turn_output_summary = capture_turn_output_data_points(
                 conversation_id=conversation_id,
                 user_id=user_id,
@@ -230,6 +236,11 @@ async def run_agent_turn(
                     "error": parsed_output.error,
                 }
             )
+        else:
+            # A provider can serialize a forced function call as plain text even when
+            # this turn does not use inline data-point extraction. Never display that
+            # transport envelope to the user.
+            reply = sanitized_structured_reply or reply
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
