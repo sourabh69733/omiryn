@@ -1,7 +1,7 @@
 import unittest
 
-from agent.profile_engine.extraction import normalize_extracted_profile
-from agent.runtime.providers import _parse_json_object
+from agent.outputs.profile_draft.models import normalize_extracted_profile
+from agent.providers import _parse_json_object
 
 
 class ExtractionQualityTest(unittest.TestCase):

@@ -12,23 +12,23 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from agent.evals.behavior.calibration import (
+from agent.evals.behavior.judging.calibration import (
     JUDGE_CALIBRATION_CASES,
     calibration_report_payload,
     run_judge_calibration,
 )
-from agent.evals.behavior.consensus import ConservativeConsensusJudge
-from agent.evals.behavior.events import EvalEvent
-from agent.evals.behavior.graders import combine_turn_grade, hard_rule_findings
-from agent.evals.behavior.judge import (
+from agent.evals.behavior.judging.consensus import ConservativeConsensusJudge
+from agent.evals.behavior.core.events import EvalEvent
+from agent.evals.behavior.core.graders import combine_turn_grade, hard_rule_findings
+from agent.evals.behavior.judging.judge import (
     JudgeExecutionError,
     JudgeProtocolError,
     ProviderRubricJudge,
     build_judge_request,
     parse_judge_result,
 )
-from agent.evals.behavior.live_reporter import LiveRunStats, TerminalProgressReporter
-from agent.evals.behavior.models import (
+from agent.evals.behavior.reporting.live import LiveRunStats, TerminalProgressReporter
+from agent.evals.behavior.core.models import (
     BehaviorScenario,
     DimensionGrade,
     JudgeResult,
@@ -42,14 +42,14 @@ from agent.evals.behavior.runner import (
     report_payload,
     run_behavior_evals,
 )
-from agent.evals.behavior.report_writer import (
+from agent.evals.behavior.reporting.writer import (
     attach_run_metadata,
     render_markdown_report,
     save_evaluation_reports,
 )
-from agent.evals.behavior.runtime_driver import RuntimeDriverConfig, RuntimeScenarioDriver
-from agent.evals.behavior.scenarios import COMPANION_BEHAVIOR_SCENARIOS
-from agent.runtime.turn_policy import direct_turn_reply
+from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig, RuntimeScenarioDriver
+from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS
+from agent.context_engine.conversation_engine.policy import direct_turn_reply
 from storage import reset_db
 from storage import list_agent_eval_case_results, list_agent_eval_runs
 
@@ -536,7 +536,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             )
 
         judged_turn = replace(observed("I hear the actual point."), conversation_id="eval-conv")
-        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+        with patch("agent.evals.behavior.judging.judge._provider_call", return_value=fake_call):
             result = await ProviderRubricJudge(provider="deepinfra", model="judge-model").judge(
                 scenario=case,
                 turn=case.turns[0],
@@ -574,7 +574,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             retry_delay_seconds=0,
             event_sink=events.append,
         )
-        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+        with patch("agent.evals.behavior.judging.judge._provider_call", return_value=fake_call):
             result = await judge.judge(
                 scenario=case,
                 turn=case.turns[0],
@@ -635,10 +635,10 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"DEEPINFRA_API_KEY": "test-key"}),
             patch(
-                "agent.runtime.providers.clients.httpx.AsyncClient",
+                "agent.providers.gateway.clients.httpx.AsyncClient",
                 FakeAsyncClient,
             ),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients._record_usage_event"),
         ):
             result = await judge.judge(
                 scenario=case,
@@ -667,7 +667,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             max_attempts=3,
             retry_delay_seconds=0,
         )
-        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+        with patch("agent.evals.behavior.judging.judge._provider_call", return_value=fake_call):
             with self.assertRaisesRegex(
                 JudgeExecutionError,
                 "3 attempts with timeout=180s: ReadTimeout",
@@ -717,7 +717,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             calls.append((system_prompt, messages, kwargs))
             return next(responses)
 
-        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+        with patch("agent.evals.behavior.judging.judge._provider_call", return_value=fake_call):
             result = await ProviderRubricJudge(provider="deepinfra").judge(
                 scenario=case,
                 turn=case.turns[0],
@@ -742,7 +742,7 @@ class JudgeProtocolTest(unittest.IsolatedAsyncioTestCase):
             calls += 1
             return "still not json"
 
-        with patch("agent.evals.behavior.judge._provider_call", return_value=fake_call):
+        with patch("agent.evals.behavior.judging.judge._provider_call", return_value=fake_call):
             with self.assertRaises(JudgeProtocolError):
                 await ProviderRubricJudge(provider="deepinfra").judge(
                     scenario=case,

@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from agent.evals.behavior.judge import _provider_call as judge_provider_call
-from agent.evals.behavior.simulated_user import _provider_call as simulated_user_provider_call
-from agent.runtime.providers.chat import generate_agent_reply
-from agent.runtime.providers.clients import _openai_compatible_chat
-from agent.runtime.providers.registry import (
+from agent.evals.behavior.judging.judge import _provider_call as judge_provider_call
+from agent.evals.behavior.simulation.user import _provider_call as simulated_user_provider_call
+from agent.providers.companion.service import generate_agent_reply
+from agent.providers.gateway.clients import _openai_compatible_chat
+from agent.providers.gateway.registry import (
     EVAL_PROVIDER_NAMES,
     OPENAI_COMPATIBLE_PROVIDERS,
     PROVIDER_REGISTRY,
@@ -18,15 +18,15 @@ from agent.runtime.providers.registry import (
     ProviderSpec,
     provider_model,
 )
-from agent.runtime.providers.errors import AgentProviderError
-from agent.runtime.providers.extraction import extract_profile
-from agent.runtime.providers.router import provider_chat
+from agent.providers.shared.errors import AgentProviderError
+from agent.providers.extraction.service import extract_profile
+from agent.providers.gateway.router import provider_chat
 
 
 class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
     async def test_routes_openai_compatible_provider_with_all_request_fields(self) -> None:
         with patch(
-            "agent.runtime.providers.router._openai_compatible_chat",
+            "agent.providers.gateway.router._openai_compatible_chat",
             new_callable=AsyncMock,
             return_value="reply",
         ) as call:
@@ -61,7 +61,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_routes_groq_without_changing_request_fields(self) -> None:
         with patch(
-            "agent.runtime.providers.router._groq_chat",
+            "agent.providers.gateway.router._groq_chat",
             new_callable=AsyncMock,
             return_value="reply",
         ) as call:
@@ -86,7 +86,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_routes_ollama_without_unsupported_timeout_argument(self) -> None:
         with patch(
-            "agent.runtime.providers.router._ollama_chat",
+            "agent.providers.gateway.router._ollama_chat",
             new_callable=AsyncMock,
             return_value="reply",
         ) as call:
@@ -127,7 +127,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
                 "OPENAI_MODEL": "gpt-test-model",
             },
         ):
-            from agent.runtime.providers.clients import _openai_compatible_provider_config
+            from agent.providers.gateway.clients import _openai_compatible_provider_config
 
             config = _openai_compatible_provider_config("openai", None)
 
@@ -164,10 +164,10 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "test-openai-key"}),
             patch(
-                "agent.runtime.providers.clients.httpx.AsyncClient",
+                "agent.providers.gateway.clients.httpx.AsyncClient",
                 side_effect=client_factory,
             ),
-            patch("agent.runtime.providers.clients._record_usage_event") as usage,
+            patch("agent.providers.gateway.clients._record_usage_event") as usage,
         ):
             result = await _openai_compatible_chat(
                 "openai",
@@ -206,8 +206,8 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
-            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event"),
         ):
             result = await _openai_compatible_chat(
                 "deepinfra",
@@ -246,10 +246,10 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
-            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event"),
             patch(
-                "agent.runtime.providers.clients._compact_chat_reply",
+                "agent.providers.gateway.clients._compact_chat_reply",
                 side_effect=AssertionError("structured output must not be compacted"),
             ),
         ):
@@ -314,10 +314,10 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
-            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event"),
             patch(
-                "agent.runtime.providers.clients._compact_chat_reply",
+                "agent.providers.gateway.clients._compact_chat_reply",
                 side_effect=AssertionError("tool arguments must not be compacted"),
             ),
         ):
@@ -371,10 +371,10 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
-            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event"),
             patch(
-                "agent.runtime.providers.clients._compact_chat_reply",
+                "agent.providers.gateway.clients._compact_chat_reply",
                 side_effect=AssertionError("textual tool calls must not be shown or compacted"),
             ),
         ):
@@ -413,10 +413,10 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
-            patch("agent.runtime.providers.clients.httpx.AsyncClient", side_effect=client_factory),
-            patch("agent.runtime.providers.clients._record_usage_event"),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event"),
             patch(
-                "agent.runtime.providers.clients._compact_chat_reply",
+                "agent.providers.gateway.clients._compact_chat_reply",
                 side_effect=AssertionError("textual tool wrappers must never reach chat output"),
             ),
         ):
@@ -444,7 +444,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(PROVIDER_REGISTRY, {"future-provider": spec}),
             patch(
-                "agent.runtime.providers.router._openai_compatible_chat",
+                "agent.providers.gateway.router._openai_compatible_chat",
                 new_callable=AsyncMock,
                 return_value="future reply",
             ) as call,
@@ -466,7 +466,7 @@ class ProviderRoleReuseTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", {"AGENT_PROVIDER": "deepinfra"}),
             patch(
-                "agent.runtime.providers.chat.provider_chat",
+                "agent.providers.companion.service.provider_chat",
                 new_callable=AsyncMock,
                 return_value="companion reply",
             ) as call,
@@ -488,7 +488,7 @@ class ProviderRoleReuseTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", {"AGENT_PROVIDER": "fireworks"}),
             patch(
-                "agent.runtime.providers.extraction.provider_chat",
+                "agent.providers.extraction.service.provider_chat",
                 new_callable=AsyncMock,
                 return_value='{"display_name":"Aarav"}',
             ) as call,
@@ -506,12 +506,12 @@ class ProviderRoleReuseTest(unittest.IsolatedAsyncioTestCase):
     async def test_judge_and_ai_user_wrappers_share_the_router(self) -> None:
         for module, factory, request_kind in (
             (
-                "agent.evals.behavior.judge.provider_chat",
+                "agent.evals.behavior.judging.judge.provider_chat",
                 judge_provider_call,
                 "behavior_eval_judge",
             ),
             (
-                "agent.evals.behavior.simulated_user.provider_chat",
+                "agent.evals.behavior.simulation.user.provider_chat",
                 simulated_user_provider_call,
                 "behavior_eval_user_simulator",
             ),

@@ -1,7 +1,7 @@
 import unittest
 
 from agent.context_engine.engine import build_model_context_package
-from agent.context_engine.matching_understanding import (
+from agent.context_engine.assembly.matching import (
     MATCHING_DIMENSIONS,
     calculate_matching_understanding,
 )

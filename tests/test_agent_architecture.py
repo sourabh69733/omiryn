@@ -1,7 +1,8 @@
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from agent.context_engine.models import ContextQueryIntent, ModelContextPackage
+from agent.context_engine.contracts.models import ContextQueryIntent, ModelContextPackage
 from agent.runtime.orchestrator import run_agent_turn
 from api.models import AgentConversation
 
@@ -13,6 +14,38 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self) -> None:
         self.turn_output_patch.stop()
+
+    def test_agent_modules_document_their_role(self) -> None:
+        agent_root = Path(__file__).resolve().parents[1] / "src" / "agent"
+        undocumented = [
+            str(path.relative_to(agent_root))
+            for path in agent_root.rglob("*.py")
+            if "__pycache__" not in path.parts
+            and not path.read_text(encoding="utf-8").lstrip().startswith(('"""', "'''"))
+        ]
+
+        self.assertEqual(undocumented, [])
+
+    def test_agent_engine_roots_only_expose_public_entrypoints(self) -> None:
+        """Prevent unrelated implementation files from accumulating at engine roots."""
+        agent_root = Path(__file__).resolve().parents[1] / "src" / "agent"
+        allowed_root_modules = {
+            "context_engine": {"__init__.py", "engine.py"},
+            "memory_engine": {"__init__.py", "engine.py"},
+            "providers": {"__init__.py"},
+            "evals": {"__init__.py"},
+        }
+
+        for folder, allowed in allowed_root_modules.items():
+            observed = {path.name for path in (agent_root / folder).glob("*.py")}
+            self.assertEqual(observed, allowed, folder)
+
+        obsolete_folders = {
+            "behavior_versions",
+            "profile_engine",
+            "turn_output",
+        }
+        self.assertTrue(obsolete_folders.isdisjoint({path.name for path in agent_root.iterdir()}))
 
     def test_agent_conversation_accepts_message_metadata(self) -> None:
         conversation = AgentConversation.model_validate(

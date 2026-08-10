@@ -10,8 +10,8 @@ from agent.context_engine.prompt_engine.registry import (
     get_prompt_behavior_version,
 )
 from agent.context_engine.engine import build_model_context_package
-from agent.memory_engine.memory import capture_profile_facts_from_user_message
-from agent.memory_engine.data_point_extraction import (
+from agent.memory_engine.engine import capture_profile_facts_from_user_message
+from agent.memory_engine.data_points.extraction.service import (
     _conversation_data_point_excerpt,
     build_data_point_candidate_review_prompt,
     build_data_point_review_prompt,
@@ -19,19 +19,21 @@ from agent.memory_engine.data_point_extraction import (
     normalize_llm_data_points,
 )
 from agent.memory_engine.data_points import normalize_data_point, rank_data_points_for_context
-from agent.context_engine.context_budget import budget_context_sources
-from agent.memory_engine.profile_facts import extract_profile_facts_from_message
+from agent.context_engine.assembly.budget import budget_context_sources
+from agent.memory_engine.data_points.extraction.legacy_rules import (
+    extract_profile_facts_from_message,
+)
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     context_sources_text,
 )
-from agent.context_engine.style_adapter import style_adaptation_guide
-from agent.memory_engine.whatsapp_data_points import (
+from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.memory_engine.data_points.extraction.whatsapp_rules import (
     extract_whatsapp_data_point_candidates,
     extract_whatsapp_data_points,
 )
-from agent.runtime.providers import _deep_fact_extraction_text
-from agent.runtime.replies import split_assistant_reply
+from agent.context_engine.conversation_engine.policy import split_assistant_reply
+from agent.providers import _deep_fact_extraction_text
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory
 from security.auth import CurrentUser, current_user

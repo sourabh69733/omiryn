@@ -1,11 +1,13 @@
 import unittest
 from unittest.mock import patch
 
-from agent.context_engine.conversation_planner import build_conversation_plan
+from agent.context_engine.conversation_engine.planning import build_conversation_plan
+from agent.context_engine.conversation_engine.understanding.rules import (
+    analyze_conversational_stance,
+    context_query_intent,
+)
 from agent.context_engine.engine import build_model_context_package
-from agent.context_engine.models import ContextQueryIntent, EmotionState
-from agent.context_engine.query_intent import context_query_intent
-from agent.context_engine.stance_engine import analyze_conversational_stance
+from agent.context_engine.contracts.models import ContextQueryIntent, EmotionState
 from storage import reset_db, save_conversation
 
 

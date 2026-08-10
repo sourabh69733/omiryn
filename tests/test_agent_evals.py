@@ -2,7 +2,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from agent.evals.runner import run_agent_evals
+from agent.evals.regression.runner import run_agent_evals
 from api.main import app
 from storage import list_agent_eval_case_results, list_agent_eval_runs
 

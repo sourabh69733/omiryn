@@ -3,14 +3,22 @@ import os
 import unittest
 from unittest.mock import patch
 
-from agent.context_engine.emotion_engine import detect_emotion_state
+from agent.context_engine.conversation_engine.understanding.contract import TurnUnderstanding
+from agent.context_engine.conversation_engine.understanding.interpreters.legacy_en_hi import (
+    LegacyEnglishHindiInterpreter,
+)
+from agent.context_engine.conversation_engine.understanding.interpreters.registry import (
+    interpret_turn,
+)
+from agent.context_engine.conversation_engine.understanding.interpreters.scripts import (
+    detect_language_profile,
+)
+from agent.context_engine.conversation_engine.understanding.rules import (
+    analyze_conversational_stance,
+    context_query_intent,
+    detect_emotion_state,
+)
 from agent.context_engine.engine import build_model_context_package
-from agent.context_engine.query_intent import context_query_intent
-from agent.context_engine.stance_engine import analyze_conversational_stance
-from agent.context_engine.turn_understanding.contract import TurnUnderstanding
-from agent.context_engine.turn_understanding.legacy_en_hi import LegacyEnglishHindiInterpreter
-from agent.context_engine.turn_understanding.registry import interpret_turn
-from agent.context_engine.turn_understanding.scripts import detect_language_profile
 from storage import reset_db, save_conversation
 
 

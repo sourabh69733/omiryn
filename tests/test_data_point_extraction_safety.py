@@ -1,7 +1,9 @@
 import unittest
 
 from agent.memory_engine.data_points import normalize_data_point
-from agent.memory_engine.profile_facts import extract_profile_facts_from_message
+from agent.memory_engine.data_points.extraction.legacy_rules import (
+    extract_profile_facts_from_message,
+)
 
 
 def _fact_keys(message: str) -> set[tuple[str, str]]:

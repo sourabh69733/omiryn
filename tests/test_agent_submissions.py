@@ -10,11 +10,11 @@ from fastapi.testclient import TestClient
 from api.config import PROFILE_UPLOAD_DIR
 from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
 from api.routes.public import _reset_public_rate_limits
-from agent.memory_engine.memory import (
+from agent.memory_engine.engine import (
     pending_data_point_messages,
     should_run_conversation_data_point_extraction,
 )
-from agent.runtime.providers import (
+from agent.providers import (
     _compact_chat_reply,
     _context_sources_text,
     _estimated_cost_usd,
@@ -30,8 +30,8 @@ from agent.runtime.providers import (
     agent_runtime_status,
 )
 from agent.runtime.orchestrator import AgentTurnResult
-from agent.runtime.replies import split_assistant_reply
-from agent.runtime.usage import PROFILE_SIGNAL_BACKFILL
+from agent.context_engine.conversation_engine.policy import split_assistant_reply
+from agent.observability.usage import PROFILE_SIGNAL_BACKFILL
 from security.auth import CurrentUser
 from ingestion.whatsapp import (
     build_whatsapp_structured_memory,
@@ -84,6 +84,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         os.environ["AUTH_REQUIRED"] = "false"
         os.environ["AGENT_PROVIDER"] = "mock"
         os.environ["DATA_POINT_EXTRACTOR"] = "rules"
+        os.environ["DATA_POINT_CAPTURE_STRATEGY"] = "legacy_rules"
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
@@ -98,6 +99,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.photo_storage_patch.stop()
+        os.environ.pop("DATA_POINT_CAPTURE_STRATEGY", None)
         app.dependency_overrides.clear()
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
@@ -1439,6 +1441,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             os.environ,
             {
                 "AGENT_PROVIDER": "mock",
+                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
                 "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "5",
             },
         ):
@@ -1472,7 +1475,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
             {"role": "user", "content": "then"},
         ]
 
-        with patch.dict(os.environ, {"PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "3"}):
+        with patch.dict(
+            os.environ,
+            {
+                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
+                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "3",
+            },
+        ):
             self.assertTrue(
                 should_run_conversation_data_point_extraction(
                     "conversation-a",
@@ -1539,6 +1548,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             os.environ,
             {
                 "AGENT_PROVIDER": "mock",
+                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
                 "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
             },
         ):
@@ -1565,6 +1575,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             os.environ,
             {
                 "AGENT_PROVIDER": "mock",
+                "DATA_POINT_CAPTURE_STRATEGY": "hybrid_review",
                 "DATA_POINT_EXTRACTOR": "hybrid",
                 "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
             },
@@ -1612,12 +1623,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 os.environ,
                 {
                     "AGENT_PROVIDER": "mock",
+                    "DATA_POINT_CAPTURE_STRATEGY": "hybrid_review",
                     "DATA_POINT_EXTRACTOR": "hybrid",
                     "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
                 },
             ),
             patch(
-                "agent.memory_engine.data_point_extraction.review_llm_data_point_candidates",
+                "agent.memory_engine.data_points.extraction.service.review_llm_data_point_candidates",
                 new=AsyncMock(side_effect=rate_limit_error),
             ),
         ):

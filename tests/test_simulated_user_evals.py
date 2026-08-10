@@ -12,31 +12,31 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agent.evals.behavior.events import EvalEvent
-from agent.evals.behavior.live_reporter import LiveRunStats, TerminalProgressReporter
-from agent.evals.behavior.report_writer import (
+from agent.evals.behavior.core.events import EvalEvent
+from agent.evals.behavior.reporting.live import LiveRunStats, TerminalProgressReporter
+from agent.evals.behavior.reporting.writer import (
     attach_run_metadata,
     render_markdown_report,
     save_evaluation_reports,
 )
-from agent.evals.behavior.runtime_driver import RuntimeDriverConfig
-from agent.evals.behavior.simulated_runner import (
+from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig
+from agent.evals.behavior.simulation.runner import (
     run_simulated_conversation,
     simulated_conversation_payload,
     simulated_conversation_suite_payload,
 )
-from agent.evals.behavior.simulated_judge import (
+from agent.evals.behavior.judging.simulated import (
     IndependentJudgment,
     ProviderConversationJudge,
     build_independent_judge_request,
     parse_independent_judge_verdict,
     run_conversation_judge_calibration,
 )
-from agent.evals.behavior.simulated_scenarios import (
+from agent.evals.behavior.simulation.scenarios import (
     SIMULATED_USER_SCENARIOS,
     list_simulated_user_scenarios,
 )
-from agent.evals.behavior.simulated_user import (
+from agent.evals.behavior.simulation.user import (
     ProviderSimulatedUser,
     SimulatedUserDecision,
     SimulatedUserExecutionError,
@@ -323,7 +323,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
             event_sink=events.append,
         )
         with patch(
-            "agent.evals.behavior.simulated_user._provider_call",
+            "agent.evals.behavior.simulation.user._provider_call",
             return_value=provider_call,
         ):
             decision = await user.next_turn(
@@ -352,7 +352,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
         user = ProviderSimulatedUser(provider="deepinfra", max_attempts=3)
         with (
             patch(
-                "agent.evals.behavior.simulated_user._provider_call",
+                "agent.evals.behavior.simulation.user._provider_call",
                 return_value=provider_call,
             ),
             self.assertRaisesRegex(SimulatedUserExecutionError, "1 attempts"),
@@ -379,7 +379,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
 
         user = ProviderSimulatedUser(provider="deepinfra", model="user-model")
         with patch(
-            "agent.evals.behavior.simulated_user._provider_call",
+            "agent.evals.behavior.simulation.user._provider_call",
             return_value=provider_call,
         ):
             decision = await user.next_turn(
@@ -410,7 +410,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
         user = ProviderSimulatedUser(provider="deepinfra")
         with (
             patch(
-                "agent.evals.behavior.simulated_user._provider_call",
+                "agent.evals.behavior.simulation.user._provider_call",
                 return_value=provider_call,
             ),
             self.assertRaises(SimulatedUserProtocolError),
@@ -433,7 +433,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
 
         user = ProviderSimulatedUser(provider="deepinfra", model="same-user-model")
         with patch(
-            "agent.evals.behavior.simulated_user._provider_call",
+            "agent.evals.behavior.simulation.user._provider_call",
             return_value=provider_call,
         ):
             verdict = await user.judge_conversation(
@@ -457,7 +457,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
 
         user = ProviderSimulatedUser(provider="deepinfra", model="same-user-model")
         with patch(
-            "agent.evals.behavior.simulated_user._provider_call",
+            "agent.evals.behavior.simulation.user._provider_call",
             return_value=provider_call,
         ):
             verdict = await user.judge_conversation(
@@ -486,7 +486,7 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
 
         judge = ProviderConversationJudge(provider="deepinfra", model="judge-model")
         with patch(
-            "agent.evals.behavior.simulated_judge._provider_call",
+            "agent.evals.behavior.judging.simulated._provider_call",
             return_value=provider_call,
         ):
             verdict = await judge.judge_conversation(
@@ -537,14 +537,14 @@ class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
         events: list[EvalEvent] = []
         judge = SequenceJudge("judge-a")
         with (
-            patch("agent.evals.behavior.simulated_runner.save_conversation"),
-            patch("agent.evals.behavior.simulated_runner.list_agent_traces", return_value=[]),
+            patch("agent.evals.behavior.simulation.runner.save_conversation"),
+            patch("agent.evals.behavior.simulation.runner.list_agent_traces", return_value=[]),
             patch(
-                "agent.evals.behavior.simulated_runner.list_agent_context_snapshots",
+                "agent.evals.behavior.simulation.runner.list_agent_context_snapshots",
                 return_value=[],
             ),
             patch(
-                "agent.evals.behavior.simulated_runner.run_agent_turn",
+                "agent.evals.behavior.simulation.runner.run_agent_turn",
                 side_effect=fake_agent_turn,
             ),
         ):
@@ -603,14 +603,14 @@ class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
             )
 
         with (
-            patch("agent.evals.behavior.simulated_runner.save_conversation"),
-            patch("agent.evals.behavior.simulated_runner.list_agent_traces", return_value=[]),
+            patch("agent.evals.behavior.simulation.runner.save_conversation"),
+            patch("agent.evals.behavior.simulation.runner.list_agent_traces", return_value=[]),
             patch(
-                "agent.evals.behavior.simulated_runner.list_agent_context_snapshots",
+                "agent.evals.behavior.simulation.runner.list_agent_context_snapshots",
                 return_value=[],
             ),
             patch(
-                "agent.evals.behavior.simulated_runner.run_agent_turn",
+                "agent.evals.behavior.simulation.runner.run_agent_turn",
                 side_effect=fake_agent_turn,
             ),
         ):
@@ -645,14 +645,14 @@ class SimulatedConversationRunnerTest(unittest.IsolatedAsyncioTestCase):
             )
 
         with (
-            patch("agent.evals.behavior.simulated_runner.save_conversation"),
-            patch("agent.evals.behavior.simulated_runner.list_agent_traces", return_value=[]),
+            patch("agent.evals.behavior.simulation.runner.save_conversation"),
+            patch("agent.evals.behavior.simulation.runner.list_agent_traces", return_value=[]),
             patch(
-                "agent.evals.behavior.simulated_runner.list_agent_context_snapshots",
+                "agent.evals.behavior.simulation.runner.list_agent_context_snapshots",
                 return_value=[],
             ),
             patch(
-                "agent.evals.behavior.simulated_runner.run_agent_turn",
+                "agent.evals.behavior.simulation.runner.run_agent_turn",
                 side_effect=fake_agent_turn,
             ),
         ):
