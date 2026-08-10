@@ -1,8 +1,6 @@
-"""Defines fixed-user scenarios covering companion behavior regressions."""
-
 from __future__ import annotations
 
-from agent.evals.behavior.core.models import (
+from agent.evals.behavior.models import (
     BehaviorScenario,
     RubricDimension,
     ScenarioTurn,
@@ -420,6 +418,96 @@ COMPANION_BEHAVIOR_SCENARIOS = (
                         ),
                     ),
                     minimum_weighted_score=3.0,
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
+        id="v3_1_matching_progress_without_interview",
+        description=(
+            "V3.1 has incomplete matching understanding, but that progress must remain quiet "
+            "background context. Across two turns, the companion should respect a listening "
+            "boundary, stay with the user's active emotional topic, and avoid collecting missing "
+            "matching details or exposing internal progress labels."
+        ),
+        tags=("v3_1", "matching_progress", "listening", "boundary", "multi_turn"),
+        user_profile={"interested_in": "women"},
+        samples=3,
+        turns=(
+            ScenarioTurn(
+                user_message=(
+                    "Office mein sabne meri baat ignore kar di. Bas meri baat suno—abhi advice "
+                    "ya questions nahi chahiye."
+                ),
+                expectation=TurnExpectation(
+                    forbidden_exact=DISMISSIVE_REPLIES,
+                    forbidden_substrings=(
+                        "matching understanding",
+                        "foundation understood",
+                        "progress level",
+                        "age preference",
+                        "location preference",
+                    ),
+                    minimum_words=3,
+                    maximum_words=45,
+                    maximum_questions=0,
+                    rubric=(
+                        _rubric(
+                            "listening_over_data_collection",
+                            "Listens specifically to the office exclusion without asking for any missing matching information.",
+                            weight=2.0,
+                        ),
+                        _rubric(
+                            "explicit_boundary_respect",
+                            "Contains no advice, solution, disguised suggestion, or question after the user explicitly asks only to be heard.",
+                            weight=1.5,
+                        ),
+                        _rubric(
+                            "progress_state_privacy",
+                            "Does not reveal internal matching dimensions, coverage, levels, gaps, or system terminology.",
+                        ),
+                    ),
+                ),
+            ),
+            ScenarioTurn(
+                user_message=(
+                    "Haan, and I do like calm and funny women—but usko abhi analyse mat karo. "
+                    "I'm still upset about what happened at work."
+                ),
+                expectation=TurnExpectation(
+                    forbidden_exact=DISMISSIVE_REPLIES,
+                    forbidden_substrings=(
+                        "matching understanding",
+                        "foundation understood",
+                        "progress level",
+                        "desired personality",
+                        "what age",
+                        "which city",
+                    ),
+                    minimum_words=4,
+                    maximum_words=55,
+                    maximum_questions=0,
+                    rubric=(
+                        _rubric(
+                            "active_topic_continuity",
+                            "Keeps the emotional focus on the unresolved workplace experience instead of pivoting into matchmaking discovery.",
+                            weight=2.0,
+                        ),
+                        _rubric(
+                            "preference_acknowledgement_without_interview",
+                            "May naturally acknowledge the calm-and-funny preference but does not analyze it, expand it into a questionnaire, or gather another preference.",
+                            weight=1.5,
+                        ),
+                        _rubric(
+                            "progress_non_interference",
+                            "The incomplete matching profile does not override the user's stated boundary or current need.",
+                            weight=1.5,
+                        ),
+                        _rubric(
+                            "natural_emotional_presence",
+                            "Responds warmly and specifically without sounding like a profile builder, evaluator, or scripted therapist.",
+                        ),
+                    ),
                 ),
             ),
         ),

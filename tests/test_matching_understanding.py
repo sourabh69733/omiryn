@@ -148,7 +148,7 @@ class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_db()
 
-    def test_v3_1_preserves_v3_prompt_and_adds_progress_to_snapshot(self) -> None:
+    def test_v3_1_adds_quiet_progress_awareness_without_changing_v3(self) -> None:
         upsert_profile_fact(normalize_data_point(matching_fact("relationship_intent")))
         profile = {"user_id": "matching-user", "interested_in": "women"}
         common = {
@@ -172,7 +172,13 @@ class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
         self.assertEqual(v3_1.snapshot["summary"]["matching_foundation_covered"], 2)
         self.assertEqual(v3_1.snapshot["context"]["matching_understanding"]["level"], "starting")
         self.assertIn("listen_only", v3_1.snapshot["summary"]["user_constraints"])
-        self.assertEqual(v3.system_prompt, v3_1.system_prompt)
+        self.assertNotIn("## Matching Understanding", v3.system_prompt)
+        self.assertIn("## Matching Understanding", v3_1.system_prompt)
+        self.assertIn("Current understanding level: starting", v3_1.system_prompt)
+        self.assertIn("Foundation understood: 2 of 5", v3_1.system_prompt)
+        self.assertIn("Known areas: relationship intent, desired partner", v3_1.system_prompt)
+        self.assertIn("not a checklist, target, or completion gate", v3_1.system_prompt)
+        self.assertIn("Do not ask about a missing area merely because it is missing", v3_1.system_prompt)
         self.assertNotIn("matching_understanding", v3.snapshot["context"])
 
 

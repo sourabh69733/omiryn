@@ -212,6 +212,26 @@ class BehaviorScenarioSchemaTest(unittest.TestCase):
             case.turns[0].expectation.forbidden_direct_reasons,
         )
 
+    def test_v3_1_progress_scenario_guards_against_onboarding_interview(self) -> None:
+        case = next(
+            item
+            for item in COMPANION_BEHAVIOR_SCENARIOS
+            if item.id == "v3_1_matching_progress_without_interview"
+        )
+
+        self.assertIn("v3_1", case.tags)
+        self.assertIn("matching_progress", case.tags)
+        self.assertEqual(len(case.turns), 2)
+        self.assertTrue(all(turn.expectation.maximum_questions == 0 for turn in case.turns))
+        self.assertIn(
+            "progress_non_interference",
+            {dimension.id for dimension in case.turns[1].expectation.rubric},
+        )
+        self.assertIn(
+            "matching understanding",
+            case.turns[0].expectation.forbidden_substrings,
+        )
+
     def test_scenario_rejects_empty_turns(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least one turn"):
             BehaviorScenario(id="empty", description="Empty.", turns=())
