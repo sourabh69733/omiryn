@@ -1,3 +1,5 @@
+"""Runs deterministic legacy agent regression fixtures."""
+
 from __future__ import annotations
 
 import argparse
@@ -90,11 +92,17 @@ async def run_agent_evals(
     persist: bool = True,
     suite_name: str = "agent_regression",
 ) -> dict[str, Any]:
-    env_names = ("AGENT_PROVIDER", "AUTH_REQUIRED", "DATA_POINT_EXTRACTOR")
+    env_names = (
+        "AGENT_PROVIDER",
+        "AUTH_REQUIRED",
+        "DATA_POINT_CAPTURE_STRATEGY",
+        "DATA_POINT_EXTRACTOR",
+    )
     previous_env = {name: os.environ.get(name) for name in env_names}
     try:
         os.environ["AGENT_PROVIDER"] = "mock"
         os.environ["AUTH_REQUIRED"] = "false"
+        os.environ["DATA_POINT_CAPTURE_STRATEGY"] = "legacy_rules"
         os.environ["DATA_POINT_EXTRACTOR"] = "rules"
         if reset:
             reset_db()
@@ -108,7 +116,7 @@ async def run_agent_evals(
                     "status": "running",
                     "metadata": {
                         "case_count": len(EVAL_CASES),
-                        "runner": "agent.evals.runner",
+                        "runner": "agent.evals.regression.runner",
                     },
                 }
             )

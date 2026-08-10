@@ -1,11 +1,13 @@
+"""Executes behavior scenarios, grades every turn, and aggregates pass results."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.graders import combine_turn_grade
-from agent.evals.behavior.models import (
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.graders import combine_turn_grade
+from agent.evals.behavior.core.models import (
     BehaviorEvalReport,
     BehaviorJudge,
     BehaviorScenario,

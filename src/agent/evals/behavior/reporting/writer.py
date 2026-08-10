@@ -1,3 +1,5 @@
+"""Writes Markdown, JSON, and historical evaluation summaries."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from agent.evals.behavior.live_reporter import LiveRunStats
+from agent.evals.behavior.reporting.live import LiveRunStats
 
 REPORT_TIMEZONE = ZoneInfo("Asia/Kolkata")
 

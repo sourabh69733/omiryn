@@ -1,7 +1,9 @@
+"""Combines multiple judges using conservative pass semantics."""
+
 from __future__ import annotations
 
-from agent.evals.behavior.judge import JudgeProtocolError
-from agent.evals.behavior.models import (
+from agent.evals.behavior.judging.judge import JudgeProtocolError
+from agent.evals.behavior.core.models import (
     BehaviorJudge,
     BehaviorScenario,
     DimensionGrade,

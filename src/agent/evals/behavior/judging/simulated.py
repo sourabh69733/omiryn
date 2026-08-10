@@ -1,3 +1,5 @@
+"""Judges complete AI-user companion conversations with an independent model."""
+
 from __future__ import annotations
 
 import asyncio
@@ -5,8 +7,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Protocol
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.simulated_user import (
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.simulation.user import (
     USER_EXPERIENCE_DIMENSIONS,
     SimulatedUserProtocolError,
     UserExperienceGrade,
@@ -14,8 +16,8 @@ from agent.evals.behavior.simulated_user import (
     _error_description,
     _is_transient_error,
 )
-from agent.runtime.providers.json_utils import _parse_json_object
-from agent.runtime.providers.router import provider_chat
+from agent.providers.shared.json_utils import _parse_json_object
+from agent.providers.gateway.router import provider_chat
 
 INDEPENDENT_JUDGE_REQUEST_KIND = "behavior_eval_conversation_judge"
 INDEPENDENT_JUDGE_REPAIR_REQUEST_KIND = "behavior_eval_conversation_judge_repair"

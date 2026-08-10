@@ -1,6 +1,8 @@
+"""Defines persona-driven adaptive simulated-user scenarios."""
+
 from __future__ import annotations
 
-from agent.evals.behavior.simulated_user import SimulatedUserScenario
+from agent.evals.behavior.simulation.user import SimulatedUserScenario
 
 
 SIMULATED_USER_SCENARIOS = (

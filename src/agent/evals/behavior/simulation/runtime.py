@@ -1,3 +1,5 @@
+"""Drives evaluation scenarios through the real companion runtime."""
+
 from __future__ import annotations
 
 import os
@@ -6,8 +8,8 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 from uuid import uuid4
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.models import BehaviorScenario, ObservedTurn
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.models import BehaviorScenario, ObservedTurn
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
     list_agent_context_snapshots,

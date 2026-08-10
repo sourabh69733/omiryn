@@ -1,3 +1,5 @@
+"""Streams evaluation progress and conversations to the terminal."""
+
 from __future__ import annotations
 
 import sys
@@ -6,7 +8,7 @@ from datetime import datetime, timezone
 from io import TextIOBase
 from time import perf_counter
 
-from agent.evals.behavior.events import EvalEvent
+from agent.evals.behavior.core.events import EvalEvent
 
 
 @dataclass(frozen=True)

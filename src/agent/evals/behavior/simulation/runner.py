@@ -1,19 +1,21 @@
+"""Runs adaptive AI-user conversations and aggregates judgments."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.models import ObservedTurn
-from agent.evals.behavior.runtime_driver import (
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.models import ObservedTurn
+from agent.evals.behavior.simulation.runtime import (
     RuntimeDriverConfig,
     _conversation_payload,
     _direct_reply_reason,
     _runtime_environment,
 )
-from agent.evals.behavior.simulated_judge import ConversationJudge, IndependentJudgment
-from agent.evals.behavior.simulated_user import (
+from agent.evals.behavior.judging.simulated import ConversationJudge, IndependentJudgment
+from agent.evals.behavior.simulation.user import (
     SimulatedUser,
     SimulatedUserScenario,
     UserExperienceVerdict,

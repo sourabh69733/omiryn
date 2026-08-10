@@ -1,3 +1,5 @@
+"""Builds rubrics and invokes provider-backed behavior judges."""
+
 from __future__ import annotations
 
 import asyncio
@@ -8,17 +10,17 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.models import (
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.models import (
     BehaviorScenario,
     DimensionGrade,
     JudgeResult,
     ObservedTurn,
     ScenarioTurn,
 )
-from agent.runtime.providers.errors import AgentProviderError
-from agent.runtime.providers.json_utils import _parse_json_object
-from agent.runtime.providers.router import provider_chat
+from agent.providers.shared.errors import AgentProviderError
+from agent.providers.shared.json_utils import _parse_json_object
+from agent.providers.gateway.router import provider_chat
 
 JUDGE_REQUEST_KIND = "behavior_eval_judge"
 

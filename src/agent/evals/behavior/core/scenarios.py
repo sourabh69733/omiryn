@@ -1,6 +1,8 @@
+"""Defines fixed-user scenarios covering companion behavior regressions."""
+
 from __future__ import annotations
 
-from agent.evals.behavior.models import (
+from agent.evals.behavior.core.models import (
     BehaviorScenario,
     RubricDimension,
     ScenarioTurn,

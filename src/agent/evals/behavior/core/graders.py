@@ -1,9 +1,11 @@
+"""Applies deterministic gates and combines semantic judge grades."""
+
 from __future__ import annotations
 
 import re
 
-from agent.context_engine.utils import normalized_memory_text
-from agent.evals.behavior.models import (
+from agent.context_engine.shared.text import normalized_memory_text
+from agent.evals.behavior.core.models import (
     BehaviorScenario,
     GradeFinding,
     JudgeResult,

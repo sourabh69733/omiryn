@@ -1,11 +1,13 @@
+"""Calibrates semantic judges against known good and bad responses."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
-from agent.evals.behavior.events import EventSink, emit_event
-from agent.evals.behavior.graders import combine_turn_grade
-from agent.evals.behavior.models import (
+from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.graders import combine_turn_grade
+from agent.evals.behavior.core.models import (
     BehaviorJudge,
     BehaviorScenario,
     DimensionGrade,
@@ -13,7 +15,7 @@ from agent.evals.behavior.models import (
     ScenarioTurn,
     TurnExpectation,
 )
-from agent.evals.behavior.scenarios import COMPANION_BEHAVIOR_SCENARIOS
+from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS
 from storage import save_conversation
 
 

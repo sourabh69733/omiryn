@@ -1,3 +1,5 @@
+"""Defines progress events emitted by behavior evaluation workflows."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
