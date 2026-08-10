@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "bash scripts/start.sh",
+    "clear-deps": "rm -rf node_modules/.vite",
+    "start": "npm run clear-deps && bash scripts/start.sh",
     "start:prod": "START_MODE=production bash scripts/start.sh",
     "landing:dev": "vite --config apps/landing/vite.config.js",
     "landing:build": "vite build --config apps/landing/vite.config.js",
