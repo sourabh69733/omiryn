@@ -1,3 +1,5 @@
+"""Supplies private matching-understanding guidance to the companion prompt."""
+
 from __future__ import annotations
 
 from agent.context_engine.contracts.models import MatchingUnderstanding
