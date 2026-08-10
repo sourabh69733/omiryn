@@ -14,7 +14,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./data/omiryn_eval_test.db")
 os.environ.setdefault("AGENT_PROVIDER", "mock")
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
-from agent.evals.runner import main
+from agent.evals.regression.runner import main
 
 
 if __name__ == "__main__":

@@ -20,26 +20,26 @@ if str(SRC_DIR) not in sys.path:
 os.environ.setdefault("DATABASE_URL", "sqlite:///./data/omiryn_behavior_eval.db")
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
-from agent.evals.behavior.live_reporter import TerminalProgressReporter  # noqa: E402
-from agent.evals.behavior.report_writer import (  # noqa: E402
+from agent.evals.behavior.reporting.live import TerminalProgressReporter  # noqa: E402
+from agent.evals.behavior.reporting.writer import (  # noqa: E402
     attach_run_metadata,
     save_evaluation_reports,
 )
-from agent.evals.behavior.runtime_driver import RuntimeDriverConfig  # noqa: E402
-from agent.evals.behavior.simulated_runner import (  # noqa: E402
+from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig  # noqa: E402
+from agent.evals.behavior.simulation.runner import (  # noqa: E402
     run_simulated_conversation,
     simulated_conversation_payload,
     simulated_conversation_suite_payload,
 )
-from agent.evals.behavior.simulated_scenarios import (  # noqa: E402
+from agent.evals.behavior.simulation.scenarios import (  # noqa: E402
     SIMULATED_USER_SCENARIOS,
     get_simulated_user_scenario,
     list_simulated_user_scenarios,
 )
-from agent.evals.behavior.simulated_judge import ProviderConversationJudge  # noqa: E402
-from agent.evals.behavior.simulated_judge import run_conversation_judge_calibration  # noqa: E402
-from agent.evals.behavior.simulated_user import ProviderSimulatedUser  # noqa: E402
-from agent.runtime.providers.registry import (  # noqa: E402
+from agent.evals.behavior.judging.simulated import ProviderConversationJudge  # noqa: E402
+from agent.evals.behavior.judging.simulated import run_conversation_judge_calibration  # noqa: E402
+from agent.evals.behavior.simulation.user import ProviderSimulatedUser  # noqa: E402
+from agent.providers.gateway.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
     PROVIDER_NAMES,
     provider_model,

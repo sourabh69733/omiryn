@@ -19,14 +19,14 @@ if str(SRC_DIR) not in sys.path:
 os.environ.setdefault("DATABASE_URL", "sqlite:///./data/omiryn_behavior_eval.db")
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
-from agent.evals.behavior.calibration import (  # noqa: E402
+from agent.evals.behavior.judging.calibration import (  # noqa: E402
     calibration_report_payload,
     run_judge_calibration,
 )
-from agent.evals.behavior.consensus import ConservativeConsensusJudge  # noqa: E402
-from agent.evals.behavior.judge import ProviderRubricJudge  # noqa: E402
-from agent.evals.behavior.live_reporter import TerminalProgressReporter  # noqa: E402
-from agent.evals.behavior.report_writer import (  # noqa: E402
+from agent.evals.behavior.judging.consensus import ConservativeConsensusJudge  # noqa: E402
+from agent.evals.behavior.judging.judge import ProviderRubricJudge  # noqa: E402
+from agent.evals.behavior.reporting.live import TerminalProgressReporter  # noqa: E402
+from agent.evals.behavior.reporting.writer import (  # noqa: E402
     attach_run_metadata,
     save_evaluation_reports,
 )
@@ -35,12 +35,12 @@ from agent.evals.behavior.runner import (  # noqa: E402
     report_payload,
     run_behavior_evals,
 )
-from agent.evals.behavior.runtime_driver import (  # noqa: E402
+from agent.evals.behavior.simulation.runtime import (  # noqa: E402
     RuntimeDriverConfig,
     RuntimeScenarioDriver,
 )
-from agent.evals.behavior.scenarios import COMPANION_BEHAVIOR_SCENARIOS  # noqa: E402
-from agent.runtime.providers.registry import (  # noqa: E402
+from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS  # noqa: E402
+from agent.providers.gateway.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
     PROVIDER_NAMES,
     provider_model,
