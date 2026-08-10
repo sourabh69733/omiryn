@@ -26,6 +26,9 @@ from agent.context_engine.prompt_engine.modules.final_reminder import final_remi
 from agent.context_engine.prompt_engine.modules.empathy import empathy_prompt
 from agent.context_engine.prompt_engine.modules.language import language_module_prompt
 from agent.context_engine.prompt_engine.modules.memory_usage import memory_usage_prompt
+from agent.context_engine.prompt_engine.modules.matching_understanding import (
+    matching_understanding_prompt,
+)
 from agent.context_engine.prompt_engine.modules.output_format import output_format_prompt
 from agent.context_engine.prompt_engine.modules.safety import safety_module_prompt
 from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
@@ -103,6 +106,7 @@ def build_companion_system_prompt_v2(
     emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
+    matching_understanding: MatchingUnderstanding | None = None,
 ) -> str:
     behavior = build_companion_behavior(
         user_profile,
@@ -126,6 +130,7 @@ def build_companion_system_prompt_v2(
         emotion_state=emotion_state,
         topic_states=topic_states,
         conversation_plan=conversation_plan,
+        matching_understanding=matching_understanding,
     )
     return structure_prompt_sections(sections, structure_context).text
 
@@ -168,8 +173,9 @@ def _v2_prompt_sections(
     emotion_state: EmotionState,
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
+    matching_understanding: MatchingUnderstanding | None,
 ) -> list[PromptSection]:
-    return [
+    sections = [
         PromptSection(
             id="base_identity",
             title="Core Identity",
@@ -310,6 +316,18 @@ def _v2_prompt_sections(
             can_skip=False,
         ),
     ]
+    if matching_understanding is not None:
+        sections.append(
+            PromptSection(
+                id="matching_understanding",
+                title="Matching Understanding",
+                content=matching_understanding_prompt(matching_understanding),
+                position="middle",
+                priority=75,
+                can_skip=False,
+            )
+        )
+    return sections
 
 
 def _prompt_structure_context(

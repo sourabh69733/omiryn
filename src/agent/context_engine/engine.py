@@ -98,6 +98,7 @@ def build_model_context_package(
             emotion_state=emotion_state,
             topic_states=topic_states,
             conversation_plan=conversation_plan,
+            matching_understanding=matching_understanding,
         )
         snapshot = build_context_snapshot_v2(
             reply_context.context_sources,
