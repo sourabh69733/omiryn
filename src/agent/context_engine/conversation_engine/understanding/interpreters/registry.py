@@ -1,11 +1,18 @@
+"""Selects the configured turn interpreter behind one stable public function."""
+
 from __future__ import annotations
 
 import os
 from dataclasses import replace
 from typing import Any
 
-from agent.context_engine.turn_understanding.contract import TurnInterpreter, TurnUnderstanding
-from agent.context_engine.turn_understanding.legacy_en_hi import LegacyEnglishHindiInterpreter
+from agent.context_engine.conversation_engine.understanding.contract import (
+    TurnInterpreter,
+    TurnUnderstanding,
+)
+from agent.context_engine.conversation_engine.understanding.interpreters.legacy_en_hi import (
+    LegacyEnglishHindiInterpreter,
+)
 
 DEFAULT_TURN_INTERPRETER = "legacy_en_hi"
 TURN_INTERPRETER_ENV = "AGENT_TURN_INTERPRETER"

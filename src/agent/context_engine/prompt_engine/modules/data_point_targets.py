@@ -1,3 +1,5 @@
+"""Describes optional learning targets without forcing interview-style questions."""
+
 from __future__ import annotations
 
 

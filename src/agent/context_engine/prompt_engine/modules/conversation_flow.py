@@ -1,7 +1,9 @@
+"""Translates the conversation plan into model-facing flow instructions."""
+
 from __future__ import annotations
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
-from agent.context_engine.models import ConversationPlan, TopicState
+from agent.context_engine.contracts.models import ConversationPlan, TopicState
 
 
 def conversation_flow_prompt(prompt_version: PromptBehaviorVersion) -> str:

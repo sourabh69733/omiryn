@@ -1,6 +1,8 @@
+"""Guides safe and natural use of retrieved user data points."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import ConversationPlan
+from agent.context_engine.contracts.models import ConversationPlan
 
 
 def data_point_usage_prompt(plan: ConversationPlan) -> str:

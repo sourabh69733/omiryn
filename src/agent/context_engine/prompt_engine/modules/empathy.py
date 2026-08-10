@@ -1,6 +1,8 @@
+"""Converts detected emotional need into concise empathy instructions."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import EmotionState
+from agent.context_engine.contracts.models import EmotionState
 
 
 def empathy_prompt(emotion: EmotionState) -> str:

@@ -1,3 +1,5 @@
+"""Defines stable safety boundaries for generated companion responses."""
+
 from __future__ import annotations
 
 

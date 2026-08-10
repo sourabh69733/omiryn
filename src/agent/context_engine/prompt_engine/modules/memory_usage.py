@@ -1,3 +1,5 @@
+"""Defines how retrieved memory may inform a response without exposing internals."""
+
 from __future__ import annotations
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion

@@ -1,3 +1,5 @@
+"""V2 instruction contract with structured planning and context behavior."""
+
 from __future__ import annotations
 
 from dataclasses import replace

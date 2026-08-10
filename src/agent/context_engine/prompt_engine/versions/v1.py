@@ -1,3 +1,5 @@
+"""Legacy V1 companion instruction contract retained for rollback."""
+
 from __future__ import annotations
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion

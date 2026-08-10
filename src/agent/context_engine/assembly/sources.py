@@ -1,15 +1,20 @@
+"""Selects stored memory and attached sources for current-turn context."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.models import AgentContext, ContextQueryIntent
-from agent.context_engine.query_intent import RECENCY_QUERY_TERMS, context_query_intent
-from agent.context_engine.style_adapter import style_adaptation_guide
-from agent.context_engine.utils import memory_terms, normalized_memory_text, source_identity
+from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent
+from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.context_engine.conversation_engine.understanding.rules.intent import (
+    RECENCY_QUERY_TERMS,
+    context_query_intent,
+)
+from agent.context_engine.shared.text import memory_terms, normalized_memory_text, source_identity
 from agent.memory_engine.data_points import rank_data_points_for_context
-from agent.memory_engine.retrieval.agent_behavior import retrieve_agent_behavior_rules_for_context
-from agent.memory_engine.retrieval.profile_facts import retrieve_profile_facts_for_context
-from agent.memory_engine.retrieval.whatsapp import (
+from agent.memory_engine.behavior.retrieval import retrieve_agent_behavior_rules_for_context
+from agent.memory_engine.data_points.retrieval.profile_facts import retrieve_profile_facts_for_context
+from agent.memory_engine.data_points.retrieval.whatsapp import (
     retrieve_whatsapp_imports,
     retrieve_whatsapp_memory,
 )

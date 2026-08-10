@@ -1,9 +1,11 @@
+"""Legacy deterministic rules for disagreement, feedback, and user boundaries."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.models import ConversationalStance, EmotionState
-from agent.context_engine.utils import normalized_memory_text
+from agent.context_engine.contracts.models import ConversationalStance, EmotionState
+from agent.context_engine.shared.text import normalized_memory_text
 
 
 NO_ADVICE_PHRASES = {

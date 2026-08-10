@@ -1,3 +1,5 @@
+"""Instructs the model to follow the user's language and writing style naturally."""
+
 from __future__ import annotations
 
 

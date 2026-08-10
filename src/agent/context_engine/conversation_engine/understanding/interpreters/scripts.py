@@ -1,8 +1,10 @@
+"""Detects writing scripts and language-style hints needed by turn interpreters."""
+
 from __future__ import annotations
 
 import unicodedata
 
-from agent.context_engine.turn_understanding.contract import LanguageProfile
+from agent.context_engine.conversation_engine.understanding.contract import LanguageProfile
 
 
 SCRIPT_RANGES: tuple[tuple[str, tuple[tuple[int, int], ...]], ...] = (

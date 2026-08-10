@@ -1,10 +1,15 @@
+"""Tracks topic recency, repetition, depth, and user interest across a conversation."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.models import ContextQueryIntent, TopicState
-from agent.context_engine.topic_catalog import TopicDefinition, relevant_topics_for_intent
-from agent.context_engine.utils import normalized_memory_text
+from agent.context_engine.contracts.models import ContextQueryIntent, TopicState
+from agent.context_engine.conversation_engine.planning.topic_catalog import (
+    TopicDefinition,
+    relevant_topics_for_intent,
+)
+from agent.context_engine.shared.text import normalized_memory_text
 
 
 RECENT_TOPIC_SCAN_LIMIT = 16

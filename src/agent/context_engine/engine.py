@@ -1,22 +1,28 @@
+"""Public context-engine facade that assembles one model-ready turn package."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.context_snapshot import build_context_snapshot, build_context_snapshot_v2
-from agent.context_engine.conversation_planner import build_conversation_plan
-from agent.context_engine.emotion_engine import detect_emotion_state
-from agent.context_engine.matching_understanding import build_matching_understanding
-from agent.context_engine.models import ModelContextPackage
+from agent.context_engine.assembly.snapshot import build_context_snapshot, build_context_snapshot_v2
+from agent.context_engine.conversation_engine.planning import (
+    build_conversation_plan,
+    build_topic_state,
+)
+from agent.context_engine.conversation_engine.understanding import interpret_turn
+from agent.context_engine.conversation_engine.understanding.rules import (
+    context_query_intent,
+    detect_emotion_state,
+)
+from agent.context_engine.assembly.matching import build_matching_understanding
+from agent.context_engine.contracts.models import ModelContextPackage
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     build_companion_system_prompt_v2,
 )
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
-from agent.context_engine.query_intent import context_query_intent
-from agent.context_engine.source_selection import build_reply_context
-from agent.context_engine.topic_state import build_topic_state
-from agent.context_engine.turn_understanding import interpret_turn
-from agent.context_engine.turn_state import active_turn_state
+from agent.context_engine.assembly.sources import build_reply_context
+from agent.context_engine.state.turn import active_turn_state
 from storage import get_conversation
 
 

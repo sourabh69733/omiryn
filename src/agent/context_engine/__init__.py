@@ -1,1 +1,1 @@
-"""Context retrieval, prompt assembly, budgeting, and trace snapshots."""
+"""Builds one model-ready turn from understanding, planning, retrieval, and prompts."""

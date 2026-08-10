@@ -1,9 +1,11 @@
+"""Defines conversation topics and ranks them against the current user intent."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agent.context_engine.models import ContextQueryIntent
-from agent.context_engine.utils import memory_terms, normalized_memory_text
+from agent.context_engine.contracts.models import ContextQueryIntent
+from agent.context_engine.shared.text import memory_terms, normalized_memory_text
 
 COMMON_STARTER_TOPIC_POLICY = (
     "Do not start generic music, movie, truth-or-dare, or how-was-your-day topics.",

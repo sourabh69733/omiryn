@@ -1,8 +1,10 @@
+"""Legacy deterministic query-intent detection used by retrieval and planning."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import ContextQueryIntent
-from agent.context_engine.utils import memory_terms, normalized_memory_text
-from agent.context_engine.turn_state import is_confirmation_to_pending_turn
+from agent.context_engine.contracts.models import ContextQueryIntent
+from agent.context_engine.shared.text import memory_terms, normalized_memory_text
+from agent.context_engine.state.turn import is_confirmation_to_pending_turn
 
 RECENCY_QUERY_TERMS = {"last", "latest", "recent", "previous", "pichli", "pehle", "before"}
 WHATSAPP_QUERY_TERMS = {

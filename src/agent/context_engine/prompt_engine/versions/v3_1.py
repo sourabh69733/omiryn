@@ -1,3 +1,5 @@
+"""V3.1 matching-discovery extension of the listener-first contract."""
+
 from __future__ import annotations
 
 from dataclasses import replace

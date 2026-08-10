@@ -1,10 +1,12 @@
+"""Projects approved matching memory into soft breadth and depth progress."""
+
 from __future__ import annotations
 
 import re
 from collections import defaultdict
 from typing import Any
 
-from agent.context_engine.models import MatchingDimensionProgress, MatchingUnderstanding
+from agent.context_engine.contracts.models import MatchingDimensionProgress, MatchingUnderstanding
 from storage import list_profile_facts
 
 

@@ -1,9 +1,11 @@
+"""Contracts exchanged between turn interpreters and the rest of the context engine."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from agent.context_engine.models import ContextQueryIntent, ConversationalStance, EmotionState
+from agent.context_engine.contracts.models import ContextQueryIntent, ConversationalStance, EmotionState
 
 
 @dataclass(frozen=True)

@@ -1,10 +1,12 @@
+"""Orders, enables, and budgets named system-prompt instruction sections."""
+
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, replace
 from typing import Callable
 
-from agent.context_engine.context_budget import truncate_for_context
+from agent.context_engine.assembly.budget import truncate_for_context
 
 PromptIncludeWhen = Callable[["PromptStructureContext"], bool]
 

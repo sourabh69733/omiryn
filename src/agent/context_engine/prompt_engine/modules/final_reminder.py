@@ -1,6 +1,8 @@
+"""Adds the final high-priority response constraints after other prompt sections."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import ConversationPlan
+from agent.context_engine.contracts.models import ConversationPlan
 
 
 def final_reminder_prompt(plan: ConversationPlan | None = None) -> str:

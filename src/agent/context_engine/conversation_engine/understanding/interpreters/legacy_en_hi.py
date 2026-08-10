@@ -1,12 +1,22 @@
+"""Legacy English/Hindi interpreter composed from deterministic understanding rules."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.emotion_engine import detect_emotion_state
-from agent.context_engine.query_intent import context_query_intent
-from agent.context_engine.stance_engine import analyze_conversational_stance
-from agent.context_engine.turn_understanding.contract import TurnUnderstanding
-from agent.context_engine.turn_understanding.scripts import detect_language_profile
+from agent.context_engine.conversation_engine.understanding.contract import TurnUnderstanding
+from agent.context_engine.conversation_engine.understanding.interpreters.scripts import (
+    detect_language_profile,
+)
+from agent.context_engine.conversation_engine.understanding.rules.emotion import (
+    detect_emotion_state,
+)
+from agent.context_engine.conversation_engine.understanding.rules.intent import (
+    context_query_intent,
+)
+from agent.context_engine.conversation_engine.understanding.rules.stance import (
+    analyze_conversational_stance,
+)
 
 
 class LegacyEnglishHindiInterpreter:

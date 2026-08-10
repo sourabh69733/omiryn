@@ -1,3 +1,5 @@
+"""Defines immutable contracts exchanged between context-engine stages."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

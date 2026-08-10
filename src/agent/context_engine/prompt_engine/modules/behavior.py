@@ -1,3 +1,5 @@
+"""Builds companion behavior and persona instructions from user configuration."""
+
 from __future__ import annotations
 
 import os

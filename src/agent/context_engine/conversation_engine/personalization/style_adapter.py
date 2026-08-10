@@ -1,3 +1,5 @@
+"""Turns approved style memory into concise guidance for the current response."""
+
 from __future__ import annotations
 
 from typing import Any

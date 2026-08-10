@@ -1,14 +1,22 @@
+"""Builds the response plan from turn understanding, topic state, and user constraints."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import (
+from agent.context_engine.contracts.models import (
     ContextQueryIntent,
     ConversationalStance,
     ConversationPlan,
     EmotionState,
     TopicState,
 )
-from agent.context_engine.topic_catalog import COMMON_STARTER_TOPIC_POLICY, relevant_topics_for_intent
-from agent.context_engine.topic_state import active_topic_state, avoid_topic_labels
+from agent.context_engine.conversation_engine.planning.topic_catalog import (
+    COMMON_STARTER_TOPIC_POLICY,
+    relevant_topics_for_intent,
+)
+from agent.context_engine.conversation_engine.planning.topic_state import (
+    active_topic_state,
+    avoid_topic_labels,
+)
 
 COMMON_STARTER_AVOID_TOPICS = (
     "Generic music preference starters.",

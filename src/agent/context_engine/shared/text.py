@@ -1,3 +1,5 @@
+"""Provides low-level text and identity helpers for context stages."""
+
 from __future__ import annotations
 
 from typing import Any

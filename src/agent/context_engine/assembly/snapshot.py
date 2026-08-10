@@ -1,10 +1,12 @@
+"""Builds debug snapshots describing context assembly decisions for each turn."""
+
 from __future__ import annotations
 
 from collections import Counter
 from typing import Any
 
-from agent.context_engine.context_budget import budget_context_sources
-from agent.context_engine.models import (
+from agent.context_engine.assembly.budget import budget_context_sources
+from agent.context_engine.contracts.models import (
     ContextBlock,
     ContextQueryIntent,
     ConversationPlan,
@@ -12,7 +14,7 @@ from agent.context_engine.models import (
     MatchingUnderstanding,
     TopicState,
 )
-from agent.context_engine.turn_understanding.contract import TurnUnderstanding
+from agent.context_engine.conversation_engine.understanding.contract import TurnUnderstanding
 
 SNAPSHOT_PREVIEW_CHARS = 500
 

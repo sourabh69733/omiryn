@@ -1,3 +1,5 @@
+"""Defines companion identity variants without coupling them to provider code."""
+
 from __future__ import annotations
 
 

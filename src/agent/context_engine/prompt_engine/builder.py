@@ -1,12 +1,14 @@
+"""Composes versioned instructions and dynamic context into the system prompt."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.context_budget import (
+from agent.context_engine.assembly.budget import (
     budget_context_sources,
     truncate_for_context,
 )
-from agent.context_engine.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
+from agent.context_engine.contracts.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.modules.behavior import (
     CompanionBehavior,

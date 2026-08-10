@@ -1,3 +1,5 @@
+"""Maps configured tone preferences to compact model instructions."""
+
 from __future__ import annotations
 
 

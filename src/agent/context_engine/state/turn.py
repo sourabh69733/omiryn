@@ -1,8 +1,10 @@
+"""Tracks pending offers and assistant-turn continuity metadata."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.utils import normalized_memory_text
+from agent.context_engine.shared.text import normalized_memory_text
 
 TURN_STATE_KEY = "turn_state"
 

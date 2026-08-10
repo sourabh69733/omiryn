@@ -1,9 +1,11 @@
+"""Legacy deterministic emotion and conversational-need detection rules."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.models import ContextQueryIntent, EmotionState
-from agent.context_engine.utils import normalized_memory_text
+from agent.context_engine.contracts.models import ContextQueryIntent, EmotionState
+from agent.context_engine.shared.text import normalized_memory_text
 
 
 FRUSTRATION_PHRASES = {

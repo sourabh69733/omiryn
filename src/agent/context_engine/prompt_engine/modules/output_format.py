@@ -1,3 +1,5 @@
+"""Defines user-visible response formatting expectations for the companion model."""
+
 from __future__ import annotations
 
 

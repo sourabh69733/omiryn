@@ -1,3 +1,5 @@
+"""Applies size and priority limits while assembling dynamic model context."""
+
 from __future__ import annotations
 
 import os

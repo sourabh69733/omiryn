@@ -1,3 +1,5 @@
+"""Guides careful use of imported WhatsApp context and style signals."""
+
 from __future__ import annotations
 
 from typing import Any

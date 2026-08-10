@@ -1,3 +1,5 @@
+"""Resolves configured prompt versions behind a stable lookup API."""
+
 from __future__ import annotations
 
 import os

@@ -1,6 +1,8 @@
+"""Provides instructions for recovering naturally from low-engagement turns."""
+
 from __future__ import annotations
 
-from agent.context_engine.models import ConversationPlan
+from agent.context_engine.contracts.models import ConversationPlan
 
 
 def boredom_recovery_prompt(plan: ConversationPlan) -> str:

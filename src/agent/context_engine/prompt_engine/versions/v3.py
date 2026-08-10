@@ -1,3 +1,5 @@
+"""V3 listener-first companion instruction contract."""
+
 from __future__ import annotations
 
 from dataclasses import replace
