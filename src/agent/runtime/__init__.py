@@ -1,1 +1,1 @@
-"""Agent runtime orchestration, provider calls, and usage accounting."""
+"""Runs the high-level companion turn lifecycle; domain logic lives in owned subsystems."""

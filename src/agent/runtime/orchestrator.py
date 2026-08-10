@@ -1,20 +1,21 @@
+"""Coordinates one complete companion turn across context, models, memory, and traces."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
+from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
 from agent.context_engine.engine import build_model_context_package
-from agent.memory_engine.memory import capture_profile_facts_from_user_message
-from agent.runtime.providers import (
+from agent.memory_engine.engine import capture_profile_facts_from_user_message
+from agent.providers import (
     _prompt_debug,
     _provider_messages,
     assess_user_message_quality,
     generate_agent_reply,
 )
-from agent.runtime.replies import split_assistant_reply
-from agent.context_engine.turn_state import assistant_turn_state
-from agent.runtime.turn_policy import direct_turn_reply
-from agent.runtime.turn_output import (
+from agent.context_engine.state.turn import assistant_turn_state
+from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOL_CHOICE,
     TURN_OUTPUT_V2_TOOLS,
     capture_turn_output_data_points,
