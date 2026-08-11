@@ -1,6 +1,8 @@
 import unittest
 
 from agent.context_engine.engine import build_model_context_package
+from agent.context_engine.conversation_engine.planning import build_conversation_plan
+from agent.context_engine.contracts.models import ContextQueryIntent, ConversationalStance, EmotionState
 from agent.context_engine.assembly.matching import (
     MATCHING_DIMENSIONS,
     calculate_matching_understanding,
@@ -143,6 +145,41 @@ class MatchingUnderstandingUnitTest(unittest.TestCase):
         self.assertEqual(progress.foundation_covered, 0)
         self.assertEqual(progress.known_dimensions, ())
 
+    def test_listener_first_planner_receives_a_private_discovery_hint_when_open(self) -> None:
+        progress = calculate_matching_understanding(
+            [matching_fact("location_preference", confidence=0.5)]
+        )
+
+        plan = build_conversation_plan(
+            user_text="I have a quiet evening today.",
+            intent=ContextQueryIntent(),
+            topic_states=[],
+            emotion_state=EmotionState(),
+            conversational_stance=ConversationalStance(),
+            matching_understanding=progress,
+            listener_first=True,
+        )
+
+        self.assertTrue(plan.matching_discovery_allowed)
+        self.assertEqual(plan.matching_discovery_topics[0], "location_preference")
+        self.assertIn("relationship_intent", plan.matching_discovery_topics)
+
+    def test_listener_first_planner_defers_discovery_for_a_listening_boundary(self) -> None:
+        progress = calculate_matching_understanding([matching_fact("location_preference")])
+
+        plan = build_conversation_plan(
+            user_text="Bas meri baat suno, questions mat puchna.",
+            intent=ContextQueryIntent(),
+            topic_states=[],
+            emotion_state=EmotionState(),
+            conversational_stance=ConversationalStance(constraints=("listen_only", "no_questions")),
+            matching_understanding=progress,
+            listener_first=True,
+        )
+
+        self.assertFalse(plan.matching_discovery_allowed)
+        self.assertEqual(plan.matching_discovery_topics, ())
+
 
 class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -172,6 +209,11 @@ class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
         self.assertEqual(v3_1.snapshot["summary"]["matching_foundation_covered"], 2)
         self.assertEqual(v3_1.snapshot["context"]["matching_understanding"]["level"], "starting")
         self.assertIn("listen_only", v3_1.snapshot["summary"]["user_constraints"])
+        self.assertFalse(v3_1.snapshot["summary"]["matching_discovery_allowed"])
+        self.assertEqual(
+            v3_1.snapshot["context"]["conversation_plan"]["matching_discovery_topics"],
+            [],
+        )
         self.assertNotIn("## Matching Understanding", v3.system_prompt)
         self.assertIn("## Matching Understanding", v3_1.system_prompt)
         self.assertIn("Current understanding level: starting", v3_1.system_prompt)
