@@ -86,6 +86,7 @@ def build_model_context_package(
             topic_states=topic_states,
             emotion_state=emotion_state,
             conversational_stance=conversational_stance,
+            matching_understanding=matching_understanding,
             listener_first=listener_first,
         )
         system_prompt = build_companion_system_prompt_v2(

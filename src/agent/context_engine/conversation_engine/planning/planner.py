@@ -7,6 +7,7 @@ from agent.context_engine.contracts.models import (
     ConversationalStance,
     ConversationPlan,
     EmotionState,
+    MatchingUnderstanding,
     TopicState,
 )
 from agent.context_engine.conversation_engine.planning.topic_catalog import (
@@ -33,6 +34,7 @@ def build_conversation_plan(
     topic_states: list[TopicState],
     emotion_state: EmotionState | None = None,
     conversational_stance: ConversationalStance | None = None,
+    matching_understanding: MatchingUnderstanding | None = None,
     listener_first: bool = False,
 ) -> ConversationPlan:
     if listener_first:
@@ -42,6 +44,7 @@ def build_conversation_plan(
             topic_states=topic_states,
             emotion_state=emotion_state or EmotionState(),
             stance=conversational_stance or ConversationalStance(),
+            matching_understanding=matching_understanding,
         )
     labels = set(intent.labels)
     active = active_topic_state(topic_states)
@@ -72,6 +75,7 @@ def _build_listener_first_plan(
     topic_states: list[TopicState],
     emotion_state: EmotionState,
     stance: ConversationalStance,
+    matching_understanding: MatchingUnderstanding | None,
 ) -> ConversationPlan:
     labels = set(intent.labels)
     prioritized = _stance_requires_attention(stance)
@@ -85,6 +89,11 @@ def _build_listener_first_plan(
     question_purpose = stance.question_purpose
     if question_purpose == "none" and not prioritized and labels & {"low_information", "boredom_complaint"}:
         question_purpose = "offer_choice"
+    matching_discovery_allowed = matching_understanding is not None and _matching_discovery_is_allowed(
+        emotion_state,
+        stance,
+        question_purpose,
+    )
     return ConversationPlan(
         current_move=_listener_first_move(labels, active, emotion_state, stance),
         response_mode=_listener_first_response_mode(user_text, labels, emotion_state, stance),
@@ -100,6 +109,40 @@ def _build_listener_first_plan(
         question_purpose=question_purpose,
         user_constraints=stance.constraints,
         feedback_kind=stance.feedback_kind,
+        matching_discovery_allowed=matching_discovery_allowed,
+        matching_discovery_topics=_matching_discovery_topics(
+            matching_understanding,
+            allowed=matching_discovery_allowed,
+        ),
+    )
+
+
+def _matching_discovery_is_allowed(
+    emotion: EmotionState,
+    stance: ConversationalStance,
+    question_purpose: str,
+) -> bool:
+    """Keep matching discovery out of turns that need attention, safety, or space."""
+    if stance.constraints or stance.feedback_kind or stance.mode != "neutral":
+        return False
+    if emotion.response_mode != "normal_chat":
+        return False
+    if question_purpose == "none" and stance.claim_type != "none":
+        return False
+    return True
+
+
+def _matching_discovery_topics(
+    matching_understanding: MatchingUnderstanding | None,
+    *,
+    allowed: bool,
+) -> tuple[str, ...]:
+    """Offer private deepening opportunities before entirely unexplored areas."""
+    if not matching_understanding or not allowed:
+        return ()
+    return (
+        *matching_understanding.can_deepen_dimensions,
+        *matching_understanding.unexplored_dimensions,
     )
 
 

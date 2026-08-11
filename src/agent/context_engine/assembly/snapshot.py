@@ -138,6 +138,7 @@ def build_context_snapshot_v2(
         "question_purpose": conversation_plan.question_purpose,
         "user_constraints": list(conversation_plan.user_constraints),
         "feedback_kind": conversation_plan.feedback_kind,
+        "matching_discovery_allowed": conversation_plan.matching_discovery_allowed,
         **flags,
     }
     context = {
@@ -346,6 +347,8 @@ def _conversation_plan_snapshot(plan: ConversationPlan) -> dict[str, Any]:
         "stance_confidence": plan.stance_confidence,
         "claim_type": plan.claim_type,
         "question_purpose": plan.question_purpose,
+        "matching_discovery_allowed": plan.matching_discovery_allowed,
+        "matching_discovery_topics": list(plan.matching_discovery_topics),
         "user_constraints": list(plan.user_constraints),
         "feedback_kind": plan.feedback_kind,
     }

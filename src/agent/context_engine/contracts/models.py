@@ -86,6 +86,9 @@ class ConversationPlan:
     question_purpose: str = "optional"
     user_constraints: tuple[str, ...] = ()
     feedback_kind: str | None = None
+    # Private V3.1 planning input. It is never a user-visible completion state.
+    matching_discovery_allowed: bool = False
+    matching_discovery_topics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
