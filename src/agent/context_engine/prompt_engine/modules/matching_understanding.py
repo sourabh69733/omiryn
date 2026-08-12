@@ -11,16 +11,15 @@ def matching_understanding_prompt(progress: MatchingUnderstanding) -> str:
     can_deepen = _dimension_list(progress.can_deepen_dimensions)
     return (
         "Private matching-understanding context:\n"
-        f"- Current understanding level: {progress.level}\n"
-        f"- Foundation understood: {progress.foundation_covered} of {progress.foundation_total}\n"
         f"- Known areas: {known}\n"
-        f"- Not yet understood: {unexplored}\n"
-        f"- Areas that could be understood more deeply: {can_deepen}\n"
+        f"- Possible areas not yet understood: {unexplored}\n"
+        f"- Known areas that may naturally deepen later: {can_deepen}\n"
         "Treat this as quiet background awareness, not a checklist, target, or completion gate. "
-        "Do not expose these internal labels or the progress level to the user. Do not ask about a "
+        "This prompt deliberately does not provide a user-facing score or level because none exists. "
+        "Do not expose these internal area labels to the user. Do not ask about a "
         "missing area merely because it is missing. The user's present emotion, boundary, request, "
         "and active topic remain more important; learn naturally only when the conversation makes "
-        "it relevant."
+        "it relevant. If asked what you know, answer with concrete remembered facts only."
     )
 
 
