@@ -8,6 +8,7 @@ import { assetUrl, canShowUsage } from "../appUtils";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, UsageEvent, UsageSummary } from "../types";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
+const CHAT_INPUT_MAX_LENGTH = 300;
 
 export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { initialConversationId?: string | null; userAvatar?: string | null, interestedIn?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
@@ -29,6 +30,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [limitNoticeVersion, setLimitNoticeVersion] = useState(0);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -191,6 +193,12 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   }, [draft]);
 
   useEffect(() => {
+    if (!limitNoticeVersion) return;
+    const timeout = window.setTimeout(() => setLimitNoticeVersion(0), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [limitNoticeVersion]);
+
+  useEffect(() => {
     return () => {
       if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
     };
@@ -244,13 +252,20 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     const input = inputRef.current;
     const start = input?.selectionStart ?? draft.length;
     const end = input?.selectionEnd ?? draft.length;
-    const nextDraft = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+    const proposedDraft = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+    if (characterCount(proposedDraft) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
+    const nextDraft = limitCharacters(proposedDraft, CHAT_INPUT_MAX_LENGTH);
     setDraft(nextDraft);
     window.requestAnimationFrame(() => {
       input?.focus();
-      const nextCursor = start + emoji.length;
+      const nextCursor = Math.min(start + emoji.length, nextDraft.length);
       input?.setSelectionRange(nextCursor, nextCursor);
     });
+  }
+
+  function updateDraft(value: string) {
+    if (characterCount(value) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
+    setDraft(limitCharacters(value, CHAT_INPUT_MAX_LENGTH));
   }
 
   async function sendMessage(event: FormEvent) {
@@ -486,7 +501,8 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
-          <form className={`composer ${composerBlocked ? "is-paused" : ""}`} onSubmit={sendMessage}>
+          <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
+            {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
             <div className="emoji-picker-anchor" ref={emojiPickerRef}>
               <button className="emoji-trigger-button" type="button" disabled={!conversation || sending || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
               {emojiPickerOpen ? (
@@ -507,7 +523,8 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 </div>
               ) : null}
             </div>
-            <textarea ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} readOnly={sending} aria-describedby={composerBlocked ? "composer-pause-note" : undefined} />
+            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} readOnly={sending} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
+            {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
             <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
         </section>
@@ -515,6 +532,14 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
       {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This will permanently remove the chat, attached context, and usage log for this conversation.</p><p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
   );
+}
+
+function characterCount(value: string) {
+  return Array.from(value).length;
+}
+
+function limitCharacters(value: string, maximum: number) {
+  return Array.from(value).slice(0, maximum).join("");
 }
 
 function formatNumber(value: number) {

@@ -4949,6 +4949,56 @@ p {
   color: #9189a6;
 }
 
+.agentic-chat .composer.is-near-limit > textarea {
+  padding-right: 48px;
+}
+
+.chat-character-count {
+  position: absolute;
+  right: 49px;
+  bottom: 7px;
+  color: #817a92;
+  font-family: var(--font-chat);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.chat-limit-notice {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  z-index: 30;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #ffffff;
+  background: rgba(35, 35, 39, 0.94);
+  box-shadow: 0 10px 28px rgba(25, 22, 34, 0.2);
+  font-family: var(--font-chat);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: chat-limit-notice-in 140ms ease-out;
+}
+
+@keyframes chat-limit-notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .agentic-chat .composer > button,
 .agentic-chat .composer .emoji-trigger-button {
   display: grid;
