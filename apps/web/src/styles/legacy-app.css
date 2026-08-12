@@ -4406,7 +4406,8 @@ p {
   position: relative;
   border-color: #e8e4f0;
   color: #2f294a;
-  background: #f5f3f9;
+  background: #ffffff;
+  /* background: #f5f3f9; */
   box-shadow: none;
 }
 
