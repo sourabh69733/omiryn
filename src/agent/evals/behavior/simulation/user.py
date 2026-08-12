@@ -47,6 +47,11 @@ class SimulatedUserScenario:
     minimum_turns: int = 3
     maximum_turns: int = 6
     mock_messages: tuple[str, ...] = ()
+    evaluation_criteria: tuple[str, ...] = ()
+    forbidden_assistant_phrases: tuple[str, ...] = ()
+    boundary_phrases: tuple[str, ...] = ()
+    max_questions_per_reply: int = 1
+    max_consecutive_question_turns: int = 2
 
     def __post_init__(self) -> None:
         if not self.id.strip():
@@ -59,6 +64,8 @@ class SimulatedUserScenario:
             raise ValueError("minimum_turns must be at least 1.")
         if self.maximum_turns < self.minimum_turns:
             raise ValueError("maximum_turns cannot be lower than minimum_turns.")
+        if self.max_questions_per_reply < 0 or self.max_consecutive_question_turns < 0:
+            raise ValueError("Question limits cannot be negative.")
 
 
 @dataclass(frozen=True)
@@ -392,6 +399,7 @@ Return every required dimension exactly once and no additional dimensions."""
                 "description": scenario.description,
                 "persona": scenario.persona,
                 "goal": scenario.goal,
+                "evaluation_criteria": list(scenario.evaluation_criteria),
             },
             "required_dimensions": list(USER_EXPERIENCE_DIMENSIONS),
             "transcript": list(transcript),

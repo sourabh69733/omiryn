@@ -15,6 +15,7 @@ from agent.evals.behavior.simulation.runtime import (
     _runtime_environment,
 )
 from agent.evals.behavior.judging.simulated import ConversationJudge, IndependentJudgment
+from agent.evals.behavior.simulation.checks import ConversationCheck, evaluate_conversation_checks
 from agent.evals.behavior.simulation.user import (
     SimulatedUser,
     SimulatedUserScenario,
@@ -37,6 +38,7 @@ class SimulatedConversationResult:
     conversation_id: str
     user_verdict: UserExperienceVerdict
     independent_judgments: tuple[IndependentJudgment, ...] = ()
+    deterministic_checks: tuple[ConversationCheck, ...] = ()
 
 
 async def run_simulated_conversation(
@@ -225,7 +227,12 @@ async def run_simulated_conversation(
         conversation_id=conversation_id,
         event_sink=event_sink,
     )
-    consensus = _conversation_consensus(user_verdict, independent_judgments)
+    deterministic_checks = evaluate_conversation_checks(scenario, tuple(observed_turns))
+    consensus = _conversation_consensus(
+        user_verdict,
+        independent_judgments,
+        deterministic_checks,
+    )
     emit_event(
         event_sink,
         "simulated_conversation_completed",
@@ -243,6 +250,7 @@ async def run_simulated_conversation(
         conversation_id=conversation_id,
         user_verdict=user_verdict,
         independent_judgments=independent_judgments,
+        deterministic_checks=deterministic_checks,
     )
 
 
@@ -255,7 +263,12 @@ def simulated_conversation_payload(
     independent_payload = [
         _independent_judgment_payload(judgment) for judgment in result.independent_judgments
     ]
-    consensus = _conversation_consensus(result.user_verdict, result.independent_judgments)
+    deterministic_checks = tuple(getattr(result, "deterministic_checks", ()))
+    consensus = _conversation_consensus(
+        result.user_verdict,
+        result.independent_judgments,
+        deterministic_checks,
+    )
     conversation = {
         "scenario_id": result.scenario_id,
         "stop_reason": result.stop_reason,
@@ -297,6 +310,15 @@ def simulated_conversation_payload(
             ],
         },
         "independent_judgments": independent_payload,
+        "deterministic_checks": [
+            {
+                "id": check.id,
+                "passed": check.passed,
+                "reason": check.reason,
+                "evidence": check.evidence,
+            }
+            for check in deterministic_checks
+        ],
         "consensus": consensus,
         "improvement_targets": _improvement_targets(
             scenario_id=result.scenario_id,
@@ -425,6 +447,7 @@ async def _run_independent_judges(
 def _conversation_consensus(
     user_verdict: UserExperienceVerdict,
     independent_judgments: tuple[IndependentJudgment, ...],
+    deterministic_checks: tuple[ConversationCheck, ...] = (),
 ) -> dict[str, Any]:
     voices: list[dict[str, Any]] = [
         {
@@ -448,7 +471,13 @@ def _conversation_consensus(
     judge_errors = sum(voice["error"] is not None for voice in voices)
     passing_voices = sum(bool(voice["passed"]) for voice in voices)
     has_independent = bool(independent_judgments)
-    passed = has_independent and judge_errors == 0 and passing_voices == len(voices)
+    failed_checks = sum(not check.passed for check in deterministic_checks)
+    passed = (
+        has_independent
+        and judge_errors == 0
+        and passing_voices == len(voices)
+        and failed_checks == 0
+    )
     verdict = "consensus_pass" if passed else "consensus_fail"
     disagreements = []
     if has_independent and len({bool(voice["passed"]) for voice in voices}) > 1:
@@ -468,8 +497,16 @@ def _conversation_consensus(
         "total_voices": len(voices),
         "passing_voices": passing_voices,
         "judge_errors": judge_errors,
+        "deterministic_checks": len(deterministic_checks),
+        "failed_deterministic_checks": failed_checks,
         "disagreements": disagreements,
-        "reason": _consensus_reason(has_independent, passed, judge_errors, disagreements),
+        "reason": _consensus_reason(
+            has_independent,
+            passed,
+            judge_errors,
+            disagreements,
+            failed_checks,
+        ),
     }
 
 
@@ -478,11 +515,14 @@ def _consensus_reason(
     passed: bool,
     judge_errors: int,
     disagreements: list[str],
+    failed_checks: int = 0,
 ) -> str:
     if not has_independent:
         return "The AI-user verdict exists, but no independent judge has reviewed the transcript yet."
     if judge_errors:
         return "At least one judge errored, so the consensus fails closed."
+    if failed_checks:
+        return f"{failed_checks} deterministic conversation check(s) failed."
     if disagreements:
         return "The user and independent judge disagree, so this needs review before trusting it."
     if passed:

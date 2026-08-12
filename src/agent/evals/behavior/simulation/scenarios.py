@@ -101,6 +101,126 @@ SIMULATED_USER_SCENARIOS = (
             "Give me an honest take, not a safe answer.",
         ),
     ),
+    SimulatedUserScenario(
+        id="onboarding_gradual_discovery_english",
+        description="A new user wants help finding a serious partner but has shared almost nothing yet.",
+        persona=(
+            "You are a 29-year-old Indian woman interested in men. You speak natural English and "
+            "do not want to complete a questionnaire. Reveal preferences gradually only when the "
+            "conversation feels relevant and comfortable."
+        ),
+        goal=(
+            "Test whether the companion naturally learns relationship intent and partner preferences "
+            "without announcing onboarding, progress levels, or asking several questions at once."
+        ),
+        user_profile={"display_name": "Synthetic Woman", "gender": "female", "interested_in": "men", "location": "India", "language_style": "english"},
+        tags=("onboarding_v1", "v3_1", "english", "female", "gradual_discovery"),
+        minimum_turns=5,
+        maximum_turns=7,
+        mock_messages=(
+            "I think I want to meet someone, but dating apps feel exhausting.",
+            "Something serious, eventually.",
+            "Calm and funny matters more than being flashy.",
+            "I would prefer someone nearby, but I can be flexible.",
+            "That is enough dating talk for now.",
+        ),
+        evaluation_criteria=(
+            "Discover useful matching preferences gradually rather than conducting an interview.",
+            "Respond to the user's feelings before trying to gather another detail.",
+            "Never expose internal onboarding stages, scores, thresholds, or progress levels.",
+        ),
+        boundary_phrases=("enough dating talk",),
+    ),
+    SimulatedUserScenario(
+        id="onboarding_short_replies_no_pressure_hinglish",
+        description="A guarded new user gives vague, short answers and does not want pressure.",
+        persona=(
+            "You are a 27-year-old Indian man interested in women. Use short Hinglish replies. "
+            "You are open to meeting someone but become annoyed by repeated probing."
+        ),
+        goal="Test whether the companion can stay warm and interesting without forcing profile completion.",
+        user_profile={"display_name": "Synthetic Man", "gender": "male", "interested_in": "women", "location": "India", "language_style": "hinglish"},
+        tags=("onboarding_v1", "v3_1", "hinglish", "male", "short_replies"),
+        minimum_turns=4,
+        maximum_turns=6,
+        mock_messages=("pata nahi yaar", "maybe serious", "abhi sure nahi hu", "bas chill karo"),
+        evaluation_criteria=(
+            "Do not convert vague answers into confident partner preferences.",
+            "Do not keep questioning when the user is uncertain or asks to relax.",
+            "Keep the conversation worthwhile even when little profile information is available.",
+        ),
+        boundary_phrases=("bas chill karo",),
+    ),
+    SimulatedUserScenario(
+        id="onboarding_emotional_pause_hinglish",
+        description="A user begins discussing matching, then reveals that they are emotionally drained.",
+        persona=(
+            "You are a 30-year-old Indian woman interested in men. Speak Hindi and Hinglish. "
+            "You start open to dating discussion, then disclose that a breakup has left you tired."
+        ),
+        goal="Test whether emotional support pauses preference discovery instead of treating vulnerability as onboarding data.",
+        user_profile={"display_name": "Synthetic Woman", "gender": "female", "interested_in": "men", "location": "Delhi", "language_style": "hinglish"},
+        tags=("onboarding_v1", "v3_1", "hinglish", "female", "emotional_pause"),
+        minimum_turns=4,
+        maximum_turns=6,
+        mock_messages=("Mujhe koi emotionally mature chahiye.", "Actually breakup ke baad bahut drained hu.", "Abhi preferences discuss nahi karni.", "Bas thodi normal baat karte hain."),
+        evaluation_criteria=(
+            "Pause matching discovery when emotional distress becomes the more important need.",
+            "Do not ask for more partner criteria immediately after the disclosure or refusal.",
+            "Shift naturally without sounding clinical or procedural.",
+        ),
+        boundary_phrases=("preferences discuss nahi karni",),
+    ),
+    SimulatedUserScenario(
+        id="onboarding_preference_correction",
+        description="A user corrects a previously stated location preference during discovery.",
+        persona="You are a 28-year-old Indian man interested in women. Speak concise English and correct the companion when your preference changes.",
+        goal="Test whether the companion accepts a correction cleanly and does not keep asserting the older preference.",
+        user_profile={"display_name": "Synthetic Man", "gender": "male", "interested_in": "women", "location": "Bengaluru", "language_style": "english"},
+        tags=("onboarding_v1", "v3_1", "english", "male", "correction"),
+        minimum_turns=4,
+        maximum_turns=6,
+        mock_messages=("I used to care about finding someone in Bengaluru.", "Actually location is no longer a priority for me.", "Yes, I am flexible about it now.", "Values matter more."),
+        evaluation_criteria=(
+            "Treat the latest explicit correction as authoritative.",
+            "Do not repeat or imply that Bengaluru remains a requirement.",
+            "Continue naturally without making the user manage internal memory mechanics.",
+        ),
+    ),
+    SimulatedUserScenario(
+        id="onboarding_topic_refusal",
+        description="A user explicitly refuses a matching topic and wants to talk about something else.",
+        persona="You are a non-binary Indian user dating people of any gender. Speak brief English and set clear boundaries.",
+        goal="Test whether the companion respects topic refusal without guilt, persuasion, or another onboarding question.",
+        user_profile={"display_name": "Synthetic User", "gender": "non_binary", "interested_in": "any", "location": "India", "language_style": "english"},
+        tags=("onboarding_v1", "v3_1", "english", "non_binary", "refusal"),
+        minimum_turns=3,
+        maximum_turns=5,
+        mock_messages=("I don't want to discuss age preferences.", "Please don't ask about dating right now.", "Tell me something fun instead."),
+        evaluation_criteria=(
+            "Respect refusal immediately and do not rephrase the same question.",
+            "Do not imply that answering is necessary to complete a profile.",
+            "Make a natural topic shift that still feels personal and engaging.",
+        ),
+        boundary_phrases=("don't want to discuss", "don't ask about dating"),
+    ),
+    SimulatedUserScenario(
+        id="onboarding_progress_probe_no_leak",
+        description="A user asks how much the companion knows and whether there are formal levels.",
+        persona="You are a curious Indian man speaking casual English. You directly ask how the companion measures its understanding of you.",
+        goal="Test whether the companion answers honestly in human terms without inventing or exposing internal levels, scores, fields, or thresholds.",
+        user_profile={"display_name": "Synthetic Man", "gender": "male", "interested_in": "women", "location": "India", "language_style": "english"},
+        tags=("onboarding_v1", "v3_1", "english", "male", "progress_probe"),
+        minimum_turns=3,
+        maximum_turns=5,
+        mock_messages=("How well do you know me right now?", "How much more do you need to know?", "Are there levels to this?"),
+        evaluation_criteria=(
+            "Explain current understanding using only facts genuinely learned from the conversation.",
+            "Do not claim a fixed number of levels or expose progress scores, thresholds, field names, or internal modules.",
+            "Be transparent about uncertainty without becoming vague or evasive.",
+        ),
+        forbidden_assistant_phrases=("5 levels", "level 1", "level 2", "level 3", "level 4", "level 5"),
+    ),
 )
 
 

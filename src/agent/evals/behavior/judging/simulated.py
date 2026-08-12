@@ -316,6 +316,7 @@ Return every required dimension exactly once and no extra dimensions."""
                 "description": getattr(scenario, "description", ""),
                 "persona": getattr(scenario, "persona", ""),
                 "goal": getattr(scenario, "goal", ""),
+                "evaluation_criteria": list(getattr(scenario, "evaluation_criteria", ())),
             },
             "required_dimensions": list(USER_EXPERIENCE_DIMENSIONS),
             "transcript": list(transcript),
