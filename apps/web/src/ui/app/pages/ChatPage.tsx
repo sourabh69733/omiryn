@@ -323,7 +323,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
       await fetchSummaries();
       void loadConversationUsage(nextConversation.id);
     } catch (caught) {
-      setDraft(message);
+      setDraft((currentDraft) => currentDraft.trim() ? currentDraft : message);
       if (!handledInlineError) setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
     } finally {
       setSending(false);
@@ -504,7 +504,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
           <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
             {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
             <div className="emoji-picker-anchor" ref={emojiPickerRef}>
-              <button className="emoji-trigger-button" type="button" disabled={!conversation || sending || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
+              <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
               {emojiPickerOpen ? (
                 <div className="emoji-picker-popover">
                   <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
@@ -523,7 +523,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 </div>
               ) : null}
             </div>
-            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} readOnly={sending} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
+            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
             {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
             <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
