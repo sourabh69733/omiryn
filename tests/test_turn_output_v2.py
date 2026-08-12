@@ -66,6 +66,17 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.reply, "Want to talk about something else?")
         self.assertNotIn("<function", parsed.reply)
 
+    def test_parser_unwraps_brace_style_function_wrapper(self) -> None:
+        parsed = parse_turn_output_v2(
+            '<function{return_companion_response({"reply":"Take care of yourself!",'
+            '"data_points":[]})}</function>',
+            user_text="I am sick today.",
+        )
+
+        self.assertTrue(parsed.parsed)
+        self.assertEqual(parsed.reply, "Take care of yourself!")
+        self.assertNotIn("<function", parsed.reply)
+
     def test_parser_accepts_fenced_json_with_nested_value_objects(self) -> None:
         parsed = parse_turn_output_v2(
             """

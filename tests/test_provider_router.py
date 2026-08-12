@@ -21,7 +21,7 @@ from agent.providers.gateway.registry import (
 from agent.providers.shared.errors import AgentProviderError
 from agent.providers.extraction.service import extract_profile
 from agent.providers.gateway.router import provider_chat
-from agent.providers.shared.structured_output import structured_companion_reply
+from agent.outputs.companion_response import structured_companion_reply, textual_tool_arguments
 
 
 class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
@@ -35,6 +35,27 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             structured_companion_reply(wrapped),
             "Location is no longer a priority for you",
         )
+
+    def test_structured_companion_reply_unwraps_brace_style_function_envelope(self) -> None:
+        wrapped = (
+            '<function{return_companion_response({"reply":"Take care of yourself!",'
+            '"data_points":[]})}</function>'
+        )
+
+        self.assertEqual(structured_companion_reply(wrapped), "Take care of yourself!")
+
+    def test_gateway_extracts_arguments_from_brace_style_function_envelope(self) -> None:
+        wrapped = (
+            '<function{return_companion_response({"reply":"Take care of yourself!",'
+            '"data_points":[]})}</function>'
+        )
+
+        arguments = textual_tool_arguments(
+            wrapped,
+            expected_name="return_companion_response",
+        )
+
+        self.assertEqual(json.loads(arguments or "{}"), {"reply": "Take care of yourself!", "data_points": []})
 
     async def test_routes_openai_compatible_provider_with_all_request_fields(self) -> None:
         with patch(
