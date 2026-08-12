@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from time import perf_counter
 from typing import Any
 
@@ -15,6 +14,7 @@ from agent.observability.usage import CHAT_REPLY
 
 from agent.providers.shared.errors import AgentProviderError
 from agent.providers.shared.messages import _compact_chat_reply, _provider_messages
+from agent.outputs.companion_response import textual_tool_arguments
 from .registry import (
     provider_api_key,
     provider_base_url,
@@ -101,9 +101,12 @@ async def _openai_compatible_chat(
             if tool_arguments is not None:
                 return tool_arguments
             content = str(message.get("content") or "")
-            textual_tool_arguments = _textual_tool_arguments(content, tool_choice)
-            if textual_tool_arguments is not None:
-                return textual_tool_arguments
+            tool_envelope_arguments = textual_tool_arguments(
+                content,
+                expected_name=_expected_tool_name(tool_choice),
+            )
+            if tool_envelope_arguments is not None:
+                return tool_envelope_arguments
 
             # Structured outputs must stay raw JSON; chat compaction can break parsing.
             if response_format and response_format.get("type") in {"json_object", "json_schema"}:
@@ -262,9 +265,12 @@ async def _groq_chat(
             if tool_arguments is not None:
                 return tool_arguments
             content = str(message.get("content") or "")
-            textual_tool_arguments = _textual_tool_arguments(content, tool_choice)
-            if textual_tool_arguments is not None:
-                return textual_tool_arguments
+            tool_envelope_arguments = textual_tool_arguments(
+                content,
+                expected_name=_expected_tool_name(tool_choice),
+            )
+            if tool_envelope_arguments is not None:
+                return tool_envelope_arguments
             if request_kind == "chat_reply":
                 return _compact_chat_reply(content, messages)
             return content
@@ -342,45 +348,6 @@ def _selected_tool_arguments(
         if isinstance(arguments, dict):
             return json.dumps(arguments)
     return None
-
-
-def _textual_tool_arguments(
-    content: str,
-    tool_choice: dict[str, Any] | str | None,
-) -> str | None:
-    """Normalize providers that serialize a forced tool call inside message content."""
-    expected_name = _expected_tool_name(tool_choice)
-    stripped = str(content or "").strip()
-    json_start = stripped.find("{")
-    if json_start < 0:
-        return None
-
-    prefix = stripped[:json_start].strip().casefold()
-    wrapped_name = _textual_function_name(prefix)
-    if not wrapped_name:
-        return None
-    if expected_name and wrapped_name != expected_name.casefold():
-        return None
-    try:
-        payload, consumed = json.JSONDecoder().raw_decode(stripped[json_start:])
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-
-    suffix = stripped[json_start + consumed :].strip().casefold()
-    if suffix and not suffix.startswith("</function"):
-        return None
-    return json.dumps(payload, ensure_ascii=False)
-
-
-def _textual_function_name(prefix: str) -> str | None:
-    match = re.search(
-        r"<function(?:\s*\(\s*|\s*=\s*|\s+name\s*=\s*['\"]?)([a-z0-9_.-]+)",
-        prefix,
-        flags=re.IGNORECASE,
-    )
-    return match.group(1).casefold() if match else None
 
 
 def _expected_tool_name(tool_choice: dict[str, Any] | str | None) -> str | None:
