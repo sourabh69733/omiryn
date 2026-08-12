@@ -4851,7 +4851,7 @@ p {
   grid-template-columns: 40px minmax(0, 1fr) 42px;
   gap: 0;
   margin: 10px 14px 14px;
-  padding: 6px;
+  padding: 2px;
   border: 1px solid #e1d9f3;
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.82);
@@ -4932,7 +4932,7 @@ p {
   min-height: 29px;
   border: 0;
   border-color: transparent;
-  border-radius: 20px;
+  /* border-radius: 20px; */
   padding: 4px 1px;
   color: var(--ink);
   background: transparent;
@@ -4988,8 +4988,8 @@ p {
 }
 
 .emoji-trigger-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
