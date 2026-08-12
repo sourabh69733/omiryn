@@ -14,7 +14,7 @@ from agent.providers import (
     assess_user_message_quality,
     generate_agent_reply,
 )
-from agent.providers.shared.structured_output import structured_companion_reply
+from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOL_CHOICE,

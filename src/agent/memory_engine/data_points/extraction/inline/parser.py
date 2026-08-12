@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from agent.memory_engine.data_points import canonical_turn_data_point_type
+from agent.outputs.companion_response import structured_companion_payload
 
 
 ALLOWED_DATA_POINT_TYPES = {
@@ -33,8 +33,8 @@ def parse_turn_output_v2(raw_text: str, *, user_text: str) -> ParsedTurnOutput:
     if not raw_text:
         return ParsedTurnOutput(reply="", data_points=[], parsed=False, error="empty_output")
 
-    raw_json = _extract_json_object(raw_text)
-    if raw_json is None:
+    payload = structured_companion_payload(raw_text)
+    if payload is None:
         return ParsedTurnOutput(
             reply=raw_text,
             data_points=[],
@@ -42,39 +42,9 @@ def parse_turn_output_v2(raw_text: str, *, user_text: str) -> ParsedTurnOutput:
             error="missing_json_object",
         )
 
-    try:
-        payload = json.loads(raw_json)
-    except json.JSONDecodeError as error:
-        return ParsedTurnOutput(
-            reply=raw_text,
-            data_points=[],
-            parsed=False,
-            error=f"invalid_json:{error.msg}",
-        )
-    if not isinstance(payload, dict):
-        return ParsedTurnOutput(
-            reply=raw_text,
-            data_points=[],
-            parsed=False,
-            error="json_not_object",
-        )
-
     reply = str(payload.get("reply") or "").strip() or raw_text
     data_points = _normalize_data_points(payload.get("data_points"), user_text=user_text)
     return ParsedTurnOutput(reply=reply, data_points=data_points, parsed=True)
-
-
-def _extract_json_object(raw_text: str) -> str | None:
-    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, flags=re.DOTALL | re.IGNORECASE)
-    if fenced:
-        return fenced.group(1).strip()
-    if raw_text.startswith("{") and raw_text.endswith("}"):
-        return raw_text
-    start = raw_text.find("{")
-    end = raw_text.rfind("}")
-    if start >= 0 and end > start:
-        return raw_text[start : end + 1]
-    return None
 
 
 def _normalize_data_points(raw_points: Any, *, user_text: str) -> list[dict[str, Any]]:
