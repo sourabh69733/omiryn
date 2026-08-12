@@ -4404,16 +4404,10 @@ p {
 
 .agentic-chat .message.agent {
   position: relative;
-  border-color: rgba(180, 154, 255, 0.16);
+  border-color: #e8e4f0;
   color: #2f294a;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
-    rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 10px 24px rgba(64, 45, 118, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  backdrop-filter: blur(12px) saturate(1.06);
-  -webkit-backdrop-filter: blur(12px) saturate(1.06);
+  background: #f5f3f9;
+  box-shadow: none;
 }
 
 .agentic-chat .message.agent::before {
@@ -4506,9 +4500,9 @@ p {
 
 .agentic-chat .message.user {
   position: relative;
-  border-color: rgba(180, 154, 255, 0.28);
-  color: var(--ink);
-  background: #7764F6;
+  border-color: #7764f6;
+  color: #ffffff;
+  background: #7764f6;
   /* background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
     linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.15), rgba(94, 234, 212, 0.13)),
@@ -4516,8 +4510,7 @@ p {
   /* box-shadow:
     0 12px 30px rgba(64, 45, 118, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.66); */
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: none;
 }
 
 .agentic-chat .message.user::before {
@@ -4929,11 +4922,10 @@ p {
 
 .agentic-chat .composer > input,
 .agentic-chat .composer > textarea {
-  border-color: rgba(180, 154, 255, 0.16);
+  border-color: #ddd6ef;
   color: var(--ink);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.62));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  background: #f7f5fb;
+  box-shadow: none;
   font-family: var(--font-chat);
   font-size: 15px;
   font-weight: 400;
@@ -4959,13 +4951,8 @@ p {
   border: 1px solid rgba(106, 70, 255, 0.16);
   border-radius: 999px;
   color: #ffffff;
-  background:
-    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.34), transparent 32%),
-    linear-gradient(135deg, #6a46ff 0%, #b49aff 48%, #ff7eb3 100%);
-  box-shadow:
-    0 14px 30px rgba(106, 70, 255, 0.22),
-    0 8px 18px rgba(255, 126, 179, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.46);
+  background: #7764f6;
+  box-shadow: 0 8px 18px rgba(119, 100, 246, 0.2);
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
@@ -4974,13 +4961,8 @@ p {
 
 .agentic-chat .composer > button:hover,
 .agentic-chat .composer .emoji-trigger-button:hover {
-  background:
-    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.38), transparent 34%),
-    linear-gradient(135deg, #5c38f2 0%, #a98fff 48%, #f06fa9 100%);
-  box-shadow:
-    0 16px 34px rgba(106, 70, 255, 0.25),
-    0 9px 20px rgba(255, 126, 179, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.52);
+  background: #6956e8;
+  box-shadow: 0 10px 22px rgba(105, 86, 232, 0.24);
 }
 
 .emoji-picker-anchor {
@@ -4990,12 +4972,8 @@ p {
 
 .agentic-chat .composer .emoji-trigger-button {
   color: #3a3158;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
-    rgba(247, 241, 255, 0.92);
-  box-shadow:
-    0 10px 22px rgba(64, 45, 118, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  background: #f7f5fb;
+  box-shadow: 0 8px 18px rgba(64, 45, 118, 0.08);
   font-size: 22px;
   font-weight: 500;
 }
@@ -5003,9 +4981,7 @@ p {
 .agentic-chat .composer .emoji-trigger-button:hover,
 .agentic-chat .composer .emoji-trigger-button[aria-expanded="true"] {
   color: #2f294a;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.64)),
-    rgba(226, 218, 255, 0.95);
+  background: #ebe7f8;
 }
 
 .emoji-picker-popover {
