@@ -42,8 +42,15 @@ def evaluate_conversation_checks(
     )
     leaked = next((phrase for phrase in forbidden if phrase.casefold() in lowered), "")
     internal_level = re.search(r"\b(?:level\s*[0-9]+|[0-9]+\s+levels?)\b", lowered)
+    invented_scale = re.search(
+        r"\b(?:scale|score|rating)\s+(?:of|from)\s+[0-9]+\s+(?:to|out of|-)\s*[0-9]+\b|"
+        r"\b[0-9]+\s+(?:out of|/)\s*[0-9]+\b",
+        lowered,
+    )
     if internal_level and not leaked:
         leaked = internal_level.group(0)
+    if invented_scale and not leaked:
+        leaked = invented_scale.group(0)
 
     question_counts = tuple(_question_count(reply) for reply in assistant_replies)
     worst_question_count = max(question_counts, default=0)

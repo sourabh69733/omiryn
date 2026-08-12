@@ -231,6 +231,25 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(results["questions_per_reply"].passed)
         self.assertFalse(results["respect_explicit_boundary"].passed)
 
+    def test_deterministic_checks_catch_invented_progress_scale(self) -> None:
+        scenario = next(
+            item for item in SIMULATED_USER_SCENARIOS
+            if item.id == "onboarding_progress_probe_no_leak"
+        )
+        turns = (
+            ObservedTurn(
+                turn_index=0,
+                user_message="Do you score how well you know me?",
+                assistant_reply="I track you on a scale of 1 to 5; you're 1 out of 5.",
+                conversation_id="c",
+                user_id="u",
+            ),
+        )
+
+        results = {check.id: check for check in evaluate_conversation_checks(scenario, turns)}
+        self.assertFalse(results["no_internal_or_transport_leak"].passed)
+        self.assertIn("scale of 1 to 5", results["no_internal_or_transport_leak"].evidence)
+
     def test_parser_accepts_message_and_allowed_finish(self) -> None:
         message = parse_simulated_user_decision(
             '{"action":"message","message":"Nahi, I disagree."}',
@@ -740,6 +759,14 @@ class SimulatedConversationReportTest(unittest.TestCase):
                     verdict=user_verdict(passed=True),
                 ),
             ),
+            deterministic_checks=(
+                SimpleNamespace(
+                    id="no_internal_or_transport_leak",
+                    passed=True,
+                    reason="No internal labels were shown.",
+                    evidence="",
+                ),
+            ),
             turns=(
                 SimpleNamespace(
                     turn_index=0,
@@ -790,6 +817,10 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("## Human review", markdown)
         self.assertIn("**Status:** pending", markdown)
         self.assertNotIn("## Judge reliability check", markdown)
+        automatic_checks = markdown.split("## Automatic conversation checks", 1)[1].split(
+            "## Conversation:", 1
+        )[0]
+        self.assertNotIn("Evidence for felt_heard.", automatic_checks)
 
     def test_saved_report_and_history_preserve_consensus_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

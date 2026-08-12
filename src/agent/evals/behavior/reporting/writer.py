@@ -268,17 +268,6 @@ def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
                     f"**Would continue chatting:** {'yes' if item.get('would_continue') else 'no'}",
                 ]
             )
-    checks = payload.get("deterministic_checks") or []
-    if checks:
-        lines.extend(["", "## Automatic conversation checks", ""])
-        for check in checks:
-            status = "PASS" if check.get("passed") else "FAIL"
-            lines.append(
-                f"- {_plain_name(check.get('id', 'check'))}: {status} — "
-                f"{check.get('reason', '')}"
-            )
-            if check.get("evidence"):
-                lines.append(f"  - Evidence: {check['evidence']}")
             if item.get("error"):
                 lines.append(f"**Judge error:** {item['error']}")
             for dimension in item.get("dimensions", []):
@@ -292,6 +281,17 @@ def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
                     f"**Biggest problem:** {item.get('biggest_problem', 'not provided')}",
                 ]
             )
+    checks = payload.get("deterministic_checks") or []
+    if checks:
+        lines.extend(["", "## Automatic conversation checks", ""])
+        for check in checks:
+            status = "PASS" if check.get("passed") else "FAIL"
+            lines.append(
+                f"- {_plain_name(check.get('id', 'check'))}: {status} — "
+                f"{check.get('reason', '')}"
+            )
+            if check.get("evidence"):
+                lines.append(f"  - Evidence: {check['evidence']}")
     for conversation in payload.get("conversations", []):
         lines.extend(
             [

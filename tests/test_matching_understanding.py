@@ -216,11 +216,15 @@ class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
         )
         self.assertNotIn("## Matching Understanding", v3.system_prompt)
         self.assertIn("## Matching Understanding", v3_1.system_prompt)
-        self.assertIn("Current understanding level: starting", v3_1.system_prompt)
-        self.assertIn("Foundation understood: 2 of 5", v3_1.system_prompt)
+        self.assertNotIn("Current understanding level: starting", v3_1.system_prompt)
+        self.assertNotIn("Foundation understood: 2 of 5", v3_1.system_prompt)
         self.assertIn("Known areas: relationship intent, desired partner", v3_1.system_prompt)
         self.assertIn("not a checklist, target, or completion gate", v3_1.system_prompt)
         self.assertIn("Do not ask about a missing area merely because it is missing", v3_1.system_prompt)
+        self.assertIn("does not provide a user-facing score or level", v3_1.system_prompt)
+        self.assertIn("Never invent or reveal understanding levels", v3_1.system_prompt)
+        self.assertIn("A correction replaces the earlier meaning exactly", v3_1.system_prompt)
+        self.assertIn("Do not merely paraphrase", v3_1.system_prompt)
         self.assertNotIn("matching_understanding", v3.snapshot["context"])
 
 
