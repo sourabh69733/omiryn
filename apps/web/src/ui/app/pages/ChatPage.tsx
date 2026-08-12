@@ -1,5 +1,6 @@
 import { Fragment, lazy, Suspense, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
+import { Smile } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { AvatarImage } from "../AvatarImage";
@@ -179,6 +180,15 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     if (!shouldStickToBottomRef.current) return;
     syncChatToBottomAfterRender();
   }, [conversation?.id, conversation?.messages.length, loading, sending]);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const maxHeight = 126;
+    input.style.height = "0px";
+    input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
+    input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [draft]);
 
   useEffect(() => {
     return () => {
@@ -478,7 +488,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
           <form className={`composer ${composerBlocked ? "is-paused" : ""}`} onSubmit={sendMessage}>
             <div className="emoji-picker-anchor" ref={emojiPickerRef}>
-              <button className="emoji-trigger-button" type="button" disabled={!conversation || sending || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}>☺</button>
+              <button className="emoji-trigger-button" type="button" disabled={!conversation || sending || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
               {emojiPickerOpen ? (
                 <div className="emoji-picker-popover">
                   <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
