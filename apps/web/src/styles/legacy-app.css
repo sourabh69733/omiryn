@@ -22,6 +22,7 @@
   --glass-highlight: rgba(255, 255, 255, 0.72);
   --glass-shadow: 0 22px 70px rgba(64, 45, 118, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --font-ui: Inter, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-chat: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-terminal: "JetBrains Mono", "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, ui-monospace, monospace;
 }
 
@@ -3889,8 +3890,10 @@ p {
     radial-gradient(circle at 96% 4%, rgba(255, 126, 179, 0.09), transparent 30%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 243, 255, 0.96)),
     #fffbff;
-  font-family: var(--font-ui);
+  font-family: var(--font-chat);
   font-variant-ligatures: none;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
   box-shadow: 0 26px 70px rgba(22, 52, 50, 0.12);
 }
 
@@ -4366,14 +4369,17 @@ p {
 .agentic-chat .message {
   max-width: min(82%, 680px, calc(100% - 48px));
   padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 430;
-  line-height: 1.62;
+  font-family: var(--font-chat);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
   letter-spacing: 0;
 }
 
 .message-content {
-  font-size: 1.1em;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -4928,7 +4934,10 @@ p {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.62));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  font-size: 13px;
+  font-family: var(--font-chat);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
   letter-spacing: 0;
 }
 
