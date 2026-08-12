@@ -20,6 +20,8 @@ from agent.evals.behavior.reporting.writer import (
     save_evaluation_reports,
 )
 from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig
+from agent.evals.behavior.simulation.checks import evaluate_conversation_checks
+from agent.evals.behavior.core.models import ObservedTurn
 from agent.evals.behavior.simulation.runner import (
     run_simulated_conversation,
     simulated_conversation_payload,
@@ -168,6 +170,66 @@ class SimulatedUserContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("skeptical user", decoded["scenario"]["persona"])
         self.assertTrue(decoded["finishing_allowed"])
         self.assertEqual(decoded["transcript"][0]["content"], "What happened?")
+
+    def test_onboarding_suite_covers_core_user_journeys(self) -> None:
+        onboarding = list_simulated_user_scenarios(tags=("onboarding_v1",))
+        tags = {tag for scenario in onboarding for tag in scenario.tags}
+        ids = {scenario.id for scenario in onboarding}
+
+        self.assertGreaterEqual(len(onboarding), 6)
+        self.assertTrue({"english", "hinglish", "female", "male"}.issubset(tags))
+        self.assertIn("onboarding_preference_correction", ids)
+        self.assertIn("onboarding_topic_refusal", ids)
+        self.assertIn("onboarding_progress_probe_no_leak", ids)
+        self.assertTrue(all(scenario.evaluation_criteria for scenario in onboarding))
+
+    def test_scenario_criteria_are_sent_to_both_model_judges(self) -> None:
+        scenario = next(
+            item for item in SIMULATED_USER_SCENARIOS if item.id == "onboarding_topic_refusal"
+        )
+        _, user_payload = build_user_experience_judge_request(
+            scenario=scenario,
+            transcript=(),
+        )
+        _, judge_payload = build_independent_judge_request(
+            scenario=scenario,
+            transcript=(),
+        )
+
+        self.assertEqual(
+            json.loads(user_payload)["scenario"]["evaluation_criteria"],
+            list(scenario.evaluation_criteria),
+        )
+        self.assertEqual(
+            json.loads(judge_payload)["scenario"]["evaluation_criteria"],
+            list(scenario.evaluation_criteria),
+        )
+
+    def test_deterministic_checks_catch_onboarding_regressions(self) -> None:
+        scenario = next(
+            item for item in SIMULATED_USER_SCENARIOS if item.id == "onboarding_topic_refusal"
+        )
+        turns = (
+            ObservedTurn(
+                turn_index=0,
+                user_message="I don't want to discuss age preferences.",
+                assistant_reply=(
+                    '<function(return_companion_response){"reply":"Okay"}</function> '
+                    "What age? What location?"
+                ),
+                assistant_messages=(),
+                trace_steps=(),
+                direct_reply_reason=None,
+                context_summary={},
+                conversation_id="c",
+                user_id="u",
+            ),
+        )
+
+        results = {check.id: check for check in evaluate_conversation_checks(scenario, turns)}
+        self.assertFalse(results["no_internal_or_transport_leak"].passed)
+        self.assertFalse(results["questions_per_reply"].passed)
+        self.assertFalse(results["respect_explicit_boundary"].passed)
 
     def test_parser_accepts_message_and_allowed_finish(self) -> None:
         message = parse_simulated_user_decision(
@@ -926,21 +988,26 @@ class SimulatedConversationReportTest(unittest.TestCase):
         self.assertIn("hinglish", language_styles)
         self.assertIn("english", language_styles)
         self.assertTrue(all(scenario.tags for scenario in SIMULATED_USER_SCENARIOS))
-        self.assertTrue(all("core_v1" in scenario.tags for scenario in SIMULATED_USER_SCENARIOS))
-        self.assertTrue(
-            all("release_gate" in scenario.tags for scenario in SIMULATED_USER_SCENARIOS)
-        )
+        backbone = list_simulated_user_scenarios(tags=("backbone",))
+        self.assertTrue(all("core_v1" in scenario.tags for scenario in backbone))
+        self.assertTrue(all("release_gate" in scenario.tags for scenario in backbone))
+        self.assertGreaterEqual(len(list_simulated_user_scenarios(tags=("onboarding_v1",))), 6)
 
     def test_simulated_scenario_tag_filtering_is_conjunctive(self) -> None:
         hinglish = list_simulated_user_scenarios(tags=("hinglish",))
         male_hinglish = list_simulated_user_scenarios(tags=("male", "hinglish"))
-        no_match = list_simulated_user_scenarios(tags=("female", "hinglish"))
+        female_hinglish = list_simulated_user_scenarios(tags=("female", "hinglish"))
 
         self.assertGreaterEqual(len(hinglish), 2)
-        self.assertEqual([scenario.id for scenario in male_hinglish], [
-            "frustrated_man_hinglish_tests_backbone"
-        ])
-        self.assertEqual(no_match, ())
+        self.assertIn("frustrated_man_hinglish_tests_backbone", {
+            scenario.id for scenario in male_hinglish
+        })
+        self.assertIn("onboarding_short_replies_no_pressure_hinglish", {
+            scenario.id for scenario in male_hinglish
+        })
+        self.assertIn("onboarding_emotional_pause_hinglish", {
+            scenario.id for scenario in female_hinglish
+        })
 
 
 class SimulatedConversationCliTest(unittest.TestCase):
@@ -1002,7 +1069,7 @@ class SimulatedConversationCliTest(unittest.TestCase):
         result = self._run_cli("--scenario-tag", "male", "--no-save")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("AI-user conversation:", result.stdout)
+        self.assertIn("AI-user suite:", result.stdout)
         self.assertIn("Frustrated man hinglish tests backbone", result.stderr)
 
     def test_cli_runs_multi_scenario_batch_by_tag(self) -> None:
