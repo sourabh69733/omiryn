@@ -28,7 +28,10 @@ TURN_OUTPUT_V2_TOOLS = [
                             "Include every clearly stated, useful signal from the latest user "
                             "message. Use an empty array only when that message reveals no "
                             "personal fact, compatibility preference, conversation learning, "
-                            "or useful temporary context. Do not infer beyond what was stated."
+                            "or useful temporary context. Do not infer beyond what was stated. "
+                            "When the user corrects an earlier point, reuse its semantic category "
+                            "and key and represent only the latest explicit meaning. Never turn "
+                            "removal of a preference into an opposite preference."
                         ),
                         "items": {
                             "type": "object",
@@ -66,7 +69,9 @@ TURN_OUTPUT_V2_TOOLS = [
                                         "Structured useful details. Preserve explicit names, places, "
                                         "items, and preferences using the exact words from the latest "
                                         "user message. Use arrays when several values are stated. Do "
-                                        "not add inferred or normalized values that the user did not say."
+                                        "not add inferred or normalized values that the user did not say. "
+                                        "For a correction, store the corrected meaning itself—not the "
+                                        "old value and not an invented opposite."
                                     )
                                 },
                                 "confidence": {

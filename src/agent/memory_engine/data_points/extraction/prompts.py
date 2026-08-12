@@ -38,6 +38,8 @@ Rules:
   long_term, short_term, casual, marriage, commitment. Do not create generic
   points like "looking for someone", "open to relationship", or "wants dating".
 - Do not invent. If weakly inferred, confidence must be <= 0.45.
+- Treat the latest explicit correction as authoritative. Reuse the existing semantic key when
+  replacing an earlier fact. Do not preserve the old value or invent its opposite.
 - Do not diagnose medical or mental health conditions.
 - Keep labels under 12 words and evidence under 30 words.
 - Return at most 25 facts."""
@@ -78,6 +80,9 @@ Rules:
 - Every point must have evidence from the supplied text.
 - Prefer fewer strong points over many weak ones. Return at most 12 points.
 - Do not invent. If uncertain, skip it.
+- Treat the latest explicit correction as authoritative. Reuse the existing semantic key when
+  replacing an earlier point. "No longer important" removes a requirement; it does not create
+  an opposite preference.
 - Avoid sensitive/private third-party details unless necessary for context; set privacy_level=private if included.
 - Valid categories: conversation_context, relationship_intent, communication_style,
   tone_traits, important_people, recent_events, preferences, boundaries, matching_signals."""
@@ -136,4 +141,6 @@ Rules:
 - Reject generic points like "talked about location" unless rewritten into useful memory.
 - Every approved/rewrite/merge review needs evidence.
 - Do not invent evidence or facts outside the supplied source text.
+- When evidence corrects an existing point, rewrite that same semantic point to the latest explicit
+  meaning. Never keep both contradictory active meanings or infer an opposite preference.
 - Prefer fewer stronger final points."""
