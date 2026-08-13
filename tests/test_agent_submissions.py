@@ -1,11 +1,13 @@
 import asyncio
 import os
 import unittest
+from io import BytesIO
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from api.config import PROFILE_UPLOAD_DIR
 from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
@@ -439,7 +441,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         response = self.client.put(
             "/api/me/profile-photo",
-            content=b"fake-image-bytes",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
 
@@ -451,15 +453,39 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response.json()["profile_photo_url"],
         )
 
+    def test_profile_photo_rejects_spoofed_non_image_bytes(self) -> None:
+        response = self.client.put(
+            "/api/me/profile-photo",
+            content=b"not an image despite this content type",
+            headers={"content-type": "image/png"},
+        )
+
+        self.assertEqual(response.status_code, 415)
+        self.assertIn("valid JPG, PNG, WebP, or GIF", response.json()["detail"])
+
+    def test_profile_photo_is_reencoded_without_exif_metadata(self) -> None:
+        response = self.client.put(
+            "/api/me/profile-photo",
+            content=sample_profile_photo_bytes(with_exif=True),
+            headers={"content-type": "image/jpeg"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        file_name = response.json()["profile_photo_file_name"]
+        self.assertTrue(file_name.endswith(".jpg"))
+        with Image.open(PROFILE_UPLOAD_DIR / file_name) as stored:
+            self.assertEqual(stored.format, "JPEG")
+            self.assertEqual(dict(stored.getexif()), {})
+
     def test_profile_photo_replaces_existing_slot_without_monthly_quota(self) -> None:
         first_response = self.client.put(
             "/api/me/profile-photo",
-            content=b"first-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         second_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"second-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
 
@@ -470,17 +496,17 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def test_profile_photo_max_count_limits_gallery_slots(self) -> None:
         first_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"first-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         add_response = self.client.put(
             "/api/me/profile-photo?slot=4",
-            content=b"fifth-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         replace_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"replacement-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
 
@@ -509,7 +535,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         first_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"first-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         self.assertEqual(first_response.status_code, 200)
@@ -517,7 +543,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         third_response = self.client.put(
             "/api/me/profile-photo?slot=2",
-            content=b"third-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         self.assertEqual(third_response.status_code, 200)
@@ -528,7 +554,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         second_response = self.client.put(
             "/api/me/profile-photo?slot=1",
-            content=b"second-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         self.assertEqual(second_response.status_code, 200)
@@ -540,13 +566,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
     def test_profile_photo_can_be_removed_and_reuploaded(self) -> None:
         upload_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"first-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
         delete_response = self.client.delete("/api/me/profile-photo?slot=0")
         reupload_response = self.client.put(
             "/api/me/profile-photo?slot=0",
-            content=b"replacement-image",
+            content=sample_profile_photo_bytes(),
             headers={"content-type": "image/png"},
         )
 
@@ -4198,6 +4224,18 @@ def sample_submission() -> dict[str, object]:
         },
         "summary": "Looking for a serious relationship.",
     }
+
+
+def sample_profile_photo_bytes(*, with_exif: bool = False) -> bytes:
+    image = Image.new("RGB", (64, 48), color=(92, 68, 192))
+    output = BytesIO()
+    save_args: dict[str, object] = {"format": "JPEG"}
+    if with_exif:
+        exif = Image.Exif()
+        exif[270] = "private photo description"
+        save_args["exif"] = exif
+    image.save(output, **save_args)
+    return output.getvalue()
 
 
 def sample_whatsapp_export() -> str:

@@ -52,6 +52,7 @@ from ..models import (
     ProfileFactPatch,
     UserProfilePatch,
 )
+from ..photo_processing import sanitize_profile_photo
 router = APIRouter()
 
 _APP_EVENT_METADATA_ALLOWLIST = {
@@ -319,8 +320,7 @@ async def put_me_profile_photo(
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
-    extension = PROFILE_PHOTO_CONTENT_TYPES.get(content_type)
-    if not extension:
+    if content_type not in PROFILE_PHOTO_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Upload a JPG, PNG, WebP, or GIF image.")
 
     content = await request.body()
@@ -329,6 +329,7 @@ async def put_me_profile_photo(
     if len(content) > PROFILE_PHOTO_MAX_BYTES:
         max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
         raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
+    sanitized_content = sanitize_profile_photo(content)
 
     existing_profile = get_user_profile(user.id)
     max_photo_count = PROFILE_PHOTO_MAX_COUNT
@@ -368,9 +369,9 @@ async def put_me_profile_photo(
     try:
         photo_url, photo_file_name = _store_profile_photo(
             user_id=user.id,
-            content=content,
-            content_type=content_type,
-            extension=extension,
+            content=sanitized_content,
+            content_type="image/jpeg",
+            extension=".jpg",
         )
     except HTTPException:
         raise
