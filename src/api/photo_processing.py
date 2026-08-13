@@ -25,6 +25,7 @@ def sanitize_profile_photo(content: bytes) -> bytes:
             if image_format not in _SUPPORTED_IMAGE_FORMATS:
                 raise ValueError("unsupported image format")
 
+            # verify() consumes the decoder state, so reopen before reading pixels.
             with Image.open(BytesIO(content)) as candidate:
                 if candidate.width * candidate.height > _MAX_IMAGE_PIXELS:
                     raise ValueError("image has too many pixels")
@@ -41,5 +42,6 @@ def sanitize_profile_photo(content: bytes) -> bytes:
         Image.Resampling.LANCZOS,
     )
     output = BytesIO()
+    # Re-encoding only decoded pixels strips EXIF and ignores extra animation frames.
     normalized.save(output, format="JPEG", quality=_JPEG_QUALITY, optimize=True)
     return output.getvalue()

@@ -329,6 +329,7 @@ async def put_me_profile_photo(
     if len(content) > PROFILE_PHOTO_MAX_BYTES:
         max_mb = max(1, round(PROFILE_PHOTO_MAX_BYTES / (1024 * 1024)))
         raise HTTPException(status_code=413, detail=f"Profile photo must be {max_mb} MB or smaller.")
+    # Storage only receives trusted JPEG bytes produced from successfully decoded pixels.
     sanitized_content = sanitize_profile_photo(content)
 
     existing_profile = get_user_profile(user.id)
