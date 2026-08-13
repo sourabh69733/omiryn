@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, MetaData, String, Table, func
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Index, Integer, MetaData, String, Table, func
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
 
@@ -114,6 +114,13 @@ app_events = Table(
     Column("metadata_json", JSON, nullable=False),
     Column("client_created_at", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+# Quota queries use this left-to-right key order, followed by a created_at range.
+Index(
+    "ix_app_events_user_event_created_at",
+    app_events.c.user_id,
+    app_events.c.event_name,
+    app_events.c.created_at,
 )
 
 feedback_submissions = Table(

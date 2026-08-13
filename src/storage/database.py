@@ -178,3 +178,12 @@ def _ensure_runtime_columns() -> None:
                             f"ADD COLUMN {column_name} {column_type}{default}"
                         )
                     )
+        # create_all() does not add new indexes to tables that already exist, so
+        # install the quota lookup index for databases created by older releases.
+        # Basically, it helps to tell use quickly "How many quota.chat_message events has this user created during the last minute or month?"
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_app_events_user_event_created_at "
+                "ON app_events (user_id, event_name, created_at)"
+            )
+        )
