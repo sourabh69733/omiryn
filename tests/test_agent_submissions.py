@@ -56,7 +56,6 @@ from storage import (
     list_user_app_events,
     list_user_data_requests,
     list_user_feedback_submissions,
-    list_context_sources,
     list_profile_facts,
     list_whatsapp_chunks,
     list_whatsapp_imports,
@@ -3151,23 +3150,16 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.json()["accepted"], 4)
         events = list_user_app_events("user-a")
         self.assertEqual(
-            [event["event_name"] for event in events],
-            [
-                "page_viewed",
-                "memory_import_completed",
-                "client_error",
-                "learned_signal_feedback_sent",
-            ],
-        )
-        self.assertEqual(events[0]["metadata"], {"page": "style"})
-        self.assertEqual(events[1]["metadata"], {"source_type": "manual_notes"})
-        self.assertEqual(
-            events[2]["metadata"],
-            {"area": "unhandled_rejection", "message_code": "failed_to_fetch"},
-        )
-        self.assertEqual(
-            events[3]["metadata"],
-            {"fact_category": "communication", "rating": "disagree"},
+            {event["event_name"]: event["metadata"] for event in events},
+            {
+                "page_viewed": {"page": "style"},
+                "memory_import_completed": {"source_type": "manual_notes"},
+                "client_error": {"area": "unhandled_rejection", "message_code": "failed_to_fetch"},
+                "learned_signal_feedback_sent": {
+                    "fact_category": "communication",
+                    "rating": "disagree",
+                },
+            },
         )
 
     def test_app_events_only_allow_known_event_names(self) -> None:
