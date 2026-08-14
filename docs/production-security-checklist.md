@@ -61,7 +61,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Production startup rejects profile photo upload limits above 10 MB.
 - [x] Profile photos are capped at 4 by gallery slot validation; replacing photos is allowed after deleting an existing one.
 - [x] Per-user rolling monthly quotas with automatic short burst protection cover chat, memory imports, and WhatsApp imports.
-- [ ] Add durable production rate limits using infrastructure, Redis, or provider controls.
+- [x] Make per-user chat and import quotas atomic and durable across Cloud Run instances using Postgres transaction locks.
 - [ ] Add upload/file size limits at proxy/runtime level.
 - [x] Add server-side profile photo decoding/validation, metadata stripping, and safe re-encoding so spoofed or malicious non-image uploads are rejected.
 - [ ] Add alerts for repeated throttling or safety reports.
