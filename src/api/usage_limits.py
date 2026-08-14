@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
-from storage import save_app_events, user_app_event_window_stats
+from storage import reserve_user_app_event
 
 
 @dataclass(frozen=True)
@@ -39,50 +39,51 @@ WHATSAPP_IMPORT_LIMIT = UserActionLimit(
     monthly_default=3,
     label="WhatsApp imports",
 )
+
+# The short abuse-control window is fixed; product-level monthly quotas remain configurable.
+_BURST_WINDOW = timedelta(seconds=60)
+
+
 def enforce_user_action_limit(user_id: str, limit: UserActionLimit) -> None:
     now = datetime.now(timezone.utc)
     monthly_limit = _env_int(limit.monthly_env, limit.monthly_default)
     burst_limit = _derived_burst_limit(monthly_limit)
-
-    if monthly_limit > 0:
-        window_days = _env_int("USER_LIMIT_MONTH_DAYS", 30)
-        month_start = now - timedelta(days=window_days)
-        month_stats = user_app_event_window_stats(user_id, limit.event_name, month_start)
-        if month_stats["count"] >= monthly_limit:
-            retry_after = _retry_after_seconds(month_stats["oldest_created_at"], now, timedelta(days=window_days))
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    f"Monthly limit reached for {limit.label}. "
-                    "Please try again when your quota resets."
-                ),
-                headers=_rate_limit_headers(retry_after),
-            )
-
-    if burst_limit:
-        burst_start = now - timedelta(seconds=60)
-        burst_stats = user_app_event_window_stats(user_id, limit.event_name, burst_start)
-        if burst_stats["count"] >= burst_limit:
-            retry_after = _retry_after_seconds(burst_stats["oldest_created_at"], now, timedelta(seconds=60))
-            raise HTTPException(
-                status_code=429,
-                detail="Too many requests in a short time. Please wait a minute and try again.",
-                headers=_rate_limit_headers(retry_after),
-            )
-
-    save_app_events(
+    window_days = _env_int("USER_LIMIT_MONTH_DAYS", 30)
+    month_window = timedelta(days=window_days)
+    # Storage performs the limit checks and reservation atomically. Reserve before
+    # downstream work so simultaneous requests cannot overspend the same quota slot.
+    result = reserve_user_app_event(
         user_id,
-        [
-            {
-                "event_name": limit.event_name,
-                "metadata": {
-                    "action": limit.action,
-                    "monthly_limit": monthly_limit,
-                    "burst_limit": burst_limit,
-                    "burst_seconds": 60,
-                },
-            }
-        ],
+        limit.event_name,
+        {
+            "action": limit.action,
+            "monthly_limit": monthly_limit,
+            "burst_limit": burst_limit,
+            "burst_seconds": int(_BURST_WINDOW.total_seconds()),
+        },
+        monthly_since=now - month_window if monthly_limit > 0 else None,
+        monthly_limit=monthly_limit,
+        burst_since=now - _BURST_WINDOW if burst_limit else None,
+        burst_limit=burst_limit,
+    )
+
+    if result["allowed"]:
+        return
+    if result["reason"] == "monthly":
+        retry_after = _retry_after_seconds(result["oldest_created_at"], now, month_window)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Monthly limit reached for {limit.label}. "
+                "Please try again when your quota resets."
+            ),
+            headers=_rate_limit_headers(retry_after),
+        )
+    retry_after = _retry_after_seconds(result["oldest_created_at"], now, _BURST_WINDOW)
+    raise HTTPException(
+        status_code=429,
+        detail="Too many requests in a short time. Please wait a minute and try again.",
+        headers=_rate_limit_headers(retry_after),
     )
 
 
