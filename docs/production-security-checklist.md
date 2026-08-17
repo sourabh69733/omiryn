@@ -1,6 +1,6 @@
 # Omiryn Production Security Checklist
 
-Last updated: July 30, 2026
+Last updated: August 17, 2026
 
 This checklist tracks the privacy and security layer required before a real public launch.
 
@@ -72,6 +72,16 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Add request IDs.
 - [ ] Monitor auth failures, chat failures, lead capture failures, and import failures.
 - [ ] Monitor LLM provider rate limits and costs.
+
+## Realtime Delivery
+
+- [x] Add an authenticated, room-based WebSocket gateway and versioned event contract.
+- [x] Keep the in-memory realtime hub for local development and single-instance deployments.
+- [ ] Before multi-instance production, add Redis/Memorystore Pub/Sub behind a broker interface for cross-instance delivery.
+- [ ] Treat the database as the source of truth; reconnect clients must fetch missed messages using their last received sequence.
+- [ ] Add a transactional outbox so saved messages are eventually published when the broker is temporarily unavailable.
+- [ ] Test reconnects, duplicate events, ordering, expired tickets, instance restarts, and broker outages.
+- [ ] Configure Cloud Run WebSocket timeout/reconnect behavior and monitor active connections, delivery failures, and broker latency.
 
 ## Launch Gate
 
