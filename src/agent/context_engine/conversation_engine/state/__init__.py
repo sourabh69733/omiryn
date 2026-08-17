@@ -1,6 +1,11 @@
 """Defines and validates persistent conversation progress without changing reply behaviour."""
 
 from .models import ConversationState, ConversationThread
+from .context import (
+    CONVERSATION_THREAD_SOURCE_TYPE,
+    conversation_state_v2_enabled,
+    conversation_thread_context_sources,
+)
 from .service import (
     ConversationStateConflictError,
     create_thread,
@@ -17,6 +22,9 @@ __all__ = [
     "ConversationStateConflictError",
     "ConversationStateValidationError",
     "ConversationThread",
+    "CONVERSATION_THREAD_SOURCE_TYPE",
+    "conversation_state_v2_enabled",
+    "conversation_thread_context_sources",
     "create_thread",
     "get_state",
     "get_thread",
