@@ -16,6 +16,13 @@ def conversation_state_v2_enabled() -> bool:
     return os.getenv("CONVERSATION_STATE_V2_ENABLED", "true").strip().lower() == "true"
 
 
+def conversation_state_shadow_enabled() -> bool:
+    return conversation_state_v2_enabled() and (
+        os.getenv("CONVERSATION_STATE_V2_SHADOW_ENABLED", "false").strip().lower()
+        == "true"
+    )
+
+
 def conversation_thread_context_sources(
     conversation_id: str,
     user_id: str | None,
@@ -50,7 +57,7 @@ def conversation_thread_context_sources(
     ]
     for thread in selected:
         role = "current" if active and thread.id == active.id else "open"
-        lines.append(f"- {role}: {thread.title}")
+        lines.append(f"- {role}; thread_id={thread.id}: {thread.title}")
         lines.append(f"  Summary: {thread.summary}")
         if thread.next_angle:
             lines.append(f"  Possible continuation: {thread.next_angle}")
