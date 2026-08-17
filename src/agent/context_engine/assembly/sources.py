@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.context_engine.conversation_engine.state import conversation_thread_context_sources
 from agent.context_engine.conversation_engine.understanding.rules.intent import (
     RECENCY_QUERY_TERMS,
     context_query_intent,
@@ -128,10 +129,11 @@ def build_reply_context_sources(
         user_id,
         query_intent,
     )
+    continuity_sources = conversation_thread_context_sources(conversation_id, user_id)
 
     if selected_styles:
         selected_style_ids = {_source_identity(source) for source in selected_styles}
-        memory_sources = _ordered_memory_context_sources(
+        memory_sources = continuity_sources + _ordered_memory_context_sources(
             agent_behavior_sources,
             data_point_sources,
             structured_whatsapp_sources,
@@ -141,7 +143,7 @@ def build_reply_context_sources(
             source for source in retrieved_sources if _source_identity(source) not in selected_style_ids
         ]
 
-    return (
+    return continuity_sources + (
         _ordered_memory_context_sources(
             agent_behavior_sources,
             data_point_sources,
