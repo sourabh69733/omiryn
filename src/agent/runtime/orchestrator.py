@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
+from agent.context_engine.conversation_engine.state import (
+    conversation_state_shadow_enabled,
+    evaluate_conversation_update_shadow,
+)
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.providers import (
@@ -18,10 +22,10 @@ from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOL_CHOICE,
-    TURN_OUTPUT_V2_TOOLS,
     capture_turn_output_data_points,
     parse_turn_output_v2,
     turn_output_v2_enabled,
+    turn_output_v2_tools,
 )
 from storage import (
     finish_agent_trace,
@@ -162,6 +166,7 @@ async def run_agent_turn(
         assistant_message_index=len(updated_messages),
     )
     turn_output_v2 = turn_output_v2_enabled()
+    conversation_state_shadow = turn_output_v2 and conversation_state_shadow_enabled()
     system_prompt = context_package.system_prompt
     save_agent_trace_step(
         {
@@ -211,7 +216,13 @@ async def run_agent_turn(
             context_sources=context_package.context_sources,
             user_profile=context_package.user_profile,
             system_prompt=system_prompt,
-            tools=TURN_OUTPUT_V2_TOOLS if turn_output_v2 else None,
+            tools=(
+                turn_output_v2_tools(
+                    include_conversation_update=conversation_state_shadow,
+                )
+                if turn_output_v2
+                else None
+            ),
             tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
         )
         turn_output_summary = None
@@ -236,6 +247,15 @@ async def run_agent_turn(
                     "error": parsed_output.error,
                 }
             )
+            if conversation_state_shadow:
+                turn_output_summary["conversation_state_shadow"] = (
+                    _evaluate_conversation_update_shadow_safely(
+                        parsed_output.conversation_update,
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        message_index=len(updated_messages) - 1,
+                    )
+                )
         else:
             # A provider can serialize a forced function call as plain text even when
             # this turn does not use inline data-point extraction. Never display that
@@ -329,3 +349,29 @@ def _source_type_counts(sources: list[dict[str, Any]]) -> dict[str, int]:
         source_type = str(source.get("source_type") or "context")
         counts[source_type] = counts.get(source_type, 0) + 1
     return counts
+
+
+def _evaluate_conversation_update_shadow_safely(
+    raw_update: Any,
+    *,
+    conversation_id: str,
+    user_id: str | None,
+    message_index: int,
+) -> dict[str, Any]:
+    """Keep optional shadow analysis from ever interrupting the visible reply."""
+    try:
+        return evaluate_conversation_update_shadow(
+            raw_update,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            message_index=message_index,
+        )
+    except Exception as error:
+        return {
+            "present": raw_update is not None,
+            "valid": False,
+            "proposed_thread_update_count": 0,
+            "proposal": None,
+            "errors": [f"{type(error).__name__}: {str(error)[:200]}"],
+            "persisted": False,
+        }
