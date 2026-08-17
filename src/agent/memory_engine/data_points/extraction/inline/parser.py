@@ -24,6 +24,7 @@ ALLOWED_DATA_POINT_TYPES = {
 class ParsedTurnOutput:
     reply: str
     data_points: list[dict[str, Any]] = field(default_factory=list)
+    conversation_update: Any = None
     parsed: bool = False
     error: str | None = None
 
@@ -44,7 +45,12 @@ def parse_turn_output_v2(raw_text: str, *, user_text: str) -> ParsedTurnOutput:
 
     reply = str(payload.get("reply") or "").strip() or raw_text
     data_points = _normalize_data_points(payload.get("data_points"), user_text=user_text)
-    return ParsedTurnOutput(reply=reply, data_points=data_points, parsed=True)
+    return ParsedTurnOutput(
+        reply=reply,
+        data_points=data_points,
+        conversation_update=payload.get("conversation_update"),
+        parsed=True,
+    )
 
 
 def _normalize_data_points(raw_points: Any, *, user_text: str) -> list[dict[str, Any]]:

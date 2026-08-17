@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from typing import Any
+
 
 TURN_OUTPUT_V2_TOOL_NAME = "return_companion_response"
 
@@ -94,3 +97,68 @@ TURN_OUTPUT_V2_TOOL_CHOICE = {
     "type": "function",
     "function": {"name": TURN_OUTPUT_V2_TOOL_NAME},
 }
+
+
+CONVERSATION_UPDATE_SCHEMA = {
+    "type": "object",
+    "description": (
+        "Private shadow proposal for meaningful, resumable conversation threads. "
+        "Do not create a thread for greetings, jokes, acknowledgements, or isolated "
+        "small talk. This proposal is never shown to the user."
+    ),
+    "properties": {
+        "user_need": {
+            "type": "string",
+            "enum": ["normal_chat", "listen", "answer", "explore", "play", "space"],
+        },
+        "session_goal": {"type": ["string", "null"]},
+        "thread_updates": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["create", "continue", "switch", "pause", "complete", "block"],
+                    },
+                    "thread_id": {"type": ["string", "null"]},
+                    "title": {"type": ["string", "null"]},
+                    "summary": {"type": ["string", "null"]},
+                    "origin": {
+                        "type": ["string", "null"],
+                        "enum": ["user_started", "agent_started", None],
+                    },
+                    "matching_dimension": {"type": ["string", "null"]},
+                    "depth": {
+                        "type": ["string", "null"],
+                        "enum": ["mentioned", "explored", "meaningful", None],
+                    },
+                    "user_interest": {
+                        "type": ["string", "null"],
+                        "enum": ["unknown", "low", "medium", "high", None],
+                    },
+                    "salience": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                    "next_angle": {"type": ["string", "null"]},
+                    "closure_reason": {"type": ["string", "null"]},
+                },
+                "required": ["operation"],
+            },
+        },
+    },
+    "required": ["user_need", "thread_updates"],
+}
+
+
+def turn_output_v2_tools(*, include_conversation_update: bool = False) -> list[dict[str, Any]]:
+    """Return an isolated schema so optional additions never mutate the baseline."""
+    tools = deepcopy(TURN_OUTPUT_V2_TOOLS)
+    if not include_conversation_update:
+        return tools
+    tools[0]["function"]["description"] += (
+        " Also return a private conversation-thread update proposal for shadow evaluation."
+    )
+    parameters = tools[0]["function"]["parameters"]
+    parameters["properties"]["conversation_update"] = deepcopy(CONVERSATION_UPDATE_SCHEMA)
+    parameters["required"].append("conversation_update")
+    return tools
