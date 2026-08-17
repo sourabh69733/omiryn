@@ -38,7 +38,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const composerPauseTimerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
-  const shouldRestoreInputFocusRef = useRef(false);
+  const handledEvidenceTargetRef = useRef("");
 
   async function fetchSummaries() {
     const response = await apiFetch("/api/agent/conversations");
@@ -144,6 +144,9 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   useLayoutEffect(() => {
     if (loading || !conversation || !window.location.hash.startsWith("#message-")) return;
     const targetId = window.location.hash.slice(1);
+    const targetKey = `${conversation.id}:${targetId}`;
+    if (handledEvidenceTargetRef.current === targetKey) return;
+    handledEvidenceTargetRef.current = targetKey;
     window.requestAnimationFrame(() => {
       const target = document.getElementById(targetId);
       if (!target) return;
@@ -157,12 +160,6 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     const log = logRef.current;
     if (!log) return true;
     return log.scrollHeight - log.scrollTop - log.clientHeight < 120;
-  }
-
-  function focusComposer() {
-    window.requestAnimationFrame(() => {
-      inputRef.current?.focus({ preventScroll: true });
-    });
   }
 
   function syncChatToBottom() {
@@ -273,16 +270,12 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     const message = draft.trim();
     if (!message || !conversation || sending || composerLimit) return;
     shouldStickToBottomRef.current = true;
-    const activeElement = document.activeElement;
-    shouldRestoreInputFocusRef.current = activeElement instanceof HTMLElement && Boolean(activeElement.closest(".composer"));
     const previousConversation = conversation;
     setDraft("");
     setSending(true);
     setError("");
     setComposerLimit(null);
     setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sent" }] });
-    syncChatToBottom();
-    if (shouldRestoreInputFocusRef.current) focusComposer();
     let handledInlineError = false;
     try {
       const response = await apiFetch(`/api/agent/conversations/${conversation.id}/messages`, {
@@ -327,8 +320,6 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
       if (!handledInlineError) setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
     } finally {
       setSending(false);
-      if (shouldRestoreInputFocusRef.current) focusComposer();
-      shouldRestoreInputFocusRef.current = false;
     }
   }
 
@@ -525,7 +516,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
             </div>
             <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
             {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
-            <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message"><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
+            <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
         </section>
       </div>
