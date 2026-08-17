@@ -17,7 +17,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api": apiProxyTarget,
+      "/api": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        ws: true,
+      },
       "/uploads": apiProxyTarget
     }
   }
