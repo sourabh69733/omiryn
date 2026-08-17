@@ -101,6 +101,53 @@ class RealtimeGatewayTest(unittest.TestCase):
                 [1, 2],
             )
 
+    def test_reconnect_can_recover_messages_missed_while_disconnected(self) -> None:
+        conversation = self.client.post("/api/agent/conversations", json={}).json()
+        first_ticket = self.client.post("/api/realtime/ticket").json()["ticket"]
+        with self.client.websocket_connect(f"/api/realtime?ticket={first_ticket}") as socket:
+            socket.receive_json()
+            socket.send_json(
+                {
+                    "type": "subscribe",
+                    "scope": "conversation",
+                    "scope_id": conversation["id"],
+                }
+            )
+            socket.receive_json()
+
+        response = self.client.post(
+            f"/api/agent/conversations/{conversation['id']}/messages",
+            json={"message": "sent while the socket is disconnected"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        second_ticket = self.client.post("/api/realtime/ticket").json()["ticket"]
+        with self.client.websocket_connect(f"/api/realtime?ticket={second_ticket}") as socket:
+            socket.receive_json()
+            socket.send_json(
+                {
+                    "type": "subscribe",
+                    "scope": "conversation",
+                    "scope_id": conversation["id"],
+                }
+            )
+            socket.receive_json()
+
+            recovered = self.client.get(
+                f"/api/agent/conversations/{conversation['id']}/messages",
+                params={"after_sequence": 0},
+            )
+            self.assertEqual(recovered.status_code, 200)
+            body = recovered.json()
+            messages = body["messages"]
+            self.assertEqual(len(messages), 2)
+            self.assertEqual(body["latest_sequence"], 2)
+            self.assertEqual([item["message_index"] for item in messages], [1, 2])
+            self.assertEqual(
+                messages[0]["message"]["content"],
+                "sent while the socket is disconnected",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
