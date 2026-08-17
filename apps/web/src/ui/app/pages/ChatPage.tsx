@@ -1,8 +1,9 @@
-import { Fragment, lazy, Suspense, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Smile } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
+import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AvatarImage } from "../AvatarImage";
 import { assetUrl, canShowUsage } from "../appUtils";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, UsageEvent, UsageSummary } from "../types";
@@ -39,6 +40,21 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const handledEvidenceTargetRef = useRef("");
+  const realtimeClientRef = useRef<RealtimeClient | null>(null);
+
+  useEffect(() => {
+    const realtime = new RealtimeClient((event) => applyRealtimeEvent(event, setConversation));
+    realtimeClientRef.current = realtime;
+    realtime.start();
+    return () => {
+      realtime.stop();
+      if (realtimeClientRef.current === realtime) realtimeClientRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    realtimeClientRef.current?.setConversation(conversation?.id || null);
+  }, [conversation?.id]);
 
   async function fetchSummaries() {
     const response = await apiFetch("/api/agent/conversations");
@@ -523,6 +539,35 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
       {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This will permanently remove the chat, attached context, and usage log for this conversation.</p><p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
   );
+}
+
+function applyRealtimeEvent(
+  event: RealtimeEvent,
+  setConversation: Dispatch<SetStateAction<Conversation | null>>,
+) {
+  if (event.type !== "message.created" || event.scope !== "conversation" || !event.scope_id) return;
+  const messageIndex = event.sequence;
+  const rawMessage = event.payload.message;
+  if (typeof messageIndex !== "number" || !Number.isInteger(messageIndex) || messageIndex < 0) return;
+  if (!rawMessage || typeof rawMessage !== "object" || Array.isArray(rawMessage)) return;
+
+  const record = rawMessage as Record<string, unknown>;
+  const message: Message = {
+    role: typeof record.role === "string" ? record.role : undefined,
+    content: typeof record.content === "string" ? record.content : undefined,
+    created_at: typeof record.created_at === "string" ? record.created_at : undefined,
+    delivery_status: typeof record.delivery_status === "string" ? record.delivery_status : undefined,
+  };
+  if (!message.role || typeof message.content !== "string") return;
+
+  setConversation((current) => {
+    if (!current || current.id !== event.scope_id) return current;
+    if (messageIndex > current.messages.length) return current;
+    const messages = [...current.messages];
+    if (messageIndex === messages.length) messages.push(message);
+    else messages[messageIndex] = { ...messages[messageIndex], ...message };
+    return { ...current, messages };
+  });
 }
 
 function characterCount(value: string) {
