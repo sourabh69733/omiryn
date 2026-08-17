@@ -3,6 +3,7 @@
 from .models import ConversationState, ConversationThread
 from .context import (
     CONVERSATION_THREAD_SOURCE_TYPE,
+    conversation_state_shadow_enabled,
     conversation_state_v2_enabled,
     conversation_thread_context_sources,
 )
@@ -15,6 +16,7 @@ from .service import (
     save_state,
     update_thread,
 )
+from .shadow import evaluate_conversation_update_shadow
 from .validation import ConversationStateValidationError
 
 __all__ = [
@@ -23,9 +25,11 @@ __all__ = [
     "ConversationStateValidationError",
     "ConversationThread",
     "CONVERSATION_THREAD_SOURCE_TYPE",
+    "conversation_state_shadow_enabled",
     "conversation_state_v2_enabled",
     "conversation_thread_context_sources",
     "create_thread",
+    "evaluate_conversation_update_shadow",
     "get_state",
     "get_thread",
     "list_threads",
