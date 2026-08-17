@@ -77,8 +77,9 @@ This checklist tracks the privacy and security layer required before a real publ
 
 - [x] Add an authenticated, room-based WebSocket gateway and versioned event contract.
 - [x] Keep the in-memory realtime hub for local development and single-instance deployments.
+- [x] Connect the browser client with active-conversation subscriptions, heartbeat, and automatic reconnection.
 - [ ] Before multi-instance production, add Redis/Memorystore Pub/Sub behind a broker interface for cross-instance delivery.
-- [ ] Treat the database as the source of truth; reconnect clients must fetch missed messages using their last received sequence.
+- [x] Treat the database as the source of truth; reconnect clients fetch messages missed during disconnection.
 - [ ] Add a transactional outbox so saved messages are eventually published when the broker is temporarily unavailable.
 - [ ] Test reconnects, duplicate events, ordering, expired tickets, instance restarts, and broker outages.
 - [ ] Configure Cloud Run WebSocket timeout/reconnect behavior and monitor active connections, delivery failures, and broker latency.
