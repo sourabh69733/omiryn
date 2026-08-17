@@ -20,6 +20,12 @@ function apiUrl(input: string) {
   return `${apiBaseUrl}${input}`;
 }
 
+export function apiWebSocketUrl(input: string) {
+  const url = new URL(apiUrl(input), window.location.href);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url;
+}
+
 async function getAuthClient() {
   if (authClientPromise) return authClientPromise;
 
