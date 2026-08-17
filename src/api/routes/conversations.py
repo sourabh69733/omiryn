@@ -13,6 +13,7 @@ from agent.memory_engine.engine import (
 )
 from agent.runtime.orchestrator import run_agent_turn
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
+from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
     delete_conversation as storage_delete_conversation,
@@ -106,6 +107,34 @@ async def create_agent_conversation(
     )
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     return conversation
+
+
+async def _publish_new_messages(
+    conversation: AgentConversation,
+    start_index: int,
+) -> None:
+    """Notify subscribed clients after durable message storage succeeds."""
+    for message_index, message in enumerate(
+        conversation.messages[start_index:],
+        start=start_index,
+    ):
+        await realtime_hub.publish(
+            conversation_event(
+                "message.created",
+                conversation.id,
+                sequence=message_index,
+                payload={
+                    "conversation_id": conversation.id,
+                    "message_index": message_index,
+                    "message": {
+                        "role": message.get("role"),
+                        "content": message.get("content"),
+                        "created_at": message.get("created_at"),
+                        "delivery_status": message.get("delivery_status"),
+                    },
+                },
+            )
+        )
 
 
 @router.get("/api/agent/conversations")
@@ -225,6 +254,7 @@ async def send_agent_message(
     conversation.messages = turn.messages
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    await _publish_new_messages(conversation, previous_message_count)
     if should_run_conversation_data_point_extraction(
         conversation.id,
         _user_id(user),
