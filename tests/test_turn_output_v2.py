@@ -2,8 +2,13 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.contracts.models import ModelContextPackage
+from agent.context_engine.conversation_engine.state import list_threads
 from agent.runtime.orchestrator import run_agent_turn
-from agent.memory_engine.data_points.extraction.inline import parse_turn_output_v2
+from agent.memory_engine.data_points.extraction.inline import (
+    TURN_OUTPUT_V2_TOOLS,
+    parse_turn_output_v2,
+    turn_output_v2_tools,
+)
 from agent.memory_engine.data_points.extraction.inline.writer import (
     capture_turn_output_data_points,
 )
@@ -47,6 +52,45 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.reply, "That makes sense. Spicy food tells me something about your vibe too.")
         self.assertEqual(parsed.data_points[0]["type"], "matching_fact")
         self.assertEqual(parsed.data_points[0]["evidence"], "I love spicy food")
+
+    def test_shadow_tool_schema_is_isolated_and_parser_keeps_private_update(self) -> None:
+        baseline = turn_output_v2_tools(include_conversation_update=False)
+        shadow = turn_output_v2_tools(include_conversation_update=True)
+
+        self.assertEqual(baseline, TURN_OUTPUT_V2_TOOLS)
+        self.assertNotIn(
+            "conversation_update",
+            baseline[0]["function"]["parameters"]["properties"],
+        )
+        self.assertIn(
+            "conversation_update",
+            shadow[0]["function"]["parameters"]["properties"],
+        )
+        self.assertIn(
+            "conversation_update",
+            shadow[0]["function"]["parameters"]["required"],
+        )
+        self.assertNotIn(
+            "conversation_update",
+            TURN_OUTPUT_V2_TOOLS[0]["function"]["parameters"]["properties"],
+        )
+
+        parsed = parse_turn_output_v2(
+            """
+            {
+              "reply": "That sounds exhausting.",
+              "data_points": [],
+              "conversation_update": {
+                "user_need": "listen",
+                "session_goal": "Understand the work situation",
+                "thread_updates": []
+              }
+            }
+            """,
+            user_text="My manager keeps changing plans.",
+        )
+        self.assertEqual(parsed.reply, "That sounds exhausting.")
+        self.assertEqual(parsed.conversation_update["user_need"], "listen")
 
     def test_parser_falls_back_to_plain_reply_when_model_returns_normal_text(self) -> None:
         parsed = parse_turn_output_v2("Normal assistant reply.", user_text="hello")
@@ -375,3 +419,79 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(facts), 1)
         self.assertEqual(facts[0]["label"], "Likes spicy food")
         self.assertEqual(facts[0]["source_kind"], "agent_turn_output_v2")
+
+    async def test_orchestrator_records_valid_thread_proposal_without_persisting_it(self) -> None:
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "AGENT_TURN_OUTPUT_VERSION": "v2",
+                    "CONVERSATION_STATE_V2_ENABLED": "true",
+                    "CONVERSATION_STATE_V2_SHADOW_ENABLED": "true",
+                },
+            ),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-shadow"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "conversation_id": "conversation-a",
+                    "message_index": 2,
+                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
+                },
+            )
+            model_call.return_value = """
+            {
+              "reply": "That uncertainty sounds genuinely tiring.",
+              "data_points": [],
+              "conversation_update": {
+                "user_need": "listen",
+                "session_goal": "Understand the user's work stress",
+                "thread_updates": [
+                  {
+                    "operation": "create",
+                    "title": "Stress with manager",
+                    "summary": "The user's manager repeatedly changes plans.",
+                    "origin": "user_started",
+                    "depth": "mentioned",
+                    "user_interest": "high",
+                    "salience": 0.8
+                  }
+                ]
+              }
+            }
+            """
+
+            result = await run_agent_turn(
+                conversation_id="conversation-a",
+                messages=[{"role": "assistant", "content": "What happened at work?"}],
+                user_text="My manager keeps changing plans and it is exhausting.",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(result.messages[-1]["content"], "That uncertainty sounds genuinely tiring.")
+        tool_parameters = model_call.call_args.kwargs["tools"][0]["function"]["parameters"]
+        self.assertIn("conversation_update", tool_parameters["properties"])
+        model_step = next(
+            call.args[0]
+            for call in save_trace_step.call_args_list
+            if call.args[0]["step_name"] == "model_call"
+        )
+        shadow = model_step["metadata"]["turn_output_v2"]["conversation_state_shadow"]
+        self.assertTrue(shadow["valid"])
+        self.assertFalse(shadow["persisted"])
+        self.assertEqual(shadow["proposed_thread_update_count"], 1)
+        self.assertEqual(list_threads("user-a"), [])

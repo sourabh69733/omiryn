@@ -12,6 +12,7 @@ from agent.context_engine.conversation_engine.state import (
     ConversationStateConflictError,
     ConversationStateValidationError,
     create_thread,
+    evaluate_conversation_update_shadow,
     get_state,
     get_thread,
     list_threads,
@@ -266,6 +267,118 @@ class ConversationThreadStateTest(unittest.TestCase):
         )
         self.assertEqual(source["metadata"]["thread_count"], 3)
         self.assertTrue(source["metadata"]["read_only"])
+
+    def test_shadow_proposal_is_validated_without_creating_a_thread(self) -> None:
+        result = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "session_goal": "Understand the user's work experience.",
+                "thread_updates": [
+                    {
+                        "operation": "create",
+                        "title": "Stress with manager",
+                        "summary": "The user is describing unclear communication at work.",
+                        "origin": "user_started",
+                        "depth": "mentioned",
+                        "user_interest": "high",
+                        "salience": 0.8,
+                        "next_angle": "Understand what part feels most exhausting.",
+                    }
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertFalse(result["persisted"])
+        self.assertEqual(result["proposed_thread_update_count"], 1)
+        self.assertEqual(list_threads(self.user_id), [])
+
+    def test_shadow_proposal_rejects_unknown_thread_and_multiple_creates(self) -> None:
+        unknown = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [
+                    {"operation": "continue", "thread_id": "not-owned"}
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+        self.assertFalse(unknown["valid"])
+        self.assertIn("owned thread_id", unknown["errors"][0])
+
+        create = {
+            "operation": "create",
+            "title": "One meaningful subject",
+            "summary": "A resumable discussion.",
+            "origin": "user_started",
+        }
+        duplicate_create = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [create, {**create, "title": "Second subject"}],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+        self.assertFalse(duplicate_create["valid"])
+        self.assertTrue(
+            any("only one new" in error for error in duplicate_create["errors"])
+        )
+
+    def test_shadow_proposal_can_continue_open_thread_but_not_user_blocked_thread(self) -> None:
+        open_thread = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Career uncertainty",
+            summary="The user is considering a job change.",
+            origin="user_started",
+        )
+        blocked_thread = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Private family subject",
+            summary="The user asked not to revisit this.",
+            origin="user_started",
+            status="blocked_by_user",
+        )
+        continued = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [
+                    {
+                        "operation": "continue",
+                        "thread_id": open_thread.id,
+                        "summary": "The user is now comparing two possible roles.",
+                        "depth": "explored",
+                    }
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=4,
+        )
+        self.assertTrue(continued["valid"])
+        self.assertEqual(get_thread(open_thread.id, self.user_id).version, 1)
+
+        blocked = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [
+                    {"operation": "continue", "thread_id": blocked_thread.id}
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=4,
+        )
+        self.assertFalse(blocked["valid"])
+        self.assertTrue(any("cannot be changed" in error for error in blocked["errors"]))
 
     def _context_package(self):
         return build_model_context_package(
