@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from agent.feedback import normalize_message_feedback
 from agent.memory_engine.engine import (
@@ -177,6 +177,27 @@ async def get_agent_conversation(
     user: CurrentUser = Depends(require_user),
 ) -> AgentConversation:
     return _get_existing_conversation(conversation_id, user)
+
+
+@router.get("/api/agent/conversations/{conversation_id}/messages")
+async def list_agent_messages_after_sequence(
+    conversation_id: str,
+    after_sequence: int = Query(-1, ge=-1),
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Return the authoritative message tail used to repair realtime delivery gaps."""
+    conversation = _get_existing_conversation(conversation_id, user)
+    messages = [
+        {"message_index": index, "message": message}
+        for index, message in enumerate(conversation.messages)
+        if index > after_sequence
+    ]
+    return {
+        "conversation_id": conversation.id,
+        "after_sequence": after_sequence,
+        "latest_sequence": len(conversation.messages) - 1,
+        "messages": messages,
+    }
 
 
 @router.delete("/api/agent/conversations/{conversation_id}")
