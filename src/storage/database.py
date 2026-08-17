@@ -15,6 +15,8 @@ from .schema import DEFAULT_DATABASE_URL, DB_DISABLE_POOL, metadata
 PRIVATE_USER_OWNED_TABLE_NAMES = (
     "draft_profiles",
     "agent_conversations",
+    "conversation_states",
+    "conversation_threads",
     "agent_usage_events",
     "agent_context_snapshots",
     "agent_traces",
