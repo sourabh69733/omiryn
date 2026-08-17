@@ -8,6 +8,12 @@ export type Conversation = {
   agent_tone?: string;
   messages: Message[];
 };
+export type MessageRecovery = {
+  conversation_id: string;
+  after_sequence: number;
+  latest_sequence: number;
+  messages: Array<{ message_index: number; message: Message }>;
+};
 export type ConversationSummary = {
   id: string;
   agent_name?: string | null;

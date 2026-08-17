@@ -6,7 +6,7 @@ import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AvatarImage } from "../AvatarImage";
 import { assetUrl, canShowUsage } from "../appUtils";
-import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, UsageEvent, UsageSummary } from "../types";
+import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 300;
@@ -43,7 +43,10 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const realtimeClientRef = useRef<RealtimeClient | null>(null);
 
   useEffect(() => {
-    const realtime = new RealtimeClient((event) => applyRealtimeEvent(event, setConversation));
+    const realtime = new RealtimeClient(
+      (event) => applyRealtimeEvent(event, setConversation),
+      (conversationId, afterSequence) => recoverConversation(conversationId, afterSequence),
+    );
     realtimeClientRef.current = realtime;
     realtime.start();
     return () => {
@@ -53,7 +56,10 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   }, []);
 
   useEffect(() => {
-    realtimeClientRef.current?.setConversation(conversation?.id || null);
+    realtimeClientRef.current?.setConversation(
+      conversation?.id || null,
+      conversation ? conversation.messages.length - 1 : undefined,
+    );
   }, [conversation?.id]);
 
   async function fetchSummaries() {
@@ -112,6 +118,24 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     } finally {
       setLoading(false);
     }
+  }
+
+  async function recoverConversation(id: string, afterSequence: number | null) {
+    const query = new URLSearchParams({ after_sequence: String(afterSequence ?? -1) });
+    const response = await apiFetch(`/api/agent/conversations/${id}/messages?${query}`);
+    if (!response.ok) return null;
+    const recovered = (await response.json()) as MessageRecovery;
+    setConversation((current) => {
+      if (!current || current.id !== id) return current;
+      const messages = [...current.messages];
+      for (const item of recovered.messages) {
+        if (!Number.isInteger(item.message_index) || item.message_index < 0) continue;
+        if (item.message_index < messages.length) messages[item.message_index] = item.message;
+        else if (item.message_index === messages.length) messages.push(item.message);
+      }
+      return { ...current, messages };
+    });
+    return recovered.latest_sequence;
   }
 
   async function createConversation() {

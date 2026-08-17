@@ -15,6 +15,10 @@ export type RealtimeEvent = {
 
 type RealtimeTicket = { ticket: string };
 type RealtimeEventHandler = (event: RealtimeEvent) => void;
+type RecoveryHandler = (
+  conversationId: string,
+  afterSequence: number | null,
+) => number | null | Promise<number | null>;
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
@@ -26,8 +30,14 @@ export class RealtimeClient {
   private reconnectTimer: number | null = null;
   private heartbeatTimer: number | null = null;
   private stopped = true;
+  private hasConnected = false;
+  private lastSequences = new Map<string, number>();
+  private recoveries = new Set<string>();
 
-  constructor(private readonly onEvent: RealtimeEventHandler) {}
+  constructor(
+    private readonly onEvent: RealtimeEventHandler,
+    private readonly onRecoveryNeeded?: RecoveryHandler,
+  ) {}
 
   start() {
     if (!this.stopped) return;
@@ -43,7 +53,11 @@ export class RealtimeClient {
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, "Client stopped");
   }
 
-  setConversation(conversationId: string | null) {
+  setConversation(conversationId: string | null, lastSequence?: number) {
+    if (conversationId && typeof lastSequence === "number") {
+      const knownSequence = this.lastSequences.get(conversationId) ?? -1;
+      this.lastSequences.set(conversationId, Math.max(knownSequence, lastSequence));
+    }
     if (this.conversationId === conversationId) return;
     const previousId = this.conversationId;
     this.conversationId = conversationId;
@@ -73,7 +87,13 @@ export class RealtimeClient {
       };
       socket.onmessage = (message) => {
         const event = parseRealtimeEvent(message.data);
-        if (event) this.onEvent(event);
+        if (!event) return;
+        if (event.type === "realtime.connected") {
+          if (this.hasConnected && this.conversationId) this.requestRecovery(this.conversationId);
+          this.hasConnected = true;
+        }
+        this.trackSequence(event);
+        this.onEvent(event);
       };
       socket.onerror = () => socket.close();
       socket.onclose = () => {
@@ -89,6 +109,27 @@ export class RealtimeClient {
 
   private sendRoomCommand(type: "subscribe" | "unsubscribe", conversationId: string) {
     this.send({ type, scope: "conversation", scope_id: conversationId });
+  }
+
+  private trackSequence(event: RealtimeEvent) {
+    if (event.scope !== "conversation" || !event.scope_id || typeof event.sequence !== "number") return;
+    const previous = this.lastSequences.get(event.scope_id) ?? -1;
+    if (event.sequence > previous + 1) this.requestRecovery(event.scope_id);
+    this.lastSequences.set(event.scope_id, Math.max(previous, event.sequence));
+  }
+
+  private requestRecovery(conversationId: string) {
+    if (!this.onRecoveryNeeded || this.recoveries.has(conversationId)) return;
+    this.recoveries.add(conversationId);
+    const afterSequence = this.lastSequences.get(conversationId) ?? null;
+    void Promise.resolve(this.onRecoveryNeeded(conversationId, afterSequence))
+      .then((latestSequence) => {
+        if (typeof latestSequence !== "number") return;
+        const previous = this.lastSequences.get(conversationId) ?? -1;
+        this.lastSequences.set(conversationId, Math.max(previous, latestSequence));
+      })
+      .catch(() => undefined)
+      .finally(() => this.recoveries.delete(conversationId));
   }
 
   private send(payload: Record<string, unknown>) {
