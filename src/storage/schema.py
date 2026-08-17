@@ -41,6 +41,59 @@ agent_conversations = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# One lightweight pointer per chat session. Detailed subjects live in the
+# user-level conversation_threads table so they can continue across sessions.
+conversation_states = Table(
+    "conversation_states",
+    metadata,
+    Column("conversation_id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("state_through_message_index", Integer, nullable=False, default=-1),
+    Column("active_thread_id", String, nullable=True),
+    Column("user_need", String, nullable=False, default="normal_chat"),
+    Column("session_goal", String, nullable=True),
+    Column("version", Integer, nullable=False, default=1),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_conversation_states_user", conversation_states.c.user_id)
+
+# Threads represent resumable subjects, not classifications for every message.
+# A thread is user-owned and records its first/last session so it may span chats.
+conversation_threads = Table(
+    "conversation_threads",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("created_in_conversation_id", String, nullable=False),
+    Column("last_conversation_id", String, nullable=False),
+    Column("title", String, nullable=False),
+    Column("summary", String, nullable=False),
+    Column("origin", String, nullable=False),
+    Column("matching_dimension", String, nullable=True),
+    Column("status", String, nullable=False, default="open"),
+    Column("depth", String, nullable=False, default="mentioned"),
+    Column("user_interest", String, nullable=False, default="unknown"),
+    Column("salience", Float, nullable=False, default=0.5),
+    Column("next_angle", String, nullable=True),
+    Column("first_message_index", Integer, nullable=True),
+    Column("last_message_index", Integer, nullable=True),
+    Column("closure_reason", String, nullable=True),
+    Column("version", Integer, nullable=False, default=1),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "ix_conversation_threads_user_status_updated",
+    conversation_threads.c.user_id,
+    conversation_threads.c.status,
+    conversation_threads.c.updated_at,
+)
+Index(
+    "ix_conversation_threads_last_conversation",
+    conversation_threads.c.last_conversation_id,
+)
+
 agent_usage_events = Table(
     "agent_usage_events",
     metadata,
