@@ -46,3 +46,12 @@ Synthetic evaluation scores are grouped by day for comparison.
 | Time (IST) | Result | Stage | Companion | Score | Passed |
 | --- | --- | --- | --- | --- | --- |
 | 14:03:08 | FAIL | Simulated conversation suite | meta-llama/Llama-3.3-70B-Instruct-Turbo | 2.3/4 | 0/6 scenarios |
+
+## 2026-08-18
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 14:45:45 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 30% | 3/10 scenarios |
+| 17:41:04 | PASS | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 1/1 scenarios |
+| 18:37:19 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 40% | 4/10 scenarios |
+| 18:44:12 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 0% | 0/1 scenarios |
