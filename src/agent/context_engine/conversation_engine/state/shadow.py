@@ -156,7 +156,8 @@ def _validate_thread_update(
         raise ConversationStateValidationError("a user-blocked thread cannot be changed")
     if existing_status == "completed" and operation not in {"complete", "block"}:
         raise ConversationStateValidationError("a completed thread cannot be reopened")
-    if raw.get("origin") is not None:
+    proposed_origin = raw.get("origin")
+    if proposed_origin is not None and proposed_origin != existing[thread_id].origin:
         raise ConversationStateValidationError("an existing thread origin cannot be changed")
 
     for field in (

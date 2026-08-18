@@ -128,6 +128,10 @@ CONVERSATION_UPDATE_SCHEMA = {
                     "origin": {
                         "type": ["string", "null"],
                         "enum": ["user_started", "agent_started", None],
+                        "description": (
+                            "Required for create. Omit for existing-thread operations; if repeated, "
+                            "it must equal the thread's existing origin."
+                        ),
                     },
                     "matching_dimension": {"type": ["string", "null"]},
                     "depth": {
