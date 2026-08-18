@@ -14,7 +14,11 @@
     "web:build": "vite build --config apps/web/vite.config.js",
     "web:preview": "vite preview --config apps/web/vite.config.js",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
-    "build": "npm run landing:build && npm run web:build"
+    "feedback:dev": "vite --config apps/feedback/vite.config.js",
+    "feedback:build": "vite build --config apps/feedback/vite.config.js",
+    "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
+    "feedback:check": "tsc -p apps/feedback/tsconfig.json --noEmit",
+    "build": "npm run landing:build && npm run web:build && npm run feedback:build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
