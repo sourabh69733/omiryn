@@ -20,6 +20,7 @@ TURN_OUTPUT_V2_TOOLS = [
             ),
             "parameters": {
                 "type": "object",
+                "additionalProperties": False,
                 "properties": {
                     "reply": {
                         "type": "string",
@@ -38,6 +39,7 @@ TURN_OUTPUT_V2_TOOLS = [
                         ),
                         "items": {
                             "type": "object",
+                            "additionalProperties": False,
                             "properties": {
                                 "type": {
                                     "type": "string",
@@ -99,13 +101,139 @@ TURN_OUTPUT_V2_TOOL_CHOICE = {
 }
 
 
+_OPTIONAL_TEXT = {"type": ["string", "null"]}
+_OPTIONAL_DEPTH = {
+    "type": ["string", "null"],
+    "enum": ["mentioned", "explored", "meaningful", None],
+}
+_OPTIONAL_INTEREST = {
+    "type": ["string", "null"],
+    "enum": ["unknown", "low", "medium", "high", None],
+}
+_OPTIONAL_SALIENCE = {
+    "type": ["number", "null"],
+    "minimum": 0,
+    "maximum": 1,
+}
+
+
+def _existing_thread_action_schema(
+    operation: str,
+    description: str,
+    *,
+    mutable_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    optional_properties = {
+        "title": _OPTIONAL_TEXT,
+        "summary": _OPTIONAL_TEXT,
+        "matching_dimension": _OPTIONAL_TEXT,
+        "depth": _OPTIONAL_DEPTH,
+        "user_interest": _OPTIONAL_INTEREST,
+        "salience": _OPTIONAL_SALIENCE,
+        "next_angle": _OPTIONAL_TEXT,
+        "closure_reason": _OPTIONAL_TEXT,
+    }
+    return {
+        "type": "object",
+        "description": description,
+        "additionalProperties": False,
+        "properties": {
+            "operation": {"const": operation},
+            "thread_id": {
+                "type": "string",
+                "description": "Select an existing thread_id supplied in conversation context.",
+            },
+            **{field: optional_properties[field] for field in mutable_fields},
+        },
+        "required": ["operation", "thread_id"],
+    }
+
+
+THREAD_ACTION_SCHEMA = {
+    "oneOf": [
+        {
+            "type": "object",
+            "description": (
+                "No durable thread action. Use for greetings, acknowledgements, jokes, "
+                "isolated small talk, or a message that does not change a resumable subject."
+            ),
+            "additionalProperties": False,
+            "properties": {"operation": {"const": "none"}},
+            "required": ["operation"],
+        },
+        {
+            "type": "object",
+            "description": "Create one new meaningful, resumable subject introduced this turn.",
+            "additionalProperties": False,
+            "properties": {
+                "operation": {"const": "create"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "origin": {
+                    "type": "string",
+                    "enum": ["user_started", "agent_started"],
+                },
+                "matching_dimension": _OPTIONAL_TEXT,
+                "depth": _OPTIONAL_DEPTH,
+                "user_interest": _OPTIONAL_INTEREST,
+                "salience": _OPTIONAL_SALIENCE,
+                "next_angle": _OPTIONAL_TEXT,
+            },
+            "required": ["operation", "title", "summary", "origin"],
+        },
+        _existing_thread_action_schema(
+            "continue",
+            "Continue the currently active thread because the latest message develops it.",
+            mutable_fields=(
+                "title",
+                "summary",
+                "matching_dimension",
+                "depth",
+                "user_interest",
+                "salience",
+                "next_angle",
+            ),
+        ),
+        _existing_thread_action_schema(
+            "switch",
+            "Switch from the active subject to a different existing open thread.",
+            mutable_fields=(
+                "title",
+                "summary",
+                "matching_dimension",
+                "depth",
+                "user_interest",
+                "salience",
+                "next_angle",
+            ),
+        ),
+        _existing_thread_action_schema(
+            "pause",
+            "Pause an unfinished thread now while allowing it to be resumed later.",
+            mutable_fields=("summary", "next_angle", "closure_reason"),
+        ),
+        _existing_thread_action_schema(
+            "complete",
+            "Complete a thread whose subject is resolved or explicitly finished.",
+            mutable_fields=("summary", "closure_reason"),
+        ),
+        _existing_thread_action_schema(
+            "block",
+            "Block a thread when the user explicitly forbids returning to its subject.",
+            mutable_fields=("summary", "closure_reason"),
+        ),
+    ]
+}
+
+
 CONVERSATION_UPDATE_SCHEMA = {
     "type": "object",
     "description": (
         "Private shadow proposal for meaningful, resumable conversation threads. "
-        "Do not create a thread for greetings, jokes, acknowledgements, or isolated "
-        "small talk. This proposal is never shown to the user."
+        "Return one explicit none action when no thread changes. This proposal is never "
+        "shown to the user."
     ),
+    "additionalProperties": False,
     "properties": {
         "user_need": {
             "type": "string",
@@ -114,40 +242,13 @@ CONVERSATION_UPDATE_SCHEMA = {
         "session_goal": {"type": ["string", "null"]},
         "thread_updates": {
             "type": "array",
+            "description": (
+                "Thread actions proposed for this turn. Use exactly one none action when no "
+                "durable subject changes; never combine none with another action."
+            ),
+            "minItems": 1,
             "maxItems": 3,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "operation": {
-                        "type": "string",
-                        "enum": ["create", "continue", "switch", "pause", "complete", "block"],
-                    },
-                    "thread_id": {"type": ["string", "null"]},
-                    "title": {"type": ["string", "null"]},
-                    "summary": {"type": ["string", "null"]},
-                    "origin": {
-                        "type": ["string", "null"],
-                        "enum": ["user_started", "agent_started", None],
-                        "description": (
-                            "Required for create. Omit for existing-thread operations; if repeated, "
-                            "it must equal the thread's existing origin."
-                        ),
-                    },
-                    "matching_dimension": {"type": ["string", "null"]},
-                    "depth": {
-                        "type": ["string", "null"],
-                        "enum": ["mentioned", "explored", "meaningful", None],
-                    },
-                    "user_interest": {
-                        "type": ["string", "null"],
-                        "enum": ["unknown", "low", "medium", "high", None],
-                    },
-                    "salience": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-                    "next_angle": {"type": ["string", "null"]},
-                    "closure_reason": {"type": ["string", "null"]},
-                },
-                "required": ["operation"],
-            },
+            "items": THREAD_ACTION_SCHEMA,
         },
     },
     "required": ["user_need", "thread_updates"],
