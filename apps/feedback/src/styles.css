@@ -357,6 +357,26 @@ h2 {
   gap: 16px;
 }
 
+.submission-error {
+  margin: 22px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--danger);
+  color: var(--danger);
+  background: #fff3f5;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.feedback-trap {
+  width: 1px;
+  height: 1px;
+  position: fixed;
+  left: -10000px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .text-response {
   position: relative;
 }

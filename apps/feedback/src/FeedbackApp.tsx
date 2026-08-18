@@ -11,8 +11,13 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  getOrCreateClientToken,
+  submitFeedback,
+  type SubmissionMode,
+} from "./feedbackApi";
 import { conceptInsertAfterQuestion, questions, type Question } from "./questionnaire";
 
 type AnswerMap = Record<string, string[]>;
@@ -21,6 +26,7 @@ type Screen = { kind: "welcome" } | { kind: "question"; questionIndex: number } 
 const draftStorageKey = "omiryn-feedback-draft-v1";
 const completedStorageKey = "omiryn-feedback-completed-v1";
 const maxFeedbackLength = 250;
+const surveyVersion = "2026-08-18-v1";
 
 const conceptFrames = [
   {
@@ -72,18 +78,22 @@ function readDraft(): { screenIndex: number; answers: AnswerMap } {
 
 export function FeedbackApp() {
   const initialDraft = useMemo(readDraft, []);
+  const responseId = useRef(crypto.randomUUID());
   const [screenIndex, setScreenIndex] = useState(initialDraft.screenIndex);
   const [answers, setAnswers] = useState<AnswerMap>(initialDraft.answers);
-  const [submitted, setSubmitted] = useState(
-    () => window.localStorage.getItem(completedStorageKey) === "true",
-  );
+  const [completionMode, setCompletionMode] = useState<SubmissionMode | null>(() => {
+    const stored = window.localStorage.getItem(completedStorageKey);
+    return stored === "submitted" || stored === "preview" ? stored : null;
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [website, setWebsite] = useState("");
   const [showConceptStory, setShowConceptStory] = useState(false);
 
   useEffect(() => {
-    if (submitted) return;
+    if (completionMode) return;
     window.localStorage.setItem(draftStorageKey, JSON.stringify({ screenIndex, answers }));
-  }, [answers, screenIndex, submitted]);
+  }, [answers, completionMode, screenIndex]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -94,26 +104,39 @@ export function FeedbackApp() {
   const moveForward = () => setScreenIndex((current) => Math.min(current + 1, screens.length - 1));
   const moveBack = () => setScreenIndex((current) => Math.max(current - 1, 0));
 
-  const submit = () => {
+  const submit = async () => {
     setSubmitting(true);
-    // Phase one deliberately keeps submission local until the Google Sheet endpoint is connected.
-    window.setTimeout(() => {
-      window.localStorage.setItem(completedStorageKey, "true");
+    setSubmitError("");
+    try {
+      const mode = await submitFeedback({
+        responseId: responseId.current,
+        surveyVersion,
+        clientToken: getOrCreateClientToken(),
+        answers,
+        website,
+      });
+      window.localStorage.setItem(completedStorageKey, mode);
       window.localStorage.removeItem(draftStorageKey);
+      setCompletionMode(mode);
+    } catch {
+      setSubmitError("We couldn't confirm your response was saved. Please try again.");
+    } finally {
       setSubmitting(false);
-      setSubmitted(true);
-    }, 650);
+    }
   };
 
   const restart = () => {
     window.localStorage.removeItem(completedStorageKey);
     window.localStorage.removeItem(draftStorageKey);
+    responseId.current = crypto.randomUUID();
     setAnswers({});
+    setWebsite("");
+    setSubmitError("");
     setScreenIndex(0);
-    setSubmitted(false);
+    setCompletionMode(null);
   };
 
-  if (submitted) return <CompletionScreen onRestart={restart} />;
+  if (completionMode) return <CompletionScreen mode={completionMode} onRestart={restart} />;
 
   return (
     <div className="feedback-app">
@@ -139,10 +162,23 @@ export function FeedbackApp() {
                 currentScreen.questionIndex === questions.length - 1 ? submit : moveForward
               }
               submitting={submitting}
+              submitError={submitError}
             />
           )}
         </div>
       </main>
+      <div className="feedback-trap" aria-hidden="true">
+        <label htmlFor="feedback-website">Website</label>
+        <input
+          id="feedback-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(event) => setWebsite(event.target.value)}
+        />
+      </div>
       {showConceptStory ? <ConceptStory onClose={() => setShowConceptStory(false)} /> : null}
     </div>
   );
@@ -193,14 +229,16 @@ function QuestionScreen({
   onBack,
   onContinue,
   submitting,
+  submitError,
 }: {
   question: Question;
   questionIndex: number;
   answers: AnswerMap;
   onAnswersChange: (answers: AnswerMap) => void;
   onBack: () => void;
-  onContinue: () => void;
+  onContinue: () => void | Promise<void>;
   submitting: boolean;
+  submitError: string;
 }) {
   const selected = answers[question.id] ?? [];
   const isText = question.type === "text";
@@ -274,6 +312,8 @@ function QuestionScreen({
         </div>
       )}
 
+      {submitError ? <p className="submission-error" role="alert">{submitError}</p> : null}
+
       <Navigation
         onBack={onBack}
         onContinue={onContinue}
@@ -306,7 +346,7 @@ function ConceptScreen({
   onWatch,
 }: {
   onBack: () => void;
-  onContinue: () => void;
+  onContinue: () => void | Promise<void>;
   onWatch: () => void;
 }) {
   return (
@@ -463,7 +503,13 @@ function ConceptStory({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CompletionScreen({ onRestart }: { onRestart: () => void }) {
+function CompletionScreen({
+  mode,
+  onRestart,
+}: {
+  mode: SubmissionMode;
+  onRestart: () => void;
+}) {
   return (
     <div className="feedback-app completion-layout">
       <Header />
@@ -478,7 +524,9 @@ function CompletionScreen({ onRestart }: { onRestart: () => void }) {
           <RotateCcw aria-hidden="true" />
           Start again
         </button>
-        <p className="mock-note">UI preview: this response is currently saved only in this browser.</p>
+        {mode === "preview" ? (
+          <p className="mock-note">UI preview: this response is currently saved only in this browser.</p>
+        ) : null}
       </main>
     </div>
   );
