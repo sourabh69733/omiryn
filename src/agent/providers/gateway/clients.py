@@ -12,7 +12,7 @@ import httpx
 
 from agent.observability.usage import CHAT_REPLY
 
-from agent.providers.shared.errors import AgentProviderError
+from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
 from agent.providers.shared.messages import _compact_chat_reply, _provider_messages
 from agent.outputs.companion_response import textual_tool_arguments
 from .registry import (
@@ -22,7 +22,13 @@ from .registry import (
     provider_spec,
     provider_timeout_seconds,
 )
-from agent.providers.shared.usage_events import _elapsed_ms, _emit_prompt_debug, _prompt_debug, _record_usage_event, _sum_optional_ints
+from agent.providers.shared.usage_events import (
+    _elapsed_ms,
+    _emit_prompt_debug,
+    _prompt_debug,
+    _record_usage_event,
+    _sum_optional_ints,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +45,7 @@ async def _openai_compatible_chat(
     response_format: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: dict[str, Any] | str | None = None,
+    max_tokens: int | None = None,
 ) -> str:
     config = _openai_compatible_provider_config(provider, model)
     provider_messages = _provider_messages(messages)
@@ -53,6 +60,8 @@ async def _openai_compatible_chat(
         payload["tools"] = tools
     if tool_choice is not None:
         payload["tool_choice"] = tool_choice
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     prompt_debug = _prompt_debug(system_prompt, provider_messages)
     _emit_prompt_debug(provider, str(config["model"]), request_kind, prompt_debug)
     headers = {
@@ -78,12 +87,32 @@ async def _openai_compatible_chat(
             latency_ms = _elapsed_ms(started_at)
             logger.info("agent.%s.response status_code=%s", provider, response.status_code)
             data = response.json()
+            choice = data["choices"][0]
             usage = data.get("usage") or {}
             raw_usage = {
                 **usage,
+                "finish_reason": choice.get("finish_reason"),
                 "rate_limit": _provider_rate_limit_headers(response),
                 "prompt_debug": prompt_debug,
             }
+            finish_reason = str(choice.get("finish_reason") or "").casefold()
+            if finish_reason in {"length", "max_tokens"}:
+                _record_usage_event(
+                    conversation_id=conversation_id,
+                    request_kind=request_kind,
+                    provider=provider,
+                    model=str(config["model"]),
+                    success=False,
+                    latency_ms=latency_ms,
+                    raw_usage=raw_usage,
+                    error=f"output_truncated:{finish_reason}",
+                    prompt_tokens=usage.get("prompt_tokens"),
+                    completion_tokens=usage.get("completion_tokens"),
+                    total_tokens=usage.get("total_tokens"),
+                )
+                raise AgentProviderTruncationError(
+                    f"{provider} stopped at the output-token limit ({finish_reason})."
+                )
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -96,7 +125,7 @@ async def _openai_compatible_chat(
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
-            message = data["choices"][0]["message"]
+            message = choice["message"]
             tool_arguments = _selected_tool_arguments(message, tool_choice)
             if tool_arguments is not None:
                 return tool_arguments
@@ -114,6 +143,8 @@ async def _openai_compatible_chat(
             if request_kind == CHAT_REPLY:
                 return _compact_chat_reply(content, messages)
             return content
+        except AgentProviderTruncationError:
+            raise
         except httpx.HTTPStatusError as error:
             raw_usage = {"prompt_debug": prompt_debug}
             detail = ""
@@ -152,6 +183,7 @@ async def _openai_compatible_chat(
             )
             raise
 
+
 def _openai_compatible_provider_config(
     provider: str,
     model: str | None,
@@ -188,12 +220,14 @@ def _provider_error_detail(error_payload: Any) -> str:
             return message
     return ""
 
+
 def _provider_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
     return {
         name: value
         for name, value in response.headers.items()
         if name.lower().startswith("x-ratelimit") or name.lower() == "retry-after"
     }
+
 
 async def _groq_chat(
     system_prompt: str,
@@ -205,6 +239,7 @@ async def _groq_chat(
     timeout_seconds: float | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: dict[str, Any] | str | None = None,
+    max_tokens: int | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -220,6 +255,8 @@ async def _groq_chat(
         payload["tools"] = tools
     if tool_choice is not None:
         payload["tool_choice"] = tool_choice
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     prompt_debug = _prompt_debug(system_prompt, provider_messages)
     _emit_prompt_debug("groq", payload["model"], request_kind, prompt_debug)
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -242,12 +279,32 @@ async def _groq_chat(
             latency_ms = _elapsed_ms(started_at)
             logger.info("agent.groq.response status_code=%s", response.status_code)
             data = response.json()
+            choice = data["choices"][0]
             usage = data.get("usage") or {}
             raw_usage = {
                 **usage,
+                "finish_reason": choice.get("finish_reason"),
                 "rate_limit": _groq_rate_limit_headers(response),
                 "prompt_debug": prompt_debug,
             }
+            finish_reason = str(choice.get("finish_reason") or "").casefold()
+            if finish_reason in {"length", "max_tokens"}:
+                _record_usage_event(
+                    conversation_id=conversation_id,
+                    request_kind=request_kind,
+                    provider="groq",
+                    model=payload["model"],
+                    success=False,
+                    latency_ms=latency_ms,
+                    raw_usage=raw_usage,
+                    error=f"output_truncated:{finish_reason}",
+                    prompt_tokens=usage.get("prompt_tokens"),
+                    completion_tokens=usage.get("completion_tokens"),
+                    total_tokens=usage.get("total_tokens"),
+                )
+                raise AgentProviderTruncationError(
+                    f"groq stopped at the output-token limit ({finish_reason})."
+                )
             _record_usage_event(
                 conversation_id=conversation_id,
                 request_kind=request_kind,
@@ -260,7 +317,7 @@ async def _groq_chat(
                 completion_tokens=usage.get("completion_tokens"),
                 total_tokens=usage.get("total_tokens"),
             )
-            message = data["choices"][0]["message"]
+            message = choice["message"]
             tool_arguments = _selected_tool_arguments(message, tool_choice)
             if tool_arguments is not None:
                 return tool_arguments
@@ -274,6 +331,8 @@ async def _groq_chat(
             if request_kind == "chat_reply":
                 return _compact_chat_reply(content, messages)
             return content
+        except AgentProviderTruncationError:
+            raise
         except httpx.HTTPStatusError as error:
             raw_usage = {"prompt_debug": prompt_debug}
             if error.response is not None:
@@ -303,6 +362,7 @@ async def _groq_chat(
             )
             raise
 
+
 def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
     header_names = [
         "retry-after",
@@ -313,11 +373,7 @@ def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
         "x-ratelimit-reset-requests",
         "x-ratelimit-reset-tokens",
     ]
-    return {
-        name: response.headers[name]
-        for name in header_names
-        if name in response.headers
-    }
+    return {name: response.headers[name] for name in header_names if name in response.headers}
 
 
 def _selected_tool_arguments(
@@ -358,6 +414,7 @@ def _expected_tool_name(tool_choice: dict[str, Any] | str | None) -> str | None:
         return None
     return str(function.get("name") or "").strip() or None
 
+
 async def _ollama_chat(
     system_prompt: str,
     messages: list[dict[str, str]],
@@ -365,6 +422,7 @@ async def _ollama_chat(
     conversation_id: str | None = None,
     request_kind: str = "chat_reply",
     model: str | None = None,
+    max_tokens: int | None = None,
 ) -> str:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     provider_messages = _provider_messages(messages)
@@ -374,6 +432,8 @@ async def _ollama_chat(
         "stream": False,
         "options": {"temperature": temperature},
     }
+    if max_tokens is not None:
+        payload["options"]["num_predict"] = max_tokens
     prompt_debug = _prompt_debug(system_prompt, provider_messages)
     _emit_prompt_debug("ollama", payload["model"], request_kind, prompt_debug)
 
@@ -408,7 +468,9 @@ async def _ollama_chat(
             detail = ""
             try:
                 error_payload = error.response.json()
-                detail = str(error_payload.get("error") or "") if isinstance(error_payload, dict) else ""
+                detail = (
+                    str(error_payload.get("error") or "") if isinstance(error_payload, dict) else ""
+                )
             except ValueError:
                 detail = ""
             _record_usage_event(

@@ -19,6 +19,7 @@ async def provider_chat(
     request_kind: str = "chat_reply",
     model: str | None = None,
     timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
     response_format: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: dict[str, Any] | str | None = None,
@@ -31,6 +32,7 @@ async def provider_chat(
         "conversation_id": conversation_id,
         "request_kind": request_kind,
         "model": model,
+        "max_tokens": max_tokens,
     }
     if spec and spec.transport == "groq":
         return await _groq_chat(

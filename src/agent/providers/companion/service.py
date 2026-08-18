@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from agent.observability.usage import CHAT_REPLY, INPUT_GUARDRAIL
@@ -31,6 +32,7 @@ async def generate_agent_reply(
     response_format: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: dict[str, Any] | str | None = None,
+    max_tokens: int | None = None,
 ) -> str:
     provider = _provider_name()
     logger.info("agent.reply provider=%s user_messages=%s", provider, _user_message_count(messages))
@@ -74,4 +76,5 @@ async def generate_agent_reply(
         response_format=response_format,
         tools=tools,
         tool_choice=tool_choice,
+        max_tokens=max_tokens or int(os.getenv("AGENT_CHAT_MAX_OUTPUT_TOKENS", "1200")),
     )

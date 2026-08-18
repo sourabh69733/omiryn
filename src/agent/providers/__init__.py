@@ -34,7 +34,7 @@ from .shared.config import (
     _provider_model,
     _provider_name,
 )
-from .shared.errors import AgentProviderError
+from .shared.errors import AgentProviderError, AgentProviderTruncationError
 from .extraction.service import (
     extract_deep_profile_facts,
     extract_llm_data_point_candidates,
@@ -96,6 +96,7 @@ from .shared.usage_events import (
 
 __all__ = [
     "AgentProviderError",
+    "AgentProviderTruncationError",
     "agent_runtime_status",
     "assess_user_message_quality",
     "extract_deep_profile_facts",

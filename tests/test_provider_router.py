@@ -18,7 +18,7 @@ from agent.providers.gateway.registry import (
     ProviderSpec,
     provider_model,
 )
-from agent.providers.shared.errors import AgentProviderError
+from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
 from agent.providers.extraction.service import extract_profile
 from agent.providers.gateway.router import provider_chat
 from agent.outputs.companion_response import structured_companion_reply, textual_tool_arguments
@@ -55,7 +55,9 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             expected_name="return_companion_response",
         )
 
-        self.assertEqual(json.loads(arguments or "{}"), {"reply": "Take care of yourself!", "data_points": []})
+        self.assertEqual(
+            json.loads(arguments or "{}"), {"reply": "Take care of yourself!", "data_points": []}
+        )
 
     async def test_routes_openai_compatible_provider_with_all_request_fields(self) -> None:
         with patch(
@@ -72,6 +74,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
                 request_kind="test_kind",
                 model="model-a",
                 timeout_seconds=91,
+                max_tokens=321,
                 response_format={"type": "json_object"},
                 tools=[{"type": "function"}],
                 tool_choice="required",
@@ -87,6 +90,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             conversation_id="conversation",
             request_kind="test_kind",
             model="model-a",
+            max_tokens=321,
             response_format={"type": "json_object"},
             tools=[{"type": "function"}],
             tool_choice="required",
@@ -113,6 +117,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
             conversation_id=None,
             request_kind="chat_reply",
             model=None,
+            max_tokens=None,
             tools=None,
             tool_choice=None,
         )
@@ -208,6 +213,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
                 [{"role": "user", "content": "hello"}],
                 model="gpt-test-model",
                 request_kind="behavior_eval_user_judge",
+                max_tokens=275,
             )
 
         self.assertEqual(result, "OpenAI reply")
@@ -215,6 +221,7 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["authorization"], "Bearer test-openai-key")
         self.assertEqual(captured["payload"]["model"], "gpt-test-model")
         self.assertEqual(captured["payload"]["messages"][0]["role"], "system")
+        self.assertEqual(captured["payload"]["max_tokens"], 275)
         self.assertEqual(usage.call_args.kwargs["provider"], "openai")
 
     async def test_openai_compatible_request_can_use_json_response_format(self) -> None:
@@ -251,6 +258,45 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, '{"reply":"ok","data_points":[]}')
         self.assertEqual(captured["payload"]["response_format"], {"type": "json_object"})
+
+    async def test_output_limit_finish_reason_is_a_failed_truncation(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "finish_reason": "length",
+                            "message": {"content": '{"reply":"partial"'},
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+                },
+            )
+
+        original_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            return original_client(
+                transport=httpx.MockTransport(handler), timeout=kwargs["timeout"]
+            )
+
+        with (
+            patch.dict("os.environ", {"DEEPINFRA_API_KEY": "test-key"}),
+            patch("agent.providers.gateway.clients.httpx.AsyncClient", side_effect=client_factory),
+            patch("agent.providers.gateway.clients._record_usage_event") as usage,
+        ):
+            with self.assertRaises(AgentProviderTruncationError):
+                await _openai_compatible_chat(
+                    "deepinfra",
+                    "system prompt",
+                    [{"role": "user", "content": "hello"}],
+                    max_tokens=20,
+                )
+
+        self.assertEqual(usage.call_count, 1)
+        self.assertFalse(usage.call_args.kwargs["success"])
+        self.assertEqual(usage.call_args.kwargs["error"], "output_truncated:length")
 
     async def test_json_schema_response_bypasses_plain_chat_compaction(self) -> None:
         response_format = {
@@ -367,7 +413,9 @@ class ProviderRouterTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["payload"]["tool_choice"], tool_choice)
         self.assertNotIn("response_format", captured["payload"])
 
-    async def test_textual_forced_tool_call_wrapper_returns_arguments_without_leaking_markup(self) -> None:
+    async def test_textual_forced_tool_call_wrapper_returns_arguments_without_leaking_markup(
+        self,
+    ) -> None:
         tools = [
             {
                 "type": "function",
@@ -516,6 +564,7 @@ class ProviderRoleReuseTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call.await_args.kwargs["system_prompt"], "existing companion prompt")
         self.assertEqual(call.await_args.kwargs["model"], "companion-model")
         self.assertEqual(call.await_args.kwargs["request_kind"], "chat_reply")
+        self.assertEqual(call.await_args.kwargs["max_tokens"], 1200)
 
     async def test_extraction_uses_same_router_with_extraction_role(self) -> None:
         with (
