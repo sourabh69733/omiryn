@@ -3,7 +3,11 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.contracts.models import ModelContextPackage
 from agent.context_engine.conversation_engine.state import list_threads
-from agent.runtime.orchestrator import run_agent_turn
+from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
+from agent.runtime.orchestrator import (
+    _visible_companion_reply,
+    run_agent_turn,
+)
 from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOLS,
     parse_turn_output_v2,
@@ -534,3 +538,115 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(shadow["persisted"])
         self.assertEqual(shadow["proposed_thread_update_count"], 1)
         self.assertEqual(list_threads("user-a"), [])
+
+    def test_private_transport_is_never_accepted_as_visible_chat_text(self) -> None:
+        with self.assertRaises(AgentProviderError):
+            _visible_companion_reply('<function(return_companion_response){"reply":')
+
+    async def test_orchestrator_retries_plain_reply_after_structured_output_truncation(
+        self,
+    ) -> None:
+        with (
+            patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch(
+                "agent.runtime.orchestrator.generate_agent_reply",
+                new_callable=AsyncMock,
+                side_effect=[
+                    AgentProviderTruncationError("length"),
+                    "Tell me more about what made that important to you.",
+                ],
+            ) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-fallback"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "conversation_id": "conversation-a",
+                    "message_index": 2,
+                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
+                },
+            )
+
+            result = await run_agent_turn(
+                conversation_id="conversation-a",
+                messages=[],
+                user_text="It mattered because she understood me.",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(
+            result.messages[-1]["content"],
+            "Tell me more about what made that important to you.",
+        )
+        self.assertEqual(model_call.await_count, 2)
+        self.assertIsNotNone(model_call.await_args_list[0].kwargs["tools"])
+        self.assertNotIn("tools", model_call.await_args_list[1].kwargs)
+        self.assertEqual(model_call.await_args_list[1].kwargs["max_tokens"], 400)
+        model_step = next(
+            call.args[0]
+            for call in save_trace_step.call_args_list
+            if call.args[0]["step_name"] == "model_call"
+        )
+        self.assertEqual(
+            model_step["metadata"]["turn_output_v2"]["error"],
+            "output_truncated",
+        )
+
+    async def test_orchestrator_retries_before_malformed_transport_reaches_ui(self) -> None:
+        with (
+            patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch(
+                "agent.runtime.orchestrator.generate_agent_reply",
+                new_callable=AsyncMock,
+                side_effect=[
+                    '<function(return_companion_response){"reply":"cut off',
+                    "I lost my train of thought—what part mattered most?",
+                ],
+            ) as model_call,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step"),
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-malformed"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "conversation_id": "conversation-a",
+                    "message_index": 2,
+                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
+                },
+            )
+
+            result = await run_agent_turn(
+                conversation_id="conversation-a",
+                messages=[],
+                user_text="I had a difficult day.",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(
+            result.messages[-1]["content"],
+            "I lost my train of thought—what part mattered most?",
+        )
+        self.assertEqual(model_call.await_count, 2)

@@ -13,6 +13,8 @@ from agent.context_engine.conversation_engine.state import (
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.providers import (
+    AgentProviderError,
+    AgentProviderTruncationError,
     _prompt_debug,
     _provider_messages,
     assess_user_message_quality,
@@ -206,34 +208,63 @@ async def run_agent_turn(
         }
     )
     try:
-        reply = await generate_agent_reply(
-            updated_messages,
-            conversation_id=conversation_id,
-            model=model,
-            agent_mode=agent_mode,
-            agent_tone=agent_tone,
-            agent_name=agent_name,
-            context_sources=context_package.context_sources,
-            user_profile=context_package.user_profile,
-            system_prompt=system_prompt,
-            tools=(
-                turn_output_v2_tools(
-                    include_conversation_update=conversation_state_shadow,
-                )
-                if turn_output_v2
-                else None
-            ),
-            tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
-        )
-        turn_output_summary = None
-        sanitized_structured_reply = structured_companion_reply(reply)
-        if turn_output_v2:
-            parsed_output = parse_turn_output_v2(reply, user_text=user_text)
-            reply = (
-                parsed_output.reply
-                if parsed_output.parsed
-                else sanitized_structured_reply or parsed_output.reply
+        generation_arguments = {
+            "conversation_id": conversation_id,
+            "model": model,
+            "agent_mode": agent_mode,
+            "agent_tone": agent_tone,
+            "agent_name": agent_name,
+            "context_sources": context_package.context_sources,
+            "user_profile": context_package.user_profile,
+            "system_prompt": system_prompt,
+        }
+        structured_tools = (
+            turn_output_v2_tools(
+                include_conversation_update=conversation_state_shadow,
             )
+            if turn_output_v2
+            else None
+        )
+        fallback_reason = None
+        try:
+            raw_reply = await generate_agent_reply(
+                updated_messages,
+                **generation_arguments,
+                tools=structured_tools,
+                tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
+            )
+        except AgentProviderTruncationError:
+            fallback_reason = "output_truncated"
+            raw_reply = await generate_agent_reply(
+                updated_messages,
+                **generation_arguments,
+                max_tokens=400,
+            )
+
+        sanitized_structured_reply = structured_companion_reply(raw_reply)
+        if (
+            fallback_reason is None
+            and turn_output_v2
+            and sanitized_structured_reply is None
+            and _looks_like_model_transport(raw_reply)
+        ):
+            fallback_reason = "malformed_structured_output"
+            raw_reply = await generate_agent_reply(
+                updated_messages,
+                **generation_arguments,
+                max_tokens=400,
+            )
+            sanitized_structured_reply = structured_companion_reply(raw_reply)
+
+        reply = _visible_companion_reply(raw_reply, sanitized_structured_reply)
+        turn_output_summary = None
+        if turn_output_v2 and fallback_reason is None:
+            parsed_output = parse_turn_output_v2(
+                raw_reply,
+                user_text=user_text,
+                require_conversation_update=conversation_state_shadow,
+            )
+            reply = _visible_companion_reply(parsed_output.reply, sanitized_structured_reply)
             turn_output_summary = capture_turn_output_data_points(
                 conversation_id=conversation_id,
                 user_id=user_id,
@@ -245,6 +276,10 @@ async def run_agent_turn(
                 {
                     "parsed": parsed_output.parsed,
                     "error": parsed_output.error,
+                    "transport_valid": parsed_output.transport_valid,
+                    "schema_valid": parsed_output.schema_valid,
+                    "semantic_valid": parsed_output.semantic_valid,
+                    "schema_errors": list(parsed_output.schema_errors),
                 }
             )
             if conversation_state_shadow:
@@ -256,11 +291,16 @@ async def run_agent_turn(
                         message_index=len(updated_messages) - 1,
                     )
                 )
-        else:
-            # A provider can serialize a forced function call as plain text even when
-            # this turn does not use inline data-point extraction. Never display that
-            # transport envelope to the user.
-            reply = sanitized_structured_reply or reply
+        elif turn_output_v2:
+            turn_output_summary = {
+                "parsed": False,
+                "error": fallback_reason,
+                "transport_valid": False,
+                "schema_valid": False,
+                "semantic_valid": False,
+                "schema_errors": [],
+                "captured_count": 0,
+            }
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -301,7 +341,7 @@ async def run_agent_turn(
                 "turn_output_v2": turn_output_summary if turn_output_v2 else None,
             },
         }
-        )
+    )
     for index, reply_part in enumerate(reply_parts):
         assistant_message = {"role": "assistant", "content": reply_part}
         turn_state = assistant_turn_state(
@@ -313,7 +353,9 @@ async def run_agent_turn(
             assistant_message["turn_state"] = turn_state
         updated_messages.append(assistant_message)
     if context_snapshot:
-        context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = reply
+        context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = (
+            reply
+        )
     save_agent_context_snapshot(context_snapshot)
     save_agent_trace_step(
         {
@@ -349,6 +391,21 @@ def _source_type_counts(sources: list[dict[str, Any]]) -> dict[str, int]:
         source_type = str(source.get("source_type") or "context")
         counts[source_type] = counts.get(source_type, 0) + 1
     return counts
+
+
+def _looks_like_model_transport(raw_text: str) -> bool:
+    """Identify private JSON/tool syntax that must not be rendered as companion text."""
+    text = str(raw_text or "").lstrip().casefold()
+    return text.startswith("{") or text.startswith("```json") or "<function" in text
+
+
+def _visible_companion_reply(raw_text: str, decoded_reply: str | None = None) -> str:
+    """Return only user-visible prose, rejecting undecodable private transport output."""
+    if decoded_reply:
+        return decoded_reply
+    if _looks_like_model_transport(raw_text):
+        raise AgentProviderError("Model returned an undecodable private response envelope.")
+    return str(raw_text or "").strip()
 
 
 def _evaluate_conversation_update_shadow_safely(
