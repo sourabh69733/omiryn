@@ -116,6 +116,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         lines.extend(_simulated_conversation_suite_markdown(payload))
     elif payload.get("stage") == "conversation_judge_calibration":
         lines.extend(_conversation_judge_calibration_markdown(payload))
+    elif payload.get("stage") == "thread_management_shadow_eval":
+        lines.extend(_thread_management_shadow_markdown(payload))
     else:
         lines.extend(
             [
@@ -138,8 +140,9 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
             reason = case.get("judge_error") or _calibration_failure_reason(case)
             lines.append(f"- **{_plain_name(case['id'])}:** {reason}")
 
-    for scenario in payload.get("scenarios", []):
-        lines.extend(_scenario_markdown(scenario))
+    if payload.get("stage") == "behavior_evaluation":
+        for scenario in payload.get("scenarios", []):
+            lines.extend(_scenario_markdown(scenario))
 
     if payload.get("stage") in {"simulated_conversation", "simulated_conversation_suite"}:
         lines.extend(_improvement_targets_markdown(payload))
@@ -377,6 +380,82 @@ def _conversation_judge_calibration_markdown(payload: dict[str, Any]) -> list[st
     return lines
 
 
+def _thread_management_shadow_markdown(payload: dict[str, Any]) -> list[str]:
+    """Explain expected versus proposed thread actions without exposing raw trace noise."""
+    summary = payload.get("summary") or {}
+    lines = [
+        "## Thread-management summary",
+        "",
+        f"**Scenarios:** {summary.get('total', 0)}",
+        f"**Passed:** {summary.get('passed', 0)}",
+        f"**Failed:** {summary.get('failed', 0)}",
+        "**Database writes from proposals:** disabled (shadow mode)",
+    ]
+    for scenario in payload.get("scenarios", []):
+        scenario_input = scenario.get("input") or {}
+        expected = scenario.get("expected") or {}
+        observed = scenario.get("observed") or {}
+        lines.extend(
+            [
+                "",
+                f"## Scenario: {_plain_name(scenario.get('scenario_id', 'unknown'))}",
+                "",
+                f"**Result:** {'PASS' if scenario.get('passed') else 'FAIL'}",
+                f"**Purpose:** {scenario.get('description', 'not provided')}",
+                "",
+                "### Conversation state",
+                "",
+            ]
+        )
+        existing_threads = scenario_input.get("existing_threads") or []
+        if existing_threads:
+            for thread in existing_threads:
+                flags = [str(thread.get("status") or "unknown")]
+                if thread.get("active"):
+                    flags.append("active")
+                if thread.get("from_previous_conversation"):
+                    flags.append("previous conversation")
+                lines.append(
+                    f"- **{thread.get('title', 'Untitled')}** "
+                    f"(`{thread.get('id', 'unknown')}`; {', '.join(flags)})"
+                )
+        else:
+            lines.append("- No existing persistent threads.")
+        for message in scenario_input.get("prior_messages") or []:
+            speaker = "User" if message.get("role") == "user" else "Companion"
+            lines.extend(["", f"**{speaker}:** {message.get('content', '')}"])
+        lines.extend(
+            [
+                "",
+                f"**Latest user message:** {scenario_input.get('user_message', '')}",
+                "",
+                "### Expected and observed",
+                "",
+                f"**Expected action:** {expected.get('operation', 'none')}",
+                f"**Expected thread:** {expected.get('thread_id') or 'none/new thread'}",
+                f"**Why:** {expected.get('reason', 'not provided')}",
+                "",
+                f"**Companion reply:** {observed.get('assistant_reply') or '(no reply)'}",
+                f"**Observed actions:** {', '.join(observed.get('operations') or []) or 'none'}",
+                f"**Shadow proposal present:** {'yes' if observed.get('shadow_present') else 'no'}",
+                f"**Structurally valid:** {'yes' if observed.get('shadow_valid') else 'no'}",
+                f"**Finding:** {scenario.get('finding', 'not provided')}",
+            ]
+        )
+        errors = observed.get("validation_errors") or []
+        if errors:
+            lines.extend(["", "**Validation problems:**"])
+            lines.extend(f"- {error}" for error in errors)
+        updates = ((observed.get("proposal") or {}).get("thread_updates") or [])
+        if updates:
+            lines.extend(["", "**Proposed updates:**"])
+            for update in updates:
+                operation = update.get("operation", "unknown")
+                target = update.get("thread_id") or (update.get("thread") or {}).get("title")
+                lines.append(f"- {operation}: {target or 'unspecified thread'}")
+    return lines
+
+
 def _improvement_targets_markdown(payload: dict[str, Any]) -> list[str]:
     targets = payload.get("improvement_targets") or []
     lines = ["", "## Improvement targets", ""]
@@ -448,6 +527,15 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             f"bad transcripts. Failed cases: {calibration.get('failed_cases', 0)}; "
             f"errors: {calibration.get('judge_errors', 0)}."
         )
+    if payload.get("stage") == "thread_management_shadow_eval":
+        summary = payload.get("summary") or {}
+        total = summary.get("total", 0)
+        scenario_word = "scenario" if total == 1 else "scenarios"
+        return (
+            f"The companion proposed thread actions for {total} {scenario_word}: "
+            f"{summary.get('passed', 0)} matched expectations and "
+            f"{summary.get('failed', 0)} did not. No proposed changes were persisted."
+        )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
     return f"The companion passed {passed} scenarios and failed {failed}."
@@ -485,6 +573,20 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             if payload.get("passed")
             else "Do not trust full-conversation verdicts from this judge until calibration passes."
         )
+    if payload.get("stage") == "thread_management_shadow_eval":
+        summary = payload.get("summary") or {}
+        if payload.get("passed"):
+            return "Every selected thread-management proposal matched the expected action."
+        failed = [
+            _plain_name(item.get("scenario_id", "unknown"))
+            for item in payload.get("scenarios", [])
+            if not item.get("passed")
+        ]
+        return (
+            f"Thread management needs improvement in {len(failed)} scenario(s): "
+            + ", ".join(failed)
+            + "."
+        )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
     failed = [
@@ -511,6 +613,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "simulated_conversation": "simulated",
         "simulated_conversation_suite": "sim_suite",
         "conversation_judge_calibration": "conv_judge_calibration",
+        "thread_management_shadow_eval": "thread_shadow",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -546,7 +649,8 @@ def _append_history(
             else (
                 f"{payload.get('summary', {}).get('passed', 0)}/"
                 f"{payload.get('summary', {}).get('total', 0)} scenarios"
-                if payload.get("stage") == "simulated_conversation_suite"
+                if payload.get("stage")
+                in {"simulated_conversation_suite", "thread_management_shadow_eval"}
                 else (
                     f"{payload.get('conversation_judge_calibration', {}).get('completed_cases', 0)}/"
                     f"{payload.get('conversation_judge_calibration', {}).get('total_cases', 0)} checks"
@@ -587,6 +691,11 @@ def _append_history(
 
 
 def _history_score(payload: dict[str, Any]) -> str:
+    if payload.get("stage") == "thread_management_shadow_eval":
+        summary = payload.get("summary") or {}
+        total = summary.get("total", 0)
+        passed = summary.get("passed", 0)
+        return f"{(passed / total) * 100:.0f}%" if total else "—"
     if payload.get("stage") == "simulated_conversation_suite":
         score = (payload.get("summary") or {}).get("average_score")
         return f"{score:.1f}/4" if isinstance(score, (int, float)) else "—"

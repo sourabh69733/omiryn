@@ -380,6 +380,50 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertFalse(blocked["valid"])
         self.assertTrue(any("cannot be changed" in error for error in blocked["errors"]))
 
+    def test_existing_thread_allows_repeated_origin_but_rejects_origin_change(self) -> None:
+        thread = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Career uncertainty",
+            summary="The user is considering a job change.",
+            origin="user_started",
+        )
+        base_update = {
+            "user_need": "explore",
+            "thread_updates": [
+                {
+                    "operation": "continue",
+                    "thread_id": thread.id,
+                    "origin": "user_started",
+                }
+            ],
+        }
+
+        repeated = evaluate_conversation_update_shadow(
+            base_update,
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=4,
+        )
+        changed = evaluate_conversation_update_shadow(
+            {
+                **base_update,
+                "thread_updates": [
+                    {
+                        **base_update["thread_updates"][0],
+                        "origin": "agent_started",
+                    }
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=4,
+        )
+
+        self.assertTrue(repeated["valid"])
+        self.assertFalse(changed["valid"])
+        self.assertTrue(any("origin cannot be changed" in error for error in changed["errors"]))
+
     def _context_package(self):
         return build_model_context_package(
             conversation_id=self.first_conversation,

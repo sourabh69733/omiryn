@@ -86,6 +86,11 @@ def _render_event(event: EvalEvent) -> str | None:
         )
     if event.kind == "scenario_started":
         return f"\nScenario: {_plain_name(data['scenario_id'])}"
+    if event.kind == "thread_scenario_started":
+        return (
+            f"\nThread scenario: {_plain_name(data['scenario_id'])} "
+            f"(expected: {data['expected_operation']})"
+        )
     if event.kind == "simulated_conversation_started":
         return (
             f"\nAI-user scenario: {_plain_name(data['scenario_id'])} "
@@ -182,6 +187,13 @@ def _render_event(event: EvalEvent) -> str | None:
         return (
             f"Scenario result: {'PASS' if data['passed'] else 'FAIL'} — "
             f"{data['passed_samples']}/{data['sample_count']} conversations passed."
+        )
+    if event.kind == "thread_scenario_completed":
+        status = "PASS" if data["passed"] else "FAIL"
+        actual = ", ".join(data.get("actual_operations") or []) or "none"
+        return (
+            f"    Thread result: {status} — expected {data['expected_operation']}, "
+            f"observed {actual}.\n    {data['finding']}"
         )
     if event.kind == "evaluation_completed":
         return (
