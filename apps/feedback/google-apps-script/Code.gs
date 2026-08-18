@@ -283,6 +283,9 @@ function appError_(code) {
 }
 
 function json_(body) {
-  return ContentService.createTextOutput(JSON.stringify(body))
-    .setMimeType(ContentService.MimeType.JSON);
+  // ContentService redirects every response through a temporary
+  // script.googleusercontent.com URL. Some server-side clients can lose that
+  // acknowledgement even after the Sheet write succeeds, so return the same
+  // JSON text directly through HtmlService and let the Worker parse the body.
+  return HtmlService.createHtmlOutput(JSON.stringify(body));
 }
