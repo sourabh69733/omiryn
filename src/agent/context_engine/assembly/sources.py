@@ -129,7 +129,11 @@ def build_reply_context_sources(
         user_id,
         query_intent,
     )
-    continuity_sources = conversation_thread_context_sources(conversation_id, user_id)
+    continuity_sources = conversation_thread_context_sources(
+        conversation_id,
+        user_id,
+        user_text,
+    )
 
     if selected_styles:
         selected_style_ids = {_source_identity(source) for source in selected_styles}
