@@ -18,6 +18,7 @@
     "feedback:build": "vite build --config apps/feedback/vite.config.js",
     "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
     "feedback:check": "tsc -p apps/feedback/tsconfig.json --noEmit",
+    "feedback:worker:check": "node --check apps/feedback/worker/index.js",
     "build": "npm run landing:build && npm run web:build && npm run feedback:build"
   },
   "dependencies": {
