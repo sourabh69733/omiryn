@@ -39,7 +39,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                   "category": "food_preferences",
                   "label": "Likes spicy food",
                   "value": {"preference": "spicy food"},
-                  "evidence": "I love spicy food",
                   "confidence": 0.86
                 }
               ]
@@ -49,7 +48,9 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(parsed.parsed)
-        self.assertEqual(parsed.reply, "That makes sense. Spicy food tells me something about your vibe too.")
+        self.assertEqual(
+            parsed.reply, "That makes sense. Spicy food tells me something about your vibe too."
+        )
         self.assertEqual(parsed.data_points[0]["type"], "matching_fact")
         self.assertEqual(parsed.data_points[0]["evidence"], "I love spicy food")
 
@@ -83,7 +84,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
               "conversation_update": {
                 "user_need": "listen",
                 "session_goal": "Understand the work situation",
-                "thread_updates": []
+                "thread_updates": [{"operation": "none"}]
               }
             }
             """,
@@ -91,6 +92,39 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(parsed.reply, "That sounds exhausting.")
         self.assertEqual(parsed.conversation_update["user_need"], "listen")
+        self.assertTrue(parsed.transport_valid)
+        self.assertTrue(parsed.schema_valid)
+        self.assertTrue(parsed.semantic_valid)
+
+    def test_partial_envelope_is_transport_valid_but_not_schema_valid(self) -> None:
+        parsed = parse_turn_output_v2(
+            '{"reply":"I hear you.","data_points":"not-an-array"}',
+            user_text="This has been difficult.",
+        )
+
+        self.assertTrue(parsed.transport_valid)
+        self.assertFalse(parsed.schema_valid)
+        self.assertFalse(parsed.semantic_valid)
+        self.assertFalse(parsed.parsed)
+        self.assertEqual(parsed.error, "schema_invalid")
+        self.assertIn("data_points is required", parsed.schema_errors[0])
+
+    def test_shadow_schema_uses_operation_specific_actions_and_explicit_none(self) -> None:
+        shadow = turn_output_v2_tools(include_conversation_update=True)
+        update_schema = shadow[0]["function"]["parameters"]["properties"]["conversation_update"]
+        action_variants = update_schema["properties"]["thread_updates"]["items"]["oneOf"]
+        variants = {
+            variant["properties"]["operation"]["const"]: variant for variant in action_variants
+        }
+
+        self.assertEqual(
+            set(variants),
+            {"none", "create", "continue", "switch", "pause", "complete", "block"},
+        )
+        self.assertNotIn("thread_id", variants["create"]["properties"])
+        self.assertIn("thread_id", variants["continue"]["required"])
+        self.assertEqual(set(variants["none"]["properties"]), {"operation"})
+        self.assertFalse(variants["block"]["additionalProperties"])
 
     def test_parser_falls_back_to_plain_reply_when_model_returns_normal_text(self) -> None:
         parsed = parse_turn_output_v2("Normal assistant reply.", user_text="hello")
@@ -133,7 +167,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                   "category": "location",
                   "label": "Lives in Bengaluru",
                   "value": {"city": "Bengaluru", "country": "India"},
-                  "evidence": "I live in Bengaluru",
                   "confidence": 0.91
                 }
               ]
@@ -230,7 +263,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                   "category": "partner_location_preference",
                   "label": "Prefers dating someone from a specific region",
                   "value": {"preference": "date someone from a specific region"},
-                  "evidence": "I want to date someone from a specific region",
                   "confidence": 0.82
                 }
               ]
@@ -292,7 +324,9 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(by_key["prefers_less_interview"]["used_for_matching"])
         self.assertTrue(by_key["prefers_less_interview"]["used_for_chat_context"])
         self.assertEqual(by_key["prefers_less_interview"]["fact_type"], "chat_context_fact")
-        self.assertEqual(by_key["prefers_less_interview"]["value"]["_data_point_type"], "chat_learning")
+        self.assertEqual(
+            by_key["prefers_less_interview"]["value"]["_data_point_type"], "chat_learning"
+        )
         self.assertEqual(len(list_data_point_extraction_debug("user-a")), 3)
 
     def test_writer_corrects_preference_type_even_without_parser(self) -> None:
@@ -356,7 +390,9 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
-            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch(
+                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
+            ) as model_call,
             patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
             patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
             patch("agent.runtime.orchestrator.save_agent_trace_step"),
@@ -381,7 +417,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                   "category": "food_preferences",
                   "label": "Likes spicy food",
                   "value": {"preference": "spicy food"},
-                  "evidence": "I love spicy food",
                   "confidence": 0.84
                 }
               ]
@@ -400,16 +435,16 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                 style_source_id=None,
             )
 
-        self.assertEqual(result.messages[-1]["content"], "Nice, spicy food gives me a small but useful signal.")
+        self.assertEqual(
+            result.messages[-1]["content"], "Nice, spicy food gives me a small but useful signal."
+        )
         self.assertEqual(model_call.call_args.kwargs["system_prompt"], "system prompt")
         self.assertNotIn("response_format", model_call.call_args.kwargs)
         tools = model_call.call_args.kwargs["tools"]
         self.assertEqual(tools[0]["function"]["name"], "return_companion_response")
         self.assertNotIn(
             "evidence",
-            tools[0]["function"]["parameters"]["properties"]["data_points"]["items"][
-                "properties"
-            ],
+            tools[0]["function"]["parameters"]["properties"]["data_points"]["items"]["properties"],
         )
         self.assertEqual(
             model_call.call_args.kwargs["tool_choice"],
@@ -432,7 +467,9 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             ),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
-            patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,
+            patch(
+                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
+            ) as model_call,
             patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
             patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
             patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
@@ -482,7 +519,9 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
                 style_source_id=None,
             )
 
-        self.assertEqual(result.messages[-1]["content"], "That uncertainty sounds genuinely tiring.")
+        self.assertEqual(
+            result.messages[-1]["content"], "That uncertainty sounds genuinely tiring."
+        )
         tool_parameters = model_call.call_args.kwargs["tools"][0]["function"]["parameters"]
         self.assertIn("conversation_update", tool_parameters["properties"])
         model_step = next(
