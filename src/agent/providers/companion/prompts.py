@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent.context_engine.assembly.budget import truncate_for_context
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     context_sources_text,
-    truncate_for_context,
 )
 from agent.context_engine.prompt_engine.modules.behavior import (
     behavior_module_prompt,

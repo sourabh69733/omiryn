@@ -70,6 +70,7 @@ class PromptSection:
     priority: int = 50
     mode: str | None = None
     can_skip: bool = True
+    minimum_content_chars: int = 1
     include_when: PromptIncludeWhen | None = None
     char_limit: int | None = None
 
@@ -138,23 +139,67 @@ def _budget_sections(
 ) -> list[PromptSection]:
     if total_budget <= 0:
         return []
-    remaining = total_budget
-    budgeted: list[PromptSection] = []
-    for section in sections:
-        rendered = _render_section(section)
-        limit = min(remaining, section.char_limit or SECTION_CHAR_LIMITS.get(section.id, PROMPT_SECTION_CHAR_LIMIT))
-        if limit <= 0:
+    indexed = list(enumerate(sections))
+    mandatory = [(index, section) for index, section in indexed if not section.can_skip]
+    optional = [(index, section) for index, section in indexed if section.can_skip]
+    separator_chars = max(0, len(mandatory) - 1) * len("\n\n")
+    remaining = max(0, total_budget - separator_chars)
+    selected: list[tuple[int, PromptSection]] = []
+
+    for position, (index, section) in enumerate(mandatory):
+        future_minimum = sum(_minimum_rendered_chars(item) for _, item in mandatory[position + 1 :])
+        allowed = max(0, remaining - future_minimum)
+        fitted = _fit_section(section, allowed)
+        if fitted is None:
+            skipped.append(
+                {"id": section.id, "reason": "Required section could not fit prompt budget."}
+            )
+            continue
+        selected.append((index, fitted))
+        remaining -= len(_render_section(fitted))
+
+    for index, section in optional:
+        separator = len("\n\n") if selected else 0
+        fitted = _fit_section(section, max(0, remaining - separator))
+        if fitted is None:
             skipped.append({"id": section.id, "reason": "Dropped by prompt budget."})
             continue
-        content_budget = max(0, limit - len(_section_heading(section)))
-        content = truncate_for_context(section.content, content_budget)
-        if not content:
-            skipped.append({"id": section.id, "reason": "Dropped because section content was empty after budgeting."})
-            continue
-        used = len(rendered if len(rendered) <= limit else _render_section(replace(section, content=content)))
-        remaining -= used
-        budgeted.append(replace(section, content=content))
+        selected.append((index, fitted))
+        remaining -= separator + len(_render_section(fitted))
+
+    selected.sort(key=lambda item: item[0])
+    budgeted = [section for _, section in selected]
+    while (
+        budgeted
+        and len("\n\n".join(_render_section(section) for section in budgeted)) > total_budget
+    ):
+        removable = next((section for section in reversed(budgeted) if section.can_skip), None)
+        if removable is None:
+            break
+        budgeted.remove(removable)
+        skipped.append({"id": removable.id, "reason": "Dropped by final rendered prompt budget."})
     return budgeted
+
+
+def _minimum_rendered_chars(section: PromptSection) -> int:
+    minimum_content = min(len(section.content), max(1, section.minimum_content_chars))
+    return len(_section_heading(section)) + 1 + minimum_content
+
+
+def _fit_section(section: PromptSection, available: int) -> PromptSection | None:
+    section_limit = section.char_limit or SECTION_CHAR_LIMITS.get(
+        section.id,
+        PROMPT_SECTION_CHAR_LIMIT,
+    )
+    limit = min(available, section_limit)
+    heading_cost = len(_section_heading(section)) + 1
+    if limit <= heading_cost:
+        return None
+    content = truncate_for_context(section.content, limit - heading_cost)
+    if not content:
+        return None
+    fitted = replace(section, content=content)
+    return fitted if len(_render_section(fitted)) <= limit else None
 
 
 def _render_section(section: PromptSection) -> str:

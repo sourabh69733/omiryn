@@ -12,6 +12,9 @@ CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "20
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
 
 SOURCE_TYPE_PRIORITY = {
+    # The current inline thread contract requires candidate IDs to be present.
+    # Keep this above optional memories until thread classification is decoupled.
+    "conversation_threads": 120,
     "agent_behavior_rules": 115,
     "data_points": 100,
     "friend_style": 90,
@@ -22,6 +25,7 @@ SOURCE_TYPE_PRIORITY = {
     "chat_export": 45,
 }
 SOURCE_TYPE_CHAR_LIMIT = {
+    "conversation_threads": 1800,
     "agent_behavior_rules": 1400,
     "data_points": 1200,
     "friend_style": STYLE_CONTEXT_CHAR_LIMIT,
@@ -101,9 +105,9 @@ def truncate_for_context(text: str, limit: int) -> str:
         return ""
     if len(normalized) <= limit:
         return normalized
-    if limit <= 4:
+    if limit <= 3:
         return normalized[:limit]
-    return normalized[: limit - 1].rstrip() + "..."
+    return normalized[: limit - 3].rstrip() + "..."
 
 
 def normalize_context_text(text: str) -> str:

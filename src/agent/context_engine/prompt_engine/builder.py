@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.assembly.budget import (
-    budget_context_sources,
-    truncate_for_context,
+from agent.context_engine.assembly.budget import budget_context_sources
+from agent.context_engine.contracts.models import (
+    ContextQueryIntent,
+    ConversationPlan,
+    EmotionState,
+    MatchingUnderstanding,
+    TopicState,
 )
-from agent.context_engine.contracts.models import ContextQueryIntent, ConversationPlan, EmotionState, TopicState
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.modules.behavior import (
     CompanionBehavior,
@@ -175,6 +178,9 @@ def _v2_prompt_sections(
     conversation_plan: ConversationPlan,
     matching_understanding: MatchingUnderstanding | None,
 ) -> list[PromptSection]:
+    has_thread_context = any(
+        source.get("source_type") == "conversation_threads" for source in context_sources or []
+    )
     sections = [
         PromptSection(
             id="base_identity",
@@ -288,6 +294,8 @@ def _v2_prompt_sections(
             priority=80,
             include_when=lambda context: context.has_context,
             char_limit=5600,
+            can_skip=not has_thread_context,
+            minimum_content_chars=800 if has_thread_context else 1,
         ),
         PromptSection(
             id="boredom_recovery",
@@ -295,9 +303,11 @@ def _v2_prompt_sections(
             content=boredom_recovery_prompt(conversation_plan),
             position="middle",
             priority=60,
-            include_when=lambda context: "simple_ack" not in context.intent_labels
-            and "confirmation" not in context.intent_labels
-            and (context.is_low_information or "boredom_complaint" in context.intent_labels),
+            include_when=lambda context: (
+                "simple_ack" not in context.intent_labels
+                and "confirmation" not in context.intent_labels
+                and (context.is_low_information or "boredom_complaint" in context.intent_labels)
+            ),
         ),
         PromptSection(
             id="output_format",
@@ -336,10 +346,7 @@ def _prompt_structure_context(
     query_intent: ContextQueryIntent,
     emotion_state: EmotionState,
 ) -> PromptStructureContext:
-    source_types = {
-        str(source.get("source_type") or "context")
-        for source in context_sources or []
-    }
+    source_types = {str(source.get("source_type") or "context") for source in context_sources or []}
     return PromptStructureContext(
         intent_labels=frozenset(query_intent.labels),
         source_types=frozenset(source_types),
