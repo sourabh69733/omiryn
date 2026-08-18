@@ -61,7 +61,10 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertEqual(updated.version, 2)
         self.assertEqual([row.id for row in list_threads(self.user_id)], [thread.id])
         self.assertEqual(
-            [row.id for row in list_threads(self.user_id, conversation_id=self.second_conversation)],
+            [
+                row.id
+                for row in list_threads(self.user_id, conversation_id=self.second_conversation)
+            ],
             [thread.id],
         )
 
@@ -268,6 +271,38 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertEqual(source["metadata"]["thread_count"], 3)
         self.assertTrue(source["metadata"]["read_only"])
 
+    def test_relevant_open_thread_from_previous_conversation_enters_context(self) -> None:
+        prior = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.second_conversation,
+            title="Stress with manager",
+            summary="The user's manager repeatedly changes priorities at work.",
+            origin="user_started",
+        )
+        unrelated = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.second_conversation,
+            title="Weekend cooking",
+            summary="The user considered trying a new pasta recipe.",
+            origin="user_started",
+        )
+
+        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "true"}):
+            package = self._context_package(
+                user_text="That situation with my manager became worse today."
+            )
+
+        source = next(
+            item
+            for item in package.context_sources
+            if item.get("source_type") == "conversation_threads"
+        )
+        self.assertIn(prior.id, source["metadata"]["thread_ids"])
+        self.assertIn(prior.id, source["metadata"]["cross_session_thread_ids"])
+        self.assertNotIn(unrelated.id, source["metadata"]["thread_ids"])
+        self.assertIn("Stress with manager", package.system_prompt)
+        self.assertNotIn("Weekend cooking", package.system_prompt)
+
     def test_shadow_proposal_is_validated_without_creating_a_thread(self) -> None:
         result = evaluate_conversation_update_shadow(
             {
@@ -296,13 +331,70 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertEqual(result["proposed_thread_update_count"], 1)
         self.assertEqual(list_threads(self.user_id), [])
 
+    def test_create_discards_model_generated_thread_id(self) -> None:
+        result = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [
+                    {
+                        "operation": "create",
+                        "thread_id": "model-invented-id",
+                        "title": "Stress with manager",
+                        "summary": "The user is describing recurring stress at work.",
+                        "origin": "user_started",
+                    }
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+
+        self.assertTrue(result["valid"])
+        created = result["proposal"]["thread_updates"][0]
+        self.assertEqual(created["operation"], "create")
+        self.assertNotIn("thread_id", created)
+        self.assertEqual(list_threads(self.user_id), [])
+
+    def test_shadow_explicit_none_normalizes_to_no_thread_updates(self) -> None:
+        result = evaluate_conversation_update_shadow(
+            {
+                "user_need": "normal_chat",
+                "thread_updates": [{"operation": "none"}],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+        mixed = evaluate_conversation_update_shadow(
+            {
+                "user_need": "explore",
+                "thread_updates": [
+                    {"operation": "none"},
+                    {
+                        "operation": "create",
+                        "title": "A real subject",
+                        "summary": "A meaningful resumable subject.",
+                        "origin": "user_started",
+                    },
+                ],
+            },
+            conversation_id=self.first_conversation,
+            user_id=self.user_id,
+            message_index=2,
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["proposal"]["thread_updates"], [])
+        self.assertEqual(result["proposed_thread_update_count"], 0)
+        self.assertFalse(mixed["valid"])
+        self.assertTrue(any("none must be the only" in error for error in mixed["errors"]))
+
     def test_shadow_proposal_rejects_unknown_thread_and_multiple_creates(self) -> None:
         unknown = evaluate_conversation_update_shadow(
             {
                 "user_need": "explore",
-                "thread_updates": [
-                    {"operation": "continue", "thread_id": "not-owned"}
-                ],
+                "thread_updates": [{"operation": "continue", "thread_id": "not-owned"}],
             },
             conversation_id=self.first_conversation,
             user_id=self.user_id,
@@ -327,9 +419,7 @@ class ConversationThreadStateTest(unittest.TestCase):
             message_index=2,
         )
         self.assertFalse(duplicate_create["valid"])
-        self.assertTrue(
-            any("only one new" in error for error in duplicate_create["errors"])
-        )
+        self.assertTrue(any("only one new" in error for error in duplicate_create["errors"]))
 
     def test_shadow_proposal_can_continue_open_thread_but_not_user_blocked_thread(self) -> None:
         open_thread = create_thread(
@@ -369,9 +459,7 @@ class ConversationThreadStateTest(unittest.TestCase):
         blocked = evaluate_conversation_update_shadow(
             {
                 "user_need": "explore",
-                "thread_updates": [
-                    {"operation": "continue", "thread_id": blocked_thread.id}
-                ],
+                "thread_updates": [{"operation": "continue", "thread_id": blocked_thread.id}],
             },
             conversation_id=self.first_conversation,
             user_id=self.user_id,
@@ -424,10 +512,10 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertFalse(changed["valid"])
         self.assertTrue(any("origin cannot be changed" in error for error in changed["errors"]))
 
-    def _context_package(self):
+    def _context_package(self, *, user_text: str = "Tell me something useful."):
         return build_model_context_package(
             conversation_id=self.first_conversation,
-            user_text="Tell me something useful.",
+            user_text=user_text,
             user_id=self.user_id,
             user_profile={"user_id": self.user_id},
             model="mock-model",
