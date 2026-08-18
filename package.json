@@ -10,15 +10,18 @@
     "landing:dev": "vite --config apps/landing/vite.config.js",
     "landing:build": "vite build --config apps/landing/vite.config.js",
     "landing:preview": "vite preview --config apps/landing/vite.config.js",
+    "landing:deploy": "npx wrangler deploy --config wrangler.jsonc",
     "web:dev": "vite --config apps/web/vite.config.js",
     "web:build": "vite build --config apps/web/vite.config.js",
     "web:preview": "vite preview --config apps/web/vite.config.js",
+    "web:deploy": "npx wrangler deploy --config apps/web/wrangler.jsonc",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
     "feedback:dev": "vite --config apps/feedback/vite.config.js",
     "feedback:build": "vite build --config apps/feedback/vite.config.js",
     "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
     "feedback:check": "tsc -p apps/feedback/tsconfig.json --noEmit",
     "feedback:worker:check": "node --check apps/feedback/worker/index.js",
+    "feedback:deploy": "npx wrangler deploy --config apps/feedback/wrangler.jsonc",
     "build": "npm run landing:build && npm run web:build && npm run feedback:build"
   },
   "dependencies": {
