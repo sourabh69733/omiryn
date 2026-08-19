@@ -3,13 +3,10 @@ import {
   ArrowRight,
   Check,
   MessageCircleMore,
-  Pause,
-  Play,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   UsersRound,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -27,6 +24,8 @@ const draftStorageKey = "omiryn-feedback-draft-v3";
 const completedStorageKey = "omiryn-feedback-completed-v3";
 const maxFeedbackLength = 250;
 const surveyVersion = "2026-08-19-v3";
+const omirynWebsiteUrl = "https://omiryn.com/";
+const omirynInstagramUrl = "https://www.instagram.com/omiryn.ai/";
 
 const conceptFrames = [
   {
@@ -88,7 +87,6 @@ export function FeedbackApp() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [website, setWebsite] = useState("");
-  const [showConceptStory, setShowConceptStory] = useState(false);
 
   useEffect(() => {
     if (completionMode) return;
@@ -146,11 +144,7 @@ export function FeedbackApp() {
           {currentScreen.kind === "welcome" ? (
             <WelcomeScreen onBegin={moveForward} />
           ) : currentScreen.kind === "concept" ? (
-            <ConceptScreen
-              onBack={moveBack}
-              onContinue={moveForward}
-              onWatch={() => setShowConceptStory(true)}
-            />
+            <ConceptScreen onBack={moveBack} onContinue={moveForward} />
           ) : (
             <QuestionScreen
               question={questions[currentScreen.questionIndex]}
@@ -179,7 +173,6 @@ export function FeedbackApp() {
           onChange={(event) => setWebsite(event.target.value)}
         />
       </div>
-      {showConceptStory ? <ConceptStory onClose={() => setShowConceptStory(false)} /> : null}
     </div>
   );
 }
@@ -197,7 +190,7 @@ function WelcomeScreen({ onBegin }: { onBegin: () => void }) {
   return (
     <section className="welcome-screen">
       <div className="welcome-copy">
-        <p className="eyebrow">A two-minute chat</p>
+        <p className="eyebrow">A tiny discovery session</p>
         <h1>How could finding the right person feel easier?</h1>
         <p className="lead">
           Eight quick questions about compatibility, meaningful connections, and what technology
@@ -212,7 +205,7 @@ function WelcomeScreen({ onBegin }: { onBegin: () => void }) {
         <div className="welcome-meta" aria-label="Survey details">
           <span>About 2 minutes</span>
           <span aria-hidden="true">·</span>
-          <span>No dating-app experience needed</span>
+          <span>Your answers stay anonymous</span>
           <span aria-hidden="true">·</span>
           <span>For adults 18+</span>
         </div>
@@ -350,12 +343,13 @@ function QuestionProgress({ current }: { current: number }) {
 function ConceptScreen({
   onBack,
   onContinue,
-  onWatch,
 }: {
   onBack: () => void;
   onContinue: () => void | Promise<void>;
-  onWatch: () => void;
 }) {
+  const [frame, setFrame] = useState(0);
+  const CurrentIcon = conceptFrames[frame].icon;
+
   return (
     <section className="concept-screen">
       <div className="concept-copy">
@@ -367,18 +361,71 @@ function ConceptScreen({
         </p>
       </div>
 
-      <button className="concept-preview" type="button" onClick={onWatch}>
-        <span className="conversation-visual" aria-hidden="true">
-          <span className="bubble bubble-left"><i /><i /><i /></span>
-          <span className="connection-line" />
-          <span className="bubble bubble-right"><i /><i /><i /></span>
-        </span>
-        <span className="play-button"><Play fill="currentColor" /></span>
-        <span className="preview-copy">
-          <strong>Watch the 45-second idea</strong>
-          <small>Optional · 4 quick scenes</small>
-        </span>
-      </button>
+      <div className="story-inline" aria-label="How Omiryn works">
+        <div className="story-steps" role="group" aria-label="Choose a slide">
+          {conceptFrames.map((_item, index) => (
+            <button
+              key={index}
+              className={index === frame ? "is-active" : ""}
+              type="button"
+              aria-label={`Show slide ${index + 1}`}
+              aria-current={index === frame ? "step" : undefined}
+              onClick={() => setFrame(index)}
+            />
+          ))}
+        </div>
+
+        <div className="story-content" key={frame}>
+          <span className="story-icon"><CurrentIcon aria-hidden="true" /></span>
+          <p className="eyebrow">{frame + 1} of {conceptFrames.length}</p>
+          <h2>{conceptFrames[frame].title}</h2>
+          <p>{conceptFrames[frame].body}</p>
+        </div>
+
+        <div className="story-controls">
+          <button
+            className="icon-button"
+            type="button"
+            disabled={frame === 0}
+            onClick={() => setFrame((current) => Math.max(0, current - 1))}
+            aria-label="Previous slide"
+            title="Previous slide"
+          >
+            <ArrowLeft aria-hidden="true" />
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            disabled={frame === conceptFrames.length - 1}
+            onClick={() => setFrame((current) => Math.min(conceptFrames.length - 1, current + 1))}
+            aria-label="Next slide"
+            title="Next slide"
+          >
+            <ArrowRight aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="concept-links" aria-label="Omiryn links">
+        <a href={omirynInstagramUrl} target="_blank" rel="noreferrer">
+          <img
+            className="social-link-icon"
+            src="/assets/instagram-color.png"
+            alt=""
+            aria-hidden="true"
+          />
+          Instagram
+        </a>
+        <a href={omirynWebsiteUrl} target="_blank" rel="noreferrer">
+          <img
+            className="website-link-logo"
+            src="/assets/omiryn-logo-neon-light.png"
+            alt=""
+            aria-hidden="true"
+          />
+          Website
+        </a>
+      </div>
 
       <Navigation
         onBack={onBack}
@@ -417,95 +464,6 @@ function Navigation({
         {busy ? "Saving..." : continueLabel}
         {!busy ? <ArrowRight aria-hidden="true" /> : null}
       </button>
-    </div>
-  );
-}
-
-function ConceptStory({ onClose }: { onClose: () => void }) {
-  const [frame, setFrame] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const CurrentIcon = conceptFrames[frame].icon;
-
-  useEffect(() => {
-    if (!playing) return undefined;
-    const timer = window.setInterval(() => {
-      setFrame((current) => {
-        if (current === conceptFrames.length - 1) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, 8000);
-    return () => window.clearInterval(timer);
-  }, [playing]);
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose]);
-
-  return (
-    <div className="story-backdrop" role="dialog" aria-modal="true" aria-label="Omiryn idea">
-      <div className="story-dialog">
-        <div className="story-toolbar">
-          <div className="story-steps" aria-hidden="true">
-            {conceptFrames.map((_item, index) => (
-              <button
-                key={index}
-                className={index <= frame ? "is-active" : ""}
-                type="button"
-                aria-label={`Show scene ${index + 1}`}
-                aria-current={index === frame ? "step" : undefined}
-                onClick={() => setFrame(index)}
-              />
-            ))}
-          </div>
-          <button className="story-close" type="button" onClick={onClose} aria-label="Close idea">
-            <X aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="story-content" key={frame}>
-          <span className="story-icon"><CurrentIcon aria-hidden="true" /></span>
-          <p className="eyebrow">{frame + 1} of {conceptFrames.length}</p>
-          <h2>{conceptFrames[frame].title}</h2>
-          <p>{conceptFrames[frame].body}</p>
-        </div>
-
-        <div className="story-controls">
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => setPlaying((current) => !current)}
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-          </button>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => {
-              if (frame < conceptFrames.length - 1) {
-                setFrame((current) => current + 1);
-              } else {
-                onClose();
-              }
-            }}
-          >
-            {frame === conceptFrames.length - 1 ? "Back to questions" : "Next"}
-            <ArrowRight aria-hidden="true" />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
