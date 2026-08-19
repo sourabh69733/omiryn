@@ -7,5 +7,13 @@
     "not_found_handling": "single-page-application",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "FEEDBACK_DB",
+      "database_name": "omiryn-feedback",
+      "database_id": "1f73c5e9-efc0-4852-85c4-48e74c355272",
+      "migrations_dir": "./migrations"
+    }
+  ]
 }
