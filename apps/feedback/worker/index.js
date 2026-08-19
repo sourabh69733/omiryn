@@ -1,4 +1,6 @@
 const maximumBodyBytes = 18_000;
+const maximumOtherAnswerLength = 120;
+const otherAnswerPrefix = "Other: ";
 // Keep obvious floods bounded without blocking classrooms or campus Wi-Fi,
 // where many legitimate respondents can share one public IP address.
 const maximumSubmissionsPerIpHour = 100;
@@ -18,7 +20,8 @@ const questionRules = {
   },
   compatibility_challenges: {
     min: 1,
-    max: 9,
+    max: 10,
+    allowOther: true,
     exclusiveOptions: ["I don't think it is particularly difficult"],
     options: [
       "Meeting the right people",
@@ -34,7 +37,8 @@ const questionRules = {
   },
   compatibility_signals: {
     min: 1,
-    max: 8,
+    max: 9,
+    allowOther: true,
     options: [
       "Shared values",
       "Similar relationship intentions",
@@ -80,7 +84,8 @@ const questionRules = {
   },
   concept_concerns: {
     min: 1,
-    max: 8,
+    max: 9,
+    allowOther: true,
     exclusiveOptions: ["Nothing concerns me yet"],
     options: [
       "Privacy and personal data",
@@ -113,6 +118,16 @@ function isToken(value, maximumLength) {
     && /^[A-Za-z0-9_.-]+$/.test(value);
 }
 
+function normalizeChoice(value, rule) {
+  if (typeof value !== "string") return null;
+  if (rule.options.includes(value)) return value;
+  if (!rule.allowOther || !value.startsWith(otherAnswerPrefix)) return null;
+
+  const customText = value.slice(otherAnswerPrefix.length).trim();
+  if (!customText || customText.length > maximumOtherAnswerLength) return null;
+  return `${otherAnswerPrefix}${customText}`;
+}
+
 function normalizeSubmission(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   if (!isToken(payload.responseId, 36) || !isToken(payload.clientToken, 36)) return null;
@@ -126,10 +141,16 @@ function normalizeSubmission(payload) {
   for (const [questionId, rule] of Object.entries(questionRules)) {
     const values = payload.answers[questionId];
     if (!Array.isArray(values) || values.length < rule.min || values.length > rule.max) return null;
-    const uniqueValues = [...new Set(values)];
+    // Custom choices are canonicalized before uniqueness and exclusivity checks.
+    const normalizedValues = values.map((value) => normalizeChoice(value, rule));
+    if (normalizedValues.some((value) => value === null)) return null;
+    const uniqueValues = [...new Set(normalizedValues)];
+    const customAnswerCount = uniqueValues.filter(
+      (value) => value.startsWith(otherAnswerPrefix),
+    ).length;
     if (
       uniqueValues.length !== values.length
-      || uniqueValues.some((value) => typeof value !== "string" || !rule.options.includes(value))
+      || customAnswerCount > 1
       || (
         uniqueValues.length > 1
         && rule.exclusiveOptions?.some((option) => uniqueValues.includes(option))

@@ -8,7 +8,7 @@ globalThis.crypto = webcrypto;
 
 const validPayload = {
   responseId: "95a3e072-6028-454c-a70d-1a559c91ec72",
-  surveyVersion: "2026-08-19-v3",
+  surveyVersion: "2026-08-19-v4",
   clientToken: "cfbc49c3-358a-40be-af36-a6b141d0e1f9",
   website: "",
   answers: {
@@ -103,6 +103,23 @@ test("supports unrestricted multi-select while keeping none options exclusive", 
   assert.ok(normalizeSubmission(payload));
 
   payload.answers.compatibility_challenges.push("I don't think it is particularly difficult");
+  assert.equal(normalizeSubmission(payload), null);
+});
+
+test("accepts one bounded custom option and normalizes its whitespace", () => {
+  const payload = structuredClone(validPayload);
+  payload.answers.compatibility_challenges.push("Other:   Distance between cities  ");
+
+  const submission = normalizeSubmission(payload);
+  assert.deepEqual(submission.answers.compatibility_challenges, [
+    "Meeting the right people",
+    "Other: Distance between cities",
+  ]);
+
+  payload.answers.compatibility_challenges.push("Other: A second custom answer");
+  assert.equal(normalizeSubmission(payload), null);
+
+  payload.answers.compatibility_challenges = [`Other: ${"x".repeat(121)}`];
   assert.equal(normalizeSubmission(payload), null);
 });
 

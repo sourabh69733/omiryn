@@ -7,6 +7,8 @@ export type Question = {
   maxChoices?: number;
   options?: string[];
   exclusiveOptions?: string[];
+  allowOther?: boolean;
+  otherPlaceholder?: string;
 };
 
 export const questions: Question[] = [
@@ -28,6 +30,8 @@ export const questions: Question[] = [
       "I don't think it is particularly difficult",
     ],
     exclusiveOptions: ["I don't think it is particularly difficult"],
+    allowOther: true,
+    otherPlaceholder: "Something else - type your answer",
   },
   {
     id: "compatibility_signals",
@@ -45,6 +49,8 @@ export const questions: Question[] = [
       "Family or cultural background",
       "Physical attraction",
     ],
+    allowOther: true,
+    otherPlaceholder: "Another compatibility factor",
   },
   {
     id: "ai_disclosure_comfort",
@@ -104,6 +110,8 @@ export const questions: Question[] = [
       "Nothing concerns me yet",
     ],
     exclusiveOptions: ["Nothing concerns me yet"],
+    allowOther: true,
+    otherPlaceholder: "Another concern - type your answer",
   },
   {
     id: "dating_openness",

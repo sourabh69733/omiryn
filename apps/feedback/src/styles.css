@@ -325,6 +325,26 @@ h2 {
   cursor: not-allowed;
 }
 
+.option-row-other:focus-within {
+  color: var(--ink);
+  border-color: var(--violet);
+}
+
+.option-row-other input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+
+.option-row-other input::placeholder {
+  color: var(--muted);
+}
+
 .selection-mark {
   width: 23px;
   height: 23px;

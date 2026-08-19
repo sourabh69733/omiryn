@@ -23,7 +23,9 @@ type Screen = { kind: "welcome" } | { kind: "question"; questionIndex: number } 
 const draftStorageKey = "omiryn-feedback-draft-v3";
 const completedStorageKey = "omiryn-feedback-completed-v3";
 const maxFeedbackLength = 250;
-const surveyVersion = "2026-08-19-v3";
+const maxOtherAnswerLength = 120;
+const otherAnswerPrefix = "Other: ";
+const surveyVersion = "2026-08-19-v4";
 const omirynWebsiteUrl = "https://omiryn.com/";
 const omirynInstagramUrl = "https://www.instagram.com/omiryn.ai/";
 
@@ -235,6 +237,8 @@ function QuestionScreen({
 }) {
   const selected = answers[question.id] ?? [];
   const isText = question.type === "text";
+  const otherAnswer = selected.find((value) => value.startsWith(otherAnswerPrefix));
+  const otherText = otherAnswer?.slice(otherAnswerPrefix.length) ?? "";
   const canContinue = isText || selected.length > 0;
 
   const toggleOption = (option: string) => {
@@ -262,6 +266,24 @@ function QuestionScreen({
 
   const setText = (value: string) => {
     onAnswersChange({ ...answers, [question.id]: [value.slice(0, maxFeedbackLength)] });
+  };
+
+  const setOtherText = (value: string) => {
+    const boundedValue = value.slice(0, maxOtherAnswerLength);
+    const withoutOther = selected.filter((answer) => !answer.startsWith(otherAnswerPrefix));
+    if (!boundedValue.trim()) {
+      onAnswersChange({ ...answers, [question.id]: withoutOther });
+      return;
+    }
+
+    // A typed answer behaves like any other non-exclusive selection.
+    const withoutExclusiveOptions = withoutOther.filter(
+      (answer) => !question.exclusiveOptions?.includes(answer),
+    );
+    onAnswersChange({
+      ...answers,
+      [question.id]: [...withoutExclusiveOptions, `${otherAnswerPrefix}${boundedValue}`],
+    });
   };
 
   return (
@@ -309,6 +331,21 @@ function QuestionScreen({
               </button>
             );
           })}
+          {question.allowOther ? (
+            <label className={`option-row option-row-other${otherText ? " is-selected" : ""}`}>
+              <input
+                type="text"
+                maxLength={maxOtherAnswerLength}
+                aria-label="Other answer"
+                placeholder={question.otherPlaceholder ?? "Other - type your answer"}
+                value={otherText}
+                onChange={(event) => setOtherText(event.target.value)}
+              />
+              <span className="selection-mark" aria-hidden="true">
+                {otherText ? <Check /> : null}
+              </span>
+            </label>
+          ) : null}
         </div>
       )}
 
