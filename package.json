@@ -21,7 +21,9 @@
     "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
     "feedback:check": "tsc -p apps/feedback/tsconfig.json --noEmit",
     "feedback:worker:check": "node --check apps/feedback/worker/index.js",
-    "feedback:deploy": "npx wrangler deploy --config apps/feedback/wrangler.jsonc",
+    "feedback:worker:test": "node --test apps/feedback/worker/index.test.js",
+    "feedback:db:migrate": "npx wrangler d1 migrations apply omiryn-feedback --remote --config apps/feedback/wrangler.jsonc",
+    "feedback:deploy": "npm run feedback:db:migrate && npx wrangler deploy --config apps/feedback/wrangler.jsonc",
     "build": "npm run landing:build && npm run web:build && npm run feedback:build"
   },
   "dependencies": {
