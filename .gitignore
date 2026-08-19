@@ -27,3 +27,5 @@ reports/**
 !reports/evals/HISTORY.md
 
 tmp/
+.agents
+skills-*.json
