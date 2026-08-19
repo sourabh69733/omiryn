@@ -2,20 +2,22 @@ import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 import test from "node:test";
 
-import { acceptSubmission } from "./index.js";
+import { acceptSubmission, normalizeSubmission } from "./index.js";
 
 globalThis.crypto = webcrypto;
 
 const validPayload = {
   responseId: "95a3e072-6028-454c-a70d-1a559c91ec72",
-  surveyVersion: "2026-08-18-v1",
+  surveyVersion: "2026-08-19-v3",
   clientToken: "cfbc49c3-358a-40be-af36-a6b141d0e1f9",
   website: "",
   answers: {
-    meeting_paths: ["Friends or family"],
+    dating_openness: ["Open to it"],
     compatibility_challenges: ["Meeting the right people"],
     compatibility_signals: ["Shared values"],
-    concept_usefulness: ["Quite useful"],
+    ai_disclosure_comfort: ["Somewhat comfortable"],
+    depth_vs_speed: ["Somewhere in between"],
+    intro_time_willingness: ["10-15 minutes"],
     concept_concerns: ["Privacy and personal data"],
     must_get_right: ["Privacy"],
   },
@@ -80,10 +82,28 @@ test("rejects a source over the hourly limit", async () => {
 
 test("rejects answers outside the server allowlist", async () => {
   const payload = structuredClone(validPayload);
-  payload.answers.meeting_paths = ["A made-up answer"];
+  payload.answers.dating_openness = ["A made-up answer"];
   const response = await acceptSubmission(requestFor(payload), environment());
   assert.equal(response.status, 422);
   assert.deepEqual(await response.json(), { ok: false, code: "invalid_submission" });
+});
+
+test("supports unrestricted multi-select while keeping none options exclusive", () => {
+  const payload = structuredClone(validPayload);
+  payload.answers.compatibility_challenges = [
+    "Meeting the right people",
+    "Understanding real intentions",
+    "Knowing if values and personalities match",
+    "Starting a meaningful conversation",
+    "Trust and personal safety",
+    "Too many low-quality or repetitive matches",
+    "Social pressure or awkwardness",
+    "Limited time or opportunities",
+  ];
+  assert.ok(normalizeSubmission(payload));
+
+  payload.answers.compatibility_challenges.push("I don't think it is particularly difficult");
+  assert.equal(normalizeSubmission(payload), null);
 });
 
 test("fails closed when D1 is not bound", async () => {

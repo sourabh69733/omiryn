@@ -23,31 +23,31 @@ import { conceptInsertAfterQuestion, questions, type Question } from "./question
 type AnswerMap = Record<string, string[]>;
 type Screen = { kind: "welcome" } | { kind: "question"; questionIndex: number } | { kind: "concept" };
 
-const draftStorageKey = "omiryn-feedback-draft-v1";
-const completedStorageKey = "omiryn-feedback-completed-v1";
+const draftStorageKey = "omiryn-feedback-draft-v3";
+const completedStorageKey = "omiryn-feedback-completed-v3";
 const maxFeedbackLength = 250;
-const surveyVersion = "2026-08-18-v1";
+const surveyVersion = "2026-08-19-v3";
 
 const conceptFrames = [
   {
     icon: MessageCircleMore,
-    title: "Start with a real conversation",
-    body: "Share what matters to you at your own pace, instead of reducing yourself to a short profile.",
+    title: "Have a short private conversation",
+    body: "Tell Omiryn what matters to you, at your own pace, instead of relying only on a short profile.",
   },
   {
     icon: Sparkles,
-    title: "Look beyond surface-level signals",
-    body: "Omiryn explores values, intentions, lifestyle, and communication preferences.",
+    title: "Review what Omiryn understood",
+    body: "Check and correct the values, intentions, lifestyle, and communication preferences used for matching.",
   },
   {
     icon: UsersRound,
-    title: "Meet fewer, more relevant people",
-    body: "The aim is thoughtful introductions, with a clear reason why two people may connect.",
+    title: "Receive a few explained introductions",
+    body: "See a small number of relevant people and a clear explanation of why each connection may work.",
   },
   {
     icon: ShieldCheck,
-    title: "Stay in control",
-    body: "You decide what is used, what stays private, and whether an introduction moves forward.",
+    title: "Move forward only by mutual choice",
+    body: "Both people approve before a conversation opens, and you control what remains private.",
   },
 ];
 
@@ -188,7 +188,7 @@ function Header() {
   return (
     <header className="feedback-header">
       <img src="/assets/omiryn-logo.png" alt="Omiryn" className="brand-logo" />
-      <span className="header-note">Thought experiment</span>
+      <span className="header-note">Discovery</span>
     </header>
   );
 }
@@ -197,10 +197,10 @@ function WelcomeScreen({ onBegin }: { onBegin: () => void }) {
   return (
     <section className="welcome-screen">
       <div className="welcome-copy">
-        <p className="eyebrow">A two-minute thought experiment</p>
+        <p className="eyebrow">A two-minute chat</p>
         <h1>How could finding the right person feel easier?</h1>
         <p className="lead">
-          Six quick prompts about compatibility, meaningful connections, and what technology
+          Eight quick questions about compatibility, meaningful connections, and what technology
           could improve.
         </p>
       </div>
@@ -255,8 +255,15 @@ function QuestionScreen({
       onAnswersChange({ ...answers, [question.id]: selected.filter((value) => value !== option) });
       return;
     }
+    if (question.exclusiveOptions?.includes(option)) {
+      onAnswersChange({ ...answers, [question.id]: [option] });
+      return;
+    }
     if (selected.length < (question.maxChoices ?? Number.POSITIVE_INFINITY)) {
-      onAnswersChange({ ...answers, [question.id]: [...selected, option] });
+      const withoutExclusiveOptions = selected.filter(
+        (value) => !question.exclusiveOptions?.includes(value),
+      );
+      onAnswersChange({ ...answers, [question.id]: [...withoutExclusiveOptions, option] });
     }
   };
 
@@ -355,8 +362,8 @@ function ConceptScreen({
         <p className="eyebrow">Meet Omiryn</p>
         <h1>A more thoughtful introduction</h1>
         <p className="lead">
-          Omiryn explores how an AI-assisted guide could understand what matters to you and
-          help identify potentially compatible people.
+          Have a short private conversation, review what Omiryn understood, then receive a small
+          number of explained introductions. A conversation opens only after mutual approval.
         </p>
       </div>
 

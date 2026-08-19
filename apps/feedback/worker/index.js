@@ -6,29 +6,27 @@ const maximumSubmissionsPerIpHour = 100;
 // This server-side allowlist is intentionally independent of the React form.
 // A caller can bypass the UI, so D1 must only receive known survey answers.
 const questionRules = {
-  meeting_paths: {
+  dating_openness: {
     min: 1,
-    max: 2,
+    max: 1,
     options: [
-      "Friends or family",
-      "College or work",
-      "Shared interests",
-      "Events or communities",
-      "Social media",
-      "Dating apps",
-      "Mostly by chance",
-      "I'm not sure",
+      "Actively looking",
+      "Open to it",
+      "Not looking right now",
+      "Prefer not to say",
     ],
   },
   compatibility_challenges: {
     min: 1,
-    max: 2,
+    max: 9,
+    exclusiveOptions: ["I don't think it is particularly difficult"],
     options: [
       "Meeting the right people",
       "Understanding real intentions",
       "Knowing if values and personalities match",
       "Starting a meaningful conversation",
       "Trust and personal safety",
+      "Too many low-quality or repetitive matches",
       "Social pressure or awkwardness",
       "Limited time or opportunities",
       "I don't think it is particularly difficult",
@@ -36,7 +34,7 @@ const questionRules = {
   },
   compatibility_signals: {
     min: 1,
-    max: 3,
+    max: 8,
     options: [
       "Shared values",
       "Similar relationship intentions",
@@ -48,21 +46,42 @@ const questionRules = {
       "Physical attraction",
     ],
   },
-  concept_usefulness: {
+  ai_disclosure_comfort: {
     min: 1,
     max: 1,
     options: [
-      "Extremely useful",
-      "Quite useful",
-      "Somewhat useful",
-      "Not very useful",
-      "Not useful",
-      "I need more information",
+      "Very comfortable",
+      "Somewhat comfortable",
+      "Depends on what's asked",
+      "Not very comfortable",
+      "Not comfortable at all",
+    ],
+  },
+  depth_vs_speed: {
+    min: 1,
+    max: 1,
+    options: [
+      "Match me quickly, even if less accurate",
+      "Take your time, I want it to really understand me",
+      "Somewhere in between",
+      "Not sure",
+    ],
+  },
+  intro_time_willingness: {
+    min: 1,
+    max: 1,
+    options: [
+      "Under 10 minutes",
+      "10-15 minutes",
+      "20-30 minutes",
+      "More than 60 minutes",
+      "I would not want to do this",
     ],
   },
   concept_concerns: {
     min: 1,
-    max: 2,
+    max: 8,
+    exclusiveOptions: ["Nothing concerns me yet"],
     options: [
       "Privacy and personal data",
       "AI understanding someone incorrectly",
@@ -111,6 +130,10 @@ function normalizeSubmission(payload) {
     if (
       uniqueValues.length !== values.length
       || uniqueValues.some((value) => typeof value !== "string" || !rule.options.includes(value))
+      || (
+        uniqueValues.length > 1
+        && rule.exclusiveOptions?.some((option) => uniqueValues.includes(option))
+      )
     ) {
       return null;
     }
@@ -165,22 +188,26 @@ async function storeSubmission(submission, request, env) {
       survey_version,
       client_token_hash,
       source_hash,
-      meeting_paths,
+      dating_openness,
       compatibility_challenges,
       compatibility_signals,
-      concept_usefulness,
+      ai_disclosure_comfort,
+      depth_vs_speed,
+      intro_time_willingness,
       concept_concerns,
       must_get_right
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     submission.responseId,
     submission.surveyVersion,
     clientHash,
     sourceHash,
-    JSON.stringify(submission.answers.meeting_paths),
+    submission.answers.dating_openness[0],
     JSON.stringify(submission.answers.compatibility_challenges),
     JSON.stringify(submission.answers.compatibility_signals),
-    submission.answers.concept_usefulness[0],
+    submission.answers.ai_disclosure_comfort[0],
+    submission.answers.depth_vs_speed[0],
+    submission.answers.intro_time_willingness[0],
     JSON.stringify(submission.answers.concept_concerns),
     submission.mustGetRight,
   ).run();
