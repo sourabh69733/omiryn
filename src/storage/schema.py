@@ -58,6 +58,23 @@ conversation_states = Table(
 )
 Index("ix_conversation_states_user", conversation_states.c.user_id)
 
+# Tracks background-memory progress independently from live conversation state.
+# The encrypted handoff connects adjacent extraction batches without resending the
+# complete conversation or treating overlap messages as new evidence.
+memory_processing_states = Table(
+    "memory_processing_states",
+    metadata,
+    Column("conversation_id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("processed_through_message_index", Integer, nullable=False, default=-1),
+    Column("last_batch_key", String, nullable=True),
+    Column("handoff_json", JSON, nullable=False),
+    Column("version", Integer, nullable=False, default=1),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_memory_processing_states_user", memory_processing_states.c.user_id)
+
 # Threads represent resumable subjects, not classifications for every message.
 # A thread is user-owned and records its first/last session so it may span chats.
 conversation_threads = Table(
