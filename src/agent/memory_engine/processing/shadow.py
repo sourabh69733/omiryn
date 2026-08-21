@@ -1,4 +1,4 @@
-"""Runs background memory analysis in observation-only shadow mode."""
+"""Runs validated background memory analysis in shadow or opt-in live mode."""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ from storage import list_data_point_extraction_debug, list_profile_facts
 from storage.profile_facts import save_data_point_extraction_debug
 
 from .context import DEFAULT_CONTEXT_OVERLAP, build_memory_batch
+from .application import (
+    apply_validated_memory_analysis,
+    memory_background_v2_live_writes_enabled,
+)
 from .models import MemoryBatch, MemoryHandoff, MemoryOperation, MemoryProcessingState
 from .prompt import memory_batch_prompt
 from .service import get_processing_state, save_processing_state
@@ -87,7 +91,7 @@ async def run_shadow_memory_extraction(
     messages: list[dict[str, object]],
     model: str | None = None,
 ) -> dict[str, Any]:
-    """Analyze and record one batch without modifying live memories or threads."""
+    """Analyze one batch and optionally apply validated memory operations."""
     state = get_processing_state(conversation_id, user_id)
     batch = build_memory_batch(
         conversation_id=conversation_id,
@@ -101,6 +105,7 @@ async def run_shadow_memory_extraction(
         return {"status": "no_pending_messages", "operation_count": 0}
 
     existing_memories = _existing_memory_context(user_id)
+    application_result = None
     try:
         raw = await analyze_memory_batch(
             memory_batch_prompt(batch, existing_memories),
@@ -113,6 +118,34 @@ async def run_shadow_memory_extraction(
             batch=batch,
             existing_memory_ids={str(memory["id"]) for memory in existing_memories},
         )
+        if analysis.valid and memory_background_v2_live_writes_enabled():
+            try:
+                application_result = apply_validated_memory_analysis(batch, analysis)
+            except Exception as error:
+                _save_shadow_debug_once(
+                    batch=batch,
+                    decision="live_error",
+                    candidate={
+                        "model_decision": analysis.decision,
+                        "operations": [
+                            _operation_dict(operation) for operation in analysis.operations
+                        ],
+                        "handoff": _handoff_dict(analysis.handoff),
+                    },
+                    review={
+                        "valid": True,
+                        "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
+                        "live_writes": True,
+                    },
+                    state_version=state.version if state else 0,
+                    live_writes=True,
+                )
+                return {
+                    "status": "live_error",
+                    "batch_key": batch.batch_key,
+                    "operation_count": len(analysis.operations),
+                    "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
+                }
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
@@ -126,7 +159,8 @@ async def run_shadow_memory_extraction(
                 handoff=next_handoff,
             )
         )
-        decision = "shadow_valid" if analysis.valid else "shadow_invalid"
+        decision = _result_decision(analysis, application_result)
+        live_writes = application_result is not None
         _save_shadow_debug_once(
             batch=batch,
             decision=decision,
@@ -138,33 +172,49 @@ async def run_shadow_memory_extraction(
             review={
                 "valid": analysis.valid,
                 "errors": list(analysis.errors),
-                "live_writes": False,
+                "live_writes": live_writes,
+                "applied_count": application_result.applied_count if application_result else 0,
+                "deferred_count": (
+                    application_result.deferred_count if application_result else 0
+                ),
+                "idempotent": application_result.idempotent if application_result else False,
             },
             state_version=saved_state.version,
+            live_writes=live_writes,
         )
         return {
             "status": decision,
             "batch_key": batch.batch_key,
             "operation_count": len(analysis.operations),
+            "applied_count": application_result.applied_count if application_result else 0,
+            "deferred_count": application_result.deferred_count if application_result else 0,
+            "idempotent": application_result.idempotent if application_result else False,
             "errors": list(analysis.errors),
             "processed_through_message_index": saved_state.processed_through_message_index,
         }
     except Exception as error:
+        live_writes = application_result is not None
+        decision = "live_error" if live_writes else "shadow_error"
         _save_shadow_debug_once(
             batch=batch,
-            decision="shadow_error",
+            decision=decision,
             candidate={},
             review={
                 "valid": False,
                 "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
-                "live_writes": False,
+                "live_writes": live_writes,
             },
             state_version=state.version if state else 0,
+            live_writes=live_writes,
         )
         return {
-            "status": "shadow_error",
+            "status": decision,
             "batch_key": batch.batch_key,
-            "operation_count": 0,
+            "operation_count": (
+                application_result.applied_count + application_result.deferred_count
+                if application_result
+                else 0
+            ),
             "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
         }
 
@@ -391,6 +441,7 @@ def _save_shadow_debug_once(
     candidate: dict[str, Any],
     review: dict[str, Any],
     state_version: int,
+    live_writes: bool = False,
 ) -> None:
     candidate_key = f"memory_shadow:{batch.batch_key}:{decision}"
     existing = list_data_point_extraction_debug(
@@ -421,7 +472,7 @@ def _save_shadow_debug_once(
                 ],
                 "evidence_eligible_message_indexes": list(batch.evidence_message_indexes),
                 "state_version": state_version,
-                "live_writes": False,
+                "live_writes": live_writes,
             },
         }
     )
@@ -439,6 +490,18 @@ def _operation_dict(operation: MemoryOperation) -> dict[str, Any]:
         "confidence": operation.confidence,
         "evidence_message_indexes": list(operation.evidence_message_indexes),
     }
+
+
+def _result_decision(analysis: ShadowMemoryAnalysis, application_result: Any) -> str:
+    if not analysis.valid:
+        return "shadow_invalid"
+    if application_result is None:
+        return "shadow_valid"
+    if application_result.applied_count:
+        return "live_applied"
+    if application_result.deferred_count:
+        return "live_deferred"
+    return "shadow_valid"
 
 
 def _handoff_dict(handoff: MemoryHandoff) -> dict[str, Any]:
