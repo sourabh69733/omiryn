@@ -1,0 +1,31 @@
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant SCH as Scheduler
+    participant POL as Proactive Policy
+    participant DB as User and Conversation Store
+    participant SEL as Topic Selector
+    participant RT as Agent Runtime
+    participant LLM as Companion Model
+    participant OUT as Delivery Service
+    participant U as User
+
+    SCH->>POL: User may be eligible for outreach
+    POL->>DB: Check consent, last activity and quiet hours
+    DB-->>POL: User state and communication history
+
+    alt Not eligible
+        POL-->>SCH: Do nothing
+    else Eligible
+        POL->>SEL: Find a meaningful reason to talk
+        SEL->>DB: Retrieve unfinished threads and relevant memories
+        DB-->>SEL: Ranked conversation candidates
+        SEL-->>POL: Topic, reason and confidence
+        POL->>RT: Create proactive agent turn
+        RT->>LLM: Generate personalized opening
+        LLM-->>RT: Candidate message
+        RT->>OUT: Deliver through WebSocket or push
+        OUT-->>U: Agent initiates conversation
+    end
+```

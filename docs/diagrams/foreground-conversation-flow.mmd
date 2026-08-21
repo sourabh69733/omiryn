@@ -1,0 +1,50 @@
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant U as User
+    participant UI as Client UI
+    participant RT as Agent Runtime
+    participant DB as Message Store
+    participant CE as Context Engine
+    participant MR as Memory Retriever
+    participant TR as Thread Retriever
+    participant CP as Conversation Planner
+    participant LLM as Companion Model
+    participant OV as Output Validator
+    participant WS as WebSocket
+    participant Q as Background Queue
+
+    U->>UI: Send message
+    UI->>RT: HTTP or WebSocket message
+    RT->>DB: Store raw user message
+    DB-->>RT: Message ID
+
+    par Retrieve context
+        RT->>MR: Retrieve relevant memories
+        MR-->>RT: Small ranked memory set
+    and Retrieve threads
+        RT->>TR: Retrieve active or related threads
+        TR-->>RT: Relevant thread summaries
+    and Read conversation
+        RT->>DB: Recent messages
+        DB-->>RT: Recent conversation window
+    end
+
+    RT->>CP: Decide conversational posture
+    CP-->>RT: Listen, answer, explore or continue thread
+
+    RT->>CE: Compile bounded model context
+    CE-->>RT: System prompt and contextual messages
+
+    RT->>LLM: Generate natural response
+    LLM-->>RT: Plain companion reply
+
+    RT->>OV: Validate and sanitize
+    OV-->>RT: Safe user-visible reply
+
+    RT->>DB: Store agent message
+    RT->>Q: Queue conversation observation
+    RT->>WS: Deliver reply
+    WS-->>UI: Display agent message
+```

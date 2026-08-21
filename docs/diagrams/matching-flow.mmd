@@ -1,0 +1,20 @@
+```mermaid
+flowchart LR
+    USER["User requests or becomes ready for matching"]
+    USER --> PROFILE["Compatibility profile builder"]
+
+    MEMORY["Confirmed matching facts"] --> PROFILE
+    BASIC["Basic profile"] --> PROFILE
+    INTENT["Relationship intent"] --> PROFILE
+    BOUNDARY["Boundaries and constraints"] --> PROFILE
+
+    PROFILE --> SEARCH["Candidate retrieval"]
+    SEARCH --> FILTER["Hard eligibility filters"]
+    FILTER --> SCORE["Compatibility scoring"]
+    SCORE --> EXPLAIN["Evidence-backed explanation"]
+    EXPLAIN --> SAFETY["Safety and privacy review"]
+    SAFETY --> INTRO["Suggested match or introduction"]
+
+    FEEDBACK["User feedback"] --> MEMORY
+    INTRO --> FEEDBACK
+```

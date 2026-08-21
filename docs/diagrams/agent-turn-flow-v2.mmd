@@ -1,0 +1,183 @@
+```mermaid
+flowchart TB
+    subgraph Clients["Client Applications"]
+        WEB["Web application"]
+        MOBILE["Mobile application"]
+        FUTURECHAT["Future matched-user chat"]
+    end
+
+    subgraph Interface["Communication Layer"]
+        HTTP["HTTP API"]
+        WS["WebSocket gateway"]
+        PUSH["Push notification service"]
+        AUTH["Authentication and identity"]
+    end
+
+    subgraph Runtime["Agent Runtime — Main Orchestrator"]
+        ENTRY["Turn entry point"]
+        INPUT["Input validation and safety"]
+        MODE["Interaction mode selector"]
+        PLAN["Conversation planner"]
+        CONTEXT["Context engine"]
+        TOOLS["Tool coordinator"]
+        MODELROUTER["Model and provider router"]
+        OUTPUT["Output validation and sanitization"]
+        DELIVERY["Message delivery"]
+    end
+
+    subgraph ContextSystem["Context Engine"]
+        RECENT["Recent conversation"]
+        WORKING["Working conversation state"]
+        THREADCTX["Relevant conversation threads"]
+        MEMORYCTX["Retrieved user memories"]
+        PROFILECTX["Basic user profile"]
+        STYLECTX["Learned interaction style"]
+        POLICYCTX["Safety and privacy policy"]
+        PROMPT["Prompt compiler"]
+        BUDGET["Context budget manager"]
+    end
+
+    subgraph Brains["LLM Brains"]
+        COMPANION["Foreground companion model"]
+        MEMORYMODEL["Background memory model"]
+        THREADMODEL["Thread understanding model"]
+        JUDGES["Evaluation judge models"]
+    end
+
+    subgraph AgentTools["Agent Tools"]
+        MATCHING["Match search and compatibility"]
+        USERPROFILE["Profile management"]
+        MEMORYTOOL["Memory operations"]
+        THREADTOOL["Thread operations"]
+        SCHEDULERTOOL["Schedule proactive message"]
+        COMMUNICATION["Messaging and introductions"]
+        SAFETYTOOL["Safety and moderation"]
+        FUTURETOOLS["Future external tools"]
+    end
+
+    subgraph Background["Background Cognition"]
+        EVENTS["Agent event queue"]
+        MEMORYWORKER["Memory worker"]
+        THREADWORKER["Thread worker"]
+        SUMMARYWORKER["Conversation summarizer"]
+        EMBEDDINGWORKER["Embedding and indexing worker"]
+        CONSOLIDATOR["Memory consolidation"]
+    end
+
+    subgraph Proactive["Proactive Conversation System"]
+        CLOCK["Scheduler"]
+        ELIGIBILITY["Consent and eligibility policy"]
+        CADENCE["Personalized timing"]
+        TOPICSELECT["Topic and thread selector"]
+        PROACTIVEPLAN["Proactive message planner"]
+    end
+
+    subgraph Storage["Canonical Storage"]
+        MESSAGES[("Conversation messages")]
+        STATES[("Working conversation states")]
+        THREADS[("Conversation threads")]
+        MEMORIES[("Typed user memories")]
+        EVIDENCE[("Memory evidence")]
+        HISTORY[("Memory operation history")]
+        PROFILE[("User profiles")]
+        BEHAVIOR[("Learned behavior preferences")]
+        JOBS[("Background jobs and cursors")]
+    end
+
+    subgraph Search["Retrieval Indexes"]
+        VECTOR[("Vector index")]
+        STRUCTURED[("Structured SQL indexes")]
+    end
+
+    subgraph Quality["Quality and Operations"]
+        TRACE["Tracing and debugging"]
+        EVALS["Scenario evaluation framework"]
+        REPORTS["Evaluation reports"]
+        METRICS["Latency, cost and quality metrics"]
+    end
+
+    WEB --> HTTP
+    WEB <--> WS
+    MOBILE --> HTTP
+    MOBILE <--> WS
+    FUTURECHAT <--> WS
+
+    HTTP --> AUTH
+    WS --> AUTH
+    AUTH --> ENTRY
+
+    ENTRY --> INPUT
+    INPUT --> MODE
+    MODE --> PLAN
+    PLAN --> CONTEXT
+    CONTEXT --> MODELROUTER
+    TOOLS <--> MODELROUTER
+    MODELROUTER --> COMPANION
+    COMPANION --> OUTPUT
+    OUTPUT --> DELIVERY
+    DELIVERY --> WS
+    DELIVERY --> HTTP
+    DELIVERY --> PUSH
+
+    RECENT --> CONTEXT
+    WORKING --> CONTEXT
+    THREADCTX --> CONTEXT
+    MEMORYCTX --> CONTEXT
+    PROFILECTX --> CONTEXT
+    STYLECTX --> CONTEXT
+    POLICYCTX --> CONTEXT
+    CONTEXT --> BUDGET
+    BUDGET --> PROMPT
+    PROMPT --> MODELROUTER
+
+    TOOLS --> MATCHING
+    TOOLS --> USERPROFILE
+    TOOLS --> MEMORYTOOL
+    TOOLS --> THREADTOOL
+    TOOLS --> SCHEDULERTOOL
+    TOOLS --> COMMUNICATION
+    TOOLS --> SAFETYTOOL
+    TOOLS --> FUTURETOOLS
+
+    ENTRY --> MESSAGES
+    ENTRY --> EVENTS
+    ENTRY --> STATES
+
+    EVENTS --> MEMORYWORKER
+    EVENTS --> THREADWORKER
+    EVENTS --> SUMMARYWORKER
+    MEMORYWORKER --> MEMORYMODEL
+    THREADWORKER --> THREADMODEL
+    MEMORYMODEL --> CONSOLIDATOR
+    THREADMODEL --> THREADS
+    SUMMARYWORKER --> STATES
+    CONSOLIDATOR --> MEMORIES
+    CONSOLIDATOR --> EVIDENCE
+    CONSOLIDATOR --> HISTORY
+    MEMORIES --> EMBEDDINGWORKER
+    EMBEDDINGWORKER --> VECTOR
+
+    MESSAGES --> RECENT
+    STATES --> WORKING
+    THREADS --> THREADCTX
+    MEMORIES --> MEMORYCTX
+    PROFILE --> PROFILECTX
+    BEHAVIOR --> STYLECTX
+    STRUCTURED --> MEMORYCTX
+    VECTOR --> MEMORYCTX
+
+    CLOCK --> ELIGIBILITY
+    ELIGIBILITY --> CADENCE
+    CADENCE --> TOPICSELECT
+    THREADS --> TOPICSELECT
+    MEMORIES --> TOPICSELECT
+    TOPICSELECT --> PROACTIVEPLAN
+    PROACTIVEPLAN --> ENTRY
+
+    ENTRY --> TRACE
+    OUTPUT --> TRACE
+    BACKGROUND --> TRACE
+    TRACE --> METRICS
+    EVALS --> JUDGES
+    JUDGES --> REPORTS
+```

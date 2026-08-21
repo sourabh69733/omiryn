@@ -1,0 +1,21 @@
+```mermaid
+flowchart LR
+    NEW["New unprocessed messages"] --> PACKAGE["Background context package"]
+    OVERLAP["Previous messages — context only"] --> PACKAGE
+    HANDOFF["Previous batch handoff"] --> PACKAGE
+    THREADS["Active thread summaries"] --> PACKAGE
+    RELATED["Related existing memories"] --> PACKAGE
+
+    PACKAGE --> MODEL["Background cognition model"]
+
+    MODEL --> OPS["Memory operations"]
+    MODEL --> TOPICS["Thread operations"]
+    MODEL --> NEXT["Next batch handoff"]
+
+    OPS --> VALIDATE["Backend validation"]
+    TOPICS --> VALIDATE
+    NEXT --> CURSOR["Processing cursor"]
+
+    VALIDATE --> EXACT["Resolve exact message evidence"]
+    EXACT --> STORE["Canonical storage"]
+```

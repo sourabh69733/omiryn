@@ -1,0 +1,51 @@
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Q as Event Queue
+    participant S as Background Scheduler
+    participant DB as Conversation Store
+    participant CUR as Processing Cursor
+    participant RET as Context Retriever
+    participant LLM as Memory Model
+    participant VAL as Operation Validator
+    participant MM as Memory Manager
+    participant TM as Thread Manager
+    participant IDX as Search Index
+
+    Q->>S: New conversation observation
+    S->>CUR: Read last processed message
+
+    alt Seven meaningful messages accumulated
+        S->>DB: Load unprocessed messages
+    else Conversation idle for 90 seconds
+        S->>DB: Load remaining messages
+    else Session ended
+        S->>DB: Load remaining messages
+    end
+
+    S->>DB: Load previous 10–15 context-only messages
+    S->>RET: Retrieve relevant existing memories
+    RET-->>S: Related memories and active threads
+    S->>CUR: Load previous batch handoff
+    CUR-->>S: Entities, topics, summary and unresolved references
+
+    S->>LLM: Messages + overlap + handoff + related memories
+    LLM-->>S: Proposed operations and next handoff
+
+    S->>VAL: Validate schema and evidence IDs
+    VAL->>DB: Resolve exact source messages
+
+    alt Valid memory operation
+        VAL->>MM: Add, reinforce, supersede or retract
+        MM->>DB: Persist canonical memory and history
+        MM->>IDX: Update embedding
+    end
+
+    alt Valid thread operation
+        VAL->>TM: Create, continue, pause or complete
+        TM->>DB: Persist thread state
+    end
+
+    VAL->>CUR: Save new cursor and handoff
+```

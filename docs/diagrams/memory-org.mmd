@@ -1,0 +1,56 @@
+```mermaid
+flowchart TB
+    RAW["Raw conversation evidence"]
+
+    subgraph ShortTerm["Short-lived memory"]
+        RECENT["Recent messages"]
+        WORKING["Current user need and conversational state"]
+        TEMP["Temporary context"]
+    end
+
+    subgraph Durable["Durable user memory"]
+        PROFILE["Profile facts"]
+        MATCH["Matching facts"]
+        LEARNING["Chat learning"]
+        EPISODES["Important events and stories"]
+        BEHAVIOR["Interaction preferences"]
+    end
+
+    subgraph Narrative["Conversation continuity"]
+        THREAD["Conversation threads"]
+        SUMMARY["Session summaries"]
+        HANDOFF["Batch handoffs"]
+    end
+
+    subgraph Lifecycle["Memory lifecycle"]
+        PROPOSED["Proposed"]
+        ACTIVE["Active"]
+        SUPERSEDED["Superseded"]
+        RETRACTED["Retracted"]
+        EXPIRED["Expired"]
+    end
+
+    RAW --> RECENT
+    RAW --> WORKING
+    RAW --> TEMP
+    RAW --> PROFILE
+    RAW --> MATCH
+    RAW --> LEARNING
+    RAW --> EPISODES
+    RAW --> BEHAVIOR
+    RAW --> THREAD
+
+    PROPOSED --> ACTIVE
+    ACTIVE --> SUPERSEDED
+    ACTIVE --> RETRACTED
+    ACTIVE --> EXPIRED
+
+    PROFILE --> Lifecycle
+    MATCH --> Lifecycle
+    LEARNING --> Lifecycle
+    EPISODES --> Lifecycle
+    BEHAVIOR --> Lifecycle
+
+    THREAD --> SUMMARY
+    SUMMARY --> HANDOFF
+```

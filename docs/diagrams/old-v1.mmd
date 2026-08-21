@@ -1,0 +1,71 @@
+```mermaid
+flowchart TB
+    USER["User sends message"]
+    API["POST conversation message API"]
+    ORCH["Agent runtime orchestrator"]
+
+    subgraph Context["Current Context Engine"]
+        HISTORY["Recent conversation messages"]
+        UNDERSTAND["Rule-based turn understanding<br/>intent, emotion, stance, language"]
+        PLANNER["Conversation planner"]
+        PROFILE["Basic user profile"]
+        DATAPOINTS["Relevant stored data points"]
+        BEHAVIOR["Learned behavior rules"]
+        THREADCTX["Existing thread context"]
+        IMPORTS["Attached and WhatsApp context"]
+        MATCHING["Matching-understanding progress"]
+        PROMPT["Versioned prompt builder<br/>v1, v2, v3, v3-1"]
+    end
+
+    PROVIDER["Provider router"]
+    LLM["Companion LLM"]
+
+    subgraph Structured["Current structured turn output"]
+        REPLY["Companion reply"]
+        POINTS["Proposed data points"]
+        THREADPROPOSAL["Conversation update proposal<br/>shadow mode only"]
+    end
+
+    PARSER["Structured-output parser"]
+    SANITY["Visible reply sanitization"]
+    WRITER["Inline data-point writer"]
+    SHADOW["Thread proposal validator<br/>does not persist"]
+    STORE["Save complete conversation"]
+    WS["Publish new messages through WebSocket"]
+    UI["Client UI"]
+
+    USER --> API
+    API --> ORCH
+
+    ORCH --> HISTORY
+    HISTORY --> UNDERSTAND
+    UNDERSTAND --> PLANNER
+
+    PROFILE --> PLANNER
+    DATAPOINTS --> PLANNER
+    BEHAVIOR --> PLANNER
+    THREADCTX --> PLANNER
+    IMPORTS --> PLANNER
+    MATCHING --> PLANNER
+
+    PLANNER --> PROMPT
+    PROMPT --> PROVIDER
+    PROVIDER --> LLM
+
+    LLM --> REPLY
+    LLM --> POINTS
+    LLM -.-> THREADPROPOSAL
+
+    REPLY --> PARSER
+    POINTS --> PARSER
+    THREADPROPOSAL --> PARSER
+
+    PARSER --> SANITY
+    PARSER --> WRITER
+    PARSER -.-> SHADOW
+
+    WRITER --> STORE
+    SANITY --> STORE
+    STORE --> WS
+    WS --> UI
+```

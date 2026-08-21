@@ -1,0 +1,31 @@
+```mermaid
+flowchart LR
+    REQUEST["Context request"]
+
+    REQUEST --> PURPOSE{"What is the agent doing?"}
+
+    PURPOSE -->|"Reply"| CHAT["Conversation memory policy"]
+    PURPOSE -->|"Matching"| MATCH["Matching memory policy"]
+    PURPOSE -->|"Proactive message"| PROACTIVE["Proactive memory policy"]
+    PURPOSE -->|"Profile screen"| REVIEW["Review policy"]
+
+    CHAT --> FILTER["Identity, consent, status and privacy filters"]
+    MATCH --> FILTER
+    PROACTIVE --> FILTER
+    REVIEW --> FILTER
+
+    FILTER --> STRUCTURED["Structured lookup"]
+    FILTER --> SEMANTIC["Semantic search"]
+    FILTER --> THREADS["Thread lookup"]
+    FILTER --> RECENCY["Recent events"]
+
+    STRUCTURED --> RANK["Hybrid ranking"]
+    SEMANTIC --> RANK
+    THREADS --> RANK
+    RECENCY --> RANK
+
+    RANK --> CONFLICT["Remove duplicates and resolve conflicts"]
+    CONFLICT --> BUDGET["Apply item and token budget"]
+    BUDGET --> VIEW["Task-specific memory view"]
+    VIEW --> CONTEXT["Model context"]
+```

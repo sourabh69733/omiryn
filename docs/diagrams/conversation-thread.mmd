@@ -1,0 +1,15 @@
+```mermaid
+stateDiagram-v2
+    [*] --> Proposed
+
+    Proposed --> Active: User or agent develops topic
+    Active --> Paused: Conversation moves elsewhere
+    Paused --> Active: Topic resumes
+    Active --> Completed: Natural conclusion
+    Active --> Blocked: User does not want discussion
+    Paused --> Abandoned: No interest over time
+    Blocked --> Active: User explicitly reopens it
+
+    Completed --> [*]
+    Abandoned --> [*]
+```
