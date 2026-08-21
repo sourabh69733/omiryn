@@ -361,10 +361,8 @@ def _thread_eval_environment(config: RuntimeDriverConfig) -> Iterator[None]:
         "AGENT_PROVIDER": config.provider,
         "AGENT_BEHAVIOR_VERSION": config.prompt_version,
         "AUTH_REQUIRED": "false",
-        "DATA_POINT_CAPTURE_STRATEGY": "inline_llm",
-        "AGENT_TURN_OUTPUT_VERSION": "v2",
-        "CONVERSATION_STATE_V2_ENABLED": "true",
-        "CONVERSATION_STATE_V2_SHADOW_ENABLED": "true",
+        "AGENT_PIPELINE_VERSION": "v2",
+        "AGENT_ROLLOUT": "shadow",
     }
     previous = {name: os.environ.get(name) for name in updates}
     try:

@@ -94,15 +94,17 @@ async def run_agent_evals(
 ) -> dict[str, Any]:
     env_names = (
         "AGENT_PROVIDER",
+        "AGENT_PIPELINE_VERSION",
+        "AGENT_ROLLOUT",
         "AUTH_REQUIRED",
-        "DATA_POINT_CAPTURE_STRATEGY",
         "DATA_POINT_EXTRACTOR",
     )
     previous_env = {name: os.environ.get(name) for name in env_names}
     try:
         os.environ["AGENT_PROVIDER"] = "mock"
         os.environ["AUTH_REQUIRED"] = "false"
-        os.environ["DATA_POINT_CAPTURE_STRATEGY"] = "legacy_rules"
+        os.environ["AGENT_PIPELINE_VERSION"] = "v1"
+        os.environ["AGENT_ROLLOUT"] = "off"
         os.environ["DATA_POINT_EXTRACTOR"] = "rules"
         if reset:
             reset_db()
