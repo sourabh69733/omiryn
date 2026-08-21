@@ -11,9 +11,9 @@ from agent.memory_engine.engine import (
     capture_deep_profile_facts_from_conversation,
     should_run_conversation_data_point_extraction,
 )
-from agent.memory_engine.processing.shadow import (
-    run_shadow_memory_extraction,
-    should_schedule_shadow_memory_extraction,
+from agent.cognition.background.service import (
+    run_background_cognition,
+    should_schedule_background_cognition,
 )
 from agent.runtime.orchestrator import run_agent_turn
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
@@ -293,14 +293,14 @@ async def send_agent_message(
             conversation.messages,
             conversation.agent_model,
         )
-    if should_schedule_shadow_memory_extraction(
+    if should_schedule_background_cognition(
         conversation.id,
         _user_id(user),
         conversation.messages,
         turn.quality_valid,
     ):
         background_tasks.add_task(
-            run_shadow_memory_extraction,
+            run_background_cognition,
             conversation.id,
             user.id,
             conversation.messages,
