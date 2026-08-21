@@ -22,7 +22,7 @@ def conversation_state_v2_enabled() -> bool:
 
 def conversation_state_shadow_enabled() -> bool:
     return conversation_state_v2_enabled() and (
-        os.getenv("CONVERSATION_STATE_V2_SHADOW_ENABLED", "false").strip().lower()
+        os.getenv("CONVERSATION_STATE_V2_SHADOW_ENABLED", "true").strip().lower()
         == "true"
     )
 

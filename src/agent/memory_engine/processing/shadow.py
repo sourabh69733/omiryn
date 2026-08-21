@@ -49,7 +49,7 @@ class ShadowMemoryAnalysis:
 
 
 def memory_background_v2_shadow_enabled() -> bool:
-    return os.getenv("MEMORY_BACKGROUND_V2_SHADOW", "false").strip().lower() == "true"
+    return os.getenv("MEMORY_BACKGROUND_V2_SHADOW", "true").strip().lower() == "true"
 
 
 def memory_background_v2_threshold() -> int:
