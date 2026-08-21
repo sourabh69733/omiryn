@@ -10,10 +10,8 @@ from uuid import uuid4
 
 from agent.evals.behavior.core.events import EventSink, emit_event
 from agent.memory_engine.processing import MemoryProcessingState, build_memory_batch
-from agent.cognition.background import (
-    background_cognition_prompt,
-    validate_background_cognition_analysis,
-)
+from agent.cognition.background.coordination import interpret_background_cognition
+from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import save_conversation
 
@@ -141,7 +139,7 @@ async def run_memory_shadow_scenario(
         scenario_id=scenario.id,
         duration_seconds=duration,
     )
-    cognition = validate_background_cognition_analysis(
+    cognition = interpret_background_cognition(
         raw,
         batch=batch,
         existing_memory_ids={memory.id for memory in scenario.existing_memories},

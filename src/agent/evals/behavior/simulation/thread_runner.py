@@ -19,7 +19,7 @@ from agent.evals.behavior.simulation.thread_scenario import (
     ExpectedThreadAction,
     ThreadManagementScenario,
 )
-from agent.memory_engine.processing.shadow import run_shadow_memory_extraction
+from agent.cognition.background.service import run_background_cognition
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
     list_data_point_extraction_debug,
@@ -199,7 +199,7 @@ async def run_background_thread_management_scenario(
         scenario_id=scenario.id,
     )
     with _thread_eval_environment(companion):
-        worker_result = await run_shadow_memory_extraction(
+        worker_result = await run_background_cognition(
             conversation_id,
             user_id,
             messages,

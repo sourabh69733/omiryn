@@ -67,10 +67,10 @@ class BackgroundCognitionTest(unittest.TestCase):
             summary="The user is considering changing careers.",
             origin="user_started",
         )
-        module = importlib.import_module("agent.cognition.background.validation")
-        function = getattr(module, "validate_background_cognition_analysis", None)
+        module = importlib.import_module("agent.cognition.background.coordination")
+        function = getattr(module, "interpret_background_cognition", None)
         self.assertTrue(
-            callable(function), "validate_background_cognition_analysis is missing"
+            callable(function), "interpret_background_cognition is missing"
         )
         result = function(
             self._analysis(thread.id),
@@ -85,10 +85,10 @@ class BackgroundCognitionTest(unittest.TestCase):
         self.assertEqual(result.thread_operation, "continue")
 
     def test_invalid_thread_lane_does_not_invalidate_valid_memory_lane(self) -> None:
-        module = importlib.import_module("agent.cognition.background.validation")
-        function = getattr(module, "validate_background_cognition_analysis", None)
+        module = importlib.import_module("agent.cognition.background.coordination")
+        function = getattr(module, "interpret_background_cognition", None)
         self.assertTrue(
-            callable(function), "validate_background_cognition_analysis is missing"
+            callable(function), "interpret_background_cognition is missing"
         )
         result = function(
             self._analysis("invented-thread"),

@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.conversation_engine.state import create_thread, get_thread
 from agent.memory_engine.processing import MemoryHandoff, MemoryProcessingState, build_memory_batch
-from agent.memory_engine.processing.shadow import (
-    run_shadow_memory_extraction,
-    should_schedule_shadow_memory_extraction,
-    validate_shadow_memory_analysis,
+from agent.cognition.background.service import (
+    run_background_cognition,
+    should_schedule_background_cognition,
 )
+from agent.memory_engine.processing.validation import validate_memory_analysis
 from storage import (
     get_profile_fact,
     list_data_point_extraction_debug,
@@ -55,7 +55,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             },
         ):
             self.assertTrue(
-                should_schedule_shadow_memory_extraction(
+                should_schedule_background_cognition(
                     self.conversation_id,
                     self.user_id,
                     self.messages,
@@ -67,7 +67,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"},
         ):
             self.assertFalse(
-                should_schedule_shadow_memory_extraction(
+                should_schedule_background_cognition(
                     self.conversation_id,
                     self.user_id,
                     self.messages,
@@ -89,7 +89,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             state=state,
         )
         assert batch is not None
-        valid = validate_shadow_memory_analysis(
+        valid = validate_memory_analysis(
             self._analysis(evidence_indexes=[2]),
             batch=batch,
             existing_memory_ids=set(),
@@ -99,7 +99,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
 
         for invalid_index in (0, 3):
             with self.subTest(invalid_index=invalid_index):
-                invalid = validate_shadow_memory_analysis(
+                invalid = validate_memory_analysis(
                     self._analysis(evidence_indexes=[invalid_index]),
                     batch=batch,
                     existing_memory_ids=set(),
@@ -122,7 +122,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 "evidence_message_indexes": [2],
             }
         )
-        result = validate_shadow_memory_analysis(
+        result = validate_memory_analysis(
             raw,
             batch=batch,
             existing_memory_ids={"real-memory"},
@@ -135,18 +135,18 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_THRESHOLD": "2"}),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ) as analyze,
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
                 "memory-model",
             )
-            repeated = await run_shadow_memory_extraction(
+            repeated = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -189,12 +189,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             "depth": "explored",
         }
         with patch(
-            "agent.memory_engine.processing.shadow.analyze_background_cognition",
+            "agent.cognition.background.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=raw,
             create=True,
         ) as analyze:
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -233,11 +233,11 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         )
         invalid = self._combined_analysis(evidence_indexes=[3])
         with patch(
-            "agent.memory_engine.processing.shadow.analyze_background_cognition",
+            "agent.cognition.background.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=invalid,
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -253,11 +253,11 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_provider_error_is_observed_without_advancing_cursor(self) -> None:
         with patch(
-            "agent.memory_engine.processing.shadow.analyze_background_cognition",
+            "agent.cognition.background.service.analyze_background_cognition",
             new_callable=AsyncMock,
             side_effect=TimeoutError("provider timed out"),
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -283,12 +283,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -352,12 +352,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=raw,
             ),
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -375,17 +375,17 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
             patch(
-                "agent.memory_engine.processing.shadow.apply_validated_memory_analysis",
+                "agent.cognition.background.service.apply_validated_memory_analysis",
                 side_effect=RuntimeError("database unavailable"),
                 create=True,
             ),
         ):
-            result = await run_shadow_memory_extraction(
+            result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -403,16 +403,16 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),
             patch(
-                "agent.memory_engine.processing.shadow.save_processing_state",
+                "agent.cognition.background.service.save_processing_state",
                 side_effect=RuntimeError("cursor unavailable"),
             ),
         ):
-            failed = await run_shadow_memory_extraction(
+            failed = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,
@@ -432,12 +432,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_background_cognition",
+                "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),
         ):
-            retried = await run_shadow_memory_extraction(
+            retried = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
                 self.messages,

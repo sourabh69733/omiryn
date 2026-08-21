@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import agent.memory_engine.processing as processing
 from agent.memory_engine.processing.models import MemoryHandoff, MemoryProcessingState
-from agent.memory_engine.processing.shadow import ShadowMemoryAnalysis
+from agent.memory_engine.processing.validation import MemoryAnalysis
 from storage import (
     list_memory_operation_applications,
     list_profile_facts,
@@ -53,7 +53,7 @@ class MemoryApplicationServiceTest(unittest.TestCase):
 
     def test_valid_analysis_resolves_exact_eligible_user_evidence(self) -> None:
         batch = self._batch()
-        analysis = ShadowMemoryAnalysis(
+        analysis = MemoryAnalysis(
             decision="propose",
             operations=(
                 processing.MemoryOperation(
@@ -97,7 +97,7 @@ class MemoryApplicationServiceTest(unittest.TestCase):
 
     def test_invalid_analysis_is_rejected_before_storage(self) -> None:
         batch = self._batch()
-        analysis = ShadowMemoryAnalysis(
+        analysis = MemoryAnalysis(
             decision="invalid",
             operations=(),
             handoff=batch.previous_handoff,
@@ -116,7 +116,7 @@ class MemoryApplicationServiceTest(unittest.TestCase):
 
     def test_missing_eligible_evidence_is_rejected_before_storage(self) -> None:
         batch = self._batch()
-        analysis = ShadowMemoryAnalysis(
+        analysis = MemoryAnalysis(
             decision="propose",
             operations=(
                 processing.MemoryOperation(
