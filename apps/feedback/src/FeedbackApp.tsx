@@ -15,6 +15,7 @@ import {
   submitFeedback,
   type SubmissionMode,
 } from "./feedbackApi";
+import { getQuestionScreenClass } from "./firstQuestionTheme.js";
 import { conceptInsertAfterQuestion, questions, type Question } from "./questionnaire";
 
 type AnswerMap = Record<string, string[]>;
@@ -141,7 +142,13 @@ export function FeedbackApp() {
   return (
     <div className="feedback-app">
       <Header />
-      <main className="feedback-main">
+      <main
+        className={`feedback-main${
+          currentScreen.kind === "question" && currentScreen.questionIndex === 0
+            ? " feedback-main--playground"
+            : ""
+        }`}
+      >
         <div className="screen-transition" key={`${currentScreen.kind}-${screenIndex}`}>
           {currentScreen.kind === "welcome" ? (
             <WelcomeScreen onBegin={moveForward} />
@@ -287,7 +294,7 @@ function QuestionScreen({
   };
 
   return (
-    <section className="question-screen">
+    <section className={getQuestionScreenClass(questionIndex)}>
       <QuestionProgress current={questionIndex + 1} />
       <div className="question-heading">
         <p className="eyebrow">{question.eyebrow}</p>
