@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Smile } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
@@ -6,6 +6,7 @@ import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AvatarImage } from "../AvatarImage";
 import { assetUrl, canShowUsage } from "../appUtils";
+import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
@@ -31,6 +32,9 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [emojiQuery, setEmojiQuery] = useState<EmojiQuery | null>(null);
+  const [emojiSuggestions, setEmojiSuggestions] = useState<EmojiSuggestion[]>([]);
+  const [selectedEmojiSuggestion, setSelectedEmojiSuggestion] = useState(0);
   const [limitNoticeVersion, setLimitNoticeVersion] = useState(0);
   const cancelDeleteRef = useRef<HTMLButtonElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -41,6 +45,8 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const shouldStickToBottomRef = useRef(true);
   const handledEvidenceTargetRef = useRef("");
   const realtimeClientRef = useRef<RealtimeClient | null>(null);
+  const emojiRecordsRef = useRef<EmojiRecord[] | null>(null);
+  const emojiSearchVersionRef = useRef(0);
 
   useEffect(() => {
     const realtime = new RealtimeClient(
@@ -285,6 +291,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   }
 
   function insertEmoji(emojiData: EmojiClickData) {
+    closeEmojiShortcodeSuggestions();
     const emoji = emojiData.emoji;
     const input = inputRef.current;
     const start = input?.selectionStart ?? draft.length;
@@ -300,15 +307,88 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
     });
   }
 
-  function updateDraft(value: string) {
+  function updateDraft(value: string, cursor: number) {
     if (characterCount(value) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
-    setDraft(limitCharacters(value, CHAT_INPUT_MAX_LENGTH));
+    const nextDraft = limitCharacters(value, CHAT_INPUT_MAX_LENGTH);
+    setDraft(nextDraft);
+    void refreshEmojiShortcodeSuggestions(nextDraft, Math.min(cursor, nextDraft.length));
+  }
+
+  function closeEmojiShortcodeSuggestions() {
+    emojiSearchVersionRef.current += 1;
+    setEmojiQuery(null);
+    setEmojiSuggestions([]);
+    setSelectedEmojiSuggestion(0);
+  }
+
+  async function refreshEmojiShortcodeSuggestions(value: string, cursor: number) {
+    const query = findEmojiQuery(value, cursor);
+    if (!query) {
+      closeEmojiShortcodeSuggestions();
+      return;
+    }
+
+    const searchVersion = emojiSearchVersionRef.current + 1;
+    emojiSearchVersionRef.current = searchVersion;
+    setEmojiQuery(query);
+    setEmojiPickerOpen(false);
+
+    try {
+      const records = emojiRecordsRef.current || await loadEmojiRecords();
+      if (emojiSearchVersionRef.current !== searchVersion) return;
+      emojiRecordsRef.current = records;
+      setEmojiSuggestions(searchEmojiSuggestions(query.query, records));
+      setSelectedEmojiSuggestion(0);
+    } catch {
+      if (emojiSearchVersionRef.current === searchVersion) closeEmojiShortcodeSuggestions();
+    }
+  }
+
+  function chooseEmojiSuggestion(index: number) {
+    const suggestion = emojiSuggestions[index];
+    if (!suggestion || !emojiQuery) return;
+    const replacement = replaceEmojiQuery(draft, emojiQuery, suggestion.unicode);
+    const nextDraft = limitCharacters(replacement.value, CHAT_INPUT_MAX_LENGTH);
+    setDraft(nextDraft);
+    closeEmojiShortcodeSuggestions();
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus({ preventScroll: true });
+      const cursor = Math.min(replacement.cursor, nextDraft.length);
+      inputRef.current?.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  function handleComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (emojiSuggestions.length) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        setSelectedEmojiSuggestion((current) => (current + direction + emojiSuggestions.length) % emojiSuggestions.length);
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        chooseEmojiSuggestion(selectedEmojiSuggestion);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeEmojiShortcodeSuggestions();
+        return;
+      }
+    }
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!composerBlocked) event.currentTarget.form?.requestSubmit();
+    }
   }
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
     if (!message || !conversation || sending || composerLimit) return;
+    closeEmojiShortcodeSuggestions();
     shouldStickToBottomRef.current = true;
     const previousConversation = conversation;
     setDraft("");
@@ -534,8 +614,27 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
           <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
             {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
+            {emojiSuggestions.length ? (
+              <div className="emoji-shortcode-menu" id="emoji-shortcode-menu" role="listbox" aria-label="Emoji suggestions">
+                {emojiSuggestions.map((suggestion, index) => (
+                  <button
+                    className="emoji-shortcode-option"
+                    id={`emoji-shortcode-option-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={index === selectedEmojiSuggestion}
+                    key={`${suggestion.unicode}-${suggestion.shortcode}`}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => chooseEmojiSuggestion(index)}
+                  >
+                    <span className="emoji-shortcode-glyph" aria-hidden="true">{suggestion.unicode}</span>
+                    <span className="emoji-shortcode-copy"><strong>:{suggestion.shortcode}</strong><small>{suggestion.label}</small></span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="emoji-picker-anchor" ref={emojiPickerRef}>
-              <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => setEmojiPickerOpen((value) => !value)}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
+              <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => { closeEmojiShortcodeSuggestions(); setEmojiPickerOpen((value) => !value); }}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
               {emojiPickerOpen ? (
                 <div className="emoji-picker-popover">
                   <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
@@ -554,7 +653,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 </div>
               ) : null}
             </div>
-            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (!composerBlocked) event.currentTarget.form?.requestSubmit(); } }} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
+            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)} onSelect={(event) => void refreshEmojiShortcodeSuggestions(draft, event.currentTarget.selectionStart)} onKeyDown={handleComposerKeyDown} onBlur={closeEmojiShortcodeSuggestions} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} role="combobox" aria-autocomplete="list" aria-expanded={Boolean(emojiSuggestions.length)} aria-controls={emojiSuggestions.length ? "emoji-shortcode-menu" : undefined} aria-activedescendant={emojiSuggestions.length ? `emoji-shortcode-option-${selectedEmojiSuggestion}` : undefined} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
             {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
             <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
           </form>
