@@ -11,7 +11,7 @@ import json
 import httpx
 
 from agent.memory_engine.data_points import canonical_fact_type, normalize_data_point
-from agent.memory_engine.shared.window import conversation_extraction_window
+from agent.shared.utils import conversation_extraction_window
 from agent.memory_engine.data_points.extraction.whatsapp_rules import (
     extract_whatsapp_data_point_candidates,
 )

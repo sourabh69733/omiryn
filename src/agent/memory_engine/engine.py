@@ -14,7 +14,7 @@ from agent.memory_engine.data_points.extraction.legacy_rules import (
 from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
 from agent.memory_engine.behavior.extraction import extract_agent_behavior_rules_from_message
 from agent.memory_engine.data_points import normalize_data_point
-from agent.memory_engine.shared.window import conversation_extraction_window
+from agent.shared.utils import conversation_extraction_window
 from agent.providers import extract_deep_profile_facts
 from storage import (
     list_data_point_extraction_debug,
