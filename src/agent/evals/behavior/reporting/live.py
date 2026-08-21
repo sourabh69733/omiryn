@@ -34,6 +34,7 @@ class TerminalProgressReporter:
             "judge_call_started",
             "companion_api_call_completed",
             "simulated_user_call_started",
+            "memory_call_started",
         }:
             self.api_calls += 1
         if not self.enabled:
@@ -91,6 +92,17 @@ def _render_event(event: EvalEvent) -> str | None:
             f"\nThread scenario: {_plain_name(data['scenario_id'])} "
             f"(expected: {data['expected_operation']})"
         )
+    if event.kind == "memory_scenario_started":
+        return (
+            f"\nMemory scenario: {_plain_name(data['scenario_id'])} "
+            f"(expected: {data['expected_decision']})"
+        )
+    if event.kind == "memory_call_started":
+        return f"    Memory model ({data['model_name']}) is analyzing the batch..."
+    if event.kind == "memory_call_completed":
+        return f"    Memory model responded in {data['duration_seconds']:.1f}s."
+    if event.kind == "memory_call_failed":
+        return f"    Memory model failed: {data['error']}"
     if event.kind == "simulated_conversation_started":
         return (
             f"\nAI-user scenario: {_plain_name(data['scenario_id'])} "
@@ -194,6 +206,13 @@ def _render_event(event: EvalEvent) -> str | None:
         return (
             f"    Thread result: {status} — expected {data['expected_operation']}, "
             f"observed {actual}.\n    {data['finding']}"
+        )
+    if event.kind == "memory_scenario_completed":
+        status = "PASS" if data["passed"] else "FAIL"
+        finding = "; ".join(data.get("findings") or [])
+        return (
+            f"    Memory result: {status} — {data['operation_count']} operation(s)."
+            + (f"\n    {finding}" if finding else "")
         )
     if event.kind == "evaluation_completed":
         return (

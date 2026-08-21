@@ -92,14 +92,27 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     run = payload.get("run") or {}
     companion = payload.get("companion") or {}
     calibration = payload.get("judge_calibration") or {}
+    is_memory_eval = payload.get("stage") == "memory_shadow_eval"
     lines = [
-        "# Companion Evaluation Report",
+        "# Background Memory Evaluation Report" if is_memory_eval else "# Companion Evaluation Report",
         "",
         f"**Result:** {result}",
         f"**Finished:** {_display_time(run.get('finished_at'))}",
-        f"**Companion agent:** {companion.get('agent_name', 'unknown')}",
-        f"**Companion provider:** {companion.get('provider', 'unknown')}",
-        f"**Companion model:** {companion.get('model', 'provider-default')}",
+        (
+            f"**Memory extractor:** {companion.get('agent_name', 'unknown')}"
+            if is_memory_eval
+            else f"**Companion agent:** {companion.get('agent_name', 'unknown')}"
+        ),
+        (
+            f"**Extractor provider:** {companion.get('provider', 'unknown')}"
+            if is_memory_eval
+            else f"**Companion provider:** {companion.get('provider', 'unknown')}"
+        ),
+        (
+            f"**Extractor model:** {companion.get('model', 'provider-default')}"
+            if is_memory_eval
+            else f"**Companion model:** {companion.get('model', 'provider-default')}"
+        ),
         f"**Prompt version:** {companion.get('prompt_version', 'unknown')}",
         f"**Judges:** {', '.join(payload.get('judges') or ['not run'])}",
         f"**Duration:** {run.get('duration_seconds', 0):.1f} seconds",
@@ -118,6 +131,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         lines.extend(_conversation_judge_calibration_markdown(payload))
     elif payload.get("stage") == "thread_management_shadow_eval":
         lines.extend(_thread_management_shadow_markdown(payload))
+    elif payload.get("stage") == "memory_shadow_eval":
+        lines.extend(_memory_shadow_markdown(payload))
     else:
         lines.extend(
             [
@@ -456,6 +471,98 @@ def _thread_management_shadow_markdown(payload: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
+    """Render memory behavior in simple terms while retaining exact evidence indexes."""
+    summary = payload.get("summary") or {}
+    lines = [
+        "## Background-memory summary",
+        "",
+        f"**Scenarios:** {summary.get('total', 0)}",
+        f"**Passed:** {summary.get('passed', 0)}",
+        f"**Failed:** {summary.get('failed', 0)}",
+        f"**Invalid model responses:** {summary.get('structural_failures', 0)}",
+        "**Live memory writes:** disabled (shadow evaluation)",
+    ]
+    for scenario in payload.get("scenarios", []):
+        scenario_input = scenario.get("input") or {}
+        expected = scenario.get("expected") or {}
+        observed = scenario.get("observed") or {}
+        lines.extend(
+            [
+                "",
+                f"## Scenario: {_plain_name(scenario.get('scenario_id', 'unknown'))}",
+                "",
+                f"**Result:** {'PASS' if scenario.get('passed') else 'FAIL'}",
+                f"**Purpose:** {scenario.get('description', 'not provided')}",
+                "",
+                "### Conversation batch",
+                "",
+            ]
+        )
+        for index, message in enumerate(scenario_input.get("messages") or []):
+            speaker = "User" if message.get("role") == "user" else "Companion"
+            scope = (
+                "context only"
+                if index <= scenario_input.get("processed_through_message_index", -1)
+                else "new"
+            )
+            lines.append(f"- **{speaker} [{index}, {scope}]:** {message.get('content', '')}")
+        existing = scenario_input.get("existing_memories") or []
+        lines.extend(["", "### Existing memory supplied", ""])
+        if existing:
+            for memory in existing:
+                lines.append(
+                    f"- `{memory.get('id', 'unknown')}` — "
+                    f"{memory.get('label', 'unlabelled')}: {memory.get('value')!r}"
+                )
+        else:
+            lines.append("- None.")
+        lines.extend(
+            [
+                "",
+                "### Expected and observed",
+                "",
+                f"**Expected decision:** {expected.get('decision', 'unknown')}",
+                f"**Observed decision:** {observed.get('decision', 'unknown')}",
+                f"**Structurally valid:** {'yes' if observed.get('structurally_valid') else 'no'}",
+                f"**Duration:** {observed.get('duration_seconds', 0):.1f} seconds",
+            ]
+        )
+        expected_operations = expected.get("operations") or []
+        lines.append("**Expected operations:**")
+        if expected_operations:
+            for operation in expected_operations:
+                lines.append(
+                    "- "
+                    f"{operation.get('operation')} / "
+                    f"{operation.get('data_point_type') or 'existing memory'} / "
+                    f"concepts={operation.get('value_concepts') or []} / "
+                    f"evidence={operation.get('evidence_message_indexes') or []}"
+                )
+        else:
+            lines.append("- None.")
+        observed_operations = observed.get("operations") or []
+        lines.append("**Observed operations:**")
+        if observed_operations:
+            for operation in observed_operations:
+                target = operation.get("target_memory_id") or "new memory"
+                lines.append(
+                    "- "
+                    f"{operation.get('operation')} / {operation.get('data_point_type')} / "
+                    f"{operation.get('label')}: {operation.get('value')!r} / "
+                    f"target={target} / evidence={operation.get('evidence_message_indexes') or []}"
+                )
+        else:
+            lines.append("- None.")
+        lines.extend(["", "**Findings:**"])
+        lines.extend(f"- {finding}" for finding in scenario.get("findings") or ["None."])
+        validation_errors = observed.get("validation_errors") or []
+        if validation_errors:
+            lines.extend(["", "**Validation problems:**"])
+            lines.extend(f"- {error}" for error in validation_errors)
+    return lines
+
+
 def _improvement_targets_markdown(payload: dict[str, Any]) -> list[str]:
     targets = payload.get("improvement_targets") or []
     lines = ["", "## Improvement targets", ""]
@@ -536,6 +643,13 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             f"{summary.get('passed', 0)} matched expectations and "
             f"{summary.get('failed', 0)} did not. No proposed changes were persisted."
         )
+    if payload.get("stage") == "memory_shadow_eval":
+        summary = payload.get("summary") or {}
+        return (
+            f"The background memory model analyzed {summary.get('total', 0)} realistic "
+            f"conversation batches: {summary.get('passed', 0)} matched expectations and "
+            f"{summary.get('failed', 0)} did not. No live memories were changed."
+        )
     passed = payload.get("scenario_passed", 0)
     failed = payload.get("scenario_failed", 0)
     return f"The companion passed {passed} scenarios and failed {failed}."
@@ -587,6 +701,20 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             + ", ".join(failed)
             + "."
         )
+    if payload.get("stage") == "memory_shadow_eval":
+        summary = payload.get("summary") or {}
+        if payload.get("passed"):
+            return "Every selected memory proposal matched the expected safe behavior."
+        failed = [
+            _plain_name(item.get("scenario_id", "unknown"))
+            for item in payload.get("scenarios", [])
+            if not item.get("passed")
+        ]
+        return (
+            f"Background memory needs improvement in {len(failed)} scenario(s): "
+            + ", ".join(failed)
+            + ". Live writes should remain disabled."
+        )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
     failed = [
@@ -614,6 +742,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "simulated_conversation_suite": "sim_suite",
         "conversation_judge_calibration": "conv_judge_calibration",
         "thread_management_shadow_eval": "thread_shadow",
+        "memory_shadow_eval": "memory_shadow",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -650,7 +779,11 @@ def _append_history(
                 f"{payload.get('summary', {}).get('passed', 0)}/"
                 f"{payload.get('summary', {}).get('total', 0)} scenarios"
                 if payload.get("stage")
-                in {"simulated_conversation_suite", "thread_management_shadow_eval"}
+                in {
+                    "simulated_conversation_suite",
+                    "thread_management_shadow_eval",
+                    "memory_shadow_eval",
+                }
                 else (
                     f"{payload.get('conversation_judge_calibration', {}).get('completed_cases', 0)}/"
                     f"{payload.get('conversation_judge_calibration', {}).get('total_cases', 0)} checks"
@@ -691,7 +824,7 @@ def _append_history(
 
 
 def _history_score(payload: dict[str, Any]) -> str:
-    if payload.get("stage") == "thread_management_shadow_eval":
+    if payload.get("stage") in {"thread_management_shadow_eval", "memory_shadow_eval"}:
         summary = payload.get("summary") or {}
         total = summary.get("total", 0)
         passed = summary.get("passed", 0)
