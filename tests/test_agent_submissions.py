@@ -16,6 +16,7 @@ from agent.memory_engine.engine import (
     pending_data_point_messages,
     should_run_conversation_data_point_extraction,
 )
+from agent.memory_engine.data_points.extraction.registry import DataPointCapturePolicy
 from agent.providers import (
     _compact_chat_reply,
     _context_sources_text,
@@ -85,7 +86,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         os.environ["AUTH_REQUIRED"] = "false"
         os.environ["AGENT_PROVIDER"] = "mock"
         os.environ["DATA_POINT_EXTRACTOR"] = "rules"
-        os.environ["DATA_POINT_CAPTURE_STRATEGY"] = "legacy_rules"
+        os.environ["AGENT_PIPELINE_VERSION"] = "v1"
+        os.environ["AGENT_ROLLOUT"] = "off"
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
@@ -100,7 +102,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.photo_storage_patch.stop()
-        os.environ.pop("DATA_POINT_CAPTURE_STRATEGY", None)
+        os.environ.pop("AGENT_PIPELINE_VERSION", None)
+        os.environ.pop("AGENT_ROLLOUT", None)
         app.dependency_overrides.clear()
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
@@ -1462,13 +1465,20 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
 
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_PROVIDER": "mock",
-                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
-                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "5",
-            },
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PROVIDER": "mock",
+                    "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "5",
+                },
+            ),
+            patch(
+                "agent.memory_engine.engine.data_point_capture_policy",
+                return_value=DataPointCapturePolicy(
+                    strategy="background_llm", background_mode="llm"
+                ),
+            ),
         ):
             for index in range(5):
                 response = self.client.post(
@@ -1500,12 +1510,17 @@ class AgentSubmissionApiTest(unittest.TestCase):
             {"role": "user", "content": "then"},
         ]
 
-        with patch.dict(
-            os.environ,
-            {
-                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
-                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "3",
-            },
+        with (
+            patch.dict(
+                os.environ,
+                {"PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "3"},
+            ),
+            patch(
+                "agent.memory_engine.engine.data_point_capture_policy",
+                return_value=DataPointCapturePolicy(
+                    strategy="background_llm", background_mode="llm"
+                ),
+            ),
         ):
             self.assertTrue(
                 should_run_conversation_data_point_extraction(
@@ -1569,13 +1584,20 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
 
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_PROVIDER": "mock",
-                "DATA_POINT_CAPTURE_STRATEGY": "background_llm",
-                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
-            },
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PROVIDER": "mock",
+                    "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+                },
+            ),
+            patch(
+                "agent.memory_engine.engine.data_point_capture_policy",
+                return_value=DataPointCapturePolicy(
+                    strategy="background_llm", background_mode="llm"
+                ),
+            ),
         ):
             for message in ("then", "..."):
                 response = self.client.post(
@@ -1596,14 +1618,21 @@ class AgentSubmissionApiTest(unittest.TestCase):
         app.dependency_overrides[current_user] = signed_in_user
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
 
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_PROVIDER": "mock",
-                "DATA_POINT_CAPTURE_STRATEGY": "hybrid_review",
-                "DATA_POINT_EXTRACTOR": "hybrid",
-                "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
-            },
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PROVIDER": "mock",
+                    "DATA_POINT_EXTRACTOR": "hybrid",
+                    "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
+                },
+            ),
+            patch(
+                "agent.memory_engine.engine.data_point_capture_policy",
+                return_value=DataPointCapturePolicy(
+                    strategy="hybrid_review", background_mode="hybrid"
+                ),
+            ),
         ):
             for index in range(2):
                 response = self.client.post(
@@ -1648,10 +1677,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 os.environ,
                 {
                     "AGENT_PROVIDER": "mock",
-                    "DATA_POINT_CAPTURE_STRATEGY": "hybrid_review",
                     "DATA_POINT_EXTRACTOR": "hybrid",
                     "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "2",
                 },
+            ),
+            patch(
+                "agent.memory_engine.engine.data_point_capture_policy",
+                return_value=DataPointCapturePolicy(
+                    strategy="hybrid_review", background_mode="hybrid"
+                ),
             ),
             patch(
                 "agent.memory_engine.data_points.extraction.service.review_llm_data_point_candidates",

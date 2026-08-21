@@ -391,7 +391,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
 
     async def test_orchestrator_v2_displays_reply_and_saves_hidden_data_points(self) -> None:
         with (
-            patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
+            patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
             patch(
@@ -459,14 +459,93 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts[0]["label"], "Likes spicy food")
         self.assertEqual(facts[0]["source_kind"], "agent_turn_output_v2")
 
+    async def test_orchestrator_live_mode_does_not_write_inline_data_points(self) -> None:
+        with (
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            ),
+            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
+            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
+            patch(
+                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
+            ) as model_call,
+            patch("agent.runtime.orchestrator.capture_turn_output_data_points") as inline_write,
+            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
+            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
+            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
+            patch("agent.runtime.orchestrator.finish_agent_trace"),
+        ):
+            save_trace.return_value = {"id": "trace-live"}
+            build_context.return_value = ModelContextPackage(
+                system_prompt="system prompt",
+                context_sources=[],
+                snapshot={
+                    "conversation_id": "conversation-a",
+                    "message_index": 2,
+                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
+                },
+            )
+            model_call.return_value = """
+            {
+              "reply": "Spicy food noted—that says something about your taste.",
+              "data_points": [{
+                "type": "matching_fact",
+                "category": "food_preferences",
+                "label": "Likes spicy food",
+                "value": {"preference": "spicy food"},
+                "confidence": 0.84
+              }],
+              "conversation_update": {
+                "user_need": "explore",
+                "session_goal": "Understand food preferences",
+                "thread_updates": [{
+                  "operation": "create",
+                  "title": "Food preferences",
+                  "summary": "The user enjoys spicy food.",
+                  "origin": "user_started",
+                  "depth": "mentioned",
+                  "user_interest": "medium",
+                  "salience": 0.6
+                }]
+              }
+            }
+            """
+
+            result = await run_agent_turn(
+                conversation_id="conversation-a",
+                messages=[],
+                user_text="I love spicy food",
+                user_id="user-a",
+                user_profile=None,
+                model="llama-70b",
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+        self.assertEqual(
+            result.messages[-1]["content"],
+            "Spicy food noted—that says something about your taste.",
+        )
+        inline_write.assert_not_called()
+        model_step = next(
+            call.args[0]
+            for call in save_trace_step.call_args_list
+            if call.args[0]["step_name"] == "model_call"
+        )
+        summary = model_step["metadata"]["turn_output_v2"]
+        self.assertEqual(summary["capture_strategy"], "background_memory")
+        self.assertEqual(summary["saved_count"], 0)
+        self.assertEqual(summary["skipped_count"], 1)
+
     async def test_orchestrator_records_valid_thread_proposal_without_persisting_it(self) -> None:
         with (
             patch.dict(
                 "os.environ",
                 {
-                    "AGENT_TURN_OUTPUT_VERSION": "v2",
-                    "CONVERSATION_STATE_V2_ENABLED": "true",
-                    "CONVERSATION_STATE_V2_SHADOW_ENABLED": "true",
+                    "AGENT_PIPELINE_VERSION": "v2",
+                    "AGENT_ROLLOUT": "shadow",
                 },
             ),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
@@ -547,7 +626,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self,
     ) -> None:
         with (
-            patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
+            patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
             patch(
@@ -606,7 +685,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
 
     async def test_orchestrator_retries_before_malformed_transport_reaches_ui(self) -> None:
         with (
-            patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v2"}),
+            patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
             patch(

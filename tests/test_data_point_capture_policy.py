@@ -1,4 +1,4 @@
-"""Regression tests for exclusive conversation data-point capture strategies."""
+"""Regression tests for pipeline-derived conversation data-point capture."""
 
 from __future__ import annotations
 
@@ -15,12 +15,8 @@ from agent.memory_engine.engine import (
 
 
 class DataPointCapturePolicyTest(unittest.TestCase):
-    def test_default_v2_uses_only_inline_even_when_legacy_extractor_is_rules(self) -> None:
-        with patch.dict(
-            os.environ,
-            {"AGENT_TURN_OUTPUT_VERSION": "v2", "DATA_POINT_EXTRACTOR": "rules"},
-        ):
-            os.environ.pop("DATA_POINT_CAPTURE_STRATEGY", None)
+    def test_default_v2_shadow_uses_only_inline_capture(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
             policy = data_point_capture_policy()
 
         self.assertEqual(policy.strategy, "inline_llm")
@@ -28,50 +24,54 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         self.assertFalse(policy.immediate_rules)
         self.assertIsNone(policy.background_mode)
 
-    def test_explicit_strategies_are_mutually_exclusive(self) -> None:
-        expected = {
-            "inline_llm": (True, False, None),
-            "legacy_rules": (False, True, None),
-            "background_llm": (False, False, "llm"),
-            "hybrid_review": (False, False, "hybrid"),
-            "disabled": (False, False, None),
-        }
-        for strategy, flags in expected.items():
-            with self.subTest(strategy=strategy), patch.dict(
-                os.environ,
-                {"DATA_POINT_CAPTURE_STRATEGY": strategy},
-            ):
-                policy = data_point_capture_policy()
-                self.assertEqual(
-                    (policy.inline, policy.immediate_rules, policy.background_mode),
-                    flags,
-                )
-
-    def test_v1_compatibility_maps_old_extractor_setting(self) -> None:
+    def test_v1_is_the_single_legacy_rules_mode(self) -> None:
         with patch.dict(
             os.environ,
-            {"AGENT_TURN_OUTPUT_VERSION": "v1", "DATA_POINT_EXTRACTOR": "hybrid"},
+            {"AGENT_PIPELINE_VERSION": "v1", "AGENT_ROLLOUT": "off"},
+            clear=True,
         ):
-            os.environ.pop("DATA_POINT_CAPTURE_STRATEGY", None)
             policy = data_point_capture_policy()
 
-        self.assertEqual(policy.strategy, "hybrid_review")
-        self.assertEqual(policy.background_mode, "hybrid")
+        self.assertEqual(policy.strategy, "legacy_rules")
+        self.assertFalse(policy.inline)
+        self.assertTrue(policy.immediate_rules)
+        self.assertIsNone(policy.background_mode)
 
-    def test_unknown_explicit_strategy_fails_configuration_early(self) -> None:
-        with patch.dict(os.environ, {"DATA_POINT_CAPTURE_STRATEGY": "mystery"}):
-            with self.assertRaisesRegex(ValueError, "Unknown DATA_POINT_CAPTURE_STRATEGY"):
-                data_point_capture_policy()
+    def test_live_mode_disables_inline_capture_for_background_memory(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            clear=True,
+        ):
+            policy = data_point_capture_policy()
 
-    def test_inline_config_delegates_to_capture_policy(self) -> None:
-        with patch.dict(os.environ, {"DATA_POINT_CAPTURE_STRATEGY": "inline_llm"}):
+        self.assertEqual(policy.strategy, "disabled")
+        self.assertFalse(policy.inline)
+        self.assertFalse(policy.immediate_rules)
+        self.assertIsNone(policy.background_mode)
+        self.assertTrue(turn_output_v2_enabled())
+
+    def test_removed_flags_cannot_override_the_central_pipeline(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_PIPELINE_VERSION": "v2",
+                "AGENT_ROLLOUT": "live",
+                "AGENT_TURN_OUTPUT_VERSION": "v1",
+                "DATA_POINT_CAPTURE_STRATEGY": "legacy_rules",
+            },
+            clear=True,
+        ):
             self.assertTrue(turn_output_v2_enabled())
-        with patch.dict(os.environ, {"DATA_POINT_CAPTURE_STRATEGY": "background_llm"}):
-            self.assertFalse(turn_output_v2_enabled())
+            self.assertEqual(data_point_capture_policy().strategy, "disabled")
 
-    def test_inline_strategy_skips_legacy_fact_rules_but_keeps_behavior_learning(self) -> None:
+    def test_v2_skips_legacy_fact_rules_but_keeps_behavior_learning(self) -> None:
         with (
-            patch.dict(os.environ, {"DATA_POINT_CAPTURE_STRATEGY": "inline_llm"}),
+            patch.dict(
+                os.environ,
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
+                clear=True,
+            ),
             patch("agent.memory_engine.engine.extract_profile_facts_from_message") as facts,
             patch(
                 "agent.memory_engine.engine.extract_agent_behavior_rules_from_message",
@@ -85,25 +85,21 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         save_fact.assert_not_called()
         behavior.assert_called_once()
 
-    def test_only_background_strategies_schedule_interval_extraction(self) -> None:
+    def test_old_interval_extractor_is_not_scheduled_by_the_main_pipeline(self) -> None:
         messages = [{"role": "user", "content": "A useful durable preference."}]
-        for strategy, expected in (
-            ("inline_llm", False),
-            ("legacy_rules", False),
-            ("disabled", False),
-            ("background_llm", True),
-            ("hybrid_review", True),
-        ):
-            with self.subTest(strategy=strategy), patch.dict(
+        modes = (("v1", "off"), ("v2", "off"), ("v2", "shadow"), ("v2", "live"))
+        for version, rollout in modes:
+            with self.subTest(version=version, rollout=rollout), patch.dict(
                 os.environ,
                 {
-                    "DATA_POINT_CAPTURE_STRATEGY": strategy,
+                    "AGENT_PIPELINE_VERSION": version,
+                    "AGENT_ROLLOUT": rollout,
                     "PROFILE_FACT_DEEP_EXTRACT_INTERVAL": "1",
                 },
+                clear=True,
             ):
-                self.assertEqual(
-                    should_run_conversation_data_point_extraction("c", "u", messages, True),
-                    expected,
+                self.assertFalse(
+                    should_run_conversation_data_point_extraction("c", "u", messages, True)
                 )
 
 

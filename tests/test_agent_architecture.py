@@ -9,7 +9,10 @@ from api.models import AgentConversation
 
 class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.turn_output_patch = patch.dict("os.environ", {"AGENT_TURN_OUTPUT_VERSION": "v1"})
+        self.turn_output_patch = patch.dict(
+            "os.environ",
+            {"AGENT_PIPELINE_VERSION": "v1", "AGENT_ROLLOUT": "off"},
+        )
         self.turn_output_patch.start()
 
     def tearDown(self) -> None:
@@ -209,7 +212,10 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
             '"data_points":[{"type":"profile_fact"}]}</function>'
         )
         with (
-            patch.dict("os.environ", {"DATA_POINT_CAPTURE_STRATEGY": "legacy_rules"}),
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v1", "AGENT_ROLLOUT": "off"},
+            ),
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
             patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
             patch("agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock) as model_call,

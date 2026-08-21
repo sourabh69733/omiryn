@@ -47,7 +47,8 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         with patch.dict(
             "os.environ",
             {
-                "MEMORY_BACKGROUND_V2_SHADOW": "true",
+                "AGENT_PIPELINE_VERSION": "v2",
+                "AGENT_ROLLOUT": "shadow",
                 "MEMORY_BACKGROUND_V2_THRESHOLD": "2",
             },
         ):
@@ -59,7 +60,10 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                     True,
                 )
             )
-        with patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_SHADOW": "false"}):
+        with patch.dict(
+            "os.environ",
+            {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"},
+        ):
             self.assertFalse(
                 should_schedule_shadow_memory_extraction(
                     self.conversation_id,
@@ -226,7 +230,8 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             patch.dict(
                 "os.environ",
                 {
-                    "MEMORY_BACKGROUND_V2_LIVE_WRITES": "true",
+                    "AGENT_PIPELINE_VERSION": "v2",
+                    "AGENT_ROLLOUT": "live",
                     "MEMORY_BACKGROUND_V2_THRESHOLD": "2",
                 },
             ),
@@ -294,7 +299,10 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         }
         before = get_profile_fact(existing["id"], self.user_id)
         with (
-            patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_LIVE_WRITES": "true"}),
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            ),
             patch(
                 "agent.memory_engine.processing.shadow.analyze_memory_batch",
                 new_callable=AsyncMock,
@@ -314,7 +322,10 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_live_application_error_does_not_advance_cursor(self) -> None:
         with (
-            patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_LIVE_WRITES": "true"}),
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            ),
             patch(
                 "agent.memory_engine.processing.shadow.analyze_memory_batch",
                 new_callable=AsyncMock,
@@ -339,7 +350,10 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
     async def test_cursor_failure_after_commit_retries_without_duplicate_write(self) -> None:
         analysis = self._analysis(evidence_indexes=[0, 2])
         with (
-            patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_LIVE_WRITES": "true"}),
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            ),
             patch(
                 "agent.memory_engine.processing.shadow.analyze_memory_batch",
                 new_callable=AsyncMock,
@@ -365,7 +379,10 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_LIVE_WRITES": "true"}),
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            ),
             patch(
                 "agent.memory_engine.processing.shadow.analyze_memory_batch",
                 new_callable=AsyncMock,

@@ -221,7 +221,7 @@ class ConversationThreadStateTest(unittest.TestCase):
             origin="user_started",
         )
 
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "true"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}):
             package = self._context_package()
 
         source = next(
@@ -240,9 +240,9 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertEqual(get_thread(current_open.id, self.user_id).version, 1)
 
     def test_thread_context_is_capped_and_feature_flag_off_preserves_old_context(self) -> None:
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "false"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}):
             original = self._context_package()
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "true"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}):
             enabled_without_threads = self._context_package()
         self.assertEqual(enabled_without_threads.system_prompt, original.system_prompt)
         self.assertEqual(enabled_without_threads.context_sources, original.context_sources)
@@ -256,12 +256,12 @@ class ConversationThreadStateTest(unittest.TestCase):
                 origin="user_started",
             )
 
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "false"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}):
             disabled = self._context_package()
         self.assertEqual(disabled.system_prompt, original.system_prompt)
         self.assertEqual(disabled.context_sources, original.context_sources)
 
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "true"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}):
             enabled = self._context_package()
         source = next(
             item
@@ -287,7 +287,7 @@ class ConversationThreadStateTest(unittest.TestCase):
             origin="user_started",
         )
 
-        with patch.dict("os.environ", {"CONVERSATION_STATE_V2_ENABLED": "true"}):
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}):
             package = self._context_package(
                 user_text="That situation with my manager became worse today."
             )

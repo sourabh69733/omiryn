@@ -36,12 +36,19 @@ class MemoryApplicationServiceTest(unittest.TestCase):
             self.user_id,
         )
 
-    def test_live_write_flag_defaults_off(self) -> None:
+    def test_live_writes_follow_pipeline_rollout(self) -> None:
         function = self._function("memory_background_v2_live_writes_enabled")
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("MEMORY_BACKGROUND_V2_LIVE_WRITES", None)
+        with patch.dict(
+            os.environ,
+            {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
+            clear=True,
+        ):
             self.assertFalse(function())
-        with patch.dict(os.environ, {"MEMORY_BACKGROUND_V2_LIVE_WRITES": "true"}):
+        with patch.dict(
+            os.environ,
+            {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            clear=True,
+        ):
             self.assertTrue(function())
 
     def test_valid_analysis_resolves_exact_eligible_user_evidence(self) -> None:
