@@ -11,6 +11,10 @@ from agent.memory_engine.engine import (
     capture_deep_profile_facts_from_conversation,
     should_run_conversation_data_point_extraction,
 )
+from agent.memory_engine.processing.shadow import (
+    run_shadow_memory_extraction,
+    should_schedule_shadow_memory_extraction,
+)
 from agent.runtime.orchestrator import run_agent_turn
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from realtime import conversation_event, realtime_hub
@@ -284,6 +288,19 @@ async def send_agent_message(
     ):
         background_tasks.add_task(
             capture_deep_profile_facts_from_conversation,
+            conversation.id,
+            user.id,
+            conversation.messages,
+            conversation.agent_model,
+        )
+    if should_schedule_shadow_memory_extraction(
+        conversation.id,
+        _user_id(user),
+        conversation.messages,
+        turn.quality_valid,
+    ):
+        background_tasks.add_task(
+            run_shadow_memory_extraction,
             conversation.id,
             user.id,
             conversation.messages,
