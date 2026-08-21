@@ -16,6 +16,7 @@
     "web:preview": "vite preview --config apps/web/vite.config.js",
     "web:deploy": "npx wrangler deploy --config apps/web/wrangler.jsonc",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
+    "web:test": "tsx --test apps/web/src/ui/app/*.test.ts",
     "feedback:dev": "vite --config apps/feedback/vite.config.js",
     "feedback:build": "vite build --config apps/feedback/vite.config.js",
     "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
@@ -30,6 +31,7 @@
     "@supabase/supabase-js": "^2.49.8",
     "@vitejs/plugin-react": "^4.3.4",
     "emoji-picker-react": "^4.19.1",
+    "emojibase-data": "^17.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.23.12"
   }
 }
