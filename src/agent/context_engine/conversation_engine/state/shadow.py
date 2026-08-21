@@ -99,6 +99,7 @@ def evaluate_conversation_update_shadow(
             normalized = _validate_thread_update(
                 raw_thread_update,
                 existing=existing,
+                candidate_thread_ids=None,
                 conversation_id=conversation_id,
                 user_id=user_id,
                 message_index=message_index,
@@ -131,10 +132,47 @@ def evaluate_conversation_update_shadow(
     return _result(True, proposal, errors)
 
 
+def evaluate_thread_operation_shadow(
+    raw_operation: Any,
+    *,
+    conversation_id: str,
+    user_id: str,
+    message_index: int,
+    candidate_thread_ids: set[str],
+) -> dict[str, Any]:
+    """Validate one background thread action against only supplied candidates."""
+    if not user_id:
+        return _result(False, None, ["thread operation requires a user_id"])
+    existing = {thread.id: thread for thread in list_threads(user_id)}
+    try:
+        normalized = _validate_thread_update(
+            raw_operation,
+            existing=existing,
+            candidate_thread_ids=candidate_thread_ids,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            message_index=message_index,
+            shadow_index=0,
+        )
+        updates = [] if normalized["operation"] == "none" else [normalized]
+        return _result(
+            True,
+            {
+                "user_need": None,
+                "session_goal": None,
+                "thread_updates": updates,
+            },
+            [],
+        )
+    except (ConversationStateValidationError, TypeError, ValueError) as error:
+        return _result(True, None, [str(error)])
+
+
 def _validate_thread_update(
     raw: Any,
     *,
     existing: dict[str, ConversationThread],
+    candidate_thread_ids: set[str] | None,
     conversation_id: str,
     user_id: str,
     message_index: int,
@@ -166,6 +204,10 @@ def _validate_thread_update(
     thread_id = raw.get("thread_id")
     if not isinstance(thread_id, str) or thread_id not in existing:
         raise ConversationStateValidationError("existing operation requires an owned thread_id")
+    if candidate_thread_ids is not None and thread_id not in candidate_thread_ids:
+        raise ConversationStateValidationError(
+            "existing operation requires a supplied candidate thread_id"
+        )
     existing_status = existing[thread_id].status
     if existing_status == "blocked_by_user" and operation != "block":
         raise ConversationStateValidationError("a user-blocked thread cannot be changed")
