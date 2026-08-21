@@ -8,6 +8,24 @@ from typing import Any
 from .models import MemoryBatch
 
 
+MEMORY_OPERATION_RULES = """Rules:
+- New messages are the only source of new observations.
+- Context messages and the previous handoff may only resolve meaning and references.
+- Only user messages marked evidence_eligible may appear in evidence_message_indexes.
+- Do not turn assistant suggestions, descriptions, or guesses into facts about the user.
+- profile_fact is limited to stable identity or logistics. Preferences, tastes, values,
+  lifestyle, boundaries, relationship intent, and partner preferences are matching_fact.
+- chat_learning is only about how conversation with this user should work.
+- temporary_context is short-lived current context, not a durable trait.
+- Use reinforce when new evidence supports an existing memory, supersede for an explicit
+  correction, retract when the user explicitly withdraws it, and add only when no supplied
+  memory represents the observation.
+- Do not create broad labels that omit concrete values stated by the user.
+- If there is no useful observation, return decision=no_change and operations=[].
+- Return at most 12 operations. Do not invent memory IDs or message indexes.
+"""
+
+
 MEMORY_BACKGROUND_V2_SYSTEM_PROMPT = """You analyze a bounded conversation batch for Omiryn memory.
 Return one JSON object and no surrounding prose.
 
@@ -35,22 +53,7 @@ Output shape:
   }
 }
 
-Rules:
-- New messages are the only source of new observations.
-- Context messages and the previous handoff may only resolve meaning and references.
-- Only user messages marked evidence_eligible may appear in evidence_message_indexes.
-- Do not turn assistant suggestions, descriptions, or guesses into facts about the user.
-- profile_fact is limited to stable identity or logistics. Preferences, tastes, values,
-  lifestyle, boundaries, relationship intent, and partner preferences are matching_fact.
-- chat_learning is only about how conversation with this user should work.
-- temporary_context is short-lived current context, not a durable trait.
-- Use reinforce when new evidence supports an existing memory, supersede for an explicit
-  correction, retract when the user explicitly withdraws it, and add only when no supplied
-  memory represents the observation.
-- Do not create broad labels that omit concrete values stated by the user.
-- If there is no useful observation, return decision=no_change and operations=[].
-- Return at most 12 operations. Do not invent memory IDs or message indexes.
-"""
+""" + MEMORY_OPERATION_RULES
 
 
 def memory_batch_prompt(
