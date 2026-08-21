@@ -14,6 +14,7 @@ from .data_requests import *
 from .app_events import *
 from .feedback import *
 from .memory_processing import *
+from .memory_applications import *
 from .user_deletion import *
 from .utils import (
     _conversation_user_id,
