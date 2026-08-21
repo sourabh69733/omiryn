@@ -85,3 +85,13 @@ class MemoryProcessingState:
     version: int = 0
     created_at: str | None = None
     updated_at: str | None = None
+
+@dataclass(frozen=True)
+class MemoryAnalysis:
+    """A memory proposal that has passed the domain contract."""
+
+    decision: str
+    operations: tuple[MemoryOperation, ...]
+    handoff: MemoryHandoff
+    valid: bool
+    errors: tuple[str, ...] = ()
