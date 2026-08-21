@@ -1,15 +1,11 @@
-"""Selects exactly one conversation data-point capture strategy.
-
-The explicit DATA_POINT_CAPTURE_STRATEGY setting is preferred. Existing
-AGENT_TURN_OUTPUT_VERSION and DATA_POINT_EXTRACTOR settings remain supported so old
-deployments can roll back without allowing multiple strategies to run together.
-"""
+"""Derives exactly one data-point capture strategy from the agent pipeline config."""
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Literal
+
+from agent.config import agent_pipeline_config
 
 CaptureStrategy = Literal[
     "inline_llm",
@@ -18,24 +14,6 @@ CaptureStrategy = Literal[
     "legacy_rules",
     "disabled",
 ]
-
-_STRATEGY_ALIASES: dict[str, CaptureStrategy] = {
-    "inline": "inline_llm",
-    "inline_llm": "inline_llm",
-    "turn_output_v2": "inline_llm",
-    "background": "background_llm",
-    "background_llm": "background_llm",
-    "llm": "background_llm",
-    "hybrid": "hybrid_review",
-    "hybrid_review": "hybrid_review",
-    "legacy": "legacy_rules",
-    "legacy_rules": "legacy_rules",
-    "rules": "legacy_rules",
-    "disabled": "disabled",
-    "none": "disabled",
-    "off": "disabled",
-}
-
 
 @dataclass(frozen=True)
 class DataPointCapturePolicy:
@@ -46,26 +24,12 @@ class DataPointCapturePolicy:
 
 
 def data_point_capture_policy() -> DataPointCapturePolicy:
-    explicit = os.getenv("DATA_POINT_CAPTURE_STRATEGY", "").strip().lower()
-    if explicit:
-        return _policy_for(_resolve_strategy(explicit))
-
-    # Compatibility: V2 inline extraction wins over the old background/rule setting.
-    # This prevents the historic behavior where both paths wrote the same message.
-    turn_output_version = os.getenv("AGENT_TURN_OUTPUT_VERSION", "v2").strip().lower()
-    if turn_output_version == "v2":
+    config = agent_pipeline_config()
+    if config.legacy_rules:
+        return _policy_for("legacy_rules")
+    if config.inline_data_points:
         return _policy_for("inline_llm")
-
-    legacy_mode = os.getenv("DATA_POINT_EXTRACTOR", "hybrid").strip().lower()
-    return _policy_for(_resolve_strategy(legacy_mode))
-
-
-def _resolve_strategy(value: str) -> CaptureStrategy:
-    strategy = _STRATEGY_ALIASES.get(value)
-    if strategy is None:
-        allowed = ", ".join(sorted(set(_STRATEGY_ALIASES.values())))
-        raise ValueError(f"Unknown DATA_POINT_CAPTURE_STRATEGY '{value}'. Expected one of: {allowed}.")
-    return strategy
+    return _policy_for("disabled")
 
 
 def _policy_for(strategy: CaptureStrategy) -> DataPointCapturePolicy:

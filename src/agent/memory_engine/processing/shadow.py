@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass, replace
 from typing import Any
 
+from agent.config import agent_pipeline_config
 from agent.providers import analyze_memory_batch
 from storage import list_data_point_extraction_debug, list_profile_facts
 from storage.profile_facts import save_data_point_extraction_debug
@@ -53,7 +54,7 @@ class ShadowMemoryAnalysis:
 
 
 def memory_background_v2_shadow_enabled() -> bool:
-    return os.getenv("MEMORY_BACKGROUND_V2_SHADOW", "true").strip().lower() == "true"
+    return agent_pipeline_config().background_memory_enabled
 
 
 def memory_background_v2_threshold() -> int:

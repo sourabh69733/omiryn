@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
+from agent.config import agent_pipeline_config
 from text_vectors import build_text_embedding, cosine_similarity
 
 from .models import ConversationThread
@@ -17,14 +17,11 @@ CROSS_SESSION_RELEVANCE_MINIMUM = 0.12
 
 
 def conversation_state_v2_enabled() -> bool:
-    return os.getenv("CONVERSATION_STATE_V2_ENABLED", "true").strip().lower() == "true"
+    return agent_pipeline_config().conversation_state_enabled
 
 
 def conversation_state_shadow_enabled() -> bool:
-    return conversation_state_v2_enabled() and (
-        os.getenv("CONVERSATION_STATE_V2_SHADOW_ENABLED", "true").strip().lower()
-        == "true"
-    )
+    return agent_pipeline_config().conversation_state_shadow
 
 
 def conversation_thread_context_sources(

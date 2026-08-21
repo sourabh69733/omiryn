@@ -26,9 +26,10 @@ from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOL_CHOICE,
     capture_turn_output_data_points,
     parse_turn_output_v2,
-    turn_output_v2_enabled,
     turn_output_v2_tools,
 )
+from agent.config import agent_pipeline_config
+
 from storage import (
     finish_agent_trace,
     save_agent_context_snapshot,
@@ -167,7 +168,7 @@ async def run_agent_turn(
         user_message_index=len(updated_messages) - 1,
         assistant_message_index=len(updated_messages),
     )
-    turn_output_v2 = turn_output_v2_enabled()
+    turn_output_v2 = agent_pipeline_config().structured_turn_output
     conversation_state_shadow = turn_output_v2 and conversation_state_shadow_enabled()
     system_prompt = context_package.system_prompt
     save_agent_trace_step(
@@ -265,13 +266,22 @@ async def run_agent_turn(
                 require_conversation_update=conversation_state_shadow,
             )
             reply = _visible_companion_reply(parsed_output.reply, sanitized_structured_reply)
-            turn_output_summary = capture_turn_output_data_points(
-                conversation_id=conversation_id,
-                user_id=user_id,
-                user_text=user_text,
-                message_index=len(updated_messages) - 1,
-                data_points=parsed_output.data_points,
-            )
+            inline_data_point_capture_enabled = agent_pipeline_config().inline_data_points
+            if inline_data_point_capture_enabled:
+                turn_output_summary = capture_turn_output_data_points(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    user_text=user_text,
+                    message_index=len(updated_messages) - 1,
+                    data_points=parsed_output.data_points,
+                )
+            else:
+                turn_output_summary = {
+                    "candidate_count": len(parsed_output.data_points),
+                    "saved_count": 0,
+                    "skipped_count": len(parsed_output.data_points),
+                    "capture_strategy": "background_memory",
+                }
             turn_output_summary.update(
                 {
                     "parsed": parsed_output.parsed,

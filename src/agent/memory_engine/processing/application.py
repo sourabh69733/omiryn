@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from dataclasses import dataclass
 from typing import Any
 
+from agent.config import agent_pipeline_config
 from storage.memory_applications import apply_memory_operation_batch
 
 from .models import MemoryBatch, MemoryOperation
@@ -25,8 +25,8 @@ class MemoryApplicationResult:
 
 
 def memory_background_v2_live_writes_enabled() -> bool:
-    """Keep live persistence opt-in until canary evaluation is complete."""
-    return os.getenv("MEMORY_BACKGROUND_V2_LIVE_WRITES", "false").strip().lower() == "true"
+    """Enable writes only in the centrally validated live rollout."""
+    return agent_pipeline_config().live_memory_writes
 
 
 def apply_validated_memory_analysis(
