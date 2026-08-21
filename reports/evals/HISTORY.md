@@ -55,3 +55,11 @@ Synthetic evaluation scores are grouped by day for comparison.
 | 17:41:04 | PASS | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 1/1 scenarios |
 | 18:37:19 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 40% | 4/10 scenarios |
 | 18:44:12 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 0% | 0/1 scenarios |
+
+## 2026-08-21
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 15:14:48 | FAIL | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 73% | 8/11 scenarios |
+| 15:52:56 | PASS | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 11/11 scenarios |
+| 20:01:06 | FAIL | Thread management shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 70% | 7/10 scenarios |
