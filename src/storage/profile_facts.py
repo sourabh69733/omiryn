@@ -13,52 +13,60 @@ from .schema import data_point_extraction_debug, data_point_feedback, profile_fa
 from .utils import _isoformat_utc, _require_user_id
 
 def upsert_profile_fact(fact: dict[str, Any]) -> dict[str, Any]:
-    payload = _profile_fact_payload(fact)
     with ENGINE.begin() as connection:
-        existing = connection.execute(
-            select(profile_facts).where(
-                profile_facts.c.user_id == payload["user_id"],
-                profile_facts.c.category == payload["category"],
-                profile_facts.c.key == payload["key"],
-            )
-        ).mappings().first()
-        if not existing:
-            same_user_rows = connection.execute(
-                select(profile_facts).where(
-                    profile_facts.c.user_id == payload["user_id"],
-                )
-            ).mappings().all()
-            incoming_label = _normalized_fact_terms(str(payload.get("label") or ""))
-            if incoming_label:
-                existing = next(
-                    (
-                        row
-                        for row in same_user_rows
-                        if _normalized_fact_terms(str(row.get("label") or ""))
-                        == incoming_label
-                    ),
-                    None,
-                )
-        if existing:
-            if _normalized_fact_terms(str(existing.get("label") or "")) == _normalized_fact_terms(
-                str(payload.get("label") or "")
-            ):
-                payload["label"] = existing["label"]
-            merged = _merge_profile_fact(existing, payload)
-            connection.execute(
-                profile_facts.update()
-                .where(profile_facts.c.id == existing["id"])
-                .values(**merged, updated_at=func.now())
-            )
-            fact_id = existing["id"]
-        else:
-            fact_id = payload["id"]
-            connection.execute(profile_facts.insert().values(**payload))
+        return _upsert_profile_fact_in_transaction(connection, fact)
 
-        row = connection.execute(
-            select(profile_facts).where(profile_facts.c.id == fact_id)
-        ).mappings().first()
+
+def _upsert_profile_fact_in_transaction(connection, fact: dict[str, Any]) -> dict[str, Any]:
+    """Upsert through a caller-owned transaction for atomic memory batches."""
+    payload = _profile_fact_payload(fact)
+    existing = _find_existing_profile_fact_row(connection, payload)
+    if existing:
+        if _normalized_fact_terms(str(existing.get("label") or "")) == _normalized_fact_terms(
+            str(payload.get("label") or "")
+        ):
+            payload["label"] = existing["label"]
+        merged = _merge_profile_fact(existing, payload)
+        connection.execute(
+            profile_facts.update()
+            .where(profile_facts.c.id == existing["id"])
+            .values(**merged, updated_at=func.now())
+        )
+        fact_id = existing["id"]
+    else:
+        fact_id = payload["id"]
+        connection.execute(profile_facts.insert().values(**payload))
+
+    row = connection.execute(
+        select(profile_facts).where(profile_facts.c.id == fact_id)
+    ).mappings().first()
     return _profile_fact_from_row(row)
+
+
+def _find_existing_profile_fact_row(connection, payload: dict[str, Any]):
+    existing = connection.execute(
+        select(profile_facts).where(
+            profile_facts.c.user_id == payload["user_id"],
+            profile_facts.c.category == payload["category"],
+            profile_facts.c.key == payload["key"],
+        )
+    ).mappings().first()
+    if existing:
+        return existing
+    incoming_label = _normalized_fact_terms(str(payload.get("label") or ""))
+    if not incoming_label:
+        return None
+    same_user_rows = connection.execute(
+        select(profile_facts).where(profile_facts.c.user_id == payload["user_id"])
+    ).mappings().all()
+    return next(
+        (
+            row
+            for row in same_user_rows
+            if _normalized_fact_terms(str(row.get("label") or "")) == incoming_label
+        ),
+        None,
+    )
 
 
 def list_profile_facts(
