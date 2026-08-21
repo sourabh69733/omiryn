@@ -1,45 +1,35 @@
-"""Delegates combined model output to memory and thread domain validators."""
+"""Splits one background response across memory and thread domain contracts."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.state import evaluate_thread_operation_shadow
 from agent.memory_engine.processing.models import MemoryBatch
+from agent.memory_engine.processing.validation import validate_memory_analysis
+from agent.shared.utils import unknown_fields
+
+from .models import BackgroundCognitionAnalysis
 
 
-@dataclass(frozen=True)
-class BackgroundCognitionAnalysis:
-    """Validated memory and thread lanes from one provider response."""
-
-    decision: str
-    memory: Any
-    thread: dict[str, Any]
-    thread_operation: str
-    valid: bool
-    errors: tuple[str, ...] = ()
-
-
-def validate_background_cognition_analysis(
+def interpret_background_cognition(
     raw: Any,
     *,
     batch: MemoryBatch,
     existing_memory_ids: set[str],
     thread_candidates: list[dict[str, object]],
 ) -> BackgroundCognitionAnalysis:
-    """Validate the envelope once, then delegate each domain-specific lane."""
-    # Imported lazily so the existing memory worker can call this coordinator
-    # without creating a module-import cycle.
-    from agent.memory_engine.processing.shadow import validate_shadow_memory_analysis
-
+    """Delegate each portion of one model response to its owning domain."""
     errors: list[str] = []
     if not isinstance(raw, dict):
         raw = {}
         errors.append("background cognition analysis must be an object")
-    unknown = set(raw) - {"decision", "operations", "thread_operation", "handoff"}
-    if unknown:
-        errors.append(f"unsupported top-level fields: {', '.join(sorted(unknown))}")
+    unsupported = unknown_fields(
+        raw,
+        {"decision", "operations", "thread_operation", "handoff"},
+    )
+    if unsupported:
+        errors.append(f"unsupported top-level fields: {', '.join(unsupported)}")
 
     decision = raw.get("decision")
     operations = raw.get("operations")
@@ -58,13 +48,12 @@ def validate_background_cognition_analysis(
     if decision == "propose" and not (has_memory_change or has_thread_change):
         errors.append("propose requires a memory or thread operation")
 
-    memory_raw = {
-        "decision": "propose" if has_memory_change else "no_change",
-        "operations": operations if isinstance(operations, list) else operations,
-        "handoff": raw.get("handoff"),
-    }
-    memory = validate_shadow_memory_analysis(
-        memory_raw,
+    memory = validate_memory_analysis(
+        {
+            "decision": "propose" if has_memory_change else "no_change",
+            "operations": operations if isinstance(operations, list) else operations,
+            "handoff": raw.get("handoff"),
+        },
         batch=batch,
         existing_memory_ids=existing_memory_ids,
     )
@@ -92,4 +81,4 @@ def validate_background_cognition_analysis(
     )
 
 
-__all__ = ["BackgroundCognitionAnalysis", "validate_background_cognition_analysis"]
+__all__ = ["interpret_background_cognition"]
