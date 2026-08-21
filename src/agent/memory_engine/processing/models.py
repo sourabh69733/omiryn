@@ -38,6 +38,7 @@ class MemoryOperation:
     data_point_type: str | None = None
     category: str | None = None
     key: str | None = None
+    label: str | None = None
     value: Any = None
     confidence: float | None = None
     evidence_message_indexes: tuple[int, ...] = ()

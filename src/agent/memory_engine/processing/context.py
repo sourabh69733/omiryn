@@ -77,11 +77,19 @@ def _batch_end_index(
     max_meaningful_user_messages: int,
 ) -> int:
     meaningful_seen = 0
-    for message in pending:
+    threshold_index: int | None = None
+    for position, message in enumerate(pending):
         if _is_meaningful_user_message(message):
             meaningful_seen += 1
             if meaningful_seen == max_meaningful_user_messages:
-                return int(message["message_index"])
+                threshold_index = int(message["message_index"])
+                continue
+            if threshold_index is not None:
+                return int(pending[position - 1]["message_index"])
+    if threshold_index is not None:
+        # Include the assistant response and lightweight continuation following
+        # the threshold turn, stopping before the next meaningful user message.
+        return int(pending[-1]["message_index"])
     return int(pending[-1]["message_index"])
 
 

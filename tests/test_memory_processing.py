@@ -61,7 +61,7 @@ class MemoryProcessingTest(unittest.TestCase):
         self.assertIsNotNone(batch)
         assert batch is not None
         self.assertEqual([message.message_index for message in batch.context_messages], [0, 1])
-        self.assertEqual([message.message_index for message in batch.new_messages], [2, 3, 4])
+        self.assertEqual([message.message_index for message in batch.new_messages], [2, 3, 4, 5])
         self.assertEqual(batch.evidence_message_indexes, (2, 4))
         self.assertEqual(batch.previous_handoff.active_people, ("Priya",))
         self.assertFalse(any(message.evidence_eligible for message in batch.context_messages))
@@ -87,8 +87,8 @@ class MemoryProcessingTest(unittest.TestCase):
         self.assertIsNotNone(batch)
         assert batch is not None
         self.assertEqual(batch.meaningful_user_message_count, 7)
-        self.assertEqual(batch.new_end_message_index, 14)
-        self.assertEqual([message.message_index for message in batch.new_messages], list(range(15)))
+        self.assertEqual(batch.new_end_message_index, 15)
+        self.assertEqual([message.message_index for message in batch.new_messages], list(range(16)))
 
     def test_same_messages_produce_stable_batch_key_and_cursor_removes_processed_work(self) -> None:
         first = build_memory_batch(
