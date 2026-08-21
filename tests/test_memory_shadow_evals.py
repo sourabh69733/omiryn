@@ -110,8 +110,95 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertFalse(passed)
-        self.assertIn("Expected 1 operation", " ".join(findings))
+        self.assertIn("Unexpected operation", " ".join(findings))
         self.assertIn("Missing expected operation", " ".join(findings))
+
+    def test_grader_accepts_meaning_preserving_chat_learning_summary(self) -> None:
+        scenario = get_memory_shadow_scenario("capture_conversation_style_learning")
+        operation = {
+            "operation": "add",
+            "target_memory_id": None,
+            "data_point_type": "chat_learning",
+            "category": "conversation_style",
+            "key": "question_frequency",
+            "label": "preference for question frequency",
+            "value": "less frequent",
+            "confidence": 1.0,
+            "evidence_message_indexes": [0],
+        }
+
+        passed, _ = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(operation,),
+            structurally_valid=True,
+        )
+
+        self.assertTrue(passed)
+
+    def test_grader_accepts_core_temporary_context_without_every_source_detail(self) -> None:
+        scenario = get_memory_shadow_scenario("capture_short_lived_health_context")
+        operation = {
+            "operation": "add",
+            "target_memory_id": None,
+            "data_point_type": "temporary_context",
+            "category": "health",
+            "key": "current_status",
+            "label": "current health status",
+            "value": "sick",
+            "confidence": 1.0,
+            "evidence_message_indexes": [0],
+        }
+
+        passed, _ = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(operation,),
+            structurally_valid=True,
+        )
+
+        self.assertTrue(passed)
+
+    def test_grader_accepts_distinct_optional_fact_but_still_rejects_duplicates(self) -> None:
+        scenario = get_memory_shadow_scenario("capture_hinglish_partner_personality")
+        required = {
+            "operation": "add",
+            "target_memory_id": None,
+            "data_point_type": "matching_fact",
+            "category": "partner_pref",
+            "key": "personality_traits",
+            "label": "prefers calm and funny partner",
+            "value": ["calm", "funny"],
+            "confidence": 0.8,
+            "evidence_message_indexes": [0],
+        }
+        optional = {
+            "operation": "add",
+            "target_memory_id": None,
+            "data_point_type": "matching_fact",
+            "category": "partner_pref",
+            "key": "loudness_tolerance",
+            "label": "does not prefer loud partner",
+            "value": "low",
+            "confidence": 0.8,
+            "evidence_message_indexes": [0],
+        }
+
+        accepted, _ = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(required, optional),
+            structurally_valid=True,
+        )
+        duplicate_accepted, _ = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(required, required),
+            structurally_valid=True,
+        )
+
+        self.assertTrue(accepted)
+        self.assertFalse(duplicate_accepted)
 
     async def test_runner_calls_real_memory_boundary_and_returns_report_payload(self) -> None:
         scenario = get_memory_shadow_scenario(

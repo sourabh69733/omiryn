@@ -192,11 +192,6 @@ def grade_memory_shadow_result(
         return False, tuple(findings)
     if decision != scenario.expected_decision:
         findings.append(f"Expected decision {scenario.expected_decision}, observed {decision}.")
-    if len(operations) != len(scenario.expected_operations):
-        findings.append(
-            f"Expected {len(scenario.expected_operations)} operation(s), observed {len(operations)}."
-        )
-
     remaining = list(operations)
     for expected in scenario.expected_operations:
         match_index = next(
@@ -211,6 +206,28 @@ def grade_memory_shadow_result(
             findings.append(_missing_operation_finding(expected))
         else:
             remaining.pop(match_index)
+
+    optional = list(scenario.optional_operations)
+    unmatched: list[dict[str, Any]] = []
+    for operation in remaining:
+        match_index = next(
+            (
+                index
+                for index, expected in enumerate(optional)
+                if _operation_matches(expected, operation)
+            ),
+            None,
+        )
+        if match_index is None:
+            unmatched.append(operation)
+        else:
+            optional.pop(match_index)
+    for operation in unmatched:
+        findings.append(
+            "Unexpected operation: "
+            f"{operation.get('operation')} / {operation.get('data_point_type')} / "
+            f"{operation.get('label') or operation.get('key') or 'unlabelled'}."
+        )
 
     searchable = " ".join(_operation_search_text(operation) for operation in operations)
     for forbidden in scenario.forbidden_concepts:
@@ -246,6 +263,16 @@ def scenario_result_payload(
                     "evidence_message_indexes": list(operation.evidence_message_indexes),
                 }
                 for operation in scenario.expected_operations
+            ],
+            "optional_operations": [
+                {
+                    "operation": operation.operation,
+                    "data_point_type": operation.data_point_type,
+                    "target_memory_id": operation.target_memory_id,
+                    "value_concepts": list(operation.value_concepts),
+                    "evidence_message_indexes": list(operation.evidence_message_indexes),
+                }
+                for operation in scenario.optional_operations
             ],
             "forbidden_concepts": list(scenario.forbidden_concepts),
         },

@@ -541,6 +541,17 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
                 )
         else:
             lines.append("- None.")
+        optional_operations = expected.get("optional_operations") or []
+        if optional_operations:
+            lines.append("**Optional valid operations:**")
+            for operation in optional_operations:
+                lines.append(
+                    "- "
+                    f"{operation.get('operation')} / "
+                    f"{operation.get('data_point_type') or 'existing memory'} / "
+                    f"concepts={operation.get('value_concepts') or []} / "
+                    f"evidence={operation.get('evidence_message_indexes') or []}"
+                )
         observed_operations = observed.get("operations") or []
         lines.append("**Observed operations:**")
         if observed_operations:

@@ -51,6 +51,7 @@ class MemoryShadowScenario:
     description: str
     messages: tuple[dict[str, Any], ...]
     expected_operations: tuple[ExpectedMemoryOperation, ...] = ()
+    optional_operations: tuple[ExpectedMemoryOperation, ...] = ()
     expected_decision: str = "propose"
     existing_memories: tuple[ExistingMemoryFixture, ...] = ()
     processed_through_message_index: int = -1
@@ -66,7 +67,7 @@ class MemoryShadowScenario:
         if self.expected_decision == "no_change" and self.expected_operations:
             raise ValueError("A no_change scenario cannot expect operations.")
         indexes = set(range(len(self.messages)))
-        for expected in self.expected_operations:
+        for expected in (*self.expected_operations, *self.optional_operations):
             if not set(expected.evidence_message_indexes).issubset(indexes):
                 raise ValueError(f"Scenario '{self.id}' contains an unknown evidence index.")
         memory_ids = {memory.id for memory in self.existing_memories}
@@ -239,7 +240,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="chat_learning",
-                value_concepts=("question", "every reply"),
+                value_concepts=("question",),
                 evidence_message_indexes=(0,),
             ),
         ),
@@ -255,7 +256,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="temporary_context",
-                value_concepts=("sick", "rest"),
+                value_concepts=("sick",),
                 evidence_message_indexes=(0,),
             ),
         ),
@@ -288,6 +289,14 @@ MEMORY_SHADOW_SCENARIOS = (
                 operation="add",
                 data_point_type="matching_fact",
                 value_concepts=("calm", "funny"),
+                evidence_message_indexes=(0,),
+            ),
+        ),
+        optional_operations=(
+            ExpectedMemoryOperation(
+                operation="add",
+                data_point_type="matching_fact",
+                value_concepts=("loud",),
                 evidence_message_indexes=(0,),
             ),
         ),
