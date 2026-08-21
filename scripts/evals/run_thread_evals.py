@@ -32,6 +32,7 @@ from agent.evals.behavior.reporting.writer import (  # noqa: E402
     save_evaluation_reports,
 )
 from agent.evals.behavior.simulation.thread_runner import (  # noqa: E402
+    run_background_thread_management_scenario,
     run_thread_management_scenario,
     thread_scenario_payload,
 )
@@ -46,6 +47,12 @@ from storage import init_db, reset_db  # noqa: E402
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate companion thread-management proposals without persisting them."
+    )
+    parser.add_argument(
+        "--lane",
+        default="background",
+        choices=("background", "foreground"),
+        help="Evaluate the new background cognition lane or the legacy foreground proposal.",
     )
     parser.add_argument(
         "--provider",
@@ -119,8 +126,13 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         agent_name=args.agent_name,
     )
     records = []
+    scenario_runner = (
+        run_background_thread_management_scenario
+        if args.lane == "background"
+        else run_thread_management_scenario
+    )
     for scenario in scenarios:
-        result = await run_thread_management_scenario(
+        result = await scenario_runner(
             scenario=scenario,
             companion=companion,
             event_sink=reporter,
@@ -132,6 +144,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         "stage": "thread_management_shadow_eval",
         "passed": passed_count == len(records),
         "judges": ["deterministic expected-versus-proposed thread action"],
+        "lane": args.lane,
         "companion": {
             "provider": args.provider,
             "model": args.model or provider_model(args.provider) or "provider-default",
@@ -215,7 +228,8 @@ def main() -> int:
         summary = payload["summary"]
         status = "PASS" if payload["passed"] else "FAIL"
         print(
-            f"\nThread shadow suite: {status}; {summary['passed']}/{summary['total']} passed; "
+            f"\nThread {args.lane} shadow suite: {status}; "
+            f"{summary['passed']}/{summary['total']} passed; "
             f"{summary['failed']} failed."
         )
     

@@ -19,8 +19,10 @@ from agent.evals.behavior.simulation.thread_scenario import (
     ExpectedThreadAction,
     ThreadManagementScenario,
 )
+from agent.memory_engine.processing.shadow import run_shadow_memory_extraction
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
+    list_data_point_extraction_debug,
     list_agent_trace_steps,
     list_agent_traces,
     save_conversation,
@@ -51,32 +53,16 @@ async def run_thread_management_scenario(
     event_sink: EventSink | None = None,
 ) -> ThreadScenarioResult:
     """Run one scenario without applying the model's proposed thread changes."""
-    run_token = uuid4().hex
-    user_id = f"thread-eval-{scenario.id}-{run_token[:8]}"
-    conversation_id = f"thread-eval-conversation-{run_token}"
-    messages = [dict(message) for message in scenario.prior_messages]
+    user_id, conversation_id, messages, fixture_ids = _prepare_thread_scenario(
+        scenario=scenario,
+        companion=companion,
+    )
     profile = {
         "user_id": user_id,
         "display_name": "Thread Eval User",
         "gender": "unknown",
         "interested_in": "unknown",
     }
-    save_conversation(
-        _conversation_payload(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            messages=messages,
-            config=companion,
-        ),
-        user_id,
-    )
-    fixture_ids = _create_thread_fixtures(
-        scenario=scenario,
-        user_id=user_id,
-        conversation_id=conversation_id,
-        companion=companion,
-    )
-
     emit_event(
         event_sink,
         "thread_scenario_started",
@@ -182,6 +168,82 @@ async def run_thread_management_scenario(
     return scenario_result
 
 
+async def run_background_thread_management_scenario(
+    *,
+    scenario: ThreadManagementScenario,
+    companion: RuntimeDriverConfig,
+    event_sink: EventSink | None = None,
+) -> ThreadScenarioResult:
+    """Run the shared thread scenario through the combined background call."""
+    user_id, conversation_id, prior_messages, fixture_ids = _prepare_thread_scenario(
+        scenario=scenario,
+        companion=companion,
+    )
+    messages = [
+        *prior_messages,
+        {"role": "user", "content": scenario.user_message},
+    ]
+    save_conversation(
+        _conversation_payload(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            messages=messages,
+            config=companion,
+        ),
+        user_id,
+    )
+    emit_event(
+        event_sink,
+        "background_thread_scenario_started",
+        "Background thread scenario started.",
+        scenario_id=scenario.id,
+    )
+    with _thread_eval_environment(companion):
+        worker_result = await run_shadow_memory_extraction(
+            conversation_id,
+            user_id,
+            messages,
+            companion.model,
+        )
+    shadow = _latest_background_shadow_result(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        worker_result=worker_result,
+    )
+    passed, finding = _grade_shadow_proposal(
+        expected=scenario.expected_action,
+        shadow=shadow,
+        fixture_ids=fixture_ids,
+    )
+    proposal = shadow.get("proposal") if isinstance(shadow.get("proposal"), dict) else None
+    operations = tuple(
+        str(update.get("operation"))
+        for update in (proposal or {}).get("thread_updates", [])
+        if isinstance(update, dict) and update.get("operation")
+    )
+    emit_event(
+        event_sink,
+        "background_thread_scenario_completed",
+        "Background thread scenario completed.",
+        scenario_id=scenario.id,
+        passed=passed,
+        finding=finding,
+    )
+    return ThreadScenarioResult(
+        scenario_id=scenario.id,
+        passed=passed,
+        assistant_reply="",
+        expected_operation=scenario.expected_action.operation if scenario.expected_action else "none",
+        actual_operations=operations,
+        shadow_present=bool(shadow.get("present")),
+        shadow_valid=bool(shadow.get("valid")),
+        proposal=proposal,
+        validation_errors=tuple(str(error) for error in shadow.get("errors") or ()),
+        finding=finding,
+        conversation_id=conversation_id,
+    )
+
+
 def thread_scenario_payload(
     result: ThreadScenarioResult,
     *,
@@ -224,6 +286,34 @@ def thread_scenario_payload(
         },
         "finding": result.finding,
     }
+
+
+def _prepare_thread_scenario(
+    *,
+    scenario: ThreadManagementScenario,
+    companion: RuntimeDriverConfig,
+) -> tuple[str, str, list[dict[str, str]], dict[str, str]]:
+    """Create one isolated conversation and its trusted thread fixtures."""
+    run_token = uuid4().hex
+    user_id = f"thread-eval-{scenario.id}-{run_token[:8]}"
+    conversation_id = f"thread-eval-conversation-{run_token}"
+    messages = [dict(message) for message in scenario.prior_messages]
+    save_conversation(
+        _conversation_payload(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            messages=messages,
+            config=companion,
+        ),
+        user_id,
+    )
+    fixture_ids = _create_thread_fixtures(
+        scenario=scenario,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        companion=companion,
+    )
+    return user_id, conversation_id, messages, fixture_ids
 
 
 def _create_thread_fixtures(
@@ -292,6 +382,34 @@ def _latest_shadow_result(*, conversation_id: str, user_id: str) -> dict[str, An
             model_called=True,
         )
     return {**shadow, "model_called": True}
+
+
+def _latest_background_shadow_result(
+    *,
+    conversation_id: str,
+    user_id: str,
+    worker_result: dict[str, Any],
+) -> dict[str, Any]:
+    rows = list_data_point_extraction_debug(
+        user_id=user_id,
+        source_id=conversation_id,
+        limit=1,
+    )
+    if not rows:
+        return _missing_shadow(
+            f"Background worker returned {worker_result.get('status') or 'no status'} without telemetry.",
+            model_called=worker_result.get("status") != "no_pending_messages",
+        )
+    review = rows[0].get("review") if isinstance(rows[0].get("review"), dict) else {}
+    proposal = review.get("thread_proposal")
+    return {
+        "present": True,
+        "valid": bool(review.get("thread_valid")),
+        "proposal": proposal if isinstance(proposal, dict) else None,
+        "errors": list(review.get("thread_errors") or []),
+        "persisted": False,
+        "model_called": True,
+    }
 
 
 def _missing_shadow(reason: str, *, model_called: bool) -> dict[str, Any]:
@@ -378,6 +496,7 @@ def _thread_eval_environment(config: RuntimeDriverConfig) -> Iterator[None]:
 
 __all__ = [
     "ThreadScenarioResult",
+    "run_background_thread_management_scenario",
     "run_thread_management_scenario",
     "thread_scenario_payload",
 ]

@@ -10,9 +10,11 @@ from uuid import uuid4
 
 from agent.evals.behavior.core.events import EventSink, emit_event
 from agent.memory_engine.processing import MemoryProcessingState, build_memory_batch
-from agent.memory_engine.processing.prompt import memory_batch_prompt
-from agent.memory_engine.processing.shadow import validate_shadow_memory_analysis
-from agent.providers import analyze_memory_batch
+from agent.cognition.background import (
+    background_cognition_prompt,
+    validate_background_cognition_analysis,
+)
+from agent.providers import analyze_background_cognition
 from storage import save_conversation
 
 from .scenarios import ExpectedMemoryOperation, MemoryShadowScenario
@@ -102,8 +104,8 @@ async def run_memory_shadow_scenario(
     )
     started = perf_counter()
     try:
-        raw = await analyze_memory_batch(
-            memory_batch_prompt(batch, existing_memories),
+        raw = await analyze_background_cognition(
+            background_cognition_prompt(batch, existing_memories, []),
             conversation_id=conversation_id,
             model=model,
             timeout_seconds=timeout_seconds,
@@ -139,11 +141,13 @@ async def run_memory_shadow_scenario(
         scenario_id=scenario.id,
         duration_seconds=duration,
     )
-    analysis = validate_shadow_memory_analysis(
+    cognition = validate_background_cognition_analysis(
         raw,
         batch=batch,
         existing_memory_ids={memory.id for memory in scenario.existing_memories},
+        thread_candidates=[],
     )
+    analysis = cognition.memory
     operations = tuple(_operation_payload(operation) for operation in analysis.operations)
     passed, findings = grade_memory_shadow_result(
         scenario=scenario,
