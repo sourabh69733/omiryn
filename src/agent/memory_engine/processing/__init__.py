@@ -12,10 +12,13 @@ from .models import (
     MemoryMessage,
     MemoryOperation,
     MemoryProcessingState,
+    MemoryAnalysis,
 )
 from .service import get_processing_state, save_processing_state
+from .validation import validate_memory_analysis
 
 __all__ = [
+    "MemoryAnalysis",
     "MemoryBatch",
     "MemoryApplicationResult",
     "MemoryHandoff",
@@ -27,4 +30,5 @@ __all__ = [
     "get_processing_state",
     "save_processing_state",
     "memory_background_v2_live_writes_enabled",
+    "validate_memory_analysis",
 ]
