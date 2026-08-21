@@ -11,10 +11,12 @@ from agent.memory_engine.data_points.extraction.prompts import (
     DATA_POINT_REVIEW_SYSTEM_PROMPT,
     DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
 )
+from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (
     DATA_POINT_EXTRACT,
+    MEMORY_SHADOW_EXTRACT,
     PROFILE_EXTRACT,
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
@@ -30,6 +32,50 @@ from agent.providers.gateway.router import provider_chat
 from agent.providers.shared.usage_events import _record_usage_event
 
 logger = logging.getLogger(__name__)
+
+
+async def analyze_memory_batch(
+    extraction_text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    """Run provider-neutral shadow memory analysis and return its JSON object."""
+    provider = _provider_name()
+    logger.info("agent.memory.shadow provider=%s chars=%s", provider, len(extraction_text))
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=MEMORY_SHADOW_EXTRACT,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        return {
+            "decision": "no_change",
+            "operations": [],
+            "handoff": {
+                "summary": "",
+                "active_people": [],
+                "active_topics": [],
+                "unresolved_references": [],
+            },
+        }
+
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=MEMORY_BACKGROUND_V2_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": extraction_text}],
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=MEMORY_SHADOW_EXTRACT,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
 
 
 async def extract_profile(
