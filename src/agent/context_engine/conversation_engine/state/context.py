@@ -14,6 +14,7 @@ from .service import get_state, get_thread, list_threads
 CONVERSATION_THREAD_SOURCE_TYPE = "conversation_threads"
 CONVERSATION_THREAD_CONTEXT_LIMIT = 3
 CROSS_SESSION_RELEVANCE_MINIMUM = 0.12
+BACKGROUND_THREAD_CANDIDATE_LIMIT = 4
 
 
 def conversation_state_v2_enabled() -> bool:
@@ -84,6 +85,54 @@ def conversation_thread_context_sources(
     ]
 
 
+def background_thread_candidates(
+    conversation_id: str,
+    user_id: str,
+    query_text: str,
+    *,
+    limit: int = BACKGROUND_THREAD_CANDIDATE_LIMIT,
+) -> list[dict[str, object]]:
+    """Return bounded, owned thread records for background model classification."""
+    if not user_id or limit <= 0:
+        return []
+    state = get_state(conversation_id, user_id)
+    active = (
+        get_thread(state.active_thread_id, user_id)
+        if state and state.active_thread_id
+        else None
+    )
+    threads = list_threads(
+        user_id,
+        statuses=("open", "paused", "completed", "blocked_by_user"),
+    )
+    ranked = _rank_thread_candidates(
+        threads,
+        conversation_id=conversation_id,
+        user_text=query_text,
+        excluded_thread_id=active.id if active else None,
+    )
+    selected = (([active] if active else []) + ranked)[:limit]
+    return [
+        {
+            "id": thread.id,
+            "user_id": thread.user_id,
+            "title": thread.title,
+            "summary": thread.summary,
+            "status": thread.status,
+            "origin": thread.origin,
+            "active": bool(active and active.id == thread.id),
+            "version": thread.version,
+            "matching_dimension": thread.matching_dimension,
+            "depth": thread.depth,
+            "user_interest": thread.user_interest,
+            "salience": thread.salience,
+            "next_angle": thread.next_angle,
+            "last_conversation_id": thread.last_conversation_id,
+        }
+        for thread in selected
+    ]
+
+
 def _rank_open_thread_candidates(
     threads: list[ConversationThread],
     *,
@@ -92,10 +141,25 @@ def _rank_open_thread_candidates(
     active_thread_id: str | None,
 ) -> list[ConversationThread]:
     """Rank current threads plus relevant prior-session threads without changing state."""
+    return _rank_thread_candidates(
+        threads,
+        conversation_id=conversation_id,
+        user_text=user_text,
+        excluded_thread_id=active_thread_id,
+    )
+
+
+def _rank_thread_candidates(
+    threads: list[ConversationThread],
+    *,
+    conversation_id: str,
+    user_text: str,
+    excluded_thread_id: str | None,
+) -> list[ConversationThread]:
     query_embedding = build_text_embedding(user_text) if user_text.strip() else None
     candidates: list[tuple[float, int, ConversationThread]] = []
     for recency_index, thread in enumerate(threads):
-        if thread.id == active_thread_id:
+        if thread.id == excluded_thread_id:
             continue
         current_conversation = thread.last_conversation_id == conversation_id
         thread_text = " ".join(
