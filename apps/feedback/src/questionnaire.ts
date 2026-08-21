@@ -6,7 +6,6 @@ export type Question = {
   type: "single" | "multiple" | "text";
   maxChoices?: number;
   options?: string[];
-  exclusiveOptions?: string[];
   allowOther?: boolean;
   otherPlaceholder?: string;
 };
@@ -29,7 +28,6 @@ export const questions: Question[] = [
       "Limited time or opportunities",
       "I don't think it is particularly difficult",
     ],
-    exclusiveOptions: ["I don't think it is particularly difficult"],
     allowOther: true,
     otherPlaceholder: "Something else - type your answer",
   },
@@ -109,7 +107,6 @@ export const questions: Question[] = [
       "The process taking too much effort",
       "Nothing concerns me yet",
     ],
-    exclusiveOptions: ["Nothing concerns me yet"],
     allowOther: true,
     otherPlaceholder: "Another concern - type your answer",
   },

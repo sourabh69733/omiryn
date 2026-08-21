@@ -15,8 +15,9 @@ import {
   submitFeedback,
   type SubmissionMode,
 } from "./feedbackApi";
-import { getQuestionScreenClass } from "./firstQuestionTheme.js";
+import { toggleAnswer } from "./answerSelection.js";
 import { conceptInsertAfterQuestion, questions, type Question } from "./questionnaire";
+import { getScreenTheme, type QuestionTheme } from "./themes.js";
 
 type AnswerMap = Record<string, string[]>;
 type Screen = { kind: "welcome" } | { kind: "question"; questionIndex: number } | { kind: "concept" };
@@ -101,6 +102,7 @@ export function FeedbackApp() {
   }, [screenIndex]);
 
   const currentScreen = screens[screenIndex];
+  const currentTheme = getScreenTheme(currentScreen);
 
   const moveForward = () => setScreenIndex((current) => Math.min(current + 1, screens.length - 1));
   const moveBack = () => setScreenIndex((current) => Math.max(current - 1, 0));
@@ -137,23 +139,21 @@ export function FeedbackApp() {
     setCompletionMode(null);
   };
 
-  if (completionMode) return <CompletionScreen mode={completionMode} onRestart={restart} />;
+  if (completionMode) {
+    return <CompletionScreen mode={completionMode} onRestart={restart} theme={getScreenTheme({ kind: "completion" })} />;
+  }
 
   return (
-    <div className="feedback-app">
+    <div className={`feedback-app ${currentTheme.appClassName}`}>
       <Header />
       <main
-        className={`feedback-main${
-          currentScreen.kind === "question" && currentScreen.questionIndex === 0
-            ? " feedback-main--playground"
-            : ""
-        }`}
+        className={`feedback-main${currentTheme ? ` ${currentTheme.mainClassName}` : ""}`}
       >
         <div className="screen-transition" key={`${currentScreen.kind}-${screenIndex}`}>
           {currentScreen.kind === "welcome" ? (
-            <WelcomeScreen onBegin={moveForward} />
+            <WelcomeScreen onBegin={moveForward} theme={currentTheme} />
           ) : currentScreen.kind === "concept" ? (
-            <ConceptScreen onBack={moveBack} onContinue={moveForward} />
+            <ConceptScreen onBack={moveBack} onContinue={moveForward} theme={currentTheme} />
           ) : (
             <QuestionScreen
               question={questions[currentScreen.questionIndex]}
@@ -166,6 +166,7 @@ export function FeedbackApp() {
               }
               submitting={submitting}
               submitError={submitError}
+              theme={currentTheme}
             />
           )}
         </div>
@@ -195,9 +196,9 @@ function Header() {
   );
 }
 
-function WelcomeScreen({ onBegin }: { onBegin: () => void }) {
+function WelcomeScreen({ onBegin, theme }: { onBegin: () => void; theme: QuestionTheme }) {
   return (
-    <section className="welcome-screen">
+    <section className={`welcome-screen ${theme.screenClassNames.welcome}`}>
       <div className="welcome-copy">
         <p className="eyebrow">A tiny discovery session</p>
         <h1>How could finding the right person feel easier?</h1>
@@ -232,6 +233,7 @@ function QuestionScreen({
   onContinue,
   submitting,
   submitError,
+  theme,
 }: {
   question: Question;
   questionIndex: number;
@@ -241,6 +243,7 @@ function QuestionScreen({
   onContinue: () => void | Promise<void>;
   submitting: boolean;
   submitError: string;
+  theme: QuestionTheme;
 }) {
   const selected = answers[question.id] ?? [];
   const isText = question.type === "text";
@@ -249,26 +252,15 @@ function QuestionScreen({
   const canContinue = isText || selected.length > 0;
 
   const toggleOption = (option: string) => {
-    if (question.type === "single") {
-      onAnswersChange({ ...answers, [question.id]: [option] });
-      return;
-    }
-
-    const isSelected = selected.includes(option);
-    if (isSelected) {
-      onAnswersChange({ ...answers, [question.id]: selected.filter((value) => value !== option) });
-      return;
-    }
-    if (question.exclusiveOptions?.includes(option)) {
-      onAnswersChange({ ...answers, [question.id]: [option] });
-      return;
-    }
-    if (selected.length < (question.maxChoices ?? Number.POSITIVE_INFINITY)) {
-      const withoutExclusiveOptions = selected.filter(
-        (value) => !question.exclusiveOptions?.includes(value),
-      );
-      onAnswersChange({ ...answers, [question.id]: [...withoutExclusiveOptions, option] });
-    }
+    onAnswersChange({
+      ...answers,
+      [question.id]: toggleAnswer({
+        type: question.type === "single" ? "single" : "multiple",
+        selected,
+        option,
+        maxChoices: question.maxChoices,
+      }),
+    });
   };
 
   const setText = (value: string) => {
@@ -283,18 +275,18 @@ function QuestionScreen({
       return;
     }
 
-    // A typed answer behaves like any other non-exclusive selection.
-    const withoutExclusiveOptions = withoutOther.filter(
-      (answer) => !question.exclusiveOptions?.includes(answer),
-    );
     onAnswersChange({
       ...answers,
-      [question.id]: [...withoutExclusiveOptions, `${otherAnswerPrefix}${boundedValue}`],
+      [question.id]: [...withoutOther, `${otherAnswerPrefix}${boundedValue}`],
     });
   };
 
   return (
-    <section className={getQuestionScreenClass(questionIndex)}>
+    <section
+      className={`question-screen${
+        ` ${theme.screenClassNames.question}`
+      }`}
+    >
       <QuestionProgress current={questionIndex + 1} />
       <div className="question-heading">
         <p className="eyebrow">{question.eyebrow}</p>
@@ -387,15 +379,17 @@ function QuestionProgress({ current }: { current: number }) {
 function ConceptScreen({
   onBack,
   onContinue,
+  theme,
 }: {
   onBack: () => void;
   onContinue: () => void | Promise<void>;
+  theme: QuestionTheme;
 }) {
   const [frame, setFrame] = useState(0);
   const CurrentIcon = conceptFrames[frame].icon;
 
   return (
-    <section className="concept-screen">
+    <section className={`concept-screen ${theme.screenClassNames.concept}`}>
       <div className="concept-copy">
         <p className="eyebrow">Meet Omiryn</p>
         <h1>A more thoughtful introduction</h1>
@@ -515,14 +509,16 @@ function Navigation({
 function CompletionScreen({
   mode,
   onRestart,
+  theme,
 }: {
   mode: SubmissionMode;
   onRestart: () => void;
+  theme: QuestionTheme;
 }) {
   return (
-    <div className="feedback-app completion-layout">
+    <div className={`feedback-app completion-layout ${theme.appClassName}`}>
       <Header />
-      <main className="completion-screen">
+      <main className={`completion-screen ${theme.screenClassNames.completion}`}>
         <span className="completion-mark"><Check aria-hidden="true" /></span>
         <p className="eyebrow">That was genuinely useful</p>
         <h1>Thank you for helping shape Omiryn.</h1>
