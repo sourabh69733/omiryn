@@ -14,6 +14,7 @@ from .schema import (
     agent_usage_events,
     draft_profiles,
     memory_processing_states,
+    memory_operation_applications,
 )
 from .utils import (
     _isoformat_utc,
@@ -205,6 +206,12 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             memory_processing_states.delete().where(
                 memory_processing_states.c.conversation_id == conversation_id,
                 memory_processing_states.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            memory_operation_applications.delete().where(
+                memory_operation_applications.c.conversation_id == conversation_id,
+                memory_operation_applications.c.user_id == owner_id,
             )
         )
         connection.execute(
