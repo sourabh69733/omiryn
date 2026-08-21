@@ -219,6 +219,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
                     "evidence_message_indexes": [2],
                 }
             ],
+            "thread_operation": {"operation": "none"},
             "handoff": {
                 "summary": "The user described preferred partner personality.",
                 "active_people": [],
@@ -227,9 +228,10 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             },
         }
         with patch(
-            "agent.evals.memory.runner.analyze_memory_batch",
+            "agent.evals.memory.runner.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=raw,
+            create=True,
         ) as analyze:
             result = await run_memory_shadow_scenario(
                 scenario=scenario,

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import unittest
+import json
 from unittest.mock import AsyncMock, patch
 
+from agent.context_engine.conversation_engine.state import create_thread, get_thread
 from agent.memory_engine.processing import MemoryHandoff, MemoryProcessingState, build_memory_batch
 from agent.memory_engine.processing.shadow import (
     run_shadow_memory_extraction,
@@ -133,9 +135,9 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_THRESHOLD": "2"}),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
-                return_value=self._analysis(evidence_indexes=[0, 2]),
+                return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ) as analyze,
         ):
             result = await run_shadow_memory_extraction(
@@ -171,6 +173,51 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(debug[0]["decision"], "shadow_valid")
         self.assertFalse(debug[0]["review"]["live_writes"])
 
+    async def test_worker_uses_one_combined_call_and_records_thread_shadow(self) -> None:
+        thread = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.conversation_id,
+            title="Partner personality",
+            summary="The user is exploring desired partner personality.",
+            origin="user_started",
+        )
+        raw = self._analysis(evidence_indexes=[0, 2])
+        raw["thread_operation"] = {
+            "operation": "continue",
+            "thread_id": thread.id,
+            "summary": "The user described calm and funny as attractive qualities.",
+            "depth": "explored",
+        }
+        with patch(
+            "agent.memory_engine.processing.shadow.analyze_background_cognition",
+            new_callable=AsyncMock,
+            return_value=raw,
+            create=True,
+        ) as analyze:
+            result = await run_shadow_memory_extraction(
+                self.conversation_id,
+                self.user_id,
+                self.messages,
+                "cognition-model",
+            )
+
+        self.assertEqual(analyze.await_count, 1)
+        payload = json.loads(analyze.await_args.args[0])
+        self.assertEqual(payload["existing_threads"][0]["id"], thread.id)
+        self.assertEqual(result["thread_operation"], "continue")
+        self.assertTrue(result["thread_valid"])
+        self.assertEqual(get_thread(thread.id, self.user_id).version, 1)
+        debug = list_data_point_extraction_debug(
+            user_id=self.user_id,
+            source_id=self.conversation_id,
+        )
+        self.assertEqual(debug[0]["candidate"]["thread_operation"]["operation"], "continue")
+        self.assertTrue(debug[0]["review"]["thread_valid"])
+        self.assertEqual(
+            debug[0]["review"]["thread_proposal"]["thread_updates"][0]["thread_id"],
+            thread.id,
+        )
+
     async def test_invalid_result_advances_cursor_but_preserves_previous_handoff(self) -> None:
         initial = save_processing_state(
             MemoryProcessingState(
@@ -184,9 +231,9 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 ),
             )
         )
-        invalid = self._analysis(evidence_indexes=[3])
+        invalid = self._combined_analysis(evidence_indexes=[3])
         with patch(
-            "agent.memory_engine.processing.shadow.analyze_memory_batch",
+            "agent.memory_engine.processing.shadow.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=invalid,
         ):
@@ -206,7 +253,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_provider_error_is_observed_without_advancing_cursor(self) -> None:
         with patch(
-            "agent.memory_engine.processing.shadow.analyze_memory_batch",
+            "agent.memory_engine.processing.shadow.analyze_background_cognition",
             new_callable=AsyncMock,
             side_effect=TimeoutError("provider timed out"),
         ):
@@ -236,9 +283,9 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
-                return_value=self._analysis(evidence_indexes=[0, 2]),
+                return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
         ):
             result = await run_shadow_memory_extraction(
@@ -290,6 +337,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                     "evidence_message_indexes": [0],
                 }
             ],
+            "thread_operation": {"operation": "none"},
             "handoff": {
                 "summary": "The earlier location preference may no longer apply.",
                 "active_people": [],
@@ -304,7 +352,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=raw,
             ),
@@ -327,9 +375,9 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
-                return_value=self._analysis(evidence_indexes=[0, 2]),
+                return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
             patch(
                 "agent.memory_engine.processing.shadow.apply_validated_memory_analysis",
@@ -348,14 +396,14 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list_profile_facts(self.user_id), [])
 
     async def test_cursor_failure_after_commit_retries_without_duplicate_write(self) -> None:
-        analysis = self._analysis(evidence_indexes=[0, 2])
+        analysis = self._combined_analysis(evidence_indexes=[0, 2])
         with (
             patch.dict(
                 "os.environ",
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),
@@ -384,7 +432,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.memory_engine.processing.shadow.analyze_memory_batch",
+                "agent.memory_engine.processing.shadow.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),
@@ -428,6 +476,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 "unresolved_references": [],
             },
         }
+
+    @classmethod
+    def _combined_analysis(cls, *, evidence_indexes: list[int]) -> dict[str, object]:
+        analysis = cls._analysis(evidence_indexes=evidence_indexes)
+        analysis["thread_operation"] = {"operation": "none"}
+        return analysis
 
 
 if __name__ == "__main__":

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import AsyncMock, patch
 
 from agent.evals.behavior.reporting.writer import save_evaluation_reports
+from agent.evals.behavior.simulation import thread_runner
+from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig
 from agent.evals.behavior.simulation.thread_scenario import (
     THREAD_MANAGEMENT_SCENARIOS,
     ExpectedThreadAction,
@@ -203,6 +207,50 @@ class ConversationThreadScenarioTest(unittest.TestCase):
         self.assertIn("Career change", markdown)
         self.assertIn("Thread management shadow eval", history)
         self.assertIn("0%", history)
+
+
+class BackgroundConversationThreadScenarioTest(unittest.IsolatedAsyncioTestCase):
+    async def test_background_runner_reuses_thread_scenario_and_calls_model_once(self) -> None:
+        function = getattr(thread_runner, "run_background_thread_management_scenario", None)
+        self.assertTrue(
+            callable(function), "run_background_thread_management_scenario is missing"
+        )
+        scenario = get_thread_management_scenario("continue_active_thread")
+
+        async def model_result(prompt: str, **_: object) -> dict[str, object]:
+            payload = json.loads(prompt)
+            active = next(thread for thread in payload["existing_threads"] if thread["active"])
+            return {
+                "decision": "propose",
+                "operations": [],
+                "thread_operation": {
+                    "operation": "continue",
+                    "thread_id": active["id"],
+                    "summary": "The user remains worried about career-change stability.",
+                    "depth": "explored",
+                },
+                "handoff": {
+                    "summary": "Career change remains unresolved.",
+                    "active_people": [],
+                    "active_topics": ["career change"],
+                    "unresolved_references": [],
+                },
+            }
+
+        with patch(
+            "agent.memory_engine.processing.shadow.analyze_background_cognition",
+            new_callable=AsyncMock,
+            side_effect=model_result,
+        ) as analyze:
+            result = await function(
+                scenario=scenario,
+                companion=RuntimeDriverConfig(provider="mock", model="cognition-model"),
+            )
+
+        self.assertEqual(analyze.await_count, 1)
+        self.assertTrue(result.passed)
+        self.assertEqual(result.actual_operations, ("continue",))
+        self.assertEqual(result.assistant_reply, "")
 
 
 if __name__ == "__main__":

@@ -7,11 +7,11 @@ import os
 import unittest
 from unittest.mock import patch
 
+from agent.config import agent_pipeline_config
 from agent.context_engine.conversation_engine.state import (
     conversation_state_shadow_enabled,
     conversation_state_v2_enabled,
 )
-from agent.memory_engine.data_points.extraction.inline import turn_output_v2_enabled
 from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
 from agent.memory_engine.processing import memory_background_v2_live_writes_enabled
 from agent.memory_engine.processing.shadow import memory_background_v2_shadow_enabled
@@ -84,7 +84,7 @@ class AgentPipelineConfigTest(unittest.TestCase):
             {"AGENT_PIPELINE_VERSION": "v1", "AGENT_ROLLOUT": "off"},
             clear=True,
         ):
-            self.assertFalse(turn_output_v2_enabled())
+            self.assertFalse(agent_pipeline_config().structured_turn_output)
             self.assertEqual(data_point_capture_policy().strategy, "legacy_rules")
             self.assertFalse(conversation_state_v2_enabled())
             self.assertFalse(conversation_state_shadow_enabled())
@@ -97,7 +97,7 @@ class AgentPipelineConfigTest(unittest.TestCase):
             {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             clear=True,
         ):
-            self.assertTrue(turn_output_v2_enabled())
+            self.assertTrue(agent_pipeline_config().structured_turn_output)
             self.assertEqual(data_point_capture_policy().strategy, "disabled")
             self.assertTrue(conversation_state_v2_enabled())
             self.assertTrue(conversation_state_shadow_enabled())

@@ -7,6 +7,8 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from agent.context_engine.engine import build_model_context_package
+from agent.context_engine.conversation_engine.state import context as thread_context
+from agent.context_engine.conversation_engine.state import shadow as thread_shadow
 from agent.context_engine.conversation_engine.state import (
     ConversationState,
     ConversationStateConflictError,
@@ -238,6 +240,143 @@ class ConversationThreadStateTest(unittest.TestCase):
         self.assertEqual(get_state(self.first_conversation, self.user_id).version, 1)
         self.assertEqual(get_thread(active.id, self.user_id).version, 1)
         self.assertEqual(get_thread(current_open.id, self.user_id).version, 1)
+
+    def test_background_candidates_are_owned_bounded_and_active_first(self) -> None:
+        active = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Career change",
+            summary="The user is considering a move into product design.",
+            origin="user_started",
+            salience=0.8,
+        )
+        save_state(
+            ConversationState(
+                conversation_id=self.second_conversation,
+                user_id=self.user_id,
+                active_thread_id=active.id,
+            )
+        )
+        relevant_prior = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Product design career",
+            summary="The user worries about losing stability during a career change.",
+            origin="user_started",
+            salience=0.9,
+        )
+        for index in range(4):
+            create_thread(
+                user_id=self.user_id,
+                conversation_id=self.second_conversation,
+                title=f"Career possibility {index}",
+                summary=f"Another product design possibility numbered {index}.",
+                origin="user_started",
+            )
+        create_thread(
+            user_id="other-user",
+            conversation_id="other-user-conversation",
+            title="Private product design topic",
+            summary="This must never enter another user's model context.",
+            origin="user_started",
+        )
+
+        function = getattr(thread_context, "background_thread_candidates", None)
+        self.assertTrue(callable(function), "background_thread_candidates is missing")
+        candidates = function(
+            self.second_conversation,
+            self.user_id,
+            "I am worried about losing stability during this career change.",
+            limit=4,
+        )
+
+        self.assertEqual(len(candidates), 4)
+        self.assertEqual(candidates[0]["id"], active.id)
+        self.assertIn(relevant_prior.id, {candidate["id"] for candidate in candidates})
+        self.assertTrue(all(candidate["user_id"] == self.user_id for candidate in candidates))
+        self.assertEqual(
+            set(candidates[0]),
+            {
+                "id",
+                "user_id",
+                "title",
+                "summary",
+                "status",
+                "origin",
+                "active",
+                "version",
+                "matching_dimension",
+                "depth",
+                "user_interest",
+                "salience",
+                "next_angle",
+                "last_conversation_id",
+            },
+        )
+
+    def test_background_thread_operation_accepts_candidate_and_never_persists(self) -> None:
+        candidate = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Career change",
+            summary="The user is considering a career change.",
+            origin="user_started",
+        )
+        function = getattr(thread_shadow, "evaluate_thread_operation_shadow", None)
+        self.assertTrue(callable(function), "evaluate_thread_operation_shadow is missing")
+
+        result = function(
+            {
+                "operation": "continue",
+                "thread_id": candidate.id,
+                "summary": "The user is worried about financial stability during the change.",
+                "depth": "explored",
+            },
+            conversation_id=self.second_conversation,
+            user_id=self.user_id,
+            message_index=8,
+            candidate_thread_ids={candidate.id},
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertFalse(result["persisted"])
+        self.assertEqual(result["proposal"]["thread_updates"][0]["thread_id"], candidate.id)
+        self.assertEqual(get_thread(candidate.id, self.user_id).version, 1)
+
+    def test_background_thread_operation_rejects_non_candidate_and_origin_change(self) -> None:
+        candidate = create_thread(
+            user_id=self.user_id,
+            conversation_id=self.first_conversation,
+            title="Career change",
+            summary="The user is considering a career change.",
+            origin="user_started",
+        )
+        function = getattr(thread_shadow, "evaluate_thread_operation_shadow", None)
+        self.assertTrue(callable(function), "evaluate_thread_operation_shadow is missing")
+
+        unavailable = function(
+            {"operation": "continue", "thread_id": candidate.id},
+            conversation_id=self.second_conversation,
+            user_id=self.user_id,
+            message_index=8,
+            candidate_thread_ids=set(),
+        )
+        changed_origin = function(
+            {
+                "operation": "continue",
+                "thread_id": candidate.id,
+                "origin": "agent_started",
+            },
+            conversation_id=self.second_conversation,
+            user_id=self.user_id,
+            message_index=8,
+            candidate_thread_ids={candidate.id},
+        )
+
+        self.assertFalse(unavailable["valid"])
+        self.assertIn("supplied candidate", " ".join(unavailable["errors"]))
+        self.assertFalse(changed_origin["valid"])
+        self.assertIn("origin cannot be changed", " ".join(changed_origin["errors"]))
 
     def test_thread_context_is_capped_and_feature_flag_off_preserves_old_context(self) -> None:
         with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}):

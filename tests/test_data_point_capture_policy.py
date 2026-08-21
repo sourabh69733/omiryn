@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from agent.memory_engine.data_points.extraction.inline.config import turn_output_v2_enabled
+from agent.config import agent_pipeline_config
 from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
 from agent.memory_engine.engine import (
     capture_profile_facts_from_user_message,
@@ -49,7 +49,7 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         self.assertFalse(policy.inline)
         self.assertFalse(policy.immediate_rules)
         self.assertIsNone(policy.background_mode)
-        self.assertTrue(turn_output_v2_enabled())
+        self.assertTrue(agent_pipeline_config().structured_turn_output)
 
     def test_removed_flags_cannot_override_the_central_pipeline(self) -> None:
         with patch.dict(
@@ -62,7 +62,7 @@ class DataPointCapturePolicyTest(unittest.TestCase):
             },
             clear=True,
         ):
-            self.assertTrue(turn_output_v2_enabled())
+            self.assertTrue(agent_pipeline_config().structured_turn_output)
             self.assertEqual(data_point_capture_policy().strategy, "disabled")
 
     def test_v2_skips_legacy_fact_rules_but_keeps_behavior_learning(self) -> None:
