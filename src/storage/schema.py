@@ -75,6 +75,40 @@ memory_processing_states = Table(
 )
 Index("ix_memory_processing_states_user", memory_processing_states.c.user_id)
 
+# Records each validated background-memory operation exactly once. Operation and
+# snapshots may contain private evidence, so storage encrypts the JSON payloads.
+memory_operation_applications = Table(
+    "memory_operation_applications",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("batch_key", String, nullable=False),
+    Column("operation_index", Integer, nullable=False),
+    Column("operation_fingerprint", String, nullable=False),
+    Column("operation_kind", String, nullable=False),
+    Column("outcome", String, nullable=False),
+    Column("target_memory_id", String, nullable=True),
+    Column("result_memory_id", String, nullable=True),
+    Column("operation_json", JSON, nullable=False),
+    Column("before_json", JSON, nullable=True),
+    Column("after_json", JSON, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "uq_memory_operation_applications_batch_index",
+    memory_operation_applications.c.user_id,
+    memory_operation_applications.c.conversation_id,
+    memory_operation_applications.c.batch_key,
+    memory_operation_applications.c.operation_index,
+    unique=True,
+)
+Index(
+    "ix_memory_operation_applications_user_created",
+    memory_operation_applications.c.user_id,
+    memory_operation_applications.c.created_at,
+)
+
 # Threads represent resumable subjects, not classifications for every message.
 # A thread is user-owned and records its first/last session so it may span chats.
 conversation_threads = Table(
