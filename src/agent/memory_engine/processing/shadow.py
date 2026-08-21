@@ -7,7 +7,12 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from agent.config import agent_pipeline_config
-from agent.providers import analyze_memory_batch
+from agent.context_engine.conversation_engine.state import background_thread_candidates
+from agent.cognition.background import (
+    background_cognition_prompt,
+    validate_background_cognition_analysis,
+)
+from agent.providers import analyze_background_cognition
 from storage import list_data_point_extraction_debug, list_profile_facts
 from storage.profile_facts import save_data_point_extraction_debug
 
@@ -17,7 +22,6 @@ from .application import (
     memory_background_v2_live_writes_enabled,
 )
 from .models import MemoryBatch, MemoryHandoff, MemoryOperation, MemoryProcessingState
-from .prompt import memory_batch_prompt
 from .service import get_processing_state, save_processing_state
 
 _ALLOWED_DATA_POINT_TYPES = {
@@ -106,19 +110,30 @@ async def run_shadow_memory_extraction(
         return {"status": "no_pending_messages", "operation_count": 0}
 
     existing_memories = _existing_memory_context(user_id)
+    thread_candidates = background_thread_candidates(
+        conversation_id,
+        user_id,
+        " ".join(
+            message.content
+            for message in batch.new_messages
+            if message.role == "user"
+        ),
+    )
     application_result = None
     try:
-        raw = await analyze_memory_batch(
-            memory_batch_prompt(batch, existing_memories),
+        raw = await analyze_background_cognition(
+            background_cognition_prompt(batch, existing_memories, thread_candidates),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
             timeout_seconds=_timeout_seconds(),
         )
-        analysis = validate_shadow_memory_analysis(
+        cognition = validate_background_cognition_analysis(
             raw,
             batch=batch,
             existing_memory_ids={str(memory["id"]) for memory in existing_memories},
+            thread_candidates=thread_candidates,
         )
+        analysis = cognition.memory
         if analysis.valid and memory_background_v2_live_writes_enabled():
             try:
                 application_result = apply_validated_memory_analysis(batch, analysis)
@@ -131,11 +146,15 @@ async def run_shadow_memory_extraction(
                         "operations": [
                             _operation_dict(operation) for operation in analysis.operations
                         ],
+                        "thread_operation": raw.get("thread_operation"),
                         "handoff": _handoff_dict(analysis.handoff),
                     },
                     review={
                         "valid": True,
                         "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
+                        "thread_valid": cognition.thread.get("valid", False),
+                        "thread_errors": cognition.thread.get("errors", []),
+                        "thread_proposal": cognition.thread.get("proposal"),
                         "live_writes": True,
                     },
                     state_version=state.version if state else 0,
@@ -145,6 +164,8 @@ async def run_shadow_memory_extraction(
                     "status": "live_error",
                     "batch_key": batch.batch_key,
                     "operation_count": len(analysis.operations),
+                    "thread_operation": cognition.thread_operation,
+                    "thread_valid": bool(cognition.thread.get("valid")),
                     "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
                 }
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
@@ -168,11 +189,17 @@ async def run_shadow_memory_extraction(
             candidate={
                 "model_decision": analysis.decision,
                 "operations": [_operation_dict(operation) for operation in analysis.operations],
+                "thread_operation": raw.get("thread_operation"),
                 "handoff": _handoff_dict(analysis.handoff),
             },
             review={
                 "valid": analysis.valid,
                 "errors": list(analysis.errors),
+                "combined_valid": cognition.valid,
+                "combined_errors": list(cognition.errors),
+                "thread_valid": bool(cognition.thread.get("valid")),
+                "thread_errors": list(cognition.thread.get("errors") or []),
+                "thread_proposal": cognition.thread.get("proposal"),
                 "live_writes": live_writes,
                 "applied_count": application_result.applied_count if application_result else 0,
                 "deferred_count": (
@@ -187,6 +214,9 @@ async def run_shadow_memory_extraction(
             "status": decision,
             "batch_key": batch.batch_key,
             "operation_count": len(analysis.operations),
+            "thread_operation": cognition.thread_operation,
+            "thread_valid": bool(cognition.thread.get("valid")),
+            "thread_errors": list(cognition.thread.get("errors") or []),
             "applied_count": application_result.applied_count if application_result else 0,
             "deferred_count": application_result.deferred_count if application_result else 0,
             "idempotent": application_result.idempotent if application_result else False,
