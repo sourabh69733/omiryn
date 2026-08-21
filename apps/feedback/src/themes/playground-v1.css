@@ -1,5 +1,6 @@
 /* playground-v1: tactile, graphic, and deliberately uniform. */
 .feedback-app--playground-v1 {
+  overflow-x: clip;
   background-color: #e7e7e0;
   background-image: radial-gradient(#b9bbb1 1px, transparent 1.5px);
   background-size: 26px 26px;
@@ -119,6 +120,7 @@
   font-weight: 900;
   line-height: 0.86;
   letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -130,6 +132,7 @@
   background: #ffffff;
   font-size: 14px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .question-screen--playground-v1 .option-list {
@@ -151,6 +154,11 @@
   font-weight: 800;
   line-height: 1.25;
   transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.question-screen--playground-v1 .option-row > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .question-screen--playground-v1 .option-row:hover:not(:disabled),
@@ -301,6 +309,10 @@
   color: #111111;
 }
 
+.concept-screen--playground-v1 .concept-links {
+  flex-wrap: wrap;
+}
+
 .completion-screen--playground-v1 {
   width: min(100% - 40px, 880px);
   min-height: calc(100svh - 150px);
@@ -361,7 +373,13 @@
   }
 
   .question-screen--playground-v1 .question-heading h1 {
-    font-size: clamp(48px, 15vw, 72px);
+    font-size: clamp(32px, 10vw, 48px);
+    line-height: 0.94;
+  }
+
+  .question-screen--playground-v1 .question-heading > p:last-child {
+    width: auto;
+    max-width: 100%;
   }
 
   .question-screen--playground-v1 .option-list {
@@ -390,7 +408,12 @@
   .welcome-screen--playground-v1 h1,
   .concept-screen--playground-v1 h1,
   .completion-screen--playground-v1 h1 {
-    font-size: clamp(44px, 14vw, 68px);
+    font-size: clamp(36px, 11vw, 52px);
+    overflow-wrap: anywhere;
+  }
+
+  .concept-screen--playground-v1 .story-content h2 {
+    font-size: clamp(30px, 9vw, 42px);
   }
 
   .completion-screen--playground-v1 {
