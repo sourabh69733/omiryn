@@ -21,12 +21,17 @@ class AgentPipelineConfig:
     rollout: RolloutMode
 
     @property
+    def foreground_reply_only(self) -> bool:
+        return True
+
+    @property
     def structured_turn_output(self) -> bool:
-        return self.version == "v2"
+        """Deprecated compatibility signal; foreground output is always plain text."""
+        return False
 
     @property
     def inline_data_points(self) -> bool:
-        return self.version == "v2" and self.rollout != "live"
+        return False
 
     @property
     def conversation_state_enabled(self) -> bool:
@@ -34,8 +39,7 @@ class AgentPipelineConfig:
 
     @property
     def conversation_state_shadow(self) -> bool:
-        # Live thread writes are intentionally not part of the current rollout.
-        return self.conversation_state_enabled
+        return False
 
     @property
     def background_memory_enabled(self) -> bool:
@@ -43,6 +47,10 @@ class AgentPipelineConfig:
 
     @property
     def live_memory_writes(self) -> bool:
+        return self.version == "v2" and self.rollout == "live"
+
+    @property
+    def live_thread_writes(self) -> bool:
         return self.version == "v2" and self.rollout == "live"
 
     @property
