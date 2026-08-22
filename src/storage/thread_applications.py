@@ -73,11 +73,29 @@ def apply_thread_operation_once(payload: dict[str, Any]) -> dict[str, Any]:
                 )
             return _application_from_row(existing, idempotent=True)
 
+        if operation_kind in {"pause", "complete", "block"}:
+            _apply_session_state_transition(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_index=_operation_message_index(operation),
+                operation_kind=operation_kind,
+                thread_id=str(operation.get("thread_id") or ""),
+            )
         result = (
             _create_thread(connection, user_id, conversation_id, operation)
             if operation_kind == "create"
             else _update_thread(connection, user_id, operation)
         )
+        if operation_kind in {"create", "continue", "switch"}:
+            _apply_session_state_transition(
+                connection,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_index=_operation_message_index(operation),
+                operation_kind=operation_kind,
+                thread_id=str(result["id"]),
+            )
         row_id = str(uuid4())
         connection.execute(
             thread_operation_applications.insert().values(
@@ -185,6 +203,86 @@ def _update_thread(connection, user_id: str, operation: dict[str, Any]):
         select(conversation_threads).where(conversation_threads.c.id == thread_id)
     ).mappings().one()
     return _thread_from_row(row)
+
+
+def _operation_message_index(operation: dict[str, Any]) -> int:
+    values = operation.get("thread")
+    if not isinstance(values, dict):
+        values = operation.get("changes")
+    value = values.get("last_message_index") if isinstance(values, dict) else None
+    if not isinstance(value, int) or value < 0:
+        raise ValueError("thread operation requires a non-negative message index")
+    return value
+
+
+def _apply_session_state_transition(
+    connection,
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_index: int,
+    operation_kind: str,
+    thread_id: str,
+) -> None:
+    """Move the session pointer with the validated thread operation atomically."""
+    current = connection.execute(
+        select(conversation_states).where(
+            conversation_states.c.conversation_id == conversation_id,
+            conversation_states.c.user_id == user_id,
+        )
+    ).mappings().first()
+    if current and message_index < int(current["state_through_message_index"]):
+        raise ConversationStateConflictError("conversation state cannot move backwards")
+
+    activating = operation_kind in {"create", "continue", "switch"}
+    if activating:
+        active_thread_id = thread_id
+    elif current and current["active_thread_id"] != thread_id:
+        active_thread_id = current["active_thread_id"]
+    else:
+        active_thread_id = None
+    if current is None:
+        connection.execute(
+            conversation_states.insert().values(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                state_through_message_index=message_index,
+                active_thread_id=active_thread_id,
+                user_need="normal_chat",
+                session_goal=None,
+                version=1,
+            )
+        )
+    else:
+        connection.execute(
+            conversation_states.update()
+            .where(
+                conversation_states.c.conversation_id == conversation_id,
+                conversation_states.c.user_id == user_id,
+                conversation_states.c.version == current["version"],
+            )
+            .values(
+                state_through_message_index=message_index,
+                active_thread_id=active_thread_id,
+                version=int(current["version"]) + 1,
+                updated_at=func.now(),
+            )
+        )
+
+    if not activating:
+        connection.execute(
+            conversation_states.update()
+            .where(
+                conversation_states.c.user_id == user_id,
+                conversation_states.c.active_thread_id == thread_id,
+                conversation_states.c.conversation_id != conversation_id,
+            )
+            .values(
+                active_thread_id=None,
+                version=conversation_states.c.version + 1,
+                updated_at=func.now(),
+            )
+        )
 
 
 def _application_from_row(row, *, idempotent: bool) -> dict[str, Any]:
