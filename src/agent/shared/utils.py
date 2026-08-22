@@ -1,5 +1,4 @@
 """Pure structural validation helpers with no agent-domain dependencies."""
-from __future__ import annotations
 
 
 def unknown_fields(value: dict[str, object], allowed: set[str] | frozenset[str]) -> tuple[str, ...]:
