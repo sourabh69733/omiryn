@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent
+from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
-from agent.context_engine.conversation_engine.state import conversation_thread_context_sources
+from agent.context_engine.conversation_engine.state import (
+    conversation_thread_context_sources,
+    conversation_thread_guidance,
+)
 from agent.context_engine.conversation_engine.understanding.rules.intent import (
     RECENCY_QUERY_TERMS,
     context_query_intent,
@@ -94,6 +97,11 @@ def build_reply_context(
     style_source_id: str | None = None,
     strict_intent: bool = False,
 ) -> AgentContext:
+    thread_guidance = conversation_thread_guidance(
+        conversation_id,
+        user_id,
+        user_text,
+    )
     return AgentContext(
         user_profile=user_profile,
         context_sources=build_reply_context_sources(
@@ -102,7 +110,9 @@ def build_reply_context(
             user_text,
             user_id,
             strict_intent=strict_intent,
+            thread_guidance=thread_guidance,
         ),
+        thread_guidance=thread_guidance,
     )
 
 
@@ -113,6 +123,7 @@ def build_reply_context_sources(
     user_id: str | None = None,
     *,
     strict_intent: bool = False,
+    thread_guidance: ThreadGuidance | None = None,
 ) -> list[dict[str, Any]]:
     query_intent = context_query_intent(user_text, strict_whatsapp=strict_intent)
     all_sources = list_context_sources(conversation_id, user_id)
@@ -133,6 +144,7 @@ def build_reply_context_sources(
         conversation_id,
         user_id,
         user_text,
+        guidance=thread_guidance,
     )
 
     if selected_styles:
