@@ -31,6 +31,7 @@ def conversation_plan_prompt(
     suggested_topics = "\n".join(f"- {topic}" for topic in plan.suggested_topics[:3])
     stance_context = _stance_context(plan)
     stance_rules = _stance_rules(plan)
+    thread_context = _thread_context(plan)
     return f"""Conversation plan for this turn:
 - Move: {plan.current_move}
 - Response mode: {plan.response_mode}
@@ -39,6 +40,7 @@ def conversation_plan_prompt(
 - Tone instruction: {plan.tone_instruction}
 {stance_context}
 {stance_rules}
+{thread_context}
 
 Active/recent topic state:
 {active_topics or "- No strong topic state yet."}
@@ -59,6 +61,25 @@ Rules:
 - Do not start generic music, movie, truth-or-dare, or how-was-your-day topics unless the user explicitly brings them up.
 - If using music/movies, connect them to a sharper dating, memory, personality, or relationship angle.
 - Ask at most one natural question, and only if it improves the flow."""
+
+
+def _thread_context(plan: ConversationPlan) -> str:
+    if plan.thread_action == "none":
+        return ""
+    subject = plan.thread_title or "none"
+    next_angle = plan.thread_next_angle or "none"
+    instruction = {
+        "follow_user": "Follow the current user message; do not steer back to a tracked subject.",
+        "continue_active": "Continue this active subject naturally without repeating its summary or interviewing the user.",
+        "offer_open": "Offer this unfinished subject lightly; make it easy for the user to decline.",
+        "ignore_unengaged": "Do not revive this subject; the user has not shown interest in it.",
+    }.get(plan.thread_action, "Do not force a tracked subject into the reply.")
+    return f"""Thread continuity decision:
+- Action: {plan.thread_action}
+- Subject: {subject}
+- Possible next angle: {next_angle}
+- {instruction}
+- Never mention thread tracking, IDs, actions, or internal state."""
 
 
 def _stance_context(plan: ConversationPlan) -> str:
