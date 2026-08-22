@@ -61,7 +61,7 @@ class AgentPipelineConfig:
 def agent_pipeline_config() -> AgentPipelineConfig:
     """Read and validate the two public runtime settings without hidden overrides."""
     version = os.getenv("AGENT_PIPELINE_VERSION", "v2").strip().lower()
-    rollout = os.getenv("AGENT_ROLLOUT", "shadow").strip().lower()
+    rollout = os.getenv("AGENT_ROLLOUT", "live").strip().lower()
     if version not in _PIPELINE_VERSIONS:
         raise ValueError(
             f"Unknown AGENT_PIPELINE_VERSION '{version}'. Expected one of: v1, v2."
