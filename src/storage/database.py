@@ -19,6 +19,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "memory_processing_states",
     "memory_operation_applications",
     "conversation_threads",
+    "thread_operation_applications",
     "agent_usage_events",
     "agent_context_snapshots",
     "agent_traces",
