@@ -6,10 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
-from agent.context_engine.conversation_engine.state import (
-    conversation_state_shadow_enabled,
-    evaluate_conversation_update_shadow,
-)
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.providers import (
@@ -22,14 +18,6 @@ from agent.providers import (
 )
 from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
-from agent.memory_engine.data_points.extraction.inline import (
-    TURN_OUTPUT_V2_TOOL_CHOICE,
-    capture_turn_output_data_points,
-    parse_turn_output_v2,
-    turn_output_v2_tools,
-)
-from agent.config import agent_pipeline_config
-
 from storage import (
     finish_agent_trace,
     save_agent_context_snapshot,
@@ -168,8 +156,6 @@ async def run_agent_turn(
         user_message_index=len(updated_messages) - 1,
         assistant_message_index=len(updated_messages),
     )
-    turn_output_v2 = agent_pipeline_config().structured_turn_output
-    conversation_state_shadow = turn_output_v2 and conversation_state_shadow_enabled()
     system_prompt = context_package.system_prompt
     save_agent_trace_step(
         {
@@ -219,20 +205,11 @@ async def run_agent_turn(
             "user_profile": context_package.user_profile,
             "system_prompt": system_prompt,
         }
-        structured_tools = (
-            turn_output_v2_tools(
-                include_conversation_update=conversation_state_shadow,
-            )
-            if turn_output_v2
-            else None
-        )
         fallback_reason = None
         try:
             raw_reply = await generate_agent_reply(
                 updated_messages,
                 **generation_arguments,
-                tools=structured_tools,
-                tool_choice=TURN_OUTPUT_V2_TOOL_CHOICE if turn_output_v2 else None,
             )
         except AgentProviderTruncationError:
             fallback_reason = "output_truncated"
@@ -245,7 +222,6 @@ async def run_agent_turn(
         sanitized_structured_reply = structured_companion_reply(raw_reply)
         if (
             fallback_reason is None
-            and turn_output_v2
             and sanitized_structured_reply is None
             and _looks_like_model_transport(raw_reply)
         ):
@@ -258,59 +234,6 @@ async def run_agent_turn(
             sanitized_structured_reply = structured_companion_reply(raw_reply)
 
         reply = _visible_companion_reply(raw_reply, sanitized_structured_reply)
-        turn_output_summary = None
-        if turn_output_v2 and fallback_reason is None:
-            parsed_output = parse_turn_output_v2(
-                raw_reply,
-                user_text=user_text,
-                require_conversation_update=conversation_state_shadow,
-            )
-            reply = _visible_companion_reply(parsed_output.reply, sanitized_structured_reply)
-            inline_data_point_capture_enabled = agent_pipeline_config().inline_data_points
-            if inline_data_point_capture_enabled:
-                turn_output_summary = capture_turn_output_data_points(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    user_text=user_text,
-                    message_index=len(updated_messages) - 1,
-                    data_points=parsed_output.data_points,
-                )
-            else:
-                turn_output_summary = {
-                    "candidate_count": len(parsed_output.data_points),
-                    "saved_count": 0,
-                    "skipped_count": len(parsed_output.data_points),
-                    "capture_strategy": "background_memory",
-                }
-            turn_output_summary.update(
-                {
-                    "parsed": parsed_output.parsed,
-                    "error": parsed_output.error,
-                    "transport_valid": parsed_output.transport_valid,
-                    "schema_valid": parsed_output.schema_valid,
-                    "semantic_valid": parsed_output.semantic_valid,
-                    "schema_errors": list(parsed_output.schema_errors),
-                }
-            )
-            if conversation_state_shadow:
-                turn_output_summary["conversation_state_shadow"] = (
-                    _evaluate_conversation_update_shadow_safely(
-                        parsed_output.conversation_update,
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        message_index=len(updated_messages) - 1,
-                    )
-                )
-        elif turn_output_v2:
-            turn_output_summary = {
-                "parsed": False,
-                "error": fallback_reason,
-                "transport_valid": False,
-                "schema_valid": False,
-                "semantic_valid": False,
-                "schema_errors": [],
-                "captured_count": 0,
-            }
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -348,7 +271,8 @@ async def run_agent_turn(
                 "prompt_version": context_package.prompt_version,
                 "agent_mode": agent_mode,
                 "agent_tone": agent_tone,
-                "turn_output_v2": turn_output_summary if turn_output_v2 else None,
+                "foreground_contract": "reply_only",
+                "fallback_reason": fallback_reason,
             },
         }
     )
@@ -416,29 +340,3 @@ def _visible_companion_reply(raw_text: str, decoded_reply: str | None = None) ->
     if _looks_like_model_transport(raw_text):
         raise AgentProviderError("Model returned an undecodable private response envelope.")
     return str(raw_text or "").strip()
-
-
-def _evaluate_conversation_update_shadow_safely(
-    raw_update: Any,
-    *,
-    conversation_id: str,
-    user_id: str | None,
-    message_index: int,
-) -> dict[str, Any]:
-    """Keep optional shadow analysis from ever interrupting the visible reply."""
-    try:
-        return evaluate_conversation_update_shadow(
-            raw_update,
-            conversation_id=conversation_id,
-            user_id=user_id,
-            message_index=message_index,
-        )
-    except Exception as error:
-        return {
-            "present": raw_update is not None,
-            "valid": False,
-            "proposed_thread_update_count": 0,
-            "proposal": None,
-            "errors": [f"{type(error).__name__}: {str(error)[:200]}"],
-            "persisted": False,
-        }
