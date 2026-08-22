@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.contracts.models import ModelContextPackage
-from agent.context_engine.conversation_engine.state import list_threads
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
 from agent.runtime.orchestrator import (
     _visible_companion_reply,
@@ -389,234 +388,6 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(corrected["fact_type"], "matching_fact")
         self.assertEqual(corrected["value"]["_data_point_type"], "matching_fact")
 
-    async def test_orchestrator_v2_displays_reply_and_saves_hidden_data_points(self) -> None:
-        with (
-            patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}),
-            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
-            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
-            patch(
-                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
-            ) as model_call,
-            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
-            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
-            patch("agent.runtime.orchestrator.save_agent_trace_step"),
-            patch("agent.runtime.orchestrator.finish_agent_trace"),
-        ):
-            save_trace.return_value = {"id": "trace-1"}
-            build_context.return_value = ModelContextPackage(
-                system_prompt="system prompt",
-                context_sources=[],
-                snapshot={
-                    "conversation_id": "conversation-a",
-                    "message_index": 2,
-                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
-                },
-            )
-            model_call.return_value = """
-            {
-              "reply": "Nice, spicy food gives me a small but useful signal.",
-              "data_points": [
-                {
-                  "type": "matching_fact",
-                  "category": "food_preferences",
-                  "label": "Likes spicy food",
-                  "value": {"preference": "spicy food"},
-                  "confidence": 0.84
-                }
-              ]
-            }
-            """
-
-            result = await run_agent_turn(
-                conversation_id="conversation-a",
-                messages=[{"role": "assistant", "content": "Tell me one small thing about you."}],
-                user_text="I love spicy food",
-                user_id="user-a",
-                user_profile=None,
-                model="llama-70b",
-                agent_mode="know_me",
-                agent_tone="auto",
-                style_source_id=None,
-            )
-
-        self.assertEqual(
-            result.messages[-1]["content"], "Nice, spicy food gives me a small but useful signal."
-        )
-        self.assertEqual(model_call.call_args.kwargs["system_prompt"], "system prompt")
-        self.assertNotIn("response_format", model_call.call_args.kwargs)
-        tools = model_call.call_args.kwargs["tools"]
-        self.assertEqual(tools[0]["function"]["name"], "return_companion_response")
-        self.assertNotIn(
-            "evidence",
-            tools[0]["function"]["parameters"]["properties"]["data_points"]["items"]["properties"],
-        )
-        self.assertEqual(
-            model_call.call_args.kwargs["tool_choice"],
-            {"type": "function", "function": {"name": "return_companion_response"}},
-        )
-        facts = list_profile_facts("user-a")
-        self.assertEqual(len(facts), 1)
-        self.assertEqual(facts[0]["label"], "Likes spicy food")
-        self.assertEqual(facts[0]["source_kind"], "agent_turn_output_v2")
-
-    async def test_orchestrator_live_mode_does_not_write_inline_data_points(self) -> None:
-        with (
-            patch.dict(
-                "os.environ",
-                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
-            ),
-            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
-            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
-            patch(
-                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
-            ) as model_call,
-            patch("agent.runtime.orchestrator.capture_turn_output_data_points") as inline_write,
-            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
-            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
-            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
-            patch("agent.runtime.orchestrator.finish_agent_trace"),
-        ):
-            save_trace.return_value = {"id": "trace-live"}
-            build_context.return_value = ModelContextPackage(
-                system_prompt="system prompt",
-                context_sources=[],
-                snapshot={
-                    "conversation_id": "conversation-a",
-                    "message_index": 2,
-                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
-                },
-            )
-            model_call.return_value = """
-            {
-              "reply": "Spicy food noted—that says something about your taste.",
-              "data_points": [{
-                "type": "matching_fact",
-                "category": "food_preferences",
-                "label": "Likes spicy food",
-                "value": {"preference": "spicy food"},
-                "confidence": 0.84
-              }],
-              "conversation_update": {
-                "user_need": "explore",
-                "session_goal": "Understand food preferences",
-                "thread_updates": [{
-                  "operation": "create",
-                  "title": "Food preferences",
-                  "summary": "The user enjoys spicy food.",
-                  "origin": "user_started",
-                  "depth": "mentioned",
-                  "user_interest": "medium",
-                  "salience": 0.6
-                }]
-              }
-            }
-            """
-
-            result = await run_agent_turn(
-                conversation_id="conversation-a",
-                messages=[],
-                user_text="I love spicy food",
-                user_id="user-a",
-                user_profile=None,
-                model="llama-70b",
-                agent_mode="know_me",
-                agent_tone="auto",
-                style_source_id=None,
-            )
-
-        self.assertEqual(
-            result.messages[-1]["content"],
-            "Spicy food noted—that says something about your taste.",
-        )
-        inline_write.assert_not_called()
-        model_step = next(
-            call.args[0]
-            for call in save_trace_step.call_args_list
-            if call.args[0]["step_name"] == "model_call"
-        )
-        summary = model_step["metadata"]["turn_output_v2"]
-        self.assertEqual(summary["capture_strategy"], "background_memory")
-        self.assertEqual(summary["saved_count"], 0)
-        self.assertEqual(summary["skipped_count"], 1)
-
-    async def test_orchestrator_records_valid_thread_proposal_without_persisting_it(self) -> None:
-        with (
-            patch.dict(
-                "os.environ",
-                {
-                    "AGENT_PIPELINE_VERSION": "v2",
-                    "AGENT_ROLLOUT": "shadow",
-                },
-            ),
-            patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),
-            patch("agent.runtime.orchestrator.build_model_context_package") as build_context,
-            patch(
-                "agent.runtime.orchestrator.generate_agent_reply", new_callable=AsyncMock
-            ) as model_call,
-            patch("agent.runtime.orchestrator.save_agent_context_snapshot"),
-            patch("agent.runtime.orchestrator.save_agent_trace") as save_trace,
-            patch("agent.runtime.orchestrator.save_agent_trace_step") as save_trace_step,
-            patch("agent.runtime.orchestrator.finish_agent_trace"),
-        ):
-            save_trace.return_value = {"id": "trace-shadow"}
-            build_context.return_value = ModelContextPackage(
-                system_prompt="system prompt",
-                context_sources=[],
-                snapshot={
-                    "conversation_id": "conversation-a",
-                    "message_index": 2,
-                    "summary": {"included_source_count": 0, "rough_context_tokens": 0},
-                },
-            )
-            model_call.return_value = """
-            {
-              "reply": "That uncertainty sounds genuinely tiring.",
-              "data_points": [],
-              "conversation_update": {
-                "user_need": "listen",
-                "session_goal": "Understand the user's work stress",
-                "thread_updates": [
-                  {
-                    "operation": "create",
-                    "title": "Stress with manager",
-                    "summary": "The user's manager repeatedly changes plans.",
-                    "origin": "user_started",
-                    "depth": "mentioned",
-                    "user_interest": "high",
-                    "salience": 0.8
-                  }
-                ]
-              }
-            }
-            """
-
-            result = await run_agent_turn(
-                conversation_id="conversation-a",
-                messages=[{"role": "assistant", "content": "What happened at work?"}],
-                user_text="My manager keeps changing plans and it is exhausting.",
-                user_id="user-a",
-                user_profile=None,
-                model="llama-70b",
-                agent_mode="know_me",
-                agent_tone="auto",
-                style_source_id=None,
-            )
-
-        self.assertEqual(
-            result.messages[-1]["content"], "That uncertainty sounds genuinely tiring."
-        )
-        tool_parameters = model_call.call_args.kwargs["tools"][0]["function"]["parameters"]
-        self.assertIn("conversation_update", tool_parameters["properties"])
-        model_step = next(
-            call.args[0]
-            for call in save_trace_step.call_args_list
-            if call.args[0]["step_name"] == "model_call"
-        )
-        shadow = model_step["metadata"]["turn_output_v2"]["conversation_state_shadow"]
-        self.assertTrue(shadow["valid"])
-        self.assertFalse(shadow["persisted"])
-        self.assertEqual(shadow["proposed_thread_update_count"], 1)
-        self.assertEqual(list_threads("user-a"), [])
 
     def test_private_transport_is_never_accepted_as_visible_chat_text(self) -> None:
         with self.assertRaises(AgentProviderError):
@@ -670,7 +441,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             "Tell me more about what made that important to you.",
         )
         self.assertEqual(model_call.await_count, 2)
-        self.assertIsNotNone(model_call.await_args_list[0].kwargs["tools"])
+        self.assertNotIn("tools", model_call.await_args_list[0].kwargs)
         self.assertNotIn("tools", model_call.await_args_list[1].kwargs)
         self.assertEqual(model_call.await_args_list[1].kwargs["max_tokens"], 400)
         model_step = next(
@@ -679,7 +450,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             if call.args[0]["step_name"] == "model_call"
         )
         self.assertEqual(
-            model_step["metadata"]["turn_output_v2"]["error"],
+            model_step["metadata"]["fallback_reason"],
             "output_truncated",
         )
 

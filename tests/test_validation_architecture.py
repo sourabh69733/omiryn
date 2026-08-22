@@ -13,7 +13,7 @@ AGENT_ROOT = PROJECT_ROOT / "src" / "agent"
 
 class ValidationArchitectureTest(unittest.TestCase):
     def test_shared_validation_helpers_have_no_imports(self) -> None:
-        path = AGENT_ROOT / "shared" / "validation.py"
+        path = AGENT_ROOT / "shared" / "utils.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
 
         imports = [
@@ -45,7 +45,7 @@ class ValidationArchitectureTest(unittest.TestCase):
         self.assertIn("agent.cognition.background", api_source)
         self.assertNotIn("memory_engine.processing.shadow", api_source)
         self.assertFalse(
-            (AGENT_ROOT / "cognition" / "background" / "validation.py").exists()
+            (AGENT_ROOT / "cognition" / "background" / "utils.py").exists()
         )
 
 

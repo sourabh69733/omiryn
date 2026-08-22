@@ -15,12 +15,12 @@ from agent.memory_engine.engine import (
 
 
 class DataPointCapturePolicyTest(unittest.TestCase):
-    def test_default_v2_shadow_uses_only_inline_capture(self) -> None:
+    def test_default_v2_shadow_disables_inline_capture(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             policy = data_point_capture_policy()
 
-        self.assertEqual(policy.strategy, "inline_llm")
-        self.assertTrue(policy.inline)
+        self.assertEqual(policy.strategy, "disabled")
+        self.assertFalse(policy.inline)
         self.assertFalse(policy.immediate_rules)
         self.assertIsNone(policy.background_mode)
 
@@ -49,7 +49,7 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         self.assertFalse(policy.inline)
         self.assertFalse(policy.immediate_rules)
         self.assertIsNone(policy.background_mode)
-        self.assertTrue(agent_pipeline_config().structured_turn_output)
+        self.assertFalse(agent_pipeline_config().structured_turn_output)
 
     def test_removed_flags_cannot_override_the_central_pipeline(self) -> None:
         with patch.dict(
@@ -62,7 +62,7 @@ class DataPointCapturePolicyTest(unittest.TestCase):
             },
             clear=True,
         ):
-            self.assertTrue(agent_pipeline_config().structured_turn_output)
+            self.assertFalse(agent_pipeline_config().structured_turn_output)
             self.assertEqual(data_point_capture_policy().strategy, "disabled")
 
     def test_v2_skips_legacy_fact_rules_but_keeps_behavior_learning(self) -> None:

@@ -23,12 +23,13 @@ class AgentPipelineConfigTest(unittest.TestCase):
 
         self.assertEqual(config.version, "v2")
         self.assertEqual(config.rollout, "shadow")
-        self.assertTrue(config.structured_turn_output)
-        self.assertTrue(config.inline_data_points)
+        self.assertFalse(config.structured_turn_output)
+        self.assertFalse(config.inline_data_points)
         self.assertTrue(config.conversation_state_enabled)
-        self.assertTrue(config.conversation_state_shadow)
+        self.assertFalse(config.conversation_state_shadow)
         self.assertTrue(config.background_memory_enabled)
         self.assertFalse(config.live_memory_writes)
+        self.assertFalse(config.live_thread_writes)
         self.assertFalse(config.legacy_rules)
 
     def test_v1_is_one_complete_legacy_rollback_mode(self) -> None:
@@ -46,31 +47,34 @@ class AgentPipelineConfigTest(unittest.TestCase):
                 self.assertFalse(config.conversation_state_shadow)
                 self.assertFalse(config.background_memory_enabled)
                 self.assertFalse(config.live_memory_writes)
+                self.assertFalse(config.live_thread_writes)
                 self.assertTrue(config.legacy_rules)
 
-    def test_v2_off_keeps_structured_reply_and_inline_memory_only(self) -> None:
+    def test_v2_off_keeps_reply_only_without_background_processing(self) -> None:
         config = self._config(
             {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "off"}
         )
 
-        self.assertTrue(config.structured_turn_output)
-        self.assertTrue(config.inline_data_points)
+        self.assertFalse(config.structured_turn_output)
+        self.assertFalse(config.inline_data_points)
         self.assertFalse(config.conversation_state_enabled)
         self.assertFalse(config.conversation_state_shadow)
         self.assertFalse(config.background_memory_enabled)
         self.assertFalse(config.live_memory_writes)
+        self.assertFalse(config.live_thread_writes)
 
-    def test_v2_live_uses_background_memory_without_inline_double_write(self) -> None:
+    def test_v2_live_uses_reply_only_foreground_and_background_memory(self) -> None:
         config = self._config(
             {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"}
         )
 
-        self.assertTrue(config.structured_turn_output)
+        self.assertFalse(config.structured_turn_output)
         self.assertFalse(config.inline_data_points)
         self.assertTrue(config.conversation_state_enabled)
-        self.assertTrue(config.conversation_state_shadow)
+        self.assertFalse(config.conversation_state_shadow)
         self.assertTrue(config.background_memory_enabled)
         self.assertTrue(config.live_memory_writes)
+        self.assertTrue(config.live_thread_writes)
 
     def test_unknown_version_or_rollout_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "AGENT_PIPELINE_VERSION"):
@@ -97,10 +101,10 @@ class AgentPipelineConfigTest(unittest.TestCase):
             {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             clear=True,
         ):
-            self.assertTrue(agent_pipeline_config().structured_turn_output)
+            self.assertFalse(agent_pipeline_config().structured_turn_output)
             self.assertEqual(data_point_capture_policy().strategy, "disabled")
             self.assertTrue(conversation_state_v2_enabled())
-            self.assertTrue(conversation_state_shadow_enabled())
+            self.assertFalse(conversation_state_shadow_enabled())
             self.assertTrue(background_cognition_enabled())
             self.assertTrue(memory_background_v2_live_writes_enabled())
 
