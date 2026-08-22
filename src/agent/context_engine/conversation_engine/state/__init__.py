@@ -1,4 +1,4 @@
-"""Defines and validates persistent conversation progress without changing reply behaviour."""
+"""Exposes persistent conversation progress to background and foreground cognition."""
 
 from .application import ThreadApplicationResult, apply_validated_thread_proposal
 from .models import ConversationState, ConversationThread
@@ -8,6 +8,7 @@ from .context import (
     conversation_state_shadow_enabled,
     conversation_state_v2_enabled,
     conversation_thread_context_sources,
+    conversation_thread_guidance,
 )
 from .service import (
     ConversationStateConflictError,
@@ -33,6 +34,7 @@ __all__ = [
     "conversation_state_shadow_enabled",
     "conversation_state_v2_enabled",
     "conversation_thread_context_sources",
+    "conversation_thread_guidance",
     "create_thread",
     "evaluate_conversation_update_shadow",
     "evaluate_thread_operation_shadow",

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agent.config import agent_pipeline_config
+from agent.context_engine.contracts.models import ThreadGuidance, ThreadReference
 from text_vectors import build_text_embedding, cosine_similarity
 
 from .models import ConversationThread
@@ -25,13 +26,14 @@ def conversation_state_shadow_enabled() -> bool:
     return agent_pipeline_config().conversation_state_shadow
 
 
-def conversation_thread_context_sources(
+def conversation_thread_guidance(
     conversation_id: str,
     user_id: str | None,
     user_text: str = "",
-) -> list[dict[str, Any]]:
+) -> ThreadGuidance:
+    """Select bounded persistent threads for one foreground planning decision."""
     if not user_id or not conversation_state_v2_enabled():
-        return []
+        return ThreadGuidance()
 
     state = get_state(conversation_id, user_id)
     active = (
@@ -41,16 +43,38 @@ def conversation_thread_context_sources(
     )
     if active and active.status != "open":
         active = None
-
-    all_open = list_threads(user_id, statuses=("open",))
     ranked = _rank_open_thread_candidates(
-        all_open,
+        list_threads(user_id, statuses=("open",)),
         conversation_id=conversation_id,
         user_text=user_text,
         active_thread_id=active.id if active else None,
     )
-    selected = ([active] if active else []) + ranked
-    selected = selected[:CONVERSATION_THREAD_CONTEXT_LIMIT]
+    return ThreadGuidance(
+        active=_thread_reference(active, conversation_id) if active else None,
+        relevant_open=tuple(
+            _thread_reference(thread, conversation_id)
+            for thread in ranked[:CONVERSATION_THREAD_CONTEXT_LIMIT - bool(active)]
+        ),
+    )
+
+
+def conversation_thread_context_sources(
+    conversation_id: str,
+    user_id: str | None,
+    user_text: str = "",
+    *,
+    guidance: ThreadGuidance | None = None,
+) -> list[dict[str, Any]]:
+    selected_guidance = guidance or conversation_thread_guidance(
+        conversation_id,
+        user_id,
+        user_text,
+    )
+    selected = tuple(
+        reference
+        for reference in (selected_guidance.active, *selected_guidance.relevant_open)
+        if reference is not None
+    )
     if not selected:
         return []
 
@@ -59,7 +83,11 @@ def conversation_thread_context_sources(
         "The current user message has priority. Use a note only when it connects naturally; do not expose internal thread names, statuses, or tracking.",
     ]
     for thread in selected:
-        role = "current" if active and thread.id == active.id else "open"
+        role = (
+            "current"
+            if selected_guidance.active and thread.id == selected_guidance.active.id
+            else "open"
+        )
         lines.append(f"- {role}; thread_id={thread.id}: {thread.title}")
         lines.append(f"  Summary: {thread.summary}")
         if thread.next_angle:
@@ -71,18 +99,33 @@ def conversation_thread_context_sources(
             "title": "Conversation continuity",
             "content": "\n".join(lines),
             "metadata": {
-                "active_thread_id": active.id if active else None,
+                "active_thread_id": (
+                    selected_guidance.active.id if selected_guidance.active else None
+                ),
                 "thread_ids": [thread.id for thread in selected],
                 "cross_session_thread_ids": [
-                    thread.id
-                    for thread in selected
-                    if thread.last_conversation_id != conversation_id
+                    thread.id for thread in selected if thread.cross_session
                 ],
                 "thread_count": len(selected),
                 "read_only": True,
             },
         }
     ]
+
+
+def _thread_reference(
+    thread: ConversationThread,
+    conversation_id: str,
+) -> ThreadReference:
+    return ThreadReference(
+        id=thread.id,
+        title=thread.title,
+        summary=thread.summary,
+        origin=thread.origin,
+        user_interest=thread.user_interest,
+        next_angle=thread.next_angle,
+        cross_session=thread.last_conversation_id != conversation_id,
+    )
 
 
 def background_thread_candidates(

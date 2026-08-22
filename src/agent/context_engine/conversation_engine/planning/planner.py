@@ -8,6 +8,8 @@ from agent.context_engine.contracts.models import (
     ConversationPlan,
     EmotionState,
     MatchingUnderstanding,
+    ThreadGuidance,
+    ThreadReference,
     TopicState,
 )
 from agent.context_engine.conversation_engine.planning.topic_catalog import (
@@ -35,6 +37,7 @@ def build_conversation_plan(
     emotion_state: EmotionState | None = None,
     conversational_stance: ConversationalStance | None = None,
     matching_understanding: MatchingUnderstanding | None = None,
+    thread_guidance: ThreadGuidance | None = None,
     listener_first: bool = False,
 ) -> ConversationPlan:
     if listener_first:
@@ -45,6 +48,7 @@ def build_conversation_plan(
             emotion_state=emotion_state or EmotionState(),
             stance=conversational_stance or ConversationalStance(),
             matching_understanding=matching_understanding,
+            thread_guidance=thread_guidance,
         )
     labels = set(intent.labels)
     active = active_topic_state(topic_states)
@@ -65,6 +69,12 @@ def build_conversation_plan(
         data_targets=data_targets,
         tone_instruction=_tone_instruction(labels, emotion),
         reason=_plan_reason(labels, active, emotion),
+        **_thread_decision(
+            intent=intent,
+            emotion=emotion,
+            stance=conversational_stance or ConversationalStance(),
+            guidance=thread_guidance,
+        ),
     )
 
 
@@ -76,6 +86,7 @@ def _build_listener_first_plan(
     emotion_state: EmotionState,
     stance: ConversationalStance,
     matching_understanding: MatchingUnderstanding | None,
+    thread_guidance: ThreadGuidance | None,
 ) -> ConversationPlan:
     labels = set(intent.labels)
     prioritized = _stance_requires_attention(stance)
@@ -114,7 +125,56 @@ def _build_listener_first_plan(
             matching_understanding,
             allowed=matching_discovery_allowed,
         ),
+        **_thread_decision(
+            intent=intent,
+            emotion=emotion_state,
+            stance=stance,
+            guidance=thread_guidance,
+        ),
     )
+
+
+def _thread_decision(
+    *,
+    intent: ContextQueryIntent,
+    emotion: EmotionState,
+    stance: ConversationalStance,
+    guidance: ThreadGuidance | None,
+) -> dict[str, str | None]:
+    if not guidance or (not guidance.active and not guidance.relevant_open):
+        return _thread_fields("none")
+    if stance.constraints or stance.feedback_kind or emotion.response_mode != "normal_chat":
+        return _thread_fields("follow_user")
+    if not intent.is_low_information:
+        return _thread_fields("follow_user")
+    if guidance.active and _thread_is_engaged(guidance.active):
+        return _thread_fields("continue_active", guidance.active)
+    candidate = next(
+        (thread for thread in guidance.relevant_open if _thread_is_engaged(thread)),
+        None,
+    )
+    if candidate:
+        return _thread_fields("offer_open", candidate)
+    unengaged = guidance.active or next(iter(guidance.relevant_open), None)
+    if unengaged:
+        return _thread_fields("ignore_unengaged", unengaged)
+    return _thread_fields("none")
+
+
+def _thread_is_engaged(thread: ThreadReference) -> bool:
+    return thread.origin == "user_started" or thread.user_interest in {"medium", "high"}
+
+
+def _thread_fields(
+    action: str,
+    thread: ThreadReference | None = None,
+) -> dict[str, str | None]:
+    return {
+        "thread_action": action,
+        "thread_id": thread.id if thread else None,
+        "thread_title": thread.title if thread else None,
+        "thread_next_angle": thread.next_angle if thread else None,
+    }
 
 
 def _matching_discovery_is_allowed(
