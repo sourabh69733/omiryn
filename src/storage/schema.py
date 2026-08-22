@@ -145,6 +145,34 @@ Index(
     conversation_threads.c.last_conversation_id,
 )
 
+# Records one validated background thread operation exactly once per batch.
+thread_operation_applications = Table(
+    "thread_operation_applications",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("batch_key", String, nullable=False),
+    Column("operation_fingerprint", String, nullable=False),
+    Column("operation_kind", String, nullable=False),
+    Column("thread_id", String, nullable=True),
+    Column("operation_json", JSON, nullable=False),
+    Column("result_json", JSON, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "uq_thread_operation_applications_batch",
+    thread_operation_applications.c.user_id,
+    thread_operation_applications.c.conversation_id,
+    thread_operation_applications.c.batch_key,
+    unique=True,
+)
+Index(
+    "ix_thread_operation_applications_user_created",
+    thread_operation_applications.c.user_id,
+    thread_operation_applications.c.created_at,
+)
+
 agent_usage_events = Table(
     "agent_usage_events",
     metadata,
