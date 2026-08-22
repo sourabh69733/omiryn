@@ -7,7 +7,10 @@ from dataclasses import replace
 from typing import Any
 
 from agent.config import agent_pipeline_config
-from agent.context_engine.conversation_engine.state import background_thread_candidates
+from agent.context_engine.conversation_engine.state import (
+    apply_validated_thread_proposal,
+    background_thread_candidates,
+)
 from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import list_data_point_extraction_debug, list_profile_facts
@@ -90,6 +93,11 @@ async def run_background_cognition(
         ),
     )
     application_result = None
+    thread_application_result = None
+    live_attempted = (
+        agent_pipeline_config().live_memory_writes
+        or agent_pipeline_config().live_thread_writes
+    )
     try:
         raw = await analyze_background_cognition(
             background_cognition_prompt(batch, existing_memories, thread_candidates),
@@ -138,6 +146,14 @@ async def run_background_cognition(
                     "thread_valid": bool(cognition.thread.get("valid")),
                     "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
                 }
+        if bool(cognition.thread.get("valid")) and agent_pipeline_config().live_thread_writes:
+            thread_application_result = apply_validated_thread_proposal(
+                batch_key=batch.batch_key,
+                conversation_id=batch.conversation_id,
+                user_id=batch.user_id,
+                message_index=batch.new_end_message_index,
+                proposal=cognition.thread.get("proposal"),
+            )
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
@@ -151,8 +167,8 @@ async def run_background_cognition(
                 handoff=next_handoff,
             )
         )
-        decision = _result_decision(analysis, application_result)
-        live_writes = application_result is not None
+        decision = _result_decision(analysis, application_result, thread_application_result)
+        live_writes = application_result is not None or thread_application_result is not None
         _save_shadow_debug_once(
             batch=batch,
             decision=decision,
@@ -176,6 +192,12 @@ async def run_background_cognition(
                     application_result.deferred_count if application_result else 0
                 ),
                 "idempotent": application_result.idempotent if application_result else False,
+                "thread_applied_count": (
+                    thread_application_result.applied_count if thread_application_result else 0
+                ),
+                "thread_idempotent": (
+                    thread_application_result.idempotent if thread_application_result else False
+                ),
             },
             state_version=saved_state.version,
             live_writes=live_writes,
@@ -190,12 +212,18 @@ async def run_background_cognition(
             "applied_count": application_result.applied_count if application_result else 0,
             "deferred_count": application_result.deferred_count if application_result else 0,
             "idempotent": application_result.idempotent if application_result else False,
+            "thread_applied_count": (
+                thread_application_result.applied_count if thread_application_result else 0
+            ),
+            "thread_idempotent": (
+                thread_application_result.idempotent if thread_application_result else False
+            ),
             "errors": list(analysis.errors),
             "processed_through_message_index": saved_state.processed_through_message_index,
         }
     except Exception as error:
-        live_writes = application_result is not None
-        decision = "live_error" if live_writes else "shadow_error"
+        live_writes = application_result is not None or thread_application_result is not None
+        decision = "live_error" if live_attempted else "shadow_error"
         _save_shadow_debug_once(
             batch=batch,
             decision=decision,
@@ -295,7 +323,13 @@ def _operation_dict(operation: MemoryOperation) -> dict[str, Any]:
     }
 
 
-def _result_decision(analysis: MemoryAnalysis, application_result: Any) -> str:
+def _result_decision(
+    analysis: MemoryAnalysis,
+    application_result: Any,
+    thread_application_result: Any,
+) -> str:
+    if thread_application_result and thread_application_result.applied_count:
+        return "live_applied"
     if not analysis.valid:
         return "shadow_invalid"
     if application_result is None:
