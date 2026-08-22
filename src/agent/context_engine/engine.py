@@ -87,6 +87,7 @@ def build_model_context_package(
             emotion_state=emotion_state,
             conversational_stance=conversational_stance,
             matching_understanding=matching_understanding,
+            thread_guidance=reply_context.thread_guidance,
             listener_first=listener_first,
         )
         system_prompt = build_companion_system_prompt_v2(
@@ -155,6 +156,7 @@ def build_model_context_package(
         prompt_version_name=prompt_version.name,
         query_intent=query_intent,
         matching_understanding=matching_understanding,
+        thread_guidance=reply_context.thread_guidance,
         snapshot=snapshot,
     )
 
