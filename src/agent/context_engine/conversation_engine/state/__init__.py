@@ -1,5 +1,6 @@
 """Defines and validates persistent conversation progress without changing reply behaviour."""
 
+from .application import ThreadApplicationResult, apply_validated_thread_proposal
 from .models import ConversationState, ConversationThread
 from .context import (
     background_thread_candidates,
@@ -25,7 +26,9 @@ __all__ = [
     "ConversationStateConflictError",
     "ConversationStateValidationError",
     "ConversationThread",
+    "ThreadApplicationResult",
     "CONVERSATION_THREAD_SOURCE_TYPE",
+    "apply_validated_thread_proposal",
     "background_thread_candidates",
     "conversation_state_shadow_enabled",
     "conversation_state_v2_enabled",
