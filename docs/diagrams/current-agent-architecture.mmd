@@ -1,0 +1,133 @@
+%% Current implemented Omiryn agent architecture.
+%% This diagram shows executable behavior, not the future target architecture.
+flowchart LR
+    subgraph clientLayer["Client"]
+        user["User"]
+        chatUi["Chat UI"]
+    end
+
+    subgraph apiLayer["API and realtime delivery"]
+        conversationApi["Conversation API"]
+        saveMessages["Save user and agent messages"]
+        websocketPublisher["WebSocket publisher"]
+        backgroundScheduler["In-process background scheduler"]
+    end
+
+    subgraph foregroundLayer["Foreground agent turn"]
+        runtimeOrchestrator["Runtime orchestrator"]
+        inputAssessment["Input quality assessment"]
+        directTurnPolicy["Direct-turn policy"]
+        contextEngine["Context engine"]
+        modelRouter["Provider and model router"]
+        companionModel["Companion model"]
+        outputSanitizer["Reply sanitizer and splitter"]
+        turnResult["Plain user-visible reply"]
+    end
+
+    subgraph contextLayer["Context engine internals"]
+        contextSources["Recent chat, profile, memories, style, and relevant threads"]
+        matchingUnderstanding["Matching-understanding progress"]
+        turnUnderstanding["Language, intent, emotion, and stance"]
+        topicState["Current topic state"]
+        conversationPlanner["Conversation planner"]
+        promptCompiler["Prompt compiler and token budget"]
+        contextSnapshot["Debug context snapshot"]
+    end
+
+    subgraph cognitionLayer["Background cognition"]
+        thresholdGate["Complete batch threshold: 7 meaningful user messages"]
+        boundedBatch["Bounded new messages plus overlap, handoff, and candidates"]
+        cognitionModel["One background cognition model call"]
+        structuredProposal["Memory operations, one thread operation, and next handoff"]
+        sharedValidation["Pure validation and evidence resolution"]
+        rolloutMode{"Rollout mode"}
+        shadowResult["Shadow: record result without canonical writes"]
+        liveApply["Live: idempotent validated writes"]
+    end
+
+    subgraph storageLayer["Canonical storage"]
+        messageStore[("Conversation messages")]
+        memoryStore[("Typed data points, evidence, and operation history")]
+        threadStore[("Conversation threads and active-thread pointer")]
+        processingStore[("Processing cursor and batch handoff")]
+        profileStore[("Basic user profile and learned style")]
+        debugStore[("Traces, snapshots, cognition debug, and usage")]
+    end
+
+    subgraph qualityLayer["Evaluation"]
+        evalRunner["Behavior, simulated-user, memory, and thread scenarios"]
+        judgeModels["User-model and independent judge models"]
+        evalReports["Readable evaluation reports"]
+    end
+
+    subgraph currentGaps["Important current limitations"]
+        noIdleFlush["No idle or session-end batch flush"]
+        noBatchLease["No atomic in-flight batch lease"]
+        noProactiveScheduler["No proactive agent-message scheduler"]
+        noDistributedRealtime["No distributed WebSocket pub-sub coordination"]
+    end
+
+    user --> chatUi
+    chatUi -->|"HTTP message"| conversationApi
+    conversationApi --> runtimeOrchestrator
+    runtimeOrchestrator --> inputAssessment
+    inputAssessment --> directTurnPolicy
+    directTurnPolicy -->|"Simple acknowledgement"| turnResult
+    directTurnPolicy -->|"Model turn"| contextEngine
+
+    contextSources --> contextEngine
+    contextEngine --> matchingUnderstanding
+    matchingUnderstanding --> turnUnderstanding
+    turnUnderstanding --> topicState
+    topicState --> conversationPlanner
+    conversationPlanner --> promptCompiler
+    promptCompiler --> modelRouter
+    promptCompiler --> contextSnapshot
+    modelRouter --> companionModel
+    companionModel --> outputSanitizer
+    outputSanitizer --> turnResult
+
+    turnResult --> saveMessages
+    saveMessages --> messageStore
+    saveMessages --> websocketPublisher
+    websocketPublisher -->|"WebSocket event"| chatUi
+
+    messageStore --> contextSources
+    memoryStore --> contextSources
+    threadStore --> contextSources
+    profileStore --> contextSources
+    contextSnapshot --> debugStore
+    companionModel --> debugStore
+
+    saveMessages --> thresholdGate
+    thresholdGate -->|"Full batch"| backgroundScheduler
+    thresholdGate -.->|"Below threshold remains pending"| noIdleFlush
+    backgroundScheduler --> boundedBatch
+    messageStore --> boundedBatch
+    memoryStore --> boundedBatch
+    threadStore --> boundedBatch
+    processingStore --> boundedBatch
+    boundedBatch --> cognitionModel
+    cognitionModel --> structuredProposal
+    structuredProposal --> sharedValidation
+    sharedValidation --> rolloutMode
+    rolloutMode -->|"Shadow"| shadowResult
+    rolloutMode -->|"Live"| liveApply
+    shadowResult --> debugStore
+    shadowResult --> processingStore
+    liveApply --> memoryStore
+    liveApply --> threadStore
+    liveApply --> processingStore
+    cognitionModel --> debugStore
+
+    backgroundScheduler -.-> noBatchLease
+    turnResult -.-> noProactiveScheduler
+    websocketPublisher -.-> noDistributedRealtime
+
+    evalRunner --> runtimeOrchestrator
+    evalRunner --> backgroundScheduler
+    evalRunner --> judgeModels
+    judgeModels --> evalReports
+
+    classDef gap fill:#fff1f0,stroke:#cf1322,color:#5c0011,stroke-dasharray: 5 5
+    class noIdleFlush,noBatchLease,noProactiveScheduler,noDistributedRealtime gap
