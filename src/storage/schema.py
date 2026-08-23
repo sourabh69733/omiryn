@@ -75,6 +75,25 @@ memory_processing_states = Table(
 )
 Index("ix_memory_processing_states_user", memory_processing_states.c.user_id)
 
+# Claims one bounded cognition batch before its model call. The expiring owner
+# token prevents duplicate calls while allowing recovery after a crashed worker.
+memory_processing_leases = Table(
+    "memory_processing_leases",
+    metadata,
+    Column("batch_key", String, primary_key=True),
+    Column("conversation_id", String, nullable=False),
+    Column("user_id", String, nullable=False),
+    Column("owner_token", String, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_memory_processing_leases_user", memory_processing_leases.c.user_id)
+Index(
+    "ix_memory_processing_leases_conversation",
+    memory_processing_leases.c.conversation_id,
+)
+
 # Records each validated background-memory operation exactly once. Operation and
 # snapshots may contain private evidence, so storage encrypts the JSON payloads.
 memory_operation_applications = Table(
