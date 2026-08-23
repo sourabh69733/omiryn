@@ -16,6 +16,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "draft_profiles",
     "agent_conversations",
     "conversation_states",
+    "memory_processing_leases",
     "memory_processing_states",
     "memory_operation_applications",
     "conversation_threads",

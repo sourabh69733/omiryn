@@ -13,6 +13,7 @@ from .schema import (
     agent_traces,
     agent_usage_events,
     draft_profiles,
+    memory_processing_leases,
     memory_processing_states,
     memory_operation_applications,
 )
@@ -200,6 +201,12 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_traces.delete().where(
                 agent_traces.c.conversation_id == conversation_id,
                 agent_traces.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            memory_processing_leases.delete().where(
+                memory_processing_leases.c.conversation_id == conversation_id,
+                memory_processing_leases.c.user_id == owner_id,
             )
         )
         connection.execute(
