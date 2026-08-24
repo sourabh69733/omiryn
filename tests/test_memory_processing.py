@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import UTC, datetime, timedelta
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
@@ -13,13 +14,15 @@ from agent.memory_engine.processing import (
     MemoryHandoff,
     MemoryProcessingState,
     build_memory_batch,
+    claim_processing_batch,
     get_processing_state,
+    release_processing_batch,
     save_processing_state,
 )
 from agent.memory_engine.processing.service import MemoryProcessingStateConflictError
 from security.encryption import is_encrypted_blob
 from storage import ENGINE, delete_conversation, reset_db, save_conversation
-from storage.schema import memory_processing_states
+from storage.schema import memory_processing_leases, memory_processing_states
 
 
 class MemoryProcessingTest(unittest.TestCase):
@@ -178,6 +181,92 @@ class MemoryProcessingTest(unittest.TestCase):
                 )
             )
 
+    def test_processing_batch_lease_allows_only_one_owner(self) -> None:
+        first_owner = claim_processing_batch(
+            self.conversation_id,
+            self.user_id,
+            "batch-one",
+            expected_processed_index=-1,
+            lease_seconds=60,
+        )
+        second_owner = claim_processing_batch(
+            self.conversation_id,
+            self.user_id,
+            "batch-one",
+            expected_processed_index=-1,
+            lease_seconds=60,
+        )
+
+        self.assertIsNotNone(first_owner)
+        self.assertIsNone(second_owner)
+        assert first_owner is not None
+        self.assertFalse(
+            release_processing_batch("batch-one", self.user_id, "wrong-owner")
+        )
+        self.assertTrue(
+            release_processing_batch("batch-one", self.user_id, first_owner)
+        )
+
+    def test_processing_batch_lease_rejects_a_stale_cursor(self) -> None:
+        save_processing_state(
+            MemoryProcessingState(
+                conversation_id=self.conversation_id,
+                user_id=self.user_id,
+                processed_through_message_index=2,
+                last_batch_key="completed-batch",
+            )
+        )
+
+        owner = claim_processing_batch(
+            self.conversation_id,
+            self.user_id,
+            "stale-batch",
+            expected_processed_index=-1,
+            lease_seconds=60,
+        )
+
+        self.assertIsNone(owner)
+        with ENGINE.begin() as connection:
+            lease_count = connection.execute(
+                select(memory_processing_leases.c.batch_key)
+            ).all()
+        self.assertEqual(lease_count, [])
+
+    def test_expired_processing_batch_lease_can_be_reclaimed(self) -> None:
+        first_owner = claim_processing_batch(
+            self.conversation_id,
+            self.user_id,
+            "expired-batch",
+            expected_processed_index=-1,
+            lease_seconds=60,
+        )
+        self.assertIsNotNone(first_owner)
+        with ENGINE.begin() as connection:
+            connection.execute(
+                memory_processing_leases.update()
+                .where(memory_processing_leases.c.batch_key == "expired-batch")
+                .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+            )
+
+        second_owner = claim_processing_batch(
+            self.conversation_id,
+            self.user_id,
+            "expired-batch",
+            expected_processed_index=-1,
+            lease_seconds=60,
+        )
+
+        self.assertIsNotNone(second_owner)
+        self.assertNotEqual(second_owner, first_owner)
+        assert first_owner is not None
+        assert second_owner is not None
+        self.assertFalse(
+            release_processing_batch("expired-batch", self.user_id, first_owner)
+        )
+        self.assertTrue(
+            release_processing_batch("expired-batch", self.user_id, second_owner)
+        )
+
     def test_handoff_is_encrypted_at_rest_and_removed_with_conversation(self) -> None:
         encryption_key = base64.urlsafe_b64encode(b"m" * 32).decode("ascii")
         with patch.dict("os.environ", {"ENCRYPTION_MASTER_KEY": encryption_key}):
@@ -196,10 +285,23 @@ class MemoryProcessingTest(unittest.TestCase):
                         memory_processing_states.c.conversation_id == self.conversation_id
                     )
                 ).scalar_one()
+            lease_owner = claim_processing_batch(
+                self.conversation_id,
+                self.user_id,
+                "private-batch-lease",
+                expected_processed_index=2,
+                lease_seconds=60,
+            )
+            self.assertIsNotNone(lease_owner)
             self.assertTrue(is_encrypted_blob(raw))
             self.assertEqual(saved.handoff.summary, "A private relationship story.")
             self.assertTrue(delete_conversation(self.conversation_id, self.user_id))
             self.assertIsNone(get_processing_state(self.conversation_id, self.user_id))
+            with ENGINE.begin() as connection:
+                remaining_lease = connection.execute(
+                    select(memory_processing_leases.c.batch_key)
+                ).first()
+            self.assertIsNone(remaining_lease)
 
     def _save_conversation(self, messages: list[dict[str, object]]) -> None:
         save_conversation(

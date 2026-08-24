@@ -22,7 +22,12 @@ from agent.memory_engine.processing.application import (
     memory_background_v2_live_writes_enabled,
 )
 from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff, MemoryOperation, MemoryProcessingState
-from agent.memory_engine.processing.service import get_processing_state, save_processing_state
+from agent.memory_engine.processing.service import (
+    claim_processing_batch,
+    get_processing_state,
+    release_processing_batch,
+    save_processing_state,
+)
 from agent.memory_engine.processing.validation import MemoryAnalysis
 from .coordination import interpret_background_cognition
 
@@ -69,7 +74,7 @@ async def run_background_cognition(
     messages: list[dict[str, object]],
     model: str | None = None,
 ) -> dict[str, Any]:
-    """Analyze one batch and optionally apply validated memory operations."""
+    """Claim and analyze one batch without duplicating its model call."""
     state = get_processing_state(conversation_id, user_id)
     batch = build_memory_batch(
         conversation_id=conversation_id,
@@ -82,6 +87,41 @@ async def run_background_cognition(
     if batch is None:
         return {"status": "no_pending_messages", "operation_count": 0}
 
+    lease_owner = claim_processing_batch(
+        conversation_id,
+        user_id,
+        batch.batch_key,
+        expected_processed_index=(
+            state.processed_through_message_index if state is not None else -1
+        ),
+        lease_seconds=_lease_seconds(),
+    )
+    if lease_owner is None:
+        return {
+            "status": "already_processing",
+            "batch_key": batch.batch_key,
+            "operation_count": 0,
+        }
+
+    try:
+        return await _run_claimed_background_cognition(
+            batch=batch,
+            state=state,
+            model=model,
+        )
+    finally:
+        release_processing_batch(batch.batch_key, user_id, lease_owner)
+
+
+async def _run_claimed_background_cognition(
+    *,
+    batch: MemoryBatch,
+    state: MemoryProcessingState | None,
+    model: str | None,
+) -> dict[str, Any]:
+    """Run the expensive work after this worker owns the batch lease."""
+    conversation_id = batch.conversation_id
+    user_id = batch.user_id
     existing_memories = _existing_memory_context(user_id)
     thread_candidates = background_thread_candidates(
         conversation_id,
@@ -362,6 +402,11 @@ def _timeout_seconds() -> float:
         return max(1.0, float(os.getenv("MEMORY_BACKGROUND_V2_TIMEOUT_SECONDS", "120")))
     except ValueError:
         return 120.0
+
+
+def _lease_seconds() -> float:
+    """Keep the claim beyond the bounded provider timeout without another flag."""
+    return _timeout_seconds() + 30.0
 
 
 __all__ = [

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 import json
 from unittest.mock import AsyncMock, patch
@@ -173,6 +174,57 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(debug[0]["decision"], "shadow_valid")
         self.assertFalse(debug[0]["review"]["live_writes"])
 
+    async def test_concurrent_workers_call_cognition_model_once_for_same_batch(self) -> None:
+        first_call_started = asyncio.Event()
+        release_first_call = asyncio.Event()
+        call_count = 0
+
+        async def analyze_once(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            first_call_started.set()
+            await release_first_call.wait()
+            return self._combined_analysis(evidence_indexes=[0, 2])
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "AGENT_PIPELINE_VERSION": "v2",
+                    "AGENT_ROLLOUT": "shadow",
+                    "MEMORY_BACKGROUND_V2_THRESHOLD": "2",
+                },
+            ),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                side_effect=analyze_once,
+            ),
+        ):
+            first_worker = asyncio.create_task(
+                run_background_cognition(
+                    self.conversation_id,
+                    self.user_id,
+                    self.messages,
+                    "memory-model",
+                )
+            )
+            await first_call_started.wait()
+            second_worker = asyncio.create_task(
+                run_background_cognition(
+                    self.conversation_id,
+                    self.user_id,
+                    self.messages,
+                    "memory-model",
+                )
+            )
+            await asyncio.sleep(0)
+            release_first_call.set()
+            first_result, second_result = await asyncio.gather(first_worker, second_worker)
+
+        self.assertEqual(call_count, 1)
+        self.assertEqual(first_result["status"], "shadow_valid")
+        self.assertEqual(second_result["status"], "already_processing")
+
     async def test_worker_uses_one_combined_call_and_records_thread_shadow(self) -> None:
         thread = create_thread(
             user_id=self.user_id,
@@ -252,10 +304,17 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list_profile_facts(self.user_id), [])
 
     async def test_provider_error_is_observed_without_advancing_cursor(self) -> None:
-        with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
-            new_callable=AsyncMock,
-            side_effect=TimeoutError("provider timed out"),
+        shadow_environment = {
+            "AGENT_PIPELINE_VERSION": "v2",
+            "AGENT_ROLLOUT": "shadow",
+        }
+        with (
+            patch.dict("os.environ", shadow_environment),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+                side_effect=TimeoutError("provider timed out"),
+            ),
         ):
             result = await run_background_cognition(
                 self.conversation_id,
@@ -271,6 +330,22 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             source_id=self.conversation_id,
         )
         self.assertEqual(debug[0]["decision"], "shadow_error")
+
+        with (
+            patch.dict("os.environ", shadow_environment),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+                return_value=self._combined_analysis(evidence_indexes=[0, 2]),
+            ),
+        ):
+            retry = await run_background_cognition(
+                self.conversation_id,
+                self.user_id,
+                self.messages,
+            )
+
+        self.assertEqual(retry["status"], "shadow_valid")
 
     async def test_enabled_valid_result_applies_memory_before_advancing_cursor(self) -> None:
         with (
