@@ -7,11 +7,34 @@ from typing import Any
 
 from storage.memory_processing import (
     MemoryProcessingStateConflictError,
+    claim_memory_processing_batch,
     get_memory_processing_state,
+    release_memory_processing_batch,
     save_memory_processing_state,
 )
 
 from .models import MemoryHandoff, MemoryProcessingState
+
+
+def claim_processing_batch(
+    conversation_id: str,
+    user_id: str,
+    batch_key: str,
+    *,
+    expected_processed_index: int,
+    lease_seconds: float,
+) -> str | None:
+    return claim_memory_processing_batch(
+        conversation_id,
+        user_id,
+        batch_key,
+        expected_processed_index=expected_processed_index,
+        lease_seconds=lease_seconds,
+    )
+
+
+def release_processing_batch(batch_key: str, user_id: str, owner_token: str) -> bool:
+    return release_memory_processing_batch(batch_key, user_id, owner_token)
 
 
 def get_processing_state(
@@ -72,6 +95,8 @@ def _validate_state(state: MemoryProcessingState) -> None:
 
 __all__ = [
     "MemoryProcessingStateConflictError",
+    "claim_processing_batch",
     "get_processing_state",
+    "release_processing_batch",
     "save_processing_state",
 ]

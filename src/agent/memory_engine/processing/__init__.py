@@ -14,7 +14,12 @@ from .models import (
     MemoryProcessingState,
     MemoryAnalysis,
 )
-from .service import get_processing_state, save_processing_state
+from .service import (
+    claim_processing_batch,
+    get_processing_state,
+    release_processing_batch,
+    save_processing_state,
+)
 from .validation import validate_memory_analysis
 
 __all__ = [
@@ -27,7 +32,9 @@ __all__ = [
     "MemoryProcessingState",
     "build_memory_batch",
     "apply_validated_memory_analysis",
+    "claim_processing_batch",
     "get_processing_state",
+    "release_processing_batch",
     "save_processing_state",
     "memory_background_v2_live_writes_enabled",
     "validate_memory_analysis",
