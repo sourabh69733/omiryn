@@ -2,19 +2,148 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from security.encryption import decrypt_json, maybe_encrypt_json
 
 from .database import ENGINE
-from .schema import agent_conversations, memory_processing_states
+from .schema import (
+    agent_conversations,
+    memory_processing_leases,
+    memory_processing_states,
+)
 from .utils import _isoformat_utc
 
 
 class MemoryProcessingStateConflictError(RuntimeError):
     """Signals a stale worker or an attempt to move a memory cursor backwards."""
+
+
+def claim_memory_processing_batch(
+    conversation_id: str,
+    user_id: str,
+    batch_key: str,
+    *,
+    expected_processed_index: int,
+    lease_seconds: float,
+) -> str | None:
+    """Atomically claim one batch, returning an owner token only to the winner."""
+    if not conversation_id or not user_id or not batch_key:
+        raise ValueError("memory processing lease requires conversation, user, and batch")
+    if lease_seconds <= 0:
+        raise ValueError("memory processing lease duration must be positive")
+
+    owner_token = str(uuid4())
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(seconds=lease_seconds)
+    try:
+        with ENGINE.begin() as connection:
+            _require_owned_conversation(connection, conversation_id, user_id)
+            connection.execute(
+                memory_processing_leases.insert().values(
+                    batch_key=batch_key,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    owner_token=owner_token,
+                    expires_at=expires_at,
+                )
+            )
+            if not _cursor_matches(
+                connection,
+                conversation_id,
+                user_id,
+                expected_processed_index,
+            ):
+                _release_lease(connection, batch_key, user_id, owner_token)
+                return None
+        return owner_token
+    except IntegrityError:
+        pass
+
+    with ENGINE.begin() as connection:
+        _require_owned_conversation(connection, conversation_id, user_id)
+        current = connection.execute(
+            select(memory_processing_leases).where(
+                memory_processing_leases.c.batch_key == batch_key,
+                memory_processing_leases.c.conversation_id == conversation_id,
+                memory_processing_leases.c.user_id == user_id,
+            )
+        ).mappings().first()
+        if current is None:
+            return None
+        result = connection.execute(
+            memory_processing_leases.update()
+            .where(
+                memory_processing_leases.c.batch_key == batch_key,
+                memory_processing_leases.c.owner_token == current["owner_token"],
+                memory_processing_leases.c.expires_at <= now,
+            )
+            .values(
+                owner_token=owner_token,
+                expires_at=expires_at,
+                updated_at=func.now(),
+            )
+        )
+        if result.rowcount != 1:
+            return None
+        if not _cursor_matches(
+            connection,
+            conversation_id,
+            user_id,
+            expected_processed_index,
+        ):
+            _release_lease(connection, batch_key, user_id, owner_token)
+            return None
+    return owner_token
+
+
+def release_memory_processing_batch(
+    batch_key: str,
+    user_id: str,
+    owner_token: str,
+) -> bool:
+    """Release only the lease still owned by this worker."""
+    if not batch_key or not user_id or not owner_token:
+        return False
+    with ENGINE.begin() as connection:
+        return _release_lease(connection, batch_key, user_id, owner_token)
+
+
+def _cursor_matches(
+    connection: Any,
+    conversation_id: str,
+    user_id: str,
+    expected_processed_index: int,
+) -> bool:
+    current_index = connection.execute(
+        select(memory_processing_states.c.processed_through_message_index).where(
+            memory_processing_states.c.conversation_id == conversation_id,
+            memory_processing_states.c.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+    actual_index = int(current_index) if current_index is not None else -1
+    return actual_index == expected_processed_index
+
+
+def _release_lease(
+    connection: Any,
+    batch_key: str,
+    user_id: str,
+    owner_token: str,
+) -> bool:
+    result = connection.execute(
+        memory_processing_leases.delete().where(
+            memory_processing_leases.c.batch_key == batch_key,
+            memory_processing_leases.c.user_id == user_id,
+            memory_processing_leases.c.owner_token == owner_token,
+        )
+    )
+    return result.rowcount == 1
 
 
 def get_memory_processing_state(conversation_id: str, user_id: str) -> dict[str, Any] | None:
