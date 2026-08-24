@@ -36,6 +36,7 @@ flowchart LR
 
     subgraph cognitionLayer["Background cognition"]
         thresholdGate["Complete batch threshold: 7 meaningful user messages"]
+        batchLease["Atomic batch claim with expiring owner token"]
         boundedBatch["Bounded new messages plus overlap, handoff, and candidates"]
         cognitionModel["One background cognition model call"]
         structuredProposal["Memory operations, one thread operation, and next handoff"]
@@ -49,7 +50,7 @@ flowchart LR
         messageStore[("Conversation messages")]
         memoryStore[("Typed data points, evidence, and operation history")]
         threadStore[("Conversation threads and active-thread pointer")]
-        processingStore[("Processing cursor and batch handoff")]
+        processingStore[("Processing cursor, batch handoff, and leases")]
         profileStore[("Basic user profile and learned style")]
         debugStore[("Traces, snapshots, cognition debug, and usage")]
     end
@@ -62,7 +63,6 @@ flowchart LR
 
     subgraph currentGaps["Important current limitations"]
         noIdleFlush["No idle or session-end batch flush"]
-        noBatchLease["No atomic in-flight batch lease"]
         noProactiveScheduler["No proactive agent-message scheduler"]
         noDistributedRealtime["No distributed WebSocket pub-sub coordination"]
     end
@@ -102,7 +102,9 @@ flowchart LR
     saveMessages --> thresholdGate
     thresholdGate -->|"Full batch"| backgroundScheduler
     thresholdGate -.->|"Below threshold remains pending"| noIdleFlush
-    backgroundScheduler --> boundedBatch
+    backgroundScheduler --> batchLease
+    batchLease --> boundedBatch
+    batchLease --> processingStore
     messageStore --> boundedBatch
     memoryStore --> boundedBatch
     threadStore --> boundedBatch
@@ -120,7 +122,6 @@ flowchart LR
     liveApply --> processingStore
     cognitionModel --> debugStore
 
-    backgroundScheduler -.-> noBatchLease
     turnResult -.-> noProactiveScheduler
     websocketPublisher -.-> noDistributedRealtime
 
@@ -130,4 +131,4 @@ flowchart LR
     judgeModels --> evalReports
 
     classDef gap fill:#fff1f0,stroke:#cf1322,color:#5c0011,stroke-dasharray: 5 5
-    class noIdleFlush,noBatchLease,noProactiveScheduler,noDistributedRealtime gap
+    class noIdleFlush,noProactiveScheduler,noDistributedRealtime gap
