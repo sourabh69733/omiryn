@@ -1,1 +1,1 @@
-"""Internal admin website and API."""
+"""Internal admin API and authorization services."""

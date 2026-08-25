@@ -8,6 +8,7 @@ from security.auth import (
     production_runtime_enabled,
     validate_production_security_config,
 )
+from security.config import configured_cors_origins
 
 
 def _valid_master_key() -> str:
@@ -15,6 +16,10 @@ def _valid_master_key() -> str:
 
 
 class ProductionSecurityConfigTest(unittest.TestCase):
+    def test_default_cors_origins_include_standalone_admin_app(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIn("https://admin.omiryn.com", configured_cors_origins())
+
     def test_local_runtime_does_not_require_production_secrets(self) -> None:
         with patch.dict(os.environ, {"APP_ENV": "local", "AUTH_REQUIRED": "false"}, clear=True):
             validate_production_security_config()

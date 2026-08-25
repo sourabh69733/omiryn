@@ -1,3 +1,5 @@
+import { adminFetch, ensureAdminSession, signInWithGoogle, signOut } from "./auth.js";
+
 const state = {
   data: null,
   route: routeName(),
@@ -14,6 +16,15 @@ const state = {
 };
 
 const statusEl = document.querySelector("#admin-status");
+const adminAuth = document.querySelector("#admin-auth");
+const adminLoading = document.querySelector("#admin-loading");
+const adminSignInPanel = document.querySelector("#admin-sign-in-panel");
+const adminAccessDenied = document.querySelector("#admin-access-denied");
+const adminAuthMessage = document.querySelector("#admin-auth-message");
+const adminApp = document.querySelector("#admin-app");
+const adminSignIn = document.querySelector("#admin-sign-in");
+const adminSignOut = document.querySelector("#admin-sign-out");
+const adminDeniedSignOut = document.querySelector("#admin-denied-sign-out");
 const refreshButton = document.querySelector("#refresh-admin");
 const metricGrid = document.querySelector("#metric-grid");
 const dashboardFunnel = document.querySelector("#dashboard-funnel");
@@ -79,10 +90,52 @@ const tables = {
 };
 
 function routeName() {
-  if (window.location.pathname === "/admin/users") return "users";
-  if (window.location.pathname === "/admin/requests") return "requests";
-  if (window.location.pathname === "/admin/usage") return "usage";
+  if (window.location.pathname === "/users") return "users";
+  if (window.location.pathname === "/requests") return "requests";
+  if (window.location.pathname === "/usage") return "usage";
   return "dashboard";
+}
+
+function showLoading() {
+  adminAuth.hidden = false;
+  adminLoading.hidden = false;
+  adminSignInPanel.hidden = true;
+  adminAccessDenied.hidden = true;
+  adminApp.hidden = true;
+}
+
+function showSignIn(message = "Use the Google account with admin access.") {
+  adminAuth.hidden = false;
+  adminLoading.hidden = true;
+  adminSignInPanel.hidden = false;
+  adminAccessDenied.hidden = true;
+  adminApp.hidden = true;
+  adminAuthMessage.textContent = message;
+}
+
+function showAccessDenied() {
+  adminAuth.hidden = false;
+  adminLoading.hidden = true;
+  adminSignInPanel.hidden = true;
+  adminAccessDenied.hidden = false;
+  adminApp.hidden = true;
+}
+
+function showAdminApp() {
+  adminAuth.hidden = true;
+  adminApp.hidden = false;
+}
+
+function handleAuthResponse(response) {
+  if (response.status === 401) {
+    showSignIn("Your session has ended. Sign in again to continue.");
+    throw new Error("Sign in required.");
+  }
+  if (response.status === 403) {
+    showAccessDenied();
+    throw new Error("Your account does not have admin access.");
+  }
+  return response;
 }
 
 function configureRoute() {
@@ -111,9 +164,9 @@ function configureRoute() {
 async function loadAdminOverview() {
   setStatus("Loading admin data...");
   try {
-    const response = await fetch("/api/admin/overview?limit=50", {
+    const response = handleAuthResponse(await adminFetch("/api/admin/overview?limit=50", {
       headers: { Accept: "application/json" }
-    });
+    }));
     const data = await response.json();
     if (!response.ok) {
       throw new Error(apiErrorMessage(data.detail, "Could not load admin data."));
@@ -305,9 +358,9 @@ async function selectUser(userId) {
   userReport.innerHTML = '<div class="table-empty">Loading selected user...</div>';
 
   try {
-    const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}?limit=100`, {
+    const response = handleAuthResponse(await adminFetch(`/api/admin/users/${encodeURIComponent(userId)}?limit=100`, {
       headers: { Accept: "application/json" }
-    });
+    }));
     const detail = await response.json();
     if (!response.ok) {
       throw new Error(apiErrorMessage(detail.detail, "Could not load selected user."));
@@ -930,9 +983,9 @@ async function loadUsageDashboard() {
   }
 
   try {
-    const response = await fetch("/api/admin/usage?limit=100", {
+    const response = handleAuthResponse(await adminFetch("/api/admin/usage?limit=100", {
       headers: { Accept: "application/json" }
-    });
+    }));
     const data = await response.json();
     if (!response.ok) {
       throw new Error(apiErrorMessage(data.detail, "Could not load usage."));
@@ -1269,9 +1322,9 @@ async function loadRequestsDashboard() {
   }
 
   try {
-    const response = await fetch("/api/admin/requests?limit=100", {
+    const response = handleAuthResponse(await adminFetch("/api/admin/requests?limit=100", {
       headers: { Accept: "application/json" }
-    });
+    }));
     const data = await response.json();
     if (!response.ok) {
       throw new Error(apiErrorMessage(data.detail, "Could not load requests."));
@@ -1571,6 +1624,32 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+async function startAdminApp() {
+  showLoading();
+  try {
+    if (!(await ensureAdminSession())) {
+      showSignIn();
+      return;
+    }
+    showAdminApp();
+    configureRoute();
+    await loadAdminOverview();
+  } catch (error) {
+    showSignIn(error.message);
+  }
+}
+
+adminSignIn.addEventListener("click", async () => {
+  showLoading();
+  try {
+    await signInWithGoogle();
+  } catch (error) {
+    showSignIn(error.message);
+  }
+});
+adminSignOut.addEventListener("click", signOut);
+adminDeniedSignOut.addEventListener("click", signOut);
+window.addEventListener("omiryn:auth-required", () => showSignIn("Your session has ended. Sign in again to continue."));
 refreshButton.addEventListener("click", loadAdminOverview);
 usersPrev?.addEventListener("click", () => {
   state.usersPage -= 1;
@@ -1592,5 +1671,4 @@ tables.users?.addEventListener("keydown", (event) => {
   event.preventDefault();
   selectUser(row.dataset.userId);
 });
-configureRoute();
-loadAdminOverview();
+startAdminApp();

@@ -1163,4 +1163,43 @@ td small {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .admin-actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
+}
+
+.admin-auth {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 22px;
+}
+
+.admin-auth-panel {
+  width: min(440px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.admin-auth-panel h1 {
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.admin-auth-panel p:not(.eyebrow) {
+  margin: 10px 0 20px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
 }
