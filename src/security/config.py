@@ -7,6 +7,7 @@ DEFAULT_CORS_ORIGINS = (
     "https://omiryn.com",
     "https://www.omiryn.com",
     "https://app.omiryn.com",
+    "https://admin.omiryn.com",
 )
 
 

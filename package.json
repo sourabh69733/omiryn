@@ -17,6 +17,12 @@
     "web:deploy": "npx wrangler deploy --config apps/web/wrangler.jsonc",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
     "web:test": "tsx --test apps/web/src/ui/app/*.test.ts",
+    "admin:dev": "vite --config apps/admin/vite.config.js",
+    "admin:test": "node --test apps/admin/src/*.test.js",
+    "admin:check": "node --check apps/admin/src/api.js && node --check apps/admin/src/auth.js && node --check apps/admin/src/main.js",
+    "admin:build": "vite build --config apps/admin/vite.config.js",
+    "admin:preview": "vite preview --config apps/admin/vite.config.js",
+    "admin:deploy": "npx wrangler deploy --config apps/admin/wrangler.jsonc",
     "feedback:dev": "vite --config apps/feedback/vite.config.js",
     "feedback:build": "vite build --config apps/feedback/vite.config.js",
     "feedback:preview": "vite preview --config apps/feedback/vite.config.js",
@@ -25,7 +31,7 @@
     "feedback:worker:test": "node --test apps/feedback/worker/index.test.js",
     "feedback:db:migrate": "npx wrangler d1 migrations apply omiryn-feedback --remote --config apps/feedback/wrangler.jsonc",
     "feedback:deploy": "npm run feedback:db:migrate && npx wrangler deploy --config apps/feedback/wrangler.jsonc",
-    "build": "npm run landing:build && npm run web:build && npm run feedback:build"
+    "build": "npm run landing:build && npm run web:build && npm run feedback:build && npm run admin:build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
