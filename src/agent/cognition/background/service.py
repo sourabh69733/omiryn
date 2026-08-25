@@ -46,26 +46,66 @@ def background_cognition_threshold() -> int:
         return 7
 
 
+def _pending_background_cognition_batch(
+    conversation_id: str,
+    user_id: str,
+    messages: list[dict[str, object]],
+    *,
+    state: MemoryProcessingState | None,
+) -> MemoryBatch | None:
+    """Build the next bounded batch from the durable processing cursor."""
+    return build_memory_batch(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        messages=messages,
+        state=state,
+        context_overlap=_context_overlap(),
+        max_meaningful_user_messages=background_cognition_threshold(),
+    )
+
+
 def should_schedule_background_cognition(
     conversation_id: str,
     user_id: str | None,
     messages: list[dict[str, object]],
     quality_valid: bool,
 ) -> bool:
-    """Schedule only complete threshold batches; idle flushing arrives later."""
+    """Schedule immediately when the meaningful-message threshold is complete."""
     if not background_cognition_enabled() or not user_id or not quality_valid:
         return False
-    state = get_processing_state(conversation_id, user_id)
-    threshold = background_cognition_threshold()
-    batch = build_memory_batch(
-        conversation_id=conversation_id,
-        user_id=user_id,
-        messages=messages,
-        state=state,
-        context_overlap=_context_overlap(),
-        max_meaningful_user_messages=threshold,
+    batch = _pending_background_cognition_batch(
+        conversation_id,
+        user_id,
+        messages,
+        state=get_processing_state(conversation_id, user_id),
     )
-    return bool(batch and batch.meaningful_user_message_count >= threshold)
+    return bool(
+        batch
+        and batch.meaningful_user_message_count >= background_cognition_threshold()
+    )
+
+
+def should_schedule_idle_background_cognition(
+    conversation_id: str,
+    user_id: str | None,
+    messages: list[dict[str, object]],
+    quality_valid: bool,
+) -> bool:
+    """Debounce only meaningful work that has not reached the normal threshold."""
+    if not background_cognition_enabled() or not user_id or not quality_valid:
+        return False
+    batch = _pending_background_cognition_batch(
+        conversation_id,
+        user_id,
+        messages,
+        state=get_processing_state(conversation_id, user_id),
+    )
+    return bool(
+        batch
+        and 0
+        < batch.meaningful_user_message_count
+        < background_cognition_threshold()
+    )
 
 
 async def run_background_cognition(
@@ -76,15 +116,13 @@ async def run_background_cognition(
 ) -> dict[str, Any]:
     """Claim and analyze one batch without duplicating its model call."""
     state = get_processing_state(conversation_id, user_id)
-    batch = build_memory_batch(
-        conversation_id=conversation_id,
-        user_id=user_id,
-        messages=messages,
+    batch = _pending_background_cognition_batch(
+        conversation_id,
+        user_id,
+        messages,
         state=state,
-        context_overlap=_context_overlap(),
-        max_meaningful_user_messages=background_cognition_threshold(),
     )
-    if batch is None:
+    if batch is None or batch.meaningful_user_message_count == 0:
         return {"status": "no_pending_messages", "operation_count": 0}
 
     lease_owner = claim_processing_batch(
@@ -414,4 +452,5 @@ __all__ = [
     "background_cognition_threshold",
     "run_background_cognition",
     "should_schedule_background_cognition",
+    "should_schedule_idle_background_cognition",
 ]
