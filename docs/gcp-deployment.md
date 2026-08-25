@@ -156,6 +156,8 @@ Production deploys also require:
 - `ADMIN_EMAILS` or `ADMIN_USER_IDS` contains at least one admin.
 - `PROFILE_PHOTO_GCS_BUCKET` is set so profile photos use durable GCS storage.
 - `PROFILE_PHOTO_MAX_MB` is greater than `0` and no more than `10`.
+- If `CORS_ALLOWED_ORIGINS` is explicitly set, it includes
+  `https://admin.omiryn.com` as well as the public web origins.
 
 ## 6. Deploy
 
@@ -185,3 +187,26 @@ DRY_RUN=false ./scripts/gcp-encrypt-backfill.sh
 ```
 
 Keep `ENCRYPTION_MASTER_KEY` safe. If it is lost, encrypted chats and context cannot be recovered.
+
+## 9. Deploy The Admin App
+
+The admin UI is a separate static app hosted on Cloudflare. Cloud Run serves
+only the protected `/api/admin/*` endpoints.
+
+Configure this Cloudflare build variable:
+
+```bash
+VITE_API_BASE_URL=https://your-cloud-run-service-url
+```
+
+`VITE_API_BASE_URL` is public configuration, not a secret. Build and deploy:
+
+```bash
+npm run admin:build
+npm run admin:deploy
+```
+
+Attach `admin.omiryn.com` to the Cloudflare project. In Supabase Auth, allow
+`https://admin.omiryn.com` as a redirect URL. Keep the backend admin allowlist
+configured through `ADMIN_EMAILS` or `ADMIN_USER_IDS`; access to the website
+alone never grants access to admin data.

@@ -1,6 +1,6 @@
 # Omiryn Production Security Checklist
 
-Last updated: August 17, 2026
+Last updated: August 25, 2026
 
 This checklist tracks the privacy and security layer required before a real public launch.
 
@@ -35,6 +35,9 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] All private user-data routes require signed-in auth.
 - [x] Admin routes allow only configured admin emails or user IDs.
 - [x] Unauthenticated admin dev bypass is disabled in production.
+- [x] Admin UI is deployed separately and the API no longer serves admin frontend assets.
+- [ ] Add `https://admin.omiryn.com` to Supabase production redirect URLs.
+- [ ] If overriding `CORS_ALLOWED_ORIGINS`, include `https://admin.omiryn.com`.
 - [ ] Staging and production auth configs are separate.
 
 ## Data And Storage
@@ -47,7 +50,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Daily backups are enabled.
 - [ ] Restore process is tested.
 - [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, and public leads where applicable.
-- [ ] Add admin/internal view for deletion and export requests.
+- [x] Add admin/internal view for deletion and export requests.
 - [x] Raw chat/import text is not written to application logs or provider error usage metadata.
 - [x] Production startup requires profile photos to use GCS instead of ephemeral local disk.
 
@@ -88,6 +91,8 @@ This checklist tracks the privacy and security layer required before a real publ
 
 - [x] `npm run web:check` passes.
 - [x] `npm run web:build` passes.
+- [x] `npm run admin:test`, `npm run admin:check`, and `npm run admin:build` pass.
 - [x] Backend tests pass.
 - [ ] Public pages render on mobile and desktop.
 - [ ] Sign-in, chat, memory import, deletion request, and contact flows are manually tested.
+- [ ] Admin Google sign-in, denied-user handling, refresh, and sign-out are manually tested on the production domains.
