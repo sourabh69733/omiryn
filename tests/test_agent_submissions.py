@@ -1402,8 +1402,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(message_response.status_code, 200)
         self.assertGreaterEqual(len(message_response.json()["messages"]), 3)
 
-        extract_response = self.client.post(f"/api/agent/conversations/{conversation_id}/extract")
+        with patch(
+            "api.routes.conversations.idle_cognition_scheduler.flush_now",
+            new_callable=AsyncMock,
+        ) as flush_now:
+            extract_response = self.client.post(
+                f"/api/agent/conversations/{conversation_id}/extract"
+            )
         self.assertEqual(extract_response.status_code, 200)
+        flush_now.assert_awaited_once_with(conversation_id, "test-user")
         draft_id = extract_response.json()["draft_id"]
         draft_response = self.client.get(f"/api/drafts/{draft_id}")
         self.assertEqual(draft_response.status_code, 200)
@@ -3331,6 +3338,43 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["agent_provider"], "ollama")
         self.assertEqual(data["agent_model"], "llama3.1:8b")
         self.assertEqual(run_turn.await_args.kwargs["model"], "llama3.1:8b")
+
+    def test_subthreshold_message_schedules_idle_cognition(self) -> None:
+        conversation = self.client.post("/api/agent/conversations").json()
+        turn_result = AgentTurnResult(
+            messages=conversation["messages"]
+            + [
+                {"role": "user", "content": "I want a calm, funny partner."},
+                {"role": "assistant", "content": "That combination sounds important."},
+            ],
+            quality_valid=True,
+        )
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AGENT_PIPELINE_VERSION": "v2",
+                    "AGENT_ROLLOUT": "shadow",
+                    "MEMORY_BACKGROUND_V2_THRESHOLD": "7",
+                },
+            ),
+            patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)),
+            patch(
+                "api.routes.conversations.idle_cognition_scheduler.schedule"
+            ) as schedule,
+        ):
+            response = self.client.post(
+                f"/api/agent/conversations/{conversation['id']}/messages",
+                json={"message": "I want a calm, funny partner."},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        schedule.assert_called_once_with(
+            conversation["id"],
+            "test-user",
+            expected_message_count=len(turn_result.messages),
+        )
 
     def test_chat_messages_are_limited_per_user_month(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")

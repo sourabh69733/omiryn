@@ -12,6 +12,7 @@ from agent.memory_engine.processing import MemoryHandoff, MemoryProcessingState,
 from agent.cognition.background.service import (
     run_background_cognition,
     should_schedule_background_cognition,
+    should_schedule_idle_background_cognition,
 )
 from agent.memory_engine.processing.validation import validate_memory_analysis
 from storage import (
@@ -75,6 +76,69 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                     True,
                 )
             )
+
+    def test_idle_scheduler_only_accepts_subthreshold_meaningful_work(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_PIPELINE_VERSION": "v2",
+                "AGENT_ROLLOUT": "shadow",
+                "MEMORY_BACKGROUND_V2_THRESHOLD": "3",
+            },
+        ):
+            self.assertTrue(
+                should_schedule_idle_background_cognition(
+                    self.conversation_id,
+                    self.user_id,
+                    self.messages,
+                    True,
+                )
+            )
+            threshold_messages = self.messages + [
+                {"role": "user", "content": "I value direct communication."},
+                {"role": "assistant", "content": "That is useful to know."},
+            ]
+            self.assertFalse(
+                should_schedule_idle_background_cognition(
+                    self.conversation_id,
+                    self.user_id,
+                    threshold_messages,
+                    True,
+                )
+            )
+            self.assertTrue(
+                should_schedule_background_cognition(
+                    self.conversation_id,
+                    self.user_id,
+                    threshold_messages,
+                    True,
+                )
+            )
+
+    async def test_worker_skips_batch_containing_only_low_information_messages(self) -> None:
+        messages = [
+            {"role": "user", "content": "hmm", "quality": "simple_acknowledgement"},
+            {"role": "assistant", "content": "I am here."},
+        ]
+        with (
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
+            ),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+            ) as analyze,
+        ):
+            result = await run_background_cognition(
+                self.conversation_id,
+                self.user_id,
+                messages,
+                "memory-model",
+            )
+
+        self.assertEqual(result["status"], "no_pending_messages")
+        analyze.assert_not_awaited()
 
     def test_validator_accepts_user_evidence_and_rejects_context_or_assistant_evidence(self) -> None:
         state = MemoryProcessingState(
