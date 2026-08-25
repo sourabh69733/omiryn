@@ -30,3 +30,4 @@ tmp/
 .agents
 skills-*.json
 superpowers
+.worktrees/
