@@ -32,6 +32,7 @@ test("standalone admin preserves action, route, and auth contracts", async () =>
   for (const route of ["users", "requests", "usage"]) {
     assert.ok(script.includes("window.location.pathname === \"/" + route + "\""), "expected route mapper for /" + route);
   }
+  assert.match(script, /return "dashboard";/, "expected root path to use dashboard route");
 
   for (const path of [
     "/api/admin/overview?limit=50",
