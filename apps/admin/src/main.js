@@ -1,0 +1,1676 @@
+import { adminFetch, ensureAdminSession, signInWithGoogle, signOut } from "./auth.js";
+
+const state = {
+  data: null,
+  route: routeName(),
+  usersPage: 1,
+  usersPerPage: 10,
+  selectedUserId: null,
+  selectedUserDetail: null,
+  visibleFactCount: 6,
+  feedbackPage: 1,
+  feedbackPerPage: 5,
+  dataPointReviewPage: 1,
+  dataPointReviewPerPage: 5,
+  requests: null
+};
+
+const statusEl = document.querySelector("#admin-status");
+const adminAuth = document.querySelector("#admin-auth");
+const adminLoading = document.querySelector("#admin-loading");
+const adminSignInPanel = document.querySelector("#admin-sign-in-panel");
+const adminAccessDenied = document.querySelector("#admin-access-denied");
+const adminAuthMessage = document.querySelector("#admin-auth-message");
+const adminApp = document.querySelector("#admin-app");
+const adminSignIn = document.querySelector("#admin-sign-in");
+const adminSignOut = document.querySelector("#admin-sign-out");
+const refreshButton = document.querySelector("#refresh-admin");
+const metricGrid = document.querySelector("#metric-grid");
+const dashboardFunnel = document.querySelector("#dashboard-funnel");
+const dashboardAttention = document.querySelector("#dashboard-attention");
+const userActivityChart = document.querySelector("#user-activity-chart");
+const engagementChart = document.querySelector("#engagement-chart");
+const userActivitySummary = document.querySelector("#user-activity-summary");
+const engagementSummary = document.querySelector("#engagement-summary");
+const usersPageStatus = document.querySelector("#users-page-status");
+const usersPrev = document.querySelector("#users-prev");
+const usersNext = document.querySelector("#users-next");
+const userDetailLayout = document.querySelector("#user-detail-layout");
+const selectedUserTitle = document.querySelector("#selected-user-title");
+const userReport = document.querySelector("#user-report");
+const usageRequests = document.querySelector("#usage-requests");
+const usageRequestDetail = document.querySelector("#usage-request-detail");
+const usageTotalTokens = document.querySelector("#usage-total-tokens");
+const usageTokenDetail = document.querySelector("#usage-token-detail");
+const usageAverageInputTokens = document.querySelector("#usage-average-input-tokens");
+const usageAverageOutputTokens = document.querySelector("#usage-average-output-tokens");
+const usageCost = document.querySelector("#usage-cost");
+const usageCostDetail = document.querySelector("#usage-cost-detail");
+const usageFailures = document.querySelector("#usage-failures");
+const usageRateLimits = document.querySelector("#usage-rate-limits");
+const usageRateLimitDetail = document.querySelector("#usage-rate-limit-detail");
+const providerList = document.querySelector("#provider-list");
+const rateLimitGrid = document.querySelector("#rate-limit-grid");
+const usageMinuteBuckets = document.querySelector("#usage-minute-buckets");
+const usageEvents = document.querySelector("#usage-events");
+const usageTableRowLimit = 20;
+const requestMetrics = {
+  feedback: document.querySelector("#request-feedback-count"),
+  invites: document.querySelector("#request-invite-count"),
+  data: document.querySelector("#request-data-count"),
+  dataDetail: document.querySelector("#request-data-detail"),
+  errors: document.querySelector("#request-error-count"),
+  publicLeads: document.querySelector("#request-public-lead-count"),
+  appEvents: document.querySelector("#request-app-event-count")
+};
+const requestFeedbackSubmissions = document.querySelector("#admin-feedback-submissions");
+const requestDataRequests = document.querySelector("#admin-data-requests");
+const requestAppEvents = document.querySelector("#admin-app-events");
+const requestPublicLeads = document.querySelector("#admin-public-leads");
+const requestPublicEvents = document.querySelector("#admin-public-events");
+
+const metrics = {
+  users: document.querySelector("#metric-users"),
+  usersDetail: document.querySelector("#metric-users-detail"),
+  activeUsers: document.querySelector("#metric-active-users"),
+  onboardingStarted: document.querySelector("#metric-onboarding-started"),
+  onboardingCompleted: document.querySelector("#metric-onboarding-completed"),
+  approvedProfiles: document.querySelector("#metric-approved-profiles"),
+  missingBasics: document.querySelector("#metric-missing-basics"),
+  newUsers: document.querySelector("#metric-new-users"),
+  newUsersDetail: document.querySelector("#metric-new-users-detail"),
+  inactiveUsers: document.querySelector("#metric-inactive-users"),
+  openDrafts: document.querySelector("#metric-open-drafts"),
+  agentFailures: document.querySelector("#metric-agent-failures")
+};
+
+const tables = {
+  users: document.querySelector("#admin-users")
+};
+
+function routeName() {
+  if (window.location.pathname === "/users") return "users";
+  if (window.location.pathname === "/requests") return "requests";
+  if (window.location.pathname === "/usage") return "usage";
+  return "dashboard";
+}
+
+function showLoading() {
+  adminAuth.hidden = false;
+  adminLoading.hidden = false;
+  adminSignInPanel.hidden = true;
+  adminAccessDenied.hidden = true;
+  adminApp.hidden = true;
+  adminSignOut.hidden = true;
+}
+
+function showSignIn(message = "Use the Google account with admin access.") {
+  adminAuth.hidden = false;
+  adminLoading.hidden = true;
+  adminSignInPanel.hidden = false;
+  adminAccessDenied.hidden = true;
+  adminApp.hidden = true;
+  adminSignOut.hidden = true;
+  adminAuthMessage.textContent = message;
+}
+
+function showAccessDenied() {
+  adminAuth.hidden = false;
+  adminLoading.hidden = true;
+  adminSignInPanel.hidden = true;
+  adminAccessDenied.hidden = false;
+  adminApp.hidden = true;
+  adminSignOut.hidden = false;
+}
+
+function showAdminApp() {
+  adminAuth.hidden = true;
+  adminApp.hidden = false;
+  adminSignOut.hidden = false;
+}
+
+function handleAuthResponse(response) {
+  if (response.status === 401) {
+    showSignIn("Your session has ended. Sign in again to continue.");
+    throw new Error("Sign in required.");
+  }
+  if (response.status === 403) {
+    showAccessDenied();
+    throw new Error("Your account does not have admin access.");
+  }
+  return response;
+}
+
+function configureRoute() {
+  document.querySelectorAll("[data-route]").forEach((link) => {
+    link.classList.toggle("active", link.dataset.route === state.route);
+  });
+  if (metricGrid) {
+    metricGrid.hidden = state.route !== "dashboard";
+  }
+  document.querySelectorAll("[data-section]").forEach((section) => {
+    const visibleRoutes = String(section.dataset.section || "").split(" ");
+    section.hidden = !visibleRoutes.includes(state.route);
+  });
+
+  const titles = {
+    dashboard: ["Dashboard", "Live view of users and product health."],
+    users: ["Users", "Track every user profile, onboarding session, and learned signal."],
+    requests: ["Requests", "Review feedback, contacts, invite requests, data requests, and app events."],
+    usage: ["Usage", "Track agent model calls, tokens, failures, and cost."]
+  };
+  const [title, subtitle] = titles[state.route] || titles.dashboard;
+  document.querySelector("#page-title").textContent = title;
+  document.querySelector("#page-subtitle").textContent = subtitle;
+}
+
+async function loadAdminOverview() {
+  setStatus("Loading admin data...");
+  try {
+    const response = handleAuthResponse(await adminFetch("/api/admin/overview?limit=50", {
+      headers: { Accept: "application/json" }
+    }));
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load admin data."));
+    }
+    state.data = data;
+    renderDashboard(data);
+    if (state.route === "requests") {
+      await loadRequestsDashboard();
+    }
+    if (state.route === "usage") {
+      await loadUsageDashboard();
+    }
+    setStatus(`Updated ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    setStatus(error.message);
+    renderError(error.message);
+  }
+}
+
+function renderDashboard(data) {
+  renderMetrics(data.summary || {});
+  renderDashboardInsights(data.summary || {});
+  renderActivityCharts(data.activity || {});
+  renderUsers(data.users || []);
+  renderUsageDashboard(data.summary?.usage || {}, data.recent_usage_events || [], data.limits || {});
+}
+
+function renderMetrics(summary) {
+  setText(metrics.users, formatNumber(summary.user_count || 0));
+  setText(metrics.usersDetail, "Registered user records");
+  setText(metrics.activeUsers, formatNumber(summary.active_user_7d_count || 0));
+  setText(metrics.onboardingStarted, formatNumber(summary.onboarding_started_user_count || 0));
+  setText(metrics.onboardingCompleted, formatNumber(summary.onboarding_completed_user_count || 0));
+  setText(metrics.approvedProfiles, formatNumber(summary.approved_profile_user_count || 0));
+  setText(metrics.missingBasics, formatNumber(summary.missing_profile_basics_user_count || 0));
+  setText(metrics.newUsers, formatNumber(summary.new_user_7d_count || 0));
+  setText(metrics.newUsersDetail, `${formatNumber(summary.new_user_today_count || 0)} today`);
+  setText(metrics.inactiveUsers, formatNumber(summary.inactive_user_count || 0));
+  setText(metrics.openDrafts, formatNumber(summary.open_draft_count || 0));
+  setText(metrics.agentFailures, formatNumber(summary.agent_failure_today_count || 0));
+}
+
+function renderDashboardInsights(summary) {
+  renderFunnel(summary);
+  renderAttention(summary);
+}
+
+function renderFunnel(summary) {
+  if (!dashboardFunnel) return;
+  const totalUsers = summary.user_count || 0;
+  const items = [
+    ["Total users", totalUsers],
+    ["Onboarding started", summary.onboarding_started_user_count || 0],
+    ["Onboarding completed", summary.onboarding_completed_user_count || 0],
+    ["Approved profiles", summary.approved_profile_user_count || 0],
+  ];
+  dashboardFunnel.innerHTML = items.map(([label, value]) => {
+    const percent = totalUsers ? Math.round((value / totalUsers) * 100) : 0;
+    return `
+      <article class="funnel-row">
+        <div>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${formatNumber(value)} · ${formatNumber(percent)}%</span>
+        </div>
+        <div class="funnel-bar" aria-hidden="true">
+          <i style="width: ${percent}%"></i>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderAttention(summary) {
+  if (!dashboardAttention) return;
+  const items = [
+    ["Pending profile approval", summary.open_draft_count || 0, "Drafts created but not approved"],
+    ["Missing profile basics", summary.missing_profile_basics_user_count || 0, "Name, gender, or interest missing"],
+    ["No recent activity", summary.inactive_user_count || 0, "Users inactive after starting"],
+    ["Agent failures today", summary.agent_failure_today_count || 0, "Provider or runtime failures"],
+  ];
+  dashboardAttention.innerHTML = items.map(([label, value, detail]) => `
+    <article class="attention-item ${value ? "warning" : "ok"}">
+      <div>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(detail)}</span>
+      </div>
+      <b>${formatNumber(value)}</b>
+    </article>
+  `).join("");
+}
+
+function renderActivityCharts(activity) {
+  const daily = activity.daily || [];
+  const totals = activity.totals || {};
+  if (userActivitySummary) {
+    userActivitySummary.textContent = `${formatNumber(totals.new_users || 0)} new · ${formatNumber(totals.active_users || 0)} active`;
+  }
+  if (engagementSummary) {
+    engagementSummary.textContent = `${formatNumber(totals.conversations || 0)} chats · ${formatNumber(totals.api_calls || 0)} API calls`;
+  }
+  renderBarChart(userActivityChart, daily, [
+    { key: "new_users", label: "New", className: "new-users" },
+    { key: "active_users", label: "Active", className: "active-users" }
+  ]);
+  renderBarChart(engagementChart, daily, [
+    { key: "conversations", label: "Chats", className: "conversations" },
+    { key: "api_calls", label: "API", className: "api-calls" }
+  ]);
+}
+
+function renderBarChart(target, daily, series) {
+  if (!target) return;
+  if (!daily.length) {
+    target.innerHTML = '<div class="table-empty">No activity data yet.</div>';
+    return;
+  }
+  const maxValue = Math.max(
+    1,
+    ...daily.flatMap((day) => series.map((item) => Number(day[item.key] || 0)))
+  );
+  target.innerHTML = `
+    <div class="chart-legend">
+      ${series.map((item) => `<span><i class="${escapeHtml(item.className)}"></i>${escapeHtml(item.label)}</span>`).join("")}
+    </div>
+    <div class="bar-chart" role="img" aria-label="14 day activity chart">
+      ${daily.map((day) => renderBarChartDay(day, series, maxValue)).join("")}
+    </div>
+  `;
+}
+
+function renderBarChartDay(day, series, maxValue) {
+  return `
+    <article class="bar-day" title="${escapeHtml(day.label || day.date || "")}">
+      <div class="bar-stack">
+        ${series.map((item) => {
+          const value = Number(day[item.key] || 0);
+          const height = Math.max(value ? 6 : 2, Math.round((value / maxValue) * 100));
+          return `<span class="${escapeHtml(item.className)}" style="height: ${height}%"><b>${formatNumber(value)}</b></span>`;
+        }).join("")}
+      </div>
+      <small>${escapeHtml(shortChartLabel(day.label || ""))}</small>
+    </article>
+  `;
+}
+
+function renderUsers(users) {
+  if (!users.length) {
+    tables.users.innerHTML = emptyRow(9, "No users have activity yet.");
+    updateUsersPagination(0);
+    return;
+  }
+  const pageCount = Math.max(1, Math.ceil(users.length / state.usersPerPage));
+  state.usersPage = Math.min(Math.max(1, state.usersPage), pageCount);
+  const start = (state.usersPage - 1) * state.usersPerPage;
+  const pageUsers = users.slice(start, start + state.usersPerPage);
+  tables.users.innerHTML = pageUsers.map((user) => `
+    <tr class="selectable-row ${user.user_id === state.selectedUserId ? "selected" : ""}" data-user-id="${escapeHtml(user.user_id)}" tabindex="0">
+      <td>${escapeHtml(user.display_name || "-")}<small>${escapeHtml(user.display_name_source || "unknown")}</small></td>
+      <td class="mono">${escapeHtml(user.user_id)}</td>
+      <td>${escapeHtml(profileLabel(user))}</td>
+      <td class="mono">${formatNumber(user.conversation_count || 0)}<small>${formatNumber(user.active_conversation_count || 0)} active</small></td>
+      <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
+      <td class="mono">${formatNumber(user.draft_count || 0)}<small>${formatNumber(user.approved_draft_count || 0)} approved</small></td>
+      <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb / ${formatNumber(user.data_point_review_count || 0)} dp</small></td>
+      <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${escapeHtml(userUsageTokenLine(user.usage))}</small></td>
+      <td>${formatDate(user.last_activity_at)}</td>
+    </tr>
+  `).join("");
+  updateUsersPagination(users.length);
+}
+
+function updateUsersPagination(totalUsers) {
+  const pageCount = Math.max(1, Math.ceil(totalUsers / state.usersPerPage));
+  usersPageStatus.textContent = `${formatNumber(totalUsers)} users · page ${formatNumber(state.usersPage)} of ${formatNumber(pageCount)}`;
+  usersPrev.disabled = state.usersPage <= 1;
+  usersNext.disabled = state.usersPage >= pageCount;
+}
+
+async function selectUser(userId) {
+  if (!userId) return;
+  state.selectedUserId = userId;
+  state.visibleFactCount = 6;
+  state.feedbackPage = 1;
+  state.feedbackPerPage = 5;
+  state.dataPointReviewPage = 1;
+  state.dataPointReviewPerPage = 5;
+  renderUsers(state.data?.users || []);
+  selectedUserTitle.textContent = "Loading user report...";
+  userReport.innerHTML = '<div class="table-empty">Loading selected user...</div>';
+
+  try {
+    const response = handleAuthResponse(await adminFetch(`/api/admin/users/${encodeURIComponent(userId)}?limit=100`, {
+      headers: { Accept: "application/json" }
+    }));
+    const detail = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(detail.detail, "Could not load selected user."));
+    }
+    state.selectedUserDetail = detail;
+    renderUserReport(detail);
+    setStatus(`Selected ${detail.user.display_name || detail.user.user_id}`);
+  } catch (error) {
+    userReport.innerHTML = `<div class="table-empty">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message);
+  }
+}
+
+function renderUserReport(detail) {
+  const user = detail.user || {};
+  const profile = detail.profile || {};
+  const conversations = detail.conversations || [];
+  const facts = detail.facts || [];
+  const feedback = detail.feedback || [];
+  const dataPointReviews = detail.data_point_reviews || [];
+  const contextSnapshots = detail.context_snapshots || [];
+  const contextSnapshotSummary = detail.context_snapshot_summary || {};
+  const feedbackSummary = detail.feedback_summary || user.feedback_summary || {};
+  const dataPointReviewSummary = detail.data_point_review_summary || {};
+  selectedUserTitle.textContent = user.display_name || "Unnamed user";
+  const profileSource = profile.source ? titleize(profile.source) : "Profile";
+  userReport.innerHTML = `
+    <div class="report-grid">
+      ${reportCard("Name", user.display_name || "-", user.display_name_source ? `Source: ${user.display_name_source}` : "")}
+      ${reportCard("Gender", profile.gender || "-", profileSource)}
+      ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
+      ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
+      ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), userUsageTokenLine(user.usage))}
+      ${reportCard("Context debug", formatNumber(contextSnapshotSummary.total || contextSnapshots.length || 0), `${formatNumber(contextSnapshotSummary.total_context_tokens || 0)} rough tokens`)}
+      ${reportCard("DP reviews", formatNumber(dataPointReviewSummary.total || dataPointReviews.length || 0), dataPointReviewSummaryDetail(dataPointReviewSummary))}
+      ${reportCard("Feedback", formatNumber(feedbackSummary.total || feedback.length || 0), feedbackSummaryDetail(feedbackSummary))}
+      ${reportCard("Last activity", formatDate(user.last_activity_at), user.user_id || "")}
+    </div>
+    ${renderFactsSection(facts)}
+    ${renderFeedbackSection(feedback, feedbackSummary)}
+    ${renderDataPointReviewSection(dataPointReviews, dataPointReviewSummary)}
+    ${renderContextSnapshotSection(contextSnapshots, contextSnapshotSummary)}
+    ${renderConversationSection(conversations)}
+  `;
+  document.querySelector("#show-more-facts")?.addEventListener("click", () => {
+    state.visibleFactCount += 6;
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#feedback-prev")?.addEventListener("click", () => {
+    state.feedbackPage = Math.max(1, state.feedbackPage - 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#feedback-next")?.addEventListener("click", () => {
+    const pageCount = Math.max(1, Math.ceil(feedback.length / state.feedbackPerPage));
+    state.feedbackPage = Math.min(pageCount, state.feedbackPage + 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#show-more-feedback")?.addEventListener("click", () => {
+    state.feedbackPerPage += 5;
+    state.feedbackPage = 1;
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#data-point-review-prev")?.addEventListener("click", () => {
+    state.dataPointReviewPage = Math.max(1, state.dataPointReviewPage - 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#data-point-review-next")?.addEventListener("click", () => {
+    const pageCount = Math.max(1, Math.ceil(dataPointReviews.length / state.dataPointReviewPerPage));
+    state.dataPointReviewPage = Math.min(pageCount, state.dataPointReviewPage + 1);
+    renderUserReport(state.selectedUserDetail);
+  });
+  document.querySelector("#show-more-data-point-reviews")?.addEventListener("click", () => {
+    state.dataPointReviewPerPage += 5;
+    state.dataPointReviewPage = 1;
+    renderUserReport(state.selectedUserDetail);
+  });
+}
+
+function reportCard(label, value, detail = "") {
+  return `
+    <article class="report-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+    </article>
+  `;
+}
+
+function userUsageTokenLine(usage = {}) {
+  const average = usage.average_tokens_per_request || 0;
+  const measured = usage.measured_request_count || usage.successful_request_count || 0;
+  const requestCount = usage.request_count || 0;
+  const cost = usage.estimated_cost_usd ? ` · ${formatUsd(usage.estimated_cost_usd)}` : "";
+  if (!requestCount) return "0 calls";
+  return `${formatNumber(average)} avg / call · ${formatNumber(measured)} measured · ${formatNumber(requestCount)} calls${cost}`;
+}
+
+function renderFactsSection(facts) {
+  const visibleFacts = facts.slice(0, state.visibleFactCount);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Profile facts</h3>
+        <span class="mono">${formatNumber(facts.length)} facts</span>
+      </div>
+      ${
+        visibleFacts.length
+          ? `<div class="fact-list">${visibleFacts.map(renderFactItem).join("")}</div>`
+          : '<div class="table-empty">No learned facts yet.</div>'
+      }
+      ${
+        facts.length > visibleFacts.length
+          ? `<div class="table-empty"><button class="secondary-button" id="show-more-facts" type="button">Show more facts</button></div>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderFactItem(fact) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(fact.label || fact.key || "Fact")}</strong>
+      <small>${escapeHtml(fact.category || "other")} · confidence ${formatNumber(Math.round((fact.confidence || 0) * 100))}% · ${escapeHtml(fact.status || "-")}</small>
+    </article>
+  `;
+}
+
+function renderContextSnapshotSection(snapshots, summary = {}) {
+  const visibleSnapshots = snapshots.slice(0, 6);
+  const detail = [
+    `${formatNumber(summary.total_context_tokens || 0)} estimated context tokens`,
+    `${formatNumber(summary.style_guide_count || 0)} style guides`,
+    `${formatNumber(summary.data_point_count || 0)} data-point uses`,
+    `${formatNumber(summary.structured_whatsapp_count || 0)} WhatsApp context`
+  ].join(" · ");
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Context debug</h3>
+        <span class="mono">${escapeHtml(detail)}</span>
+      </div>
+      ${
+        visibleSnapshots.length
+          ? `<div class="feedback-list">${visibleSnapshots.map(renderContextSnapshotItem).join("")}</div>`
+          : '<div class="table-empty">No context snapshots yet.</div>'
+      }
+    </section>
+  `;
+}
+
+function renderContextSnapshotItem(snapshot) {
+  const summary = snapshot.summary || {};
+  const context = snapshot.context || {};
+  const sources = context.sources || [];
+  const blocks = context.blocks || [];
+  const skippedBlocks = context.skipped_blocks || [];
+  const messages = snapshot.messages || {};
+  const promptDebug = messages.prompt_debug || {};
+  const flags = [
+    summary.used_data_points ? "data_points" : "",
+    summary.used_structured_whatsapp ? "structured_whatsapp" : "",
+    summary.used_style_context ? "style_context" : "",
+    summary.used_style_guide ? "style_guide" : "",
+    summary.used_whatsapp_chunks ? "whatsapp_chunks" : ""
+  ].filter(Boolean);
+  return `
+    <article class="feedback-item">
+      <div class="feedback-item-head">
+        <span class="status-pill">${formatNumber(summary.included_source_count || sources.length || 0)} sources</span>
+        <span class="mono">${formatDate(snapshot.created_at)}</span>
+      </div>
+      <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
+      <p>${escapeHtml(contextSnapshotHeadline(summary, promptDebug))}</p>
+      <small>${escapeHtml(contextSnapshotSourceLine(summary))}</small>
+      ${renderContextSnapshotPlannerLine(summary, context)}
+      ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
+      ${renderSnapshotTurnMessages(messages)}
+      ${renderSnapshotPromptPayload(messages)}
+      ${renderContextPlannerDebug(context)}
+      <details>
+        <summary>Sources sent</summary>
+        <div class="snapshot-source-list">
+          ${
+            sources.length
+              ? sources.map(renderContextSnapshotSource).join("")
+              : '<div class="table-empty">No sources included.</div>'
+          }
+        </div>
+      </details>
+      ${
+        blocks.length || skippedBlocks.length
+          ? `
+            <details>
+              <summary>Context blocks</summary>
+              <div class="snapshot-source-list">
+                ${blocks.length ? blocks.map(renderContextBlock).join("") : '<div class="table-empty">No selected blocks.</div>'}
+                ${skippedBlocks.length ? skippedBlocks.map(renderSkippedContextBlock).join("") : ""}
+              </div>
+            </details>
+          `
+          : ""
+      }
+    </article>
+  `;
+}
+
+function contextSnapshotHeadline(summary = {}, promptDebug = {}) {
+  if (promptDebug.total_chars || promptDebug.rough_tokens || promptDebug.provider_message_count) {
+    return [
+      `${formatNumber(promptDebug.total_chars || 0)} prompt chars`,
+      `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
+      `${formatNumber(promptDebug.provider_message_count || 0)} messages`
+    ].join(" · ");
+  }
+  return [
+    `${formatNumber(summary.context_chars || 0)} source chars`,
+    `${formatNumber(summary.rough_context_tokens || 0)} estimated context tokens`,
+    `${formatNumber(summary.source_count || 0)} candidates`
+  ].join(" · ");
+}
+
+function contextSnapshotSourceLine(summary = {}) {
+  return [
+    `${formatNumber(summary.context_chars || 0)} source chars`,
+    `${formatNumber(summary.rough_context_tokens || 0)} estimated source tokens`,
+    `${formatNumber(summary.source_count || 0)} candidates`
+  ].join(" · ");
+}
+
+function renderContextSnapshotPlannerLine(summary = {}, context = {}) {
+  const intent = context.intent || {};
+  const labels = Array.isArray(intent.labels) && intent.labels.length
+    ? intent.labels.join(", ")
+    : (summary.intent_labels || []).join(", ");
+  const details = [
+    summary.engine_version || "",
+    labels ? `intent: ${labels}` : "",
+    summary.conversation_move ? `move: ${summary.conversation_move}` : "",
+    summary.active_topic ? `topic: ${summary.active_topic}` : ""
+  ].filter(Boolean);
+  return details.length ? `<small>${escapeHtml(details.join(" · "))}</small>` : "";
+}
+
+function renderContextPlannerDebug(context = {}) {
+  const plan = context.conversation_plan || {};
+  const topicState = context.topic_state || [];
+  const intent = context.intent || {};
+  if (!Object.keys(plan).length && !topicState.length && !Object.keys(intent).length) return "";
+  return `
+    <details>
+      <summary>Planner debug</summary>
+      <pre class="debug-json">${escapeHtml(JSON.stringify({ intent, conversation_plan: plan, topic_state: topicState }, null, 2))}</pre>
+    </details>
+  `;
+}
+
+function renderContextBlock(block) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(block.title || "Context block")}</strong>
+      <small>${escapeHtml(block.source || "context")} · priority ${formatNumber(block.priority || 0)} · ${escapeHtml(block.position || "middle")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
+      ${block.include_reason ? `<small>${escapeHtml(block.include_reason)}</small>` : ""}
+      ${block.preview ? `<blockquote>${escapeHtml(block.preview)}</blockquote>` : ""}
+    </article>
+  `;
+}
+
+function renderSkippedContextBlock(block) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(block.title || "Skipped context")}</strong>
+      <small>Skipped · ${escapeHtml(block.source || "context")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
+      ${block.skip_reason ? `<small>${escapeHtml(block.skip_reason)}</small>` : ""}
+    </article>
+  `;
+}
+
+function renderSnapshotTurnMessages(messages = {}) {
+  const user = messages.user;
+  const assistant = messages.assistant;
+  const assistantReply = messages.assistant_reply;
+  if (!user && !assistant && !assistantReply) return "";
+
+  return `
+    <details>
+      <summary>User message and reply</summary>
+      <div class="snapshot-source-list">
+        ${
+          user
+            ? renderSnapshotMessage("User message", user)
+            : '<div class="table-empty">User message was not found in the saved conversation.</div>'
+        }
+        ${
+          assistant
+            ? renderSnapshotMessage("Saved assistant reply", assistant)
+            : assistantReply
+              ? `<article class="fact-item"><strong>Assistant reply</strong><blockquote>${escapeHtml(assistantReply)}</blockquote></article>`
+              : '<div class="table-empty">Assistant reply was not found in the saved conversation.</div>'
+        }
+      </div>
+    </details>
+  `;
+}
+
+function renderSnapshotMessage(label, message) {
+  const meta = [
+    message.role || "message",
+    Number.isInteger(message.index) ? `#${formatNumber(message.index + 1)}` : "",
+    message.quality ? `quality: ${message.quality}` : ""
+  ].filter(Boolean).join(" · ");
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(label)}</strong>
+      <small>${escapeHtml(meta)}</small>
+      ${message.content ? `<blockquote>${escapeHtml(message.content)}</blockquote>` : ""}
+    </article>
+  `;
+}
+
+function renderSnapshotPromptPayload(messages = {}) {
+  const systemPrompt = messages.system_prompt;
+  const providerMessages = Array.isArray(messages.provider) ? messages.provider : [];
+  const promptDebug = messages.prompt_debug || {};
+  if (!systemPrompt && !providerMessages.length) {
+    return `
+      <details>
+        <summary>Prompt sent to model</summary>
+        <div class="table-empty">Prompt payload was not stored for this older snapshot.</div>
+      </details>
+    `;
+  }
+
+  const payload = [
+    systemPrompt ? { role: "system", content: systemPrompt } : null,
+    ...providerMessages
+  ].filter(Boolean);
+
+  return `
+    <details>
+      <summary>Prompt sent to model</summary>
+      ${
+        Object.keys(promptDebug).length
+          ? `<small>${escapeHtml(promptDebugLabel(promptDebug))}</small>`
+          : ""
+      }
+      <pre class="debug-json">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+    </details>
+  `;
+}
+
+function promptDebugLabel(promptDebug = {}) {
+  return [
+    `${formatNumber(promptDebug.total_chars || 0)} chars`,
+    `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
+    `${formatNumber(promptDebug.system_chars || 0)} system chars`,
+    `${formatNumber(promptDebug.provider_message_count || 0)} messages`
+  ].join(" · ");
+}
+
+function renderContextSnapshotSource(source) {
+  return `
+    <article class="fact-item">
+      <strong>${escapeHtml(source.title || "Untitled source")}</strong>
+      <small>${escapeHtml(source.source_type || "context")} · ${formatNumber(source.included_chars || 0)} chars · ${formatNumber(source.rough_tokens || 0)} estimated source tokens${source.truncated ? " · truncated" : ""}</small>
+      ${source.preview ? `<blockquote>${escapeHtml(source.preview)}</blockquote>` : ""}
+    </article>
+  `;
+}
+
+function renderFeedbackSection(feedback, summary = {}) {
+  const pageCount = Math.max(1, Math.ceil(feedback.length / state.feedbackPerPage));
+  state.feedbackPage = Math.min(Math.max(1, state.feedbackPage), pageCount);
+  const start = (state.feedbackPage - 1) * state.feedbackPerPage;
+  const visibleFeedback = feedback.slice(start, start + state.feedbackPerPage);
+  const showingStart = feedback.length ? start + 1 : 0;
+  const showingEnd = Math.min(start + state.feedbackPerPage, feedback.length);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Message feedback</h3>
+        <span class="mono">${escapeHtml(feedbackSummaryDetail(summary))}</span>
+      </div>
+      ${
+        visibleFeedback.length
+          ? `<div class="feedback-list">${visibleFeedback.map(renderFeedbackItem).join("")}</div>`
+          : '<div class="table-empty">No message feedback yet.</div>'
+      }
+      ${
+        feedback.length > state.feedbackPerPage
+          ? `
+            <div class="detail-pagination">
+              <span class="mono">Showing ${formatNumber(showingStart)}-${formatNumber(showingEnd)} of ${formatNumber(feedback.length)}</span>
+              <div>
+                <button class="secondary-button" id="feedback-prev" type="button" ${state.feedbackPage <= 1 ? "disabled" : ""}>Previous</button>
+                <button class="secondary-button" id="feedback-next" type="button" ${state.feedbackPage >= pageCount ? "disabled" : ""}>Next</button>
+                <button class="secondary-button" id="show-more-feedback" type="button">Show more feedback</button>
+              </div>
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderFeedbackItem(item) {
+  const reasons = feedbackItemReasons(item);
+  const comment = (item.comment || "").trim();
+  const preview = (item.message_preview || "").trim();
+  return `
+    <article class="feedback-item">
+      <div class="feedback-item-head">
+        ${feedbackRatingPill(item.rating)}
+        <span class="mono">${formatDate(item.created_at)}</span>
+      </div>
+      ${
+        reasons.length
+          ? `<div class="feedback-reason-chips">${reasons.map((reason) => `<span>${escapeHtml(feedbackReasonLabel(reason))}</span>`).join("")}</div>`
+          : `<strong>${escapeHtml("No reason")}</strong>`
+      }
+      ${comment ? `<p>${escapeHtml(comment)}</p>` : ""}
+      ${preview ? `<blockquote>${escapeHtml(preview)}</blockquote>` : ""}
+      <small class="mono">${escapeHtml(item.conversation_id || "-")} · message ${formatNumber((item.message_index ?? 0) + 1)}</small>
+    </article>
+  `;
+}
+
+function feedbackItemReasons(item) {
+  const reasons = Array.isArray(item.reasons) ? item.reasons : [];
+  const legacyReason = item.reason ? [item.reason] : [];
+  return [...new Set([...reasons, ...legacyReason].filter(Boolean))];
+}
+
+function feedbackRatingPill(rating) {
+  const labels = {
+    good: "Good",
+    off: "Off",
+    bad: "Bad",
+    harmful: "Harmful"
+  };
+  const value = rating || "unknown";
+  return `<span class="status-pill rating-${escapeHtml(value)}">${escapeHtml(labels[value] || titleize(value))}</span>`;
+}
+
+function feedbackSummaryDetail(summary = {}) {
+  const total = summary.total || 0;
+  if (!total) return "0 feedback";
+  return `${formatNumber(summary.good || 0)} good / ${formatNumber((summary.off || 0) + (summary.bad || 0) + (summary.harmful || 0))} issues`;
+}
+
+function renderDataPointReviewSection(reviews, summary = {}) {
+  const pageCount = Math.max(1, Math.ceil(reviews.length / state.dataPointReviewPerPage));
+  state.dataPointReviewPage = Math.min(Math.max(1, state.dataPointReviewPage), pageCount);
+  const start = (state.dataPointReviewPage - 1) * state.dataPointReviewPerPage;
+  const visibleReviews = reviews.slice(start, start + state.dataPointReviewPerPage);
+  const showingStart = reviews.length ? start + 1 : 0;
+  const showingEnd = Math.min(start + state.dataPointReviewPerPage, reviews.length);
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Data point review debug</h3>
+        <span class="mono">${escapeHtml(dataPointReviewSummaryDetail(summary))}</span>
+      </div>
+      ${
+        visibleReviews.length
+          ? `<div class="feedback-list data-point-review-list">${visibleReviews.map(renderDataPointReviewItem).join("")}</div>`
+          : '<div class="table-empty">No data point review rows yet.</div>'
+      }
+      ${
+        reviews.length > state.dataPointReviewPerPage
+          ? `
+            <div class="detail-pagination">
+              <span class="mono">Showing ${formatNumber(showingStart)}-${formatNumber(showingEnd)} of ${formatNumber(reviews.length)}</span>
+              <div>
+                <button class="secondary-button" id="data-point-review-prev" type="button" ${state.dataPointReviewPage <= 1 ? "disabled" : ""}>Previous</button>
+                <button class="secondary-button" id="data-point-review-next" type="button" ${state.dataPointReviewPage >= pageCount ? "disabled" : ""}>Next</button>
+                <button class="secondary-button" id="show-more-data-point-reviews" type="button">Show more reviews</button>
+              </div>
+            </div>
+          `
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderDataPointReviewItem(item) {
+  const candidate = item.candidate || {};
+  const review = item.review || {};
+  const metadata = item.metadata || {};
+  const evidence = Array.isArray(review.evidence) && review.evidence.length
+    ? review.evidence
+    : Array.isArray(candidate.evidence)
+      ? candidate.evidence
+      : [];
+  const confidence = review.confidence ?? candidate.confidence;
+  const learned = review.what_we_learned || candidate.label || candidate.meaning || item.candidate_key || "Data point candidate";
+  const matters = review.why_it_matters || candidate.meaning || "";
+  const rejection = review.rejection_reason || "";
+  return `
+    <article class="feedback-item data-point-review-item">
+      <div class="feedback-item-head">
+        ${dataPointDecisionPill(item.decision)}
+        <span class="mono">${formatDate(item.created_at)}</span>
+      </div>
+      <strong>${escapeHtml(learned)}</strong>
+      ${matters ? `<p>${escapeHtml(matters)}</p>` : ""}
+      ${rejection ? `<p class="review-rejection">${escapeHtml(rejection)}</p>` : ""}
+      <div class="review-meta-row">
+        <span>${escapeHtml(candidate.category || item.source_kind || "candidate")}</span>
+        <span>${formatNumber(Math.round(Number(confidence || 0) * 100))}% confidence</span>
+        <span>${escapeHtml(dataPointUsageLabel(review.usage || candidate.usage || {}))}</span>
+      </div>
+      ${
+        evidence.length
+          ? `<div class="review-evidence">${evidence.slice(0, 3).map((text) => `<blockquote>${escapeHtml(text)}</blockquote>`).join("")}</div>`
+          : ""
+      }
+      <small class="mono">${escapeHtml(metadata.title || item.source_kind || "-")} · ${escapeHtml(item.candidate_key || "-")}</small>
+      <details>
+        <summary>Debug payload</summary>
+        <pre class="debug-json">${escapeHtml(JSON.stringify({ candidate, review, metadata }, null, 2))}</pre>
+      </details>
+    </article>
+  `;
+}
+
+function dataPointDecisionPill(decision) {
+  const value = decision || "unknown";
+  return `<span class="status-pill data-point-decision-${escapeHtml(value)}">${escapeHtml(titleize(value))}</span>`;
+}
+
+function dataPointUsageLabel(usage = {}) {
+  const labels = [];
+  if (usage.chat_context) labels.push("chat");
+  if (usage.matching) labels.push("matching");
+  if (usage.style) labels.push("style");
+  if (usage.debug_only) labels.push("debug only");
+  return labels.length ? labels.join(" / ") : "no usage";
+}
+
+function dataPointReviewSummaryDetail(summary = {}) {
+  const total = summary.total || 0;
+  if (!total) return "0 reviews";
+  const kept = (summary.approve || 0) + (summary.rewrite || 0) + (summary.merge || 0);
+  return `${formatNumber(kept)} kept / ${formatNumber(summary.reject || 0)} rejected`;
+}
+
+function feedbackReasonLabel(reason) {
+  const labels = {
+    rating_good: "Good",
+    rating_off: "Tone off",
+    rating_bad: "Bad reply",
+    rating_harmful: "Harmful",
+    not_me: "Not me",
+    wrong_memory: "Wrong memory",
+    bad_tone: "Bad tone",
+    too_much: "Too much",
+    not_helpful: "Not helpful",
+    unsafe: "Unsafe",
+    other: "Other"
+  };
+  return labels[reason] || titleize(String(reason || "feedback").replaceAll("_", " "));
+}
+
+function renderConversationSection(conversations) {
+  return `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h3>Chat conversations</h3>
+        <span class="mono">${formatNumber(conversations.length)} conversations</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Conversation</th>
+              <th>Status</th>
+              <th>Messages</th>
+              <th>Tokens</th>
+              <th>API calls</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              conversations.length
+                ? conversations.map(renderConversationReportRow).join("")
+                : '<tr><td class="table-empty" colspan="6">No conversations yet.</td></tr>'
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderConversationReportRow(conversation) {
+  const latestSnapshot = conversation.latest_context_snapshot?.summary || {};
+  return `
+    <tr>
+      <td class="mono">${escapeHtml(conversation.id)}<small>${escapeHtml(conversation.agent_model || conversation.agent_provider || "-")}</small></td>
+      <td>${statusPill(conversation.status)}</td>
+      <td class="mono">${formatNumber(conversation.message_count || 0)}<small>${formatNumber(conversation.user_message_count || 0)} user / ${formatNumber(conversation.context_source_count || 0)} context</small></td>
+      <td class="mono">${formatNumber(conversation.usage?.total_tokens || 0)}<small>${formatNumber(conversation.usage?.prompt_tokens || 0)} in / ${formatNumber(conversation.usage?.completion_tokens || 0)} out</small></td>
+      <td class="mono">${formatNumber(conversation.usage?.request_count || 0)}<small>${formatNumber(conversation.context_snapshot_count || 0)} ctx · ${formatNumber(latestSnapshot.rough_context_tokens || 0)} ctx tokens</small></td>
+      <td>${formatDate(conversation.updated_at)}</td>
+    </tr>
+  `;
+}
+
+async function loadUsageDashboard() {
+  if (!usageEvents) return;
+
+  usageEvents.innerHTML = '<tr><td colspan="6">Loading usage...</td></tr>';
+  providerList.innerHTML = '<div class="table-empty">Loading provider mix...</div>';
+  if (usageMinuteBuckets) {
+    usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Loading usage...</td></tr>';
+  }
+
+  try {
+    const response = handleAuthResponse(await adminFetch("/api/admin/usage?limit=100", {
+      headers: { Accept: "application/json" }
+    }));
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load usage."));
+    }
+    renderUsageDashboard(data.summary || {}, data.events || [], data.limits || {});
+  } catch (error) {
+    usageEvents.innerHTML = `<tr><td colspan="6">Could not load usage. ${escapeHtml(error.message)}</td></tr>`;
+    providerList.innerHTML = '<div class="table-empty">Usage unavailable.</div>';
+    if (rateLimitGrid) {
+      rateLimitGrid.innerHTML = '<div class="table-empty">Rate-limit data unavailable.</div>';
+    }
+    if (usageMinuteBuckets) {
+      usageMinuteBuckets.innerHTML = '<tr><td colspan="4">Usage unavailable.</td></tr>';
+    }
+  }
+}
+
+function renderUsageDashboard(summary, events = [], limits = {}) {
+  renderUsageSummary(summary, events);
+  renderProviderMix(summary, events);
+  renderProviderRateLimitHealth(events, limits);
+  renderTokensByMinute(events);
+  renderUsageEvents(events);
+}
+
+function renderProviderRateLimitHealth(events, limits = {}) {
+  if (!rateLimitGrid) return;
+
+  const rateLimitedEvents = events.filter((event) => isRateLimitEvent(event));
+  const localDaily = localProviderDaily(events);
+  const todayRateLimitedEvents = localDaily.events.filter((event) => isRateLimitEvent(event));
+  if (usageRateLimits) {
+    usageRateLimits.textContent = formatNumber(todayRateLimitedEvents.length);
+  }
+  if (usageRateLimitDetail) {
+    usageRateLimitDetail.textContent = todayRateLimitedEvents.length
+      ? `${formatNumber(todayRateLimitedEvents.length)} today · ${formatNumber(rateLimitedEvents.length)} logged`
+      : "No recent throttling";
+  }
+
+  const localRate = localProviderRate(events);
+  rateLimitGrid.innerHTML = `
+    ${usageLimitMetric("RPM", localRate.rpmValue, limits.groq_rpm, "Requests consumed in last 60 seconds")}
+    ${usageLimitMetric("RPD", localDaily.requests, limits.groq_rpd, "Requests consumed today")}
+    ${usageLimitMetric("TPM", localRate.tpm, limits.groq_tpm, "Tokens consumed in last 60 seconds")}
+    ${usageLimitMetric("TPD", localDaily.tokens, limits.groq_tpd, `${formatNumber(localDaily.promptTokens)} input / ${formatNumber(localDaily.completionTokens)} output today`)}
+    ${rateLimitMetric("Recent requests", formatNumber(events.length), "Recent logged provider requests")}
+    ${rateLimitMetric("Recent tokens", formatNumber(totalProviderTokens(events)), "Recent logged input + output tokens")}
+    ${rateLimitMetric("429 today", formatNumber(todayRateLimitedEvents.length), `${formatNumber(rateLimitedEvents.length)} total 429 responses logged`)}
+  `;
+}
+
+function usageLimitMetric(label, used, limit, fallbackDetail) {
+  if (!limit) {
+    return rateLimitMetric(label, formatNumber(used), `${fallbackDetail} · set ${usageLimitEnvName(label)} to show remaining`);
+  }
+
+  const remaining = Math.max(0, limit - used);
+  const percent = Math.min(100, Math.round((used / limit) * 100));
+  const state = percent >= 90 ? "danger" : percent >= 75 ? "warning" : "ok";
+  return `
+    <article class="rate-limit-card ${state}">
+      <span>${label}</span>
+      <strong>${formatNumber(used)} / ${formatNumber(limit)}</strong>
+      <small>${formatNumber(remaining)} remaining · ${percent}% used</small>
+    </article>
+  `;
+}
+
+function rateLimitMetric(label, value, detail) {
+  return `
+    <article class="rate-limit-card">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${detail}</small>
+    </article>
+  `;
+}
+
+function usageLimitEnvName(label) {
+  const envNames = {
+    RPM: "GROQ_RPM_LIMIT",
+    RPD: "GROQ_RPD_LIMIT",
+    TPM: "GROQ_TPM_LIMIT",
+    TPD: "GROQ_TPD_LIMIT"
+  };
+  return envNames[label] || "provider limit env";
+}
+
+function isRateLimitEvent(event) {
+  const error = `${event.error || ""} ${JSON.stringify(event.raw_usage?.error || {})}`;
+  return error.includes("429") || error.toLowerCase().includes("too many requests");
+}
+
+function localProviderRate(events) {
+  const now = Date.now();
+  const windowStart = now - 60_000;
+  const windowEvents = events.filter((event) => {
+    if (!event.created_at) return false;
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return false;
+    const timestamp = createdAt.getTime();
+    return timestamp >= windowStart && timestamp <= now + 5_000;
+  });
+  const tokens = windowEvents.reduce((total, event) => total + (event.total_tokens || 0), 0);
+  return {
+    rpm: formatNumber(windowEvents.length),
+    rpmValue: windowEvents.length,
+    tpm: tokens
+  };
+}
+
+function localProviderDaily(events) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayEvents = events.filter((event) => {
+    if (!event.created_at) return false;
+    const createdAt = new Date(event.created_at);
+    return !Number.isNaN(createdAt.getTime()) && createdAt >= startOfToday;
+  });
+
+  return {
+    events: todayEvents,
+    requests: todayEvents.length,
+    promptTokens: todayEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0),
+    completionTokens: todayEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0),
+    tokens: todayEvents.reduce((total, event) => total + (event.total_tokens || 0), 0)
+  };
+}
+
+function totalProviderTokens(events) {
+  return events.reduce((total, event) => total + (event.total_tokens || 0), 0);
+}
+
+function renderUsageSummary(summary, events = []) {
+  const averageUsage = averageChatUsage(events, summary);
+  const latestModel = [summary.latest_provider, summary.latest_model].filter(Boolean).join(" · ");
+  usageRequests.textContent = formatNumber(summary.request_count || 0);
+  usageRequestDetail.textContent = latestModel
+    ? `${formatNumber(summary.successful_request_count || 0)} successful · latest ${latestModel}`
+    : `${formatNumber(summary.successful_request_count || 0)} successful`;
+  usageTotalTokens.textContent = formatNumber(summary.total_tokens || 0);
+  usageTokenDetail.textContent = `${formatNumber(summary.prompt_tokens || 0)} input / ${formatNumber(summary.completion_tokens || 0)} output`;
+  usageAverageInputTokens.textContent = formatNumber(averageUsage.prompt);
+  usageAverageOutputTokens.textContent = formatNumber(averageUsage.completion);
+  usageFailures.textContent = formatNumber(summary.failed_request_count || 0);
+
+  if (summary.estimated_cost_usd) {
+    usageCost.textContent = formatUsd(summary.estimated_cost_usd);
+    usageCostDetail.textContent = summary.estimated_cost_inr
+      ? `${formatInr(summary.estimated_cost_inr)} estimated`
+      : "USD estimate";
+  } else {
+    usageCost.textContent = "$0.000000";
+    usageCostDetail.textContent = "Set pricing env for estimates";
+  }
+}
+
+function averageChatUsage(events, summary = {}) {
+  if (summary.average_tokens_per_message || summary.average_prompt_tokens_per_message || summary.average_completion_tokens_per_message) {
+    return {
+      total: summary.average_tokens_per_message || 0,
+      prompt: summary.average_prompt_tokens_per_message || 0,
+      completion: summary.average_completion_tokens_per_message || 0
+    };
+  }
+
+  const chatEvents = events.filter((event) =>
+    event.success && event.request_kind === "chat_reply" && event.total_tokens
+  );
+  if (!chatEvents.length) {
+    return { total: 0, prompt: 0, completion: 0 };
+  }
+
+  return {
+    total: Math.round(chatEvents.reduce((total, event) => total + (event.total_tokens || 0), 0) / chatEvents.length),
+    prompt: Math.round(chatEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0) / chatEvents.length),
+    completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
+  };
+}
+
+function renderProviderMix(summary, events = []) {
+  const rows = Array.isArray(summary.provider_model_breakdown)
+    ? summary.provider_model_breakdown
+    : providerRowsFromEvents(events);
+
+  if (!rows.length) {
+    providerList.innerHTML = '<div class="table-empty">No agent usage yet.</div>';
+    return;
+  }
+
+  providerList.innerHTML = `
+    <table class="provider-table">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Calls</th>
+          <th>Tokens</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.provider)}<small>${escapeHtml(row.model)}</small></td>
+                <td class="mono">${formatNumber(row.request_count || row.requests || 0)}<small>${formatNumber(row.failed_request_count || 0)} failed</small></td>
+                <td class="mono">${formatNumber(row.total_tokens || row.tokens || 0)}<small>${formatNumber(row.prompt_tokens || 0)} in / ${formatNumber(row.completion_tokens || 0)} out</small></td>
+                <td class="mono">${row.estimated_cost_usd || row.cost ? formatUsd(row.estimated_cost_usd || row.cost) : "-"}</td>
+              </tr>
+            `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function providerRowsFromEvents(events) {
+  const totals = events.reduce((accumulator, event) => {
+    const key = `${event.provider || "unknown"} · ${event.model || "unknown"}`;
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        provider: event.provider || "unknown",
+        model: event.model || "unknown",
+        request_count: 0,
+        failed_request_count: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        estimated_cost_usd: 0
+      };
+    }
+    accumulator[key].request_count += 1;
+    if (!event.success) accumulator[key].failed_request_count += 1;
+    accumulator[key].prompt_tokens += event.prompt_tokens || 0;
+    accumulator[key].completion_tokens += event.completion_tokens || 0;
+    accumulator[key].total_tokens += event.total_tokens || 0;
+    accumulator[key].estimated_cost_usd += event.estimated_cost_usd || 0;
+    return accumulator;
+  }, {});
+  return Object.values(totals).sort((first, second) => second.total_tokens - first.total_tokens);
+}
+
+function renderTokensByMinute(events) {
+  if (!usageMinuteBuckets) return;
+
+  const buckets = events.reduce((accumulator, event) => {
+    if (!event.created_at) return accumulator;
+    const createdAt = new Date(event.created_at);
+    if (Number.isNaN(createdAt.getTime())) return accumulator;
+
+    createdAt.setSeconds(0, 0);
+    const key = createdAt.getTime();
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        minute: createdAt,
+        calls: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+    }
+
+    accumulator[key].calls += 1;
+    accumulator[key].promptTokens += event.prompt_tokens || 0;
+    accumulator[key].completionTokens += event.completion_tokens || 0;
+    accumulator[key].totalTokens += event.total_tokens || 0;
+    return accumulator;
+  }, {});
+
+  const rows = Object.values(buckets).sort((first, second) => second.minute - first.minute);
+  if (!rows.length) {
+    usageMinuteBuckets.innerHTML = '<tr><td class="table-empty" colspan="4">No token minutes yet.</td></tr>';
+    return;
+  }
+
+  usageMinuteBuckets.innerHTML = rows
+    .slice(0, usageTableRowLimit)
+    .map((row) => `
+      <tr>
+        <td>${formatMinute(row.minute)}</td>
+        <td class="mono">${formatNumber(row.calls)}</td>
+        <td class="mono">${formatNumber(row.totalTokens)}</td>
+        <td class="mono">${formatNumber(row.promptTokens)} in / ${formatNumber(row.completionTokens)} out</td>
+      </tr>
+    `)
+    .join("");
+}
+
+function renderUsageEvents(events) {
+  if (!events.length) {
+    usageEvents.innerHTML = '<tr><td class="table-empty" colspan="6">No agent calls logged yet.</td></tr>';
+    return;
+  }
+
+  usageEvents.innerHTML = events
+    .slice(0, usageTableRowLimit)
+    .map((event) => {
+      const statusClass = event.success ? "success" : "failed";
+      const statusText = event.success ? "Success" : "Failed";
+      const cost = event.estimated_cost_usd ? formatUsd(event.estimated_cost_usd) : "-";
+      const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+      return `
+        <tr>
+          <td>${escapeHtml(usageKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small></td>
+          <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
+          <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
+          <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
+          <td class="mono">${cost}</td>
+          <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function loadRequestsDashboard() {
+  if (!requestFeedbackSubmissions) return;
+
+  requestFeedbackSubmissions.innerHTML = '<div class="table-empty">Loading feedback...</div>';
+  if (requestDataRequests) {
+    requestDataRequests.innerHTML = '<tr><td colspan="5">Loading data requests...</td></tr>';
+  }
+  if (requestAppEvents) {
+    requestAppEvents.innerHTML = '<tr><td colspan="5">Loading app events...</td></tr>';
+  }
+  if (requestPublicLeads) {
+    requestPublicLeads.innerHTML = '<div class="table-empty">Loading public contacts...</div>';
+  }
+  if (requestPublicEvents) {
+    requestPublicEvents.innerHTML = '<tr><td colspan="4">Loading public events...</td></tr>';
+  }
+
+  try {
+    const response = handleAuthResponse(await adminFetch("/api/admin/requests?limit=100", {
+      headers: { Accept: "application/json" }
+    }));
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(data.detail, "Could not load requests."));
+    }
+    state.requests = data;
+    renderRequestsDashboard(data);
+  } catch (error) {
+    renderRequestsError(error.message);
+    setStatus(error.message);
+  }
+}
+
+function renderRequestsDashboard(data) {
+  const summary = data.summary || {};
+  const feedbackAndInvites = [
+    ...(data.feedback_messages || []),
+    ...(data.community_invites || [])
+  ].sort((first, second) => new Date(second.created_at || 0) - new Date(first.created_at || 0));
+
+  renderRequestMetrics(summary);
+  renderFeedbackSubmissions(feedbackAndInvites);
+  renderDataRequests(data.data_requests || []);
+  renderAppEvents(data.app_events || []);
+  renderPublicLeads(data.public_leads || []);
+  renderPublicEvents(data.public_events || []);
+}
+
+function renderRequestMetrics(summary) {
+  setText(requestMetrics.feedback, formatNumber(summary.feedback_message_count || 0));
+  setText(requestMetrics.invites, formatNumber(summary.community_invite_count || 0));
+  setText(requestMetrics.data, formatNumber(summary.data_request_count || 0));
+  setText(requestMetrics.dataDetail, `${formatNumber(summary.open_data_request_count || 0)} open`);
+  setText(requestMetrics.errors, formatNumber(summary.client_error_count || 0));
+  setText(requestMetrics.publicLeads, formatNumber(summary.public_lead_count || 0));
+  setText(requestMetrics.appEvents, formatNumber(summary.app_event_count || 0));
+}
+
+function renderFeedbackSubmissions(rows) {
+  if (!requestFeedbackSubmissions) return;
+  if (!rows.length) {
+    requestFeedbackSubmissions.innerHTML = '<div class="table-empty">No feedback or invite requests yet.</div>';
+    return;
+  }
+  requestFeedbackSubmissions.innerHTML = rows.map(renderRequestCard).join("");
+}
+
+function renderRequestCard(item) {
+  const metadata = item.metadata || {};
+  const requestType = metadata.request_type === "community_invite" ? "invite" : "feedback";
+  const channel = metadata.channel || item.category || "feedback";
+  const allowContact = item.allow_contact ? "Contact allowed" : "No contact permission";
+  const userLine = [
+    item.email || "No email",
+    item.user_id ? `user ${shortId(item.user_id)}` : ""
+  ].filter(Boolean).join(" · ");
+  const message = item.message_preview || item.message || "";
+  return `
+    <article class="request-card">
+      <div class="request-card-head">
+        <div>
+          <span class="status-pill ${escapeHtml(requestType)}">${escapeHtml(requestTypeLabel(item))}</span>
+          <strong>${escapeHtml(titleize(channel))}</strong>
+        </div>
+        <small>${formatDate(item.created_at)}</small>
+      </div>
+      <p class="request-message">${escapeHtml(message || "No message provided.")}</p>
+      <div class="request-meta-row">
+        <span>${escapeHtml(userLine || "-")}</span>
+        <span>${escapeHtml(allowContact)}</span>
+        <span>${statusPill(item.status)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderDataRequests(rows) {
+  if (!requestDataRequests) return;
+  if (!rows.length) {
+    requestDataRequests.innerHTML = emptyRow(5, "No export or deletion requests yet.");
+    return;
+  }
+  requestDataRequests.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${statusPill(row.request_type)}</td>
+      <td>${escapeHtml(row.email || "-")}<small class="mono">${escapeHtml(row.user_id || "-")}</small></td>
+      <td>${statusPill(row.status)}</td>
+      <td>${escapeHtml(row.message_preview || row.message || "-")}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderAppEvents(rows) {
+  if (!requestAppEvents) return;
+  if (!rows.length) {
+    requestAppEvents.innerHTML = emptyRow(5, "No app events logged yet.");
+    return;
+  }
+  requestAppEvents.innerHTML = rows.slice(0, 40).map((row) => `
+    <tr>
+      <td>${statusPill(row.event_name)}</td>
+      <td class="mono">${escapeHtml(row.user_id || "-")}<small>${escapeHtml(row.session_id || "")}</small></td>
+      <td>${escapeHtml(row.page || "-")}<small>${escapeHtml([row.target_type, row.target_id].filter(Boolean).join(" · "))}</small></td>
+      <td class="metadata-line">${escapeHtml(metadataSummary(row.metadata))}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderPublicLeads(rows) {
+  if (!requestPublicLeads) return;
+  if (!rows.length) {
+    requestPublicLeads.innerHTML = '<div class="table-empty">No public contact submissions yet.</div>';
+    return;
+  }
+  requestPublicLeads.innerHTML = rows.slice(0, 20).map((row) => `
+    <article class="request-card public-lead-card">
+      <div class="request-card-head">
+        <div>
+          <span class="status-pill">${escapeHtml(titleize(row.intent || "lead"))}</span>
+          <strong>${escapeHtml(row.name || row.contact || "Anonymous")}</strong>
+        </div>
+        <small>${formatDate(row.created_at)}</small>
+      </div>
+      <p class="request-message">${escapeHtml(row.message_preview || row.message || "No message provided.")}</p>
+      <div class="request-meta-row">
+        <span>${escapeHtml(row.contact || "-")}</span>
+        <span>${escapeHtml(titleize(row.channel || "email"))}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPublicEvents(rows) {
+  if (!requestPublicEvents) return;
+  if (!rows.length) {
+    requestPublicEvents.innerHTML = emptyRow(4, "No public page events yet.");
+    return;
+  }
+  requestPublicEvents.innerHTML = rows.slice(0, 40).map((row) => `
+    <tr>
+      <td>${statusPill(row.event_name)}</td>
+      <td>${escapeHtml(row.path || "/")}<small>${escapeHtml(row.referrer || "")}</small></td>
+      <td class="metadata-line">${escapeHtml(metadataSummary(row.metadata))}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderRequestsError(message) {
+  if (requestFeedbackSubmissions) {
+    requestFeedbackSubmissions.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (requestDataRequests) {
+    requestDataRequests.innerHTML = emptyRow(5, message);
+  }
+  if (requestAppEvents) {
+    requestAppEvents.innerHTML = emptyRow(5, message);
+  }
+  if (requestPublicLeads) {
+    requestPublicLeads.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (requestPublicEvents) {
+    requestPublicEvents.innerHTML = emptyRow(4, message);
+  }
+}
+
+function renderError(message) {
+  tables.users.innerHTML = emptyRow(9, message);
+  if (providerList) {
+    providerList.innerHTML = `<div class="table-empty">${escapeHtml(message)}</div>`;
+  }
+  if (usageEvents) {
+    usageEvents.innerHTML = emptyRow(6, message);
+  }
+  renderRequestsError(message);
+}
+
+function statusPill(value) {
+  const text = value || "unknown";
+  return `<span class="status-pill ${escapeHtml(text)}">${escapeHtml(titleize(text))}</span>`;
+}
+
+function profileLabel(user) {
+  const gender = user.gender || "unknown";
+  const interested = user.interested_in || "unknown";
+  return `${titleize(gender)} -> ${titleize(interested)}`;
+}
+
+function usageKindLabel(kind) {
+  const labels = {
+    chat_reply: "Chat reply",
+    input_guardrail: "Input guardrail",
+    profile_extract: "Profile extraction",
+    profile_extract_repair: "Extraction repair",
+    data_point_extract: "Data point extraction",
+    profile_fact_extract: "Profile fact extraction",
+    profile_signal_extract: "Signal extraction",
+    profile_signal_backfill: "Signal backfill",
+    profile_fact_aggregate: "Fact aggregation",
+    match_snapshot_generate: "Match snapshot"
+  };
+  return labels[kind] || titleize(String(kind || "API call").replaceAll("_", " "));
+}
+
+function requestTypeLabel(item) {
+  const metadata = item.metadata || {};
+  if (metadata.request_type === "community_invite") {
+    return `${titleize(metadata.channel || "community")} invite`;
+  }
+  return titleize(item.category || "feedback");
+}
+
+function metadataSummary(metadata) {
+  if (!metadata || typeof metadata !== "object" || !Object.keys(metadata).length) return "-";
+  return Object.entries(metadata)
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${metadataValueSummary(value)}`)
+    .join(" · ");
+}
+
+function metadataValueSummary(value) {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") return JSON.stringify(value).slice(0, 120);
+  return String(value).slice(0, 120);
+}
+
+function apiErrorMessage(detail, fallback) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((item) => item.msg || item.message || String(item)).join(", ");
+  return fallback;
+}
+
+function setStatus(message) {
+  statusEl.textContent = message;
+}
+
+function setText(element, value) {
+  if (!element) return;
+  element.textContent = value;
+}
+
+function emptyRow(colspan, message) {
+  return `<tr><td class="empty-row" colspan="${colspan}">${escapeHtml(message)}</td></tr>`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN").format(Number(value || 0));
+}
+
+function formatUsd(value) {
+  return `$${Number(value || 0).toFixed(6)}`;
+}
+
+function formatInr(value) {
+  return `₹${Number(value || 0).toFixed(4)}`;
+}
+
+function formatMinute(value) {
+  return value.toLocaleString([], {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function shortChartLabel(value) {
+  return String(value || "").split(" ")[0] || "-";
+}
+
+function shortId(value) {
+  const text = String(value || "");
+  if (text.length <= 12) return text;
+  return text.slice(0, 8);
+}
+
+function titleize(value) {
+  return String(value || "")
+    .replaceAll("_", " ")
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function startAdminApp() {
+  showLoading();
+  try {
+    if (!(await ensureAdminSession())) {
+      showSignIn();
+      return;
+    }
+    showAdminApp();
+    configureRoute();
+    await loadAdminOverview();
+  } catch (error) {
+    showSignIn(error.message);
+  }
+}
+
+adminSignIn.addEventListener("click", async () => {
+  showLoading();
+  try {
+    await signInWithGoogle();
+  } catch (error) {
+    showSignIn(error.message);
+  }
+});
+adminSignOut.addEventListener("click", signOut);
+window.addEventListener("omiryn:auth-required", () => showSignIn("Your session has ended. Sign in again to continue."));
+refreshButton.addEventListener("click", loadAdminOverview);
+usersPrev?.addEventListener("click", () => {
+  state.usersPage -= 1;
+  renderUsers(state.data?.users || []);
+});
+usersNext?.addEventListener("click", () => {
+  state.usersPage += 1;
+  renderUsers(state.data?.users || []);
+});
+tables.users?.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-user-id]");
+  if (!row) return;
+  selectUser(row.dataset.userId);
+});
+tables.users?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const row = event.target.closest("[data-user-id]");
+  if (!row) return;
+  event.preventDefault();
+  selectUser(row.dataset.userId);
+});
+startAdminApp();

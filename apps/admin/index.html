@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omiryn Admin</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <section class="admin-auth" id="admin-auth" aria-live="polite">
+      <div class="admin-auth-panel" id="admin-loading">
+        <p class="eyebrow">Omiryn Admin</p>
+        <h1>Checking your session</h1>
+        <p>Loading admin access.</p>
+      </div>
+      <div class="admin-auth-panel" id="admin-sign-in-panel" hidden>
+        <p class="eyebrow">Omiryn Admin</p>
+        <h1>Sign in to continue</h1>
+        <p id="admin-auth-message">Use the Google account with admin access.</p>
+        <button id="admin-sign-in" type="button">Continue with Google</button>
+      </div>
+      <div class="admin-auth-panel" id="admin-access-denied" hidden>
+        <p class="eyebrow">Omiryn Admin</p>
+        <h1>Access denied</h1>
+        <p>Your account is signed in but does not have admin access.</p>
+      </div>
+    </section>
+    <button class="admin-sign-out" id="admin-sign-out" type="button" hidden>Sign out</button>
+
+    <div class="admin-shell" id="admin-app" hidden>
+      <header class="admin-header">
+        <a class="brand" href="/" aria-label="Omiryn admin home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>
+            <strong>Omiryn Admin</strong>
+            <small>Users and API usage</small>
+          </span>
+        </a>
+        <nav class="admin-nav" aria-label="Admin sections">
+          <a href="/" data-route="dashboard">Dashboard</a>
+          <a href="/users" data-route="users">Users</a>
+          <a href="/requests" data-route="requests">Requests</a>
+          <a href="/usage" data-route="usage">Usage</a>
+        </nav>
+        <button id="refresh-admin" type="button">Refresh</button>
+      </header>
+
+      <main>
+        <section class="admin-title">
+          <div>
+            <p class="eyebrow">Internal Admin</p>
+            <h1 id="page-title">Dashboard</h1>
+            <p id="page-subtitle">Live view of users and product health.</p>
+          </div>
+          <p class="admin-status" id="admin-status">Loading admin data...</p>
+        </section>
+
+        <section class="metric-grid dashboard-metrics" id="metric-grid">
+          <article class="metric-card">
+            <span>Total Users</span>
+            <strong id="metric-users">0</strong>
+            <small id="metric-users-detail">Registered user records</small>
+          </article>
+          <article class="metric-card">
+            <span>Active Users 7d</span>
+            <strong id="metric-active-users">0</strong>
+            <small>Users with recent activity</small>
+          </article>
+          <article class="metric-card">
+            <span>Onboarding Started</span>
+            <strong id="metric-onboarding-started">0</strong>
+            <small>Users with at least one chat</small>
+          </article>
+          <article class="metric-card">
+            <span>Onboarding Completed</span>
+            <strong id="metric-onboarding-completed">0</strong>
+            <small>Profile draft created</small>
+          </article>
+          <article class="metric-card">
+            <span>Approved Profiles</span>
+            <strong id="metric-approved-profiles">0</strong>
+            <small>Ready for matching</small>
+          </article>
+          <article class="metric-card">
+            <span>Missing Basics</span>
+            <strong id="metric-missing-basics">0</strong>
+            <small>Name, gender, or interest missing</small>
+          </article>
+          <article class="metric-card">
+            <span>New Users</span>
+            <strong id="metric-new-users">0</strong>
+            <small id="metric-new-users-detail">0 today</small>
+          </article>
+          <article class="metric-card">
+            <span>No Recent Activity</span>
+            <strong id="metric-inactive-users">0</strong>
+            <small>Started, inactive 14d</small>
+          </article>
+          <article class="metric-card">
+            <span>Pending Approval</span>
+            <strong id="metric-open-drafts">0</strong>
+            <small>Drafts waiting approval</small>
+          </article>
+          <article class="metric-card">
+            <span>Agent Failures Today</span>
+            <strong id="metric-agent-failures">0</strong>
+            <small>Provider or runtime failures</small>
+          </article>
+        </section>
+
+        <section class="dashboard-insights" id="dashboard-insights" data-section="dashboard">
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Funnel</p>
+                <h2>Onboarding health</h2>
+              </div>
+            </div>
+            <div class="funnel-list" id="dashboard-funnel"></div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Needs Attention</p>
+                <h2>Operational queue</h2>
+              </div>
+            </div>
+            <div class="attention-list" id="dashboard-attention"></div>
+          </section>
+        </section>
+
+        <section class="activity-charts" id="activity-charts" data-section="dashboard">
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Users</p>
+                <h2>Growth and activity</h2>
+              </div>
+              <span class="chart-summary" id="user-activity-summary">14 days</span>
+            </div>
+            <div class="chart-body" id="user-activity-chart"></div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Engagement</p>
+                <h2>Conversations and API calls</h2>
+              </div>
+              <span class="chart-summary" id="engagement-summary">14 days</span>
+            </div>
+            <div class="chart-body" id="engagement-chart"></div>
+          </section>
+        </section>
+
+        <section class="admin-section" data-section="users">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Users</p>
+              <h2>User activity</h2>
+            </div>
+            <div class="panel-actions">
+              <span id="users-page-status">Page 1</span>
+              <button class="secondary-button" id="users-prev" type="button">Previous</button>
+              <button class="secondary-button" id="users-next" type="button">Next</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>User ID</th>
+                  <th>Profile</th>
+                  <th>Conversations</th>
+                  <th>Messages</th>
+                  <th>Drafts</th>
+                  <th>Facts</th>
+                  <th>Tokens / avg</th>
+                  <th>Last activity</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users">
+                <tr><td colspan="9">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="user-detail-layout" id="user-detail-layout" data-section="users" hidden>
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Selected User</p>
+                <h2 id="selected-user-title">Select a user</h2>
+              </div>
+            </div>
+            <div class="user-report" id="user-report">
+              <div class="table-empty">Click a user row to view their profile, facts, and conversations.</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-usage-dashboard" data-section="usage">
+          <div class="usage-grid" id="usage-grid">
+            <article class="metric-card">
+              <span>Requests</span>
+              <strong id="usage-requests">0</strong>
+              <small id="usage-request-detail">0 successful</small>
+            </article>
+            <article class="metric-card">
+              <span>Total tokens</span>
+              <strong id="usage-total-tokens">0</strong>
+              <small id="usage-token-detail">0 input / 0 output</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg input / msg</span>
+              <strong id="usage-average-input-tokens">0</strong>
+              <small>Prompt tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Avg output / msg</span>
+              <strong id="usage-average-output-tokens">0</strong>
+              <small>Reply tokens per chat message</small>
+            </article>
+            <article class="metric-card">
+              <span>Estimated cost</span>
+              <strong id="usage-cost">$0.000000</strong>
+              <small id="usage-cost-detail">Set pricing env for estimates</small>
+            </article>
+            <article class="metric-card">
+              <span>Failures</span>
+              <strong id="usage-failures">0</strong>
+              <small>Provider/network errors</small>
+            </article>
+            <article class="metric-card">
+              <span>Provider 429s</span>
+              <strong id="usage-rate-limits">0</strong>
+              <small id="usage-rate-limit-detail">No recent throttling</small>
+            </article>
+          </div>
+
+          <div class="usage-panels">
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Provider Limits</p>
+                  <h2>Rate-limit health</h2>
+                </div>
+              </div>
+              <div class="rate-limit-grid" id="rate-limit-grid">
+                <div class="table-empty">Rate-limit headers will appear after provider calls.</div>
+              </div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Model Mix</p>
+                  <h2>Tokens by provider</h2>
+                </div>
+              </div>
+              <div class="provider-list" id="provider-list"></div>
+            </section>
+
+            <section class="usage-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Rate</p>
+                  <h2>Tokens by minute</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="provider-table">
+                  <thead>
+                    <tr>
+                      <th>Minute</th>
+                      <th>Calls</th>
+                      <th>Tokens</th>
+                      <th>Input / Output</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-minute-buckets">
+                    <tr>
+                      <td colspan="4">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="usage-panel usage-panel-wide">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Ledger</p>
+                  <h2>Recent agent calls</h2>
+                </div>
+              </div>
+              <div class="usage-table-wrap">
+                <table class="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Model</th>
+                      <th>Tokens</th>
+                      <th>Latency</th>
+                      <th>Cost</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usage-events">
+                    <tr>
+                      <td colspan="6">Loading usage...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="admin-requests-dashboard" data-section="requests">
+          <div class="usage-grid request-metric-grid" id="request-grid">
+            <article class="metric-card">
+              <span>Feedback</span>
+              <strong id="request-feedback-count">0</strong>
+              <small>Signed-in feedback and support messages</small>
+            </article>
+            <article class="metric-card">
+              <span>Invite Requests</span>
+              <strong id="request-invite-count">0</strong>
+              <small>WhatsApp and Discord review queue</small>
+            </article>
+            <article class="metric-card">
+              <span>Data Requests</span>
+              <strong id="request-data-count">0</strong>
+              <small id="request-data-detail">0 open</small>
+            </article>
+            <article class="metric-card">
+              <span>Client Errors</span>
+              <strong id="request-error-count">0</strong>
+              <small>App-side error events</small>
+            </article>
+            <article class="metric-card">
+              <span>Public Leads</span>
+              <strong id="request-public-lead-count">0</strong>
+              <small>Public contact form submissions</small>
+            </article>
+            <article class="metric-card">
+              <span>App Events</span>
+              <strong id="request-app-event-count">0</strong>
+              <small>Signed-in activity events</small>
+            </article>
+          </div>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Contact</p>
+                <h2>Feedback and community requests</h2>
+              </div>
+            </div>
+            <div class="request-list" id="admin-feedback-submissions">
+              <div class="table-empty">Loading feedback...</div>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Account Data</p>
+                <h2>Export and deletion requests</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Message</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-data-requests">
+                  <tr><td colspan="5">Loading data requests...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">App Activity</p>
+                <h2>Recent signed-in events</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Event</th>
+                    <th>User</th>
+                    <th>Page</th>
+                    <th>Metadata</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-app-events">
+                  <tr><td colspan="5">Loading app events...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Public Site</p>
+                <h2>Public contacts and page events</h2>
+              </div>
+            </div>
+            <div class="request-public-grid">
+              <div class="request-list" id="admin-public-leads">
+                <div class="table-empty">Loading public contacts...</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Event</th>
+                      <th>Path</th>
+                      <th>Metadata</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-public-events">
+                    <tr><td colspan="4">Loading public events...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
