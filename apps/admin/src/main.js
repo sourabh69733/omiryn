@@ -24,6 +24,7 @@ const adminAuthMessage = document.querySelector("#admin-auth-message");
 const adminApp = document.querySelector("#admin-app");
 const adminSignIn = document.querySelector("#admin-sign-in");
 const adminSignOut = document.querySelector("#admin-sign-out");
+const adminDeniedSignOut = document.querySelector("#admin-denied-sign-out");
 const refreshButton = document.querySelector("#refresh-admin");
 const metricGrid = document.querySelector("#metric-grid");
 const dashboardFunnel = document.querySelector("#dashboard-funnel");
@@ -101,7 +102,6 @@ function showLoading() {
   adminSignInPanel.hidden = true;
   adminAccessDenied.hidden = true;
   adminApp.hidden = true;
-  adminSignOut.hidden = true;
 }
 
 function showSignIn(message = "Use the Google account with admin access.") {
@@ -110,7 +110,6 @@ function showSignIn(message = "Use the Google account with admin access.") {
   adminSignInPanel.hidden = false;
   adminAccessDenied.hidden = true;
   adminApp.hidden = true;
-  adminSignOut.hidden = true;
   adminAuthMessage.textContent = message;
 }
 
@@ -120,13 +119,11 @@ function showAccessDenied() {
   adminSignInPanel.hidden = true;
   adminAccessDenied.hidden = false;
   adminApp.hidden = true;
-  adminSignOut.hidden = false;
 }
 
 function showAdminApp() {
   adminAuth.hidden = true;
   adminApp.hidden = false;
-  adminSignOut.hidden = false;
 }
 
 function handleAuthResponse(response) {
@@ -1651,6 +1648,7 @@ adminSignIn.addEventListener("click", async () => {
   }
 });
 adminSignOut.addEventListener("click", signOut);
+adminDeniedSignOut.addEventListener("click", signOut);
 window.addEventListener("omiryn:auth-required", () => showSignIn("Your session has ended. Sign in again to continue."));
 refreshButton.addEventListener("click", loadAdminOverview);
 usersPrev?.addEventListener("click", () => {

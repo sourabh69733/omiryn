@@ -1163,6 +1163,11 @@ td small {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .admin-actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
 }
 
 .admin-auth {
@@ -1192,9 +1197,9 @@ td small {
   line-height: 1.5;
 }
 
-.admin-sign-out {
-  position: fixed;
-  top: 20px;
-  right: 22px;
-  z-index: 5;
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
 }

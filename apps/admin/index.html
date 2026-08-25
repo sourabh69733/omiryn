@@ -23,10 +23,9 @@
         <p class="eyebrow">Omiryn Admin</p>
         <h1>Access denied</h1>
         <p>Your account is signed in but does not have admin access.</p>
+        <button class="secondary-button" id="admin-denied-sign-out" type="button">Sign out</button>
       </div>
     </section>
-    <button class="admin-sign-out" id="admin-sign-out" type="button" hidden>Sign out</button>
-
     <div class="admin-shell" id="admin-app" hidden>
       <header class="admin-header">
         <a class="brand" href="/" aria-label="Omiryn admin home">
@@ -42,7 +41,10 @@
           <a href="/requests" data-route="requests">Requests</a>
           <a href="/usage" data-route="usage">Usage</a>
         </nav>
-        <button id="refresh-admin" type="button">Refresh</button>
+        <div class="admin-actions">
+          <button id="refresh-admin" type="button">Refresh</button>
+          <button class="secondary-button admin-sign-out" id="admin-sign-out" type="button">Sign out</button>
+        </div>
       </header>
 
       <main>
