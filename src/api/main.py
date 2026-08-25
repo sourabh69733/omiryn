@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.routes import router as admin_router
+from agent.cognition.background.idle import idle_cognition_scheduler
 from security.auth import current_user, production_runtime_enabled, validate_production_security_config
 from storage import init_db, validate_private_data_ownership
 
@@ -88,6 +89,11 @@ def startup() -> None:
         validate_private_data_ownership()
 
 
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await idle_cognition_scheduler.shutdown()
+
+
 __all__ = [
     "CORS_ALLOWED_ORIGINS",
     "NoCacheStaticFiles",
@@ -101,4 +107,5 @@ __all__ = [
     "current_user",
     "run_agent_turn",
     "startup",
+    "shutdown",
 ]
