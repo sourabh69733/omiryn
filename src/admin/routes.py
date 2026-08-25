@@ -1,26 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
 
 from admin.auth import require_admin_user
 from admin.service import admin_eval_runs, admin_overview, admin_requests, admin_user_detail
 from security.auth import CurrentUser
 
-ADMIN_STATIC_DIR = Path(__file__).parent / "static"
-ADMIN_SHELL_HEADERS = {"Cache-Control": "no-store"}
-
 router = APIRouter()
-
-
-@router.get("/admin")
-@router.get("/admin/users")
-@router.get("/admin/usage")
-@router.get("/admin/requests")
-async def admin_shell(_: CurrentUser = Depends(require_admin_user)) -> FileResponse:
-    return FileResponse(ADMIN_STATIC_DIR / "index.html", headers=ADMIN_SHELL_HEADERS)
 
 
 @router.get("/api/admin/overview")

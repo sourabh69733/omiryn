@@ -2636,19 +2636,6 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "The chat has repeated music hooks.",
         )
 
-    def test_admin_pages_serve_separate_admin_shell(self) -> None:
-        response = self.client.get("/admin")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Omiryn Admin", response.text)
-        self.assertIn('/admin/requests" data-route="requests"', response.text)
-        self.assertIn("/admin/static/app.js", response.text)
-
-        requests_response = self.client.get("/admin/requests")
-        self.assertEqual(requests_response.status_code, 200)
-        self.assertIn("Omiryn Admin", requests_response.text)
-        self.assertIn("admin-requests-dashboard", requests_response.text)
-
     def test_backend_does_not_serve_frontend_pages(self) -> None:
         for path in (
             "/",
@@ -2665,55 +2652,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
             "/style",
             "/profile",
             "/usage",
+            "/admin",
+            "/admin/users",
+            "/admin/requests",
+            "/admin/usage",
+            "/admin/static/app.js",
         ):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
-
-    def test_admin_dev_bypass_serves_shell_when_auth_required(self) -> None:
-        with patch.dict(
-            "os.environ",
-            {
-                "AUTH_REQUIRED": "true",
-                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
-                "ADMIN_EMAILS": "",
-                "ADMIN_USER_IDS": "",
-            },
-        ):
-            response = self.client.get("/admin")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Omiryn Admin", response.text)
-
-    def test_admin_dev_bypass_overrides_configured_admin_allowlist(self) -> None:
-        with patch.dict(
-            "os.environ",
-            {
-                "AUTH_REQUIRED": "true",
-                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
-                "ADMIN_EMAILS": "admin@example.com",
-                "ADMIN_USER_IDS": "admin-user",
-            },
-        ):
-            response = self.client.get("/admin")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Omiryn Admin", response.text)
-
-    def test_admin_dev_bypass_is_disabled_in_production(self) -> None:
-        app.dependency_overrides.clear()
-        with patch.dict(
-            "os.environ",
-            {
-                "APP_ENV": "production",
-                "AUTH_REQUIRED": "true",
-                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true",
-                "ADMIN_EMAILS": "",
-                "ADMIN_USER_IDS": "",
-            },
-        ):
-            response = self.client.get("/admin")
-
-        self.assertEqual(response.status_code, 401)
 
     def test_admin_api_rejects_non_admin_when_admins_are_configured(self) -> None:
         async def non_admin_user() -> CurrentUser:
@@ -2732,6 +2678,25 @@ class AgentSubmissionApiTest(unittest.TestCase):
             response = self.client.get("/api/admin/overview")
 
         self.assertEqual(response.status_code, 403)
+
+    def test_admin_api_responses_disable_browser_caching(self) -> None:
+        async def admin_user() -> CurrentUser:
+            return CurrentUser(id="admin-user", email="admin@example.com")
+
+        app.dependency_overrides[current_user] = admin_user
+        with patch.dict(
+            "os.environ",
+            {
+                "AUTH_REQUIRED": "true",
+                "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "false",
+                "ADMIN_EMAILS": "admin@example.com",
+                "ADMIN_USER_IDS": "",
+            },
+        ):
+            response = self.client.get("/api/admin/overview")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("cache-control"), "no-store")
 
     def test_agent_status_exposes_safe_runtime_config(self) -> None:
         response = self.client.get("/api/agent/status")

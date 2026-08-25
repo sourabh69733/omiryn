@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from admin.routes import ADMIN_STATIC_DIR, router as admin_router
+from admin.routes import router as admin_router
 from security.auth import current_user, production_runtime_enabled, validate_production_security_config
 from storage import init_db, validate_private_data_ownership
 
@@ -65,6 +65,8 @@ async def request_monitoring_middleware(request, call_next):
             content={"detail": "Something went wrong.", "request_id": request_id},
         )
     response.headers["X-Request-ID"] = request_id
+    if request.url.path.startswith("/api/admin/"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -73,11 +75,6 @@ app.mount(
     "/uploads/profile_photos",
     NoCacheStaticFiles(directory=PROFILE_UPLOAD_DIR),
     name="profile-photos",
-)
-app.mount(
-    "/admin/static",
-    NoCacheStaticFiles(directory=ADMIN_STATIC_DIR),
-    name="admin-static",
 )
 app.include_router(admin_router)
 app.include_router(api_router)
