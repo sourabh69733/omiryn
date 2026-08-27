@@ -58,6 +58,8 @@ class MemoryShadowScenario:
     processed_through_message_index: int = -1
     previous_handoff: MemoryHandoff = field(default_factory=MemoryHandoff)
     forbidden_concepts: tuple[str, ...] = ()
+    allowed_data_point_types: tuple[str, ...] = ()
+    allow_additional_operations: bool = False
     tags: tuple[str, ...] = ("memory_shadow_v1",)
 
     def __post_init__(self) -> None:
@@ -342,10 +344,11 @@ MEMORY_SHADOW_SCENARIOS = (
                 operation="add",
                 data_point_type="profile_fact",
                 memory_basis="stable_user_attribute",
-                value_concepts=("build", "omiryn"),
                 evidence_message_indexes=(0,),
             ),
         ),
+        allowed_data_point_types=("profile_fact",),
+        allow_additional_operations=True,
         tags=("memory_shadow_v1", "memory_eligibility", "profile_fact", "work_background"),
     ),
 )

@@ -224,12 +224,20 @@ def grade_memory_shadow_result(
             unmatched.append(operation)
         else:
             optional.pop(match_index)
-    for operation in unmatched:
-        findings.append(
-            "Unexpected operation: "
-            f"{operation.get('operation')} / {operation.get('data_point_type')} / "
-            f"{operation.get('label') or operation.get('key') or 'unlabelled'}."
-        )
+    if not scenario.allow_additional_operations:
+        for operation in unmatched:
+            findings.append(
+                "Unexpected operation: "
+                f"{operation.get('operation')} / {operation.get('data_point_type')} / "
+                f"{operation.get('label') or operation.get('key') or 'unlabelled'}."
+            )
+    if scenario.allowed_data_point_types:
+        allowed_types = set(scenario.allowed_data_point_types)
+        for operation in operations:
+            if operation.get("data_point_type") not in allowed_types:
+                findings.append(
+                    "Operation used a disallowed memory type: "
+                    f"{operation.get('data_point_type') or 'missing'}.")
 
     searchable = " ".join(_operation_search_text(operation) for operation in operations)
     for forbidden in scenario.forbidden_concepts:
@@ -279,6 +287,8 @@ def scenario_result_payload(
                 for operation in scenario.optional_operations
             ],
             "forbidden_concepts": list(scenario.forbidden_concepts),
+            "allowed_data_point_types": list(scenario.allowed_data_point_types),
+            "allow_additional_operations": scenario.allow_additional_operations,
         },
         "observed": {
             "decision": result.decision,
