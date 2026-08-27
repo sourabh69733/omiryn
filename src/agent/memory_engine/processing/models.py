@@ -36,6 +36,7 @@ class MemoryOperation:
 
     operation: MemoryOperationKind
     data_point_type: str | None = None
+    memory_basis: str | None = None
     category: str | None = None
     key: str | None = None
     label: str | None = None

@@ -13,10 +13,16 @@ MEMORY_OPERATION_RULES = """Rules:
 - Context messages and the previous handoff may only resolve meaning and references.
 - Only user messages marked evidence_eligible may appear in evidence_message_indexes.
 - Do not turn assistant suggestions, descriptions, or guesses into facts about the user.
-- profile_fact is limited to stable identity or logistics. Preferences, tastes, values,
-  lifestyle, boundaries, relationship intent, and partner preferences are matching_fact.
-- chat_learning is only about how conversation with this user should work.
-- temporary_context is short-lived current context, not a durable trait.
+- Store only explicit, personally true user information; a discussed subject is not an observation.
+  Do not store technical explanations, code, examples, definitions, questions, or names merely mentioned.
+- profile_fact is a stable user attribute (identity, location, work, or life logistics).
+- matching_fact is an explicit partner preference, relationship intent, value, boundary, or lifestyle preference.
+- chat_learning is a direct instruction or preference for how Omiryn should converse.
+- For each add or supersede, set memory_basis exactly: stable_user_attribute for profile_fact,
+  explicit_matching_preference for matching_fact, or direct_chat_preference for chat_learning.
+- temporary_context is not supported until it has an expiry lifecycle; return no_change instead.
+- Examples: "I work as a designer" may be profile_fact; "smoking is a dealbreaker" may be
+  matching_fact; "ask fewer questions" may be chat_learning; a code example or product mention is no_change.
 - Use reinforce when new evidence supports an existing memory, supersede for an explicit
   correction, retract when the user explicitly withdraws it, and add only when no supplied
   memory represents the observation.
@@ -36,7 +42,8 @@ Output shape:
     {
       "operation": "add" | "reinforce" | "supersede" | "retract",
       "target_memory_id": "required for reinforce/supersede/retract, otherwise null",
-      "data_point_type": "profile_fact | matching_fact | chat_learning | temporary_context",
+      "data_point_type": "profile_fact | matching_fact | chat_learning",
+      "memory_basis": "stable_user_attribute | explicit_matching_preference | direct_chat_preference",
       "category": "short semantic category",
       "key": "short_snake_case_key",
       "label": "concrete description of what was learned",

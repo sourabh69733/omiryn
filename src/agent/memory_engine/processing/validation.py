@@ -13,13 +13,18 @@ _ALLOWED_DATA_POINT_TYPES = {
     "profile_fact",
     "matching_fact",
     "chat_learning",
-    "temporary_context",
+}
+_REQUIRED_MEMORY_BASIS_BY_TYPE = {
+    "profile_fact": "stable_user_attribute",
+    "matching_fact": "explicit_matching_preference",
+    "chat_learning": "direct_chat_preference",
 }
 _ALLOWED_OPERATIONS = {"add", "reinforce", "supersede", "retract"}
 _OPERATION_FIELDS = {
     "operation",
     "target_memory_id",
     "data_point_type",
+    "memory_basis",
     "category",
     "key",
     "label",
@@ -115,14 +120,25 @@ def _validate_operation(
 
     requires_value = operation in {"add", "supersede"}
     data_point_type = raw.get("data_point_type")
+    memory_basis = raw.get("memory_basis")
     category = raw.get("category")
     key = raw.get("key")
     label = raw.get("label")
     value = raw.get("value")
     confidence = raw.get("confidence")
     if requires_value:
-        if data_point_type not in _ALLOWED_DATA_POINT_TYPES:
+        if data_point_type == "temporary_context":
+            errors.append("temporary_context is not supported without an expiry lifecycle")
+        elif data_point_type not in _ALLOWED_DATA_POINT_TYPES:
             errors.append("unsupported data_point_type")
+        expected_basis = _REQUIRED_MEMORY_BASIS_BY_TYPE.get(data_point_type)
+        if memory_basis is None:
+            errors.append("memory_basis is required for add and supersede")
+        elif memory_basis != expected_basis:
+            errors.append(
+                "memory_basis must match data_point_type "
+                f"({expected_basis or 'no supported basis'})"
+            )
         for field_name, field_value in (("category", category), ("key", key), ("label", label)):
             if not is_non_empty_string(field_value):
                 errors.append(f"{field_name} must be a non-empty string")
@@ -158,6 +174,7 @@ def _validate_operation(
         operation=operation,
         target_memory_id=target_memory_id,
         data_point_type=data_point_type,
+        memory_basis=memory_basis,
         category=category,
         key=key,
         label=label,
