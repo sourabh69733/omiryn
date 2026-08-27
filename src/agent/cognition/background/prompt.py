@@ -22,7 +22,8 @@ Output shape:
     {
       "operation": "add" | "reinforce" | "supersede" | "retract",
       "target_memory_id": "supplied ID or null",
-      "data_point_type": "profile_fact | matching_fact | chat_learning | temporary_context",
+      "data_point_type": "profile_fact | matching_fact | chat_learning",
+      "memory_basis": "stable_user_attribute | explicit_matching_preference | direct_chat_preference",
       "category": "short semantic category",
       "key": "short_snake_case_key",
       "label": "concrete description",
