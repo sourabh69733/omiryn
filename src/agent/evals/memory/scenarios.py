@@ -38,6 +38,7 @@ class ExpectedMemoryOperation:
 
     operation: str
     data_point_type: str | None = None
+    memory_basis: str | None = None
     target_memory_id: str | None = None
     value_concepts: tuple[str, ...] = ()
     evidence_message_indexes: tuple[int, ...] = ()
@@ -87,6 +88,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="profile_fact",
+                memory_basis="stable_user_attribute",
                 value_concepts=("pune",),
                 evidence_message_indexes=(1,),
             ),
@@ -106,6 +108,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="matching_fact",
+                memory_basis="explicit_matching_preference",
                 value_concepts=("tamil nadu", "chennai"),
                 evidence_message_indexes=(0,),
             ),
@@ -157,6 +160,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="supersede",
                 data_point_type="profile_fact",
+                memory_basis="stable_user_attribute",
                 target_memory_id="location-memory",
                 value_concepts=("hyderabad",),
                 evidence_message_indexes=(0,),
@@ -203,6 +207,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="matching_fact",
+                memory_basis="explicit_matching_preference",
                 value_concepts=("team", "sports"),
                 evidence_message_indexes=(1,),
             ),
@@ -224,6 +229,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="matching_fact",
+                memory_basis="explicit_matching_preference",
                 value_concepts=("calm", "funny"),
                 evidence_message_indexes=(2,),
             ),
@@ -240,6 +246,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="chat_learning",
+                memory_basis="direct_chat_preference",
                 value_concepts=("question",),
                 evidence_message_indexes=(0,),
             ),
@@ -247,20 +254,13 @@ MEMORY_SHADOW_SCENARIOS = (
         tags=("memory_shadow_v1", "chat_learning", "add"),
     ),
     MemoryShadowScenario(
-        id="capture_short_lived_health_context",
-        description="A current short-lived condition should not become a durable user trait.",
+        id="ignore_short_lived_health_context_without_expiry",
+        description="Short-lived context is ignored until it has a real expiry lifecycle.",
         messages=(
             {"role": "user", "content": "I'm sick today, so I'm mostly resting."},
         ),
-        expected_operations=(
-            ExpectedMemoryOperation(
-                operation="add",
-                data_point_type="temporary_context",
-                value_concepts=("sick",),
-                evidence_message_indexes=(0,),
-            ),
-        ),
-        tags=("memory_shadow_v1", "temporary_context", "add"),
+        expected_decision="no_change",
+        tags=("memory_shadow_v1", "temporary_context_rejected", "no_change"),
     ),
     MemoryShadowScenario(
         id="ignore_low_information_acknowledgement",
@@ -288,6 +288,7 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="matching_fact",
+                memory_basis="explicit_matching_preference",
                 value_concepts=("calm", "funny"),
                 evidence_message_indexes=(0,),
             ),
@@ -296,11 +297,56 @@ MEMORY_SHADOW_SCENARIOS = (
             ExpectedMemoryOperation(
                 operation="add",
                 data_point_type="matching_fact",
+                memory_basis="explicit_matching_preference",
                 value_concepts=("loud",),
                 evidence_message_indexes=(0,),
             ),
         ),
         tags=("memory_shadow_v1", "hinglish", "matching_fact"),
+    ),
+    MemoryShadowScenario(
+        id="ignore_technical_explanation",
+        description="A technical explanation is not personal memory.",
+        messages=(
+            {"role": "user", "content": "A buffer overflow happens when software writes past allocated memory."},
+        ),
+        expected_decision="no_change",
+        tags=("memory_shadow_v1", "memory_eligibility", "technical_content", "no_change"),
+    ),
+    MemoryShadowScenario(
+        id="ignore_code_example",
+        description="A code example is not personal memory.",
+        messages=(
+            {"role": "user", "content": "A basic Python example is print('hello world')."},
+        ),
+        expected_decision="no_change",
+        tags=("memory_shadow_v1", "memory_eligibility", "code_example", "no_change"),
+    ),
+    MemoryShadowScenario(
+        id="ignore_product_name_without_personal_claim",
+        description="Merely naming a product does not say anything about the user.",
+        messages=(
+            {"role": "user", "content": "I was reviewing a product called Omiryn today."},
+        ),
+        expected_decision="no_change",
+        tags=("memory_shadow_v1", "memory_eligibility", "incidental_mention", "no_change"),
+    ),
+    MemoryShadowScenario(
+        id="capture_explicit_work_background_as_profile_fact",
+        description="An explicit statement about the user's work belongs in profile facts, never matching facts.",
+        messages=(
+            {"role": "user", "content": "I build a matchmaking product called Omiryn."},
+        ),
+        expected_operations=(
+            ExpectedMemoryOperation(
+                operation="add",
+                data_point_type="profile_fact",
+                memory_basis="stable_user_attribute",
+                value_concepts=("build", "omiryn"),
+                evidence_message_indexes=(0,),
+            ),
+        ),
+        tags=("memory_shadow_v1", "memory_eligibility", "profile_fact", "work_background"),
     ),
 )
 

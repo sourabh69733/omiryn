@@ -196,9 +196,69 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.operations, ())
         self.assertIn("supplied existing target_memory_id", " ".join(result.errors))
 
+    def test_validator_rejects_memory_add_without_an_eligibility_basis(self) -> None:
+        """An add must declare why the observation is safe to store."""
+        batch = build_memory_batch(
+            conversation_id=self.conversation_id,
+            user_id=self.user_id,
+            messages=self.messages,
+        )
+        assert batch is not None
+        raw = self._analysis(evidence_indexes=[2])
+        raw["operations"][0].pop("memory_basis")
+
+        result = validate_memory_analysis(
+            raw,
+            batch=batch,
+            existing_memory_ids=set(),
+        )
+
+        self.assertFalse(result.valid)
+        self.assertIn("memory_basis is required", " ".join(result.errors))
+
+    def test_validator_rejects_a_memory_basis_that_does_not_match_its_type(self) -> None:
+        """A stable personal attribute cannot be stored as a matching preference."""
+        batch = build_memory_batch(
+            conversation_id=self.conversation_id,
+            user_id=self.user_id,
+            messages=self.messages,
+        )
+        assert batch is not None
+        raw = self._analysis(evidence_indexes=[2])
+        raw["operations"][0]["data_point_type"] = "profile_fact"
+
+        result = validate_memory_analysis(raw, batch=batch, existing_memory_ids=set())
+
+        self.assertFalse(result.valid)
+        self.assertIn("memory_basis must match data_point_type", " ".join(result.errors))
+
+    def test_validator_rejects_temporary_context_until_expiry_exists(self) -> None:
+        """Short-lived context cannot be retained before expiry storage exists."""
+        batch = build_memory_batch(
+            conversation_id=self.conversation_id,
+            user_id=self.user_id,
+            messages=self.messages,
+        )
+        assert batch is not None
+        raw = self._analysis(evidence_indexes=[2])
+        raw["operations"][0]["data_point_type"] = "temporary_context"
+        raw["operations"][0]["memory_basis"] = "current_life_situation"
+
+        result = validate_memory_analysis(raw, batch=batch, existing_memory_ids=set())
+
+        self.assertFalse(result.valid)
+        self.assertIn("temporary_context is not supported", " ".join(result.errors))
+
     async def test_worker_records_valid_shadow_result_without_live_memory_write(self) -> None:
         with (
-            patch.dict("os.environ", {"MEMORY_BACKGROUND_V2_THRESHOLD": "2"}),
+            patch.dict(
+                "os.environ",
+                {
+                    "AGENT_PIPELINE_VERSION": "v2",
+                    "AGENT_ROLLOUT": "shadow",
+                    "MEMORY_BACKGROUND_V2_THRESHOLD": "2",
+                },
+            ),
             patch(
                 "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
@@ -304,12 +364,18 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             "summary": "The user described calm and funny as attractive qualities.",
             "depth": "explored",
         }
-        with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
-            new_callable=AsyncMock,
-            return_value=raw,
-            create=True,
-        ) as analyze:
+        with (
+            patch.dict(
+                "os.environ",
+                {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
+            ),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+                return_value=raw,
+                create=True,
+            ) as analyze,
+        ):
             result = await run_background_cognition(
                 self.conversation_id,
                 self.user_id,
@@ -600,6 +666,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                     "operation": "add",
                     "target_memory_id": None,
                     "data_point_type": "matching_fact",
+                    "memory_basis": "explicit_matching_preference",
                     "category": "partner_preferences",
                     "key": "preferred_personality",
                     "label": "Prefers calm and funny partners",

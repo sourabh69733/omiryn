@@ -38,16 +38,32 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
                 "assistant_contamination",
                 "cross_batch",
                 "chat_learning",
-                "temporary_context",
+                "temporary_context_rejected",
                 "no_change",
                 "hinglish",
             }.issubset(tags)
         )
-        self.assertGreaterEqual(len(MEMORY_SHADOW_SCENARIOS), 10)
+        self.assertGreaterEqual(len(MEMORY_SHADOW_SCENARIOS), 14)
         self.assertEqual(
             len({scenario.id for scenario in MEMORY_SHADOW_SCENARIOS}),
             len(MEMORY_SHADOW_SCENARIOS),
         )
+
+    def test_memory_eligibility_regressions_protect_incidental_content(self) -> None:
+        """Technical content and names alone must never be treated as user memory."""
+        rejected_ids = {
+            "ignore_technical_explanation",
+            "ignore_code_example",
+            "ignore_product_name_without_personal_claim",
+            "ignore_short_lived_health_context_without_expiry",
+        }
+        rejected = [get_memory_shadow_scenario(scenario_id) for scenario_id in rejected_ids]
+
+        self.assertTrue(all(scenario.expected_decision == "no_change" for scenario in rejected))
+        work_fact = get_memory_shadow_scenario("capture_explicit_work_background_as_profile_fact")
+        expected = work_fact.expected_operations[0]
+        self.assertEqual(expected.data_point_type, "profile_fact")
+        self.assertEqual(expected.memory_basis, "stable_user_attribute")
 
     def test_lookup_and_tag_filter_are_stable(self) -> None:
         corrections = list_memory_shadow_scenarios(tags=("correction",))
@@ -74,6 +90,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             "operation": "add",
             "target_memory_id": None,
             "data_point_type": "matching_fact",
+            "memory_basis": "explicit_matching_preference",
             "category": "partner_location",
             "key": "preferred_partner_location",
             "label": "Prefers a partner near Chennai",
@@ -119,6 +136,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             "operation": "add",
             "target_memory_id": None,
             "data_point_type": "chat_learning",
+            "memory_basis": "direct_chat_preference",
             "category": "conversation_style",
             "key": "question_frequency",
             "label": "preference for question frequency",
@@ -136,8 +154,8 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(passed)
 
-    def test_grader_accepts_core_temporary_context_without_every_source_detail(self) -> None:
-        scenario = get_memory_shadow_scenario("capture_short_lived_health_context")
+    def test_grader_rejects_short_lived_context_without_expiry_support(self) -> None:
+        scenario = get_memory_shadow_scenario("ignore_short_lived_health_context_without_expiry")
         operation = {
             "operation": "add",
             "target_memory_id": None,
@@ -157,7 +175,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             structurally_valid=True,
         )
 
-        self.assertTrue(passed)
+        self.assertFalse(passed)
 
     def test_grader_accepts_distinct_optional_fact_but_still_rejects_duplicates(self) -> None:
         scenario = get_memory_shadow_scenario("capture_hinglish_partner_personality")
@@ -165,6 +183,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             "operation": "add",
             "target_memory_id": None,
             "data_point_type": "matching_fact",
+            "memory_basis": "explicit_matching_preference",
             "category": "partner_pref",
             "key": "personality_traits",
             "label": "prefers calm and funny partner",
@@ -176,6 +195,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
             "operation": "add",
             "target_memory_id": None,
             "data_point_type": "matching_fact",
+            "memory_basis": "explicit_matching_preference",
             "category": "partner_pref",
             "key": "loudness_tolerance",
             "label": "does not prefer loud partner",
@@ -211,6 +231,7 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
                     "operation": "add",
                     "target_memory_id": None,
                     "data_point_type": "matching_fact",
+                    "memory_basis": "explicit_matching_preference",
                     "category": "partner_personality",
                     "key": "preferred_partner_traits",
                     "label": "Prefers calm and funny partners",

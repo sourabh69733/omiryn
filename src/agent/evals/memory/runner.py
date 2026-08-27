@@ -260,6 +260,7 @@ def scenario_result_payload(
                 {
                     "operation": operation.operation,
                     "data_point_type": operation.data_point_type,
+                    "memory_basis": operation.memory_basis,
                     "target_memory_id": operation.target_memory_id,
                     "value_concepts": list(operation.value_concepts),
                     "evidence_message_indexes": list(operation.evidence_message_indexes),
@@ -270,6 +271,7 @@ def scenario_result_payload(
                 {
                     "operation": operation.operation,
                     "data_point_type": operation.data_point_type,
+                    "memory_basis": operation.memory_basis,
                     "target_memory_id": operation.target_memory_id,
                     "value_concepts": list(operation.value_concepts),
                     "evidence_message_indexes": list(operation.evidence_message_indexes),
@@ -295,6 +297,8 @@ def _operation_matches(expected: ExpectedMemoryOperation, actual: dict[str, Any]
     if actual.get("operation") != expected.operation:
         return False
     if expected.data_point_type and actual.get("data_point_type") != expected.data_point_type:
+        return False
+    if expected.memory_basis and actual.get("memory_basis") != expected.memory_basis:
         return False
     if expected.target_memory_id and actual.get("target_memory_id") != expected.target_memory_id:
         return False
@@ -330,6 +334,7 @@ def _operation_payload(operation: Any) -> dict[str, Any]:
         "operation": operation.operation,
         "target_memory_id": operation.target_memory_id,
         "data_point_type": operation.data_point_type,
+        "memory_basis": operation.memory_basis,
         "category": operation.category,
         "key": operation.key,
         "label": operation.label,
