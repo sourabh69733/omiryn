@@ -109,6 +109,110 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(passed)
         self.assertIn("matched", findings[0])
 
+    def test_grader_accepts_split_profile_facts_for_explicit_work_background(self) -> None:
+        """One explicit work statement may safely yield more than one profile fact."""
+        scenario = get_memory_shadow_scenario("capture_explicit_work_background_as_profile_fact")
+        operations = (
+            {
+                "operation": "add",
+                "target_memory_id": None,
+                "data_point_type": "profile_fact",
+                "memory_basis": "stable_user_attribute",
+                "category": "work",
+                "key": "product_builder",
+                "label": "Builds a matchmaking product",
+                "value": "Omiryn",
+                "confidence": 0.9,
+                "evidence_message_indexes": [0],
+            },
+            {
+                "operation": "add",
+                "target_memory_id": None,
+                "data_point_type": "profile_fact",
+                "memory_basis": "stable_user_attribute",
+                "category": "work",
+                "key": "product_name",
+                "label": "Product being built",
+                "value": "Omiryn",
+                "confidence": 0.9,
+                "evidence_message_indexes": [0],
+            },
+        )
+
+        passed, findings = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=operations,
+            structurally_valid=True,
+        )
+
+        self.assertTrue(passed, findings)
+
+    def test_grader_accepts_the_reported_split_work_profile_output(self) -> None:
+        """Profile facts split across role and project name must satisfy this classification scenario."""
+        scenario = get_memory_shadow_scenario("capture_explicit_work_background_as_profile_fact")
+        operations = (
+            {
+                "operation": "add",
+                "target_memory_id": None,
+                "data_point_type": "profile_fact",
+                "memory_basis": "stable_user_attribute",
+                "category": "work",
+                "key": "job_title",
+                "label": "Job Title",
+                "value": "Matchmaker",
+                "confidence": 0.9,
+                "evidence_message_indexes": [0],
+            },
+            {
+                "operation": "add",
+                "target_memory_id": None,
+                "data_point_type": "profile_fact",
+                "memory_basis": "stable_user_attribute",
+                "category": "work",
+                "key": "product_name",
+                "label": "Product Name",
+                "value": "Omiryn",
+                "confidence": 0.9,
+                "evidence_message_indexes": [0],
+            },
+        )
+
+        passed, findings = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=operations,
+            structurally_valid=True,
+        )
+
+        self.assertTrue(passed, findings)
+
+    def test_grader_rejects_matching_fact_for_explicit_work_background(self) -> None:
+        """The flexible work scenario still forbids a matching-fact classification."""
+        scenario = get_memory_shadow_scenario("capture_explicit_work_background_as_profile_fact")
+        operation = {
+            "operation": "add",
+            "target_memory_id": None,
+            "data_point_type": "matching_fact",
+            "memory_basis": "explicit_matching_preference",
+            "category": "work",
+            "key": "product_builder",
+            "label": "Builds a matchmaking product",
+            "value": "Omiryn",
+            "confidence": 0.9,
+            "evidence_message_indexes": [0],
+        }
+
+        passed, findings = grade_memory_shadow_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(operation,),
+            structurally_valid=True,
+        )
+
+        self.assertFalse(passed)
+        self.assertIn("disallowed memory type", " ".join(findings))
+
     def test_grader_rejects_duplicate_and_wrong_classification(self) -> None:
         scenario = get_memory_shadow_scenario("capture_current_location_profile_fact")
         wrong = {
