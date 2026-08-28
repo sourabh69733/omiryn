@@ -31,6 +31,7 @@ from agent.evals.behavior.reporting.writer import (  # noqa: E402
     save_evaluation_reports,
 )
 from agent.evals.memory import (  # noqa: E402
+    ProviderMemoryEvidenceJudge,
     get_memory_shadow_scenario,
     list_memory_shadow_scenarios,
     run_memory_shadow_scenario,
@@ -54,6 +55,17 @@ def _parser() -> argparse.ArgumentParser:
         help="Memory extraction provider.",
     )
     parser.add_argument("--model", default=None, help="Memory extraction model override.")
+    parser.add_argument(
+        "--judge-provider",
+        default=None,
+        choices=PROVIDER_NAMES,
+        help="Optional independent evidence-judge provider.",
+    )
+    parser.add_argument(
+        "--judge-model",
+        default=None,
+        help="Optional evidence-judge model; uses --provider when judge provider is omitted.",
+    )
     parser.add_argument(
         "--scenario",
         action="append",
@@ -108,6 +120,14 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
     scenarios = _selected_scenarios(args)
     if not scenarios:
         raise ValueError("No memory scenarios matched the selection.")
+    semantic_judge = None
+    if args.judge_provider or args.judge_model:
+        semantic_judge = ProviderMemoryEvidenceJudge(
+            provider=args.judge_provider or args.provider,
+            model=args.judge_model,
+            timeout_seconds=args.timeout_seconds,
+            event_sink=reporter,
+        )
     records = []
     for scenario in scenarios:
         result = await run_memory_shadow_scenario(
@@ -115,21 +135,34 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             model=args.model,
             timeout_seconds=args.timeout_seconds,
             event_sink=reporter,
+            semantic_judge=semantic_judge,
         )
         records.append(scenario_result_payload(result, scenario=scenario))
     passed = sum(record["passed"] is True for record in records)
     structural_failures = sum(
         not record["observed"]["structurally_valid"] for record in records
     )
+    judges = ["deterministic expected-versus-proposed memory behavior"]
+    if semantic_judge is not None:
+        judges.append(semantic_judge.judge_name)
     return {
         "stage": "memory_shadow_eval",
         "passed": passed == len(records),
-        "judges": ["deterministic expected-versus-proposed memory behavior"],
+        "judges": judges,
         "summary": {
             "total": len(records),
             "passed": passed,
             "failed": len(records) - passed,
             "structural_failures": structural_failures,
+            "semantic_failures": sum(
+                record["observed"].get("semantic_judgment") is not None
+                and not record["observed"]["semantic_judgment"]["passed"]
+                for record in records
+            ),
+            "semantic_judge_errors": sum(
+                bool(record["observed"].get("semantic_judge_error"))
+                for record in records
+            ),
             "live_memory_writes": False,
         },
         "scenarios": records,
