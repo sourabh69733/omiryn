@@ -15,6 +15,10 @@ from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import save_conversation
 
+from .judge import (
+    MemoryEvidenceJudge,
+    memory_evidence_judgment_payload,
+)
 from .scenarios import ExpectedMemoryOperation, MemoryShadowScenario
 
 
@@ -32,6 +36,8 @@ class MemoryScenarioResult:
     raw_response: dict[str, Any] | None
     duration_seconds: float
     error: str | None = None
+    semantic_judgment: dict[str, Any] | None = None
+    semantic_judge_error: str | None = None
 
 
 async def run_memory_shadow_scenario(
@@ -40,6 +46,7 @@ async def run_memory_shadow_scenario(
     model: str | None,
     timeout_seconds: float,
     event_sink: EventSink | None = None,
+    semantic_judge: MemoryEvidenceJudge | None = None,
 ) -> MemoryScenarioResult:
     """Call the configured provider once and grade its validated shadow proposal."""
     conversation_id = f"memory-eval-{scenario.id}-{uuid4().hex}"
@@ -154,6 +161,33 @@ async def run_memory_shadow_scenario(
         structurally_valid=analysis.valid,
         validation_errors=analysis.errors,
     )
+    semantic_judgment: dict[str, Any] | None = None
+    semantic_judge_error: str | None = None
+    if semantic_judge is not None and analysis.valid and operations:
+        try:
+            judgment = await semantic_judge.judge_memories(
+                messages=scenario.messages,
+                operations=operations,
+                conversation_id=conversation_id,
+            )
+        except Exception as error:
+            semantic_judge_error = f"{type(error).__name__}: {error}"
+            findings = (*findings, f"Semantic evidence judge error: {semantic_judge_error}")
+            passed = False
+        else:
+            semantic_judgment = memory_evidence_judgment_payload(
+                judgment,
+                judge_name=semantic_judge.judge_name,
+            )
+            if not judgment.passed:
+                semantic_findings = tuple(
+                    "Semantic evidence issue for operation "
+                    f"{item.index}: {', '.join(item.issues)} — {item.reason}"
+                    for item in judgment.operations
+                    if not item.supported
+                )
+                findings = (*findings, *semantic_findings)
+                passed = False
     emit_event(
         event_sink,
         "memory_scenario_completed",
@@ -173,6 +207,8 @@ async def run_memory_shadow_scenario(
         findings=findings,
         raw_response=raw,
         duration_seconds=duration,
+        semantic_judgment=semantic_judgment,
+        semantic_judge_error=semantic_judge_error,
     )
 
 
@@ -297,6 +333,8 @@ def scenario_result_payload(
             "validation_errors": list(result.validation_errors),
             "duration_seconds": result.duration_seconds,
             "error": result.error,
+            "semantic_judgment": result.semantic_judgment,
+            "semantic_judge_error": result.semantic_judge_error,
         },
         "findings": list(result.findings),
         "raw_response": result.raw_response,
