@@ -94,23 +94,182 @@
 .connection-scene,
 .connection-art,
 .connection-art img,
-.connection-threads { position: absolute; inset: 0; }
+.connection-thought-field { position: absolute; inset: 0; }
 
 .connection-scene { z-index: -2; overflow: hidden; pointer-events: none; }
-.connection-art, .connection-art img { width: 100%; height: 100%; }
-.connection-art img { object-fit: cover; object-position: center; }
+.connection-art { width: 100%; height: 100%; background: var(--connection-ink); }
+.connection-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1);
+}
 
-.connection-threads { z-index: 1; width: 100%; height: 100%; overflow: visible; opacity: .58; mix-blend-mode: screen; }
-.thread { fill: none; stroke-linecap: round; stroke-width: 1; stroke-dasharray: 1 13; stroke-dashoffset: 0; animation: connection-thread 13s linear infinite; }
-.thread--one { stroke: rgba(243,211,148,.72); }
-.thread--two { stroke: rgba(180,169,232,.68); animation-delay: -3.6s; }
-.thread--three { stroke: rgba(233,139,120,.62); animation-delay: -7.2s; }
-.signal { fill: var(--connection-gold); filter: drop-shadow(0 0 8px rgba(243,211,148,.92)); transform-origin: 720px 660px; animation: connection-signal 3.6s ease-in-out infinite; }
-.signal--two { animation-delay: .45s; }
-.signal--three { animation-delay: .9s; }
+.connection-thought-field {
+  z-index: 1;
+  overflow: hidden;
+  clip-path: inset(15% 0 35% 0);
+  pointer-events: none;
+}
+.connection-signal-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.connection-background-thought {
+  font-family: "Caveat", cursive;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: .025em;
+  opacity: .56;
+  paint-order: stroke;
+  stroke: rgba(7, 15, 29, .72);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.connection-background-thought--mist { fill: rgba(224, 225, 218, .72); }
+.connection-background-thought--gold { fill: rgba(243, 211, 148, .82); }
+.connection-background-thought--coral { fill: rgba(222, 154, 128, .74); }
+.connection-signal-route {
+  fill: none;
+  stroke: rgba(243, 211, 148, .42);
+  stroke-width: 1.1;
+  stroke-dasharray: 3 10;
+  opacity: 0;
+}
+.connection-signal-route.is-active { animation: connection-route-glow 2.6s ease-out both; }
+.connection-signal-node {
+  fill: rgba(243, 211, 148, .64);
+  filter: drop-shadow(0 0 8px rgba(243, 211, 148, .5));
+  opacity: .32;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.connection-signal-node.is-active { animation: connection-node-bloom 1.3s ease-in-out infinite alternate; }
+.connection-signal-traveler,
+.connection-signal-insight {
+  fill: rgba(240, 234, 223, .96);
+  font-family: "Caveat", cursive;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  paint-order: stroke;
+  stroke: rgba(7, 15, 29, .7);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.connection-signal-insight {
+  fill: var(--connection-gold);
+  font-size: 28px;
+  font-weight: 600;
+  text-anchor: middle;
+  transform: translateY(12px) scale(.9);
+  transform-origin: center;
+}
+.connection-signal-insight.is-visible { animation: connection-insight 1.3s ease-out both; }
 
-@keyframes connection-thread { to { stroke-dashoffset: -120; } }
-@keyframes connection-signal { 0%, 100% { opacity: .5; transform: scale(.75); } 45% { opacity: 1; transform: scale(1.3); } }
+@keyframes connection-route-glow {
+  0% { opacity: 0; stroke-dashoffset: 70; }
+  25%, 82% { opacity: .78; }
+  100% { opacity: 0; stroke-dashoffset: 0; }
+}
+@keyframes connection-node-bloom {
+  from { opacity: .55; transform: scale(1); }
+  to { opacity: 1; transform: scale(2.25); }
+}
+@keyframes connection-insight {
+  0% { opacity: 0; transform: translateY(12px) scale(.9); }
+  26%, 68% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(.96); }
+}
+.connection-thought {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: max-content;
+  color: rgba(240, 234, 223, 0.56);
+  font-family: "Caveat", cursive;
+  font-size: clamp(14px, 1.25vw, 19px);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  opacity: 0;
+  text-shadow: 0 0 18px rgba(243, 211, 148, 0.16);
+  will-change: opacity, transform;
+}
+
+.connection-thought--left { animation: connection-thought-drift-left 15s var(--delay) linear infinite; }
+.connection-thought--right { animation: connection-thought-drift-right 15s var(--delay) linear infinite; }
+
+.connection-particle-cloud {
+  position: absolute;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--connection-gold);
+  box-shadow: -32px -13px 0 -1px currentColor, -20px 10px 0 0 currentColor, -8px -20px 0 -1px currentColor, 13px -11px 0 0 currentColor, 27px 9px 0 -1px currentColor, 38px -4px 0 -2px currentColor, 6px 22px 0 -1px currentColor, -29px 25px 0 -2px currentColor;
+  filter: drop-shadow(0 0 7px currentColor);
+  opacity: .7;
+  transform: translateX(-50%);
+  animation: connection-particle-breathe 4.8s ease-in-out infinite;
+}
+
+.connection-particle-cloud::before,
+.connection-particle-cloud::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.connection-particle-cloud::before { box-shadow: -24px -23px 0 -1px currentColor, -12px 17px 0 -1px currentColor, 18px -25px 0 -1px currentColor, 32px 18px 0 -1px currentColor; }
+.connection-particle-cloud::after { box-shadow: -39px 5px 0 -1px currentColor, 4px -34px 0 -1px currentColor, 22px 30px 0 -1px currentColor; }
+
+.connection-particle-cloud--one { top: 34%; color: var(--connection-lavender); animation-delay: -.8s; }
+.connection-particle-cloud--two { top: 47%; color: var(--connection-gold); animation-delay: -2s; }
+.connection-particle-cloud--three { top: 60%; color: var(--connection-coral); animation-delay: -3.2s; }
+
+@keyframes connection-thought-drift-left {
+  0%, 10% { opacity: 0; transform: translateX(-14px); }
+  22%, 67% { opacity: .86; transform: translateX(0); }
+  90%, 100% { opacity: 0; transform: translateX(22vw); }
+}
+
+@keyframes connection-thought-drift-right {
+  0%, 10% { opacity: 0; transform: translateX(14px); }
+  22%, 67% { opacity: .86; transform: translateX(0); }
+  90%, 100% { opacity: 0; transform: translateX(-22vw); }
+}
+
+@keyframes connection-particle-breathe {
+  0%, 100% { opacity: .34; transform: translateX(-50%) scale(.72); }
+  50% { opacity: .96; transform: translateX(-50%) scale(1.16); }
+}
+
+.hero-copy--art {
+  justify-content: flex-end;
+  min-height: calc(max(720px, 100svh) - 206px);
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+.hero-copy--art .hero-kicker { margin-bottom: 8px; }
+.hero-whisper {
+  margin: 0;
+  color: rgba(240, 234, 223, .8);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(15px, 1.4vw, 20px);
+  font-style: italic;
+}
+.hero-copy--art .hero-scroll-cue { margin-top: 16px; }
+
 @keyframes connection-nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 
 @media (max-width: 900px) {
@@ -121,14 +280,21 @@
 @media (max-width: 620px) {
   .hero--connection { min-height: max(780px, 100svh); padding: 108px 18px 28px; }
   .hero-copy { min-height: calc(max(780px, 100svh) - 136px); justify-content: flex-start; padding-top: 38px; }
+  .hero-copy--art { justify-content: flex-end; padding-top: 0; padding-bottom: 2px; }
   .hero-kicker { margin-bottom: 16px; font-size: 8px; }
   .hero--connection h1 { font-size: clamp(36px, 11vw, 50px); }
   .hero--connection .hero-sub { max-width: 330px; margin-bottom: 24px; font-size: 13px; }
   .hero-scroll-cue { margin-top: 22px; }
-  .connection-art img { object-position: center; }
-  .connection-threads { opacity: .42; }
+  .connection-art img { object-position: center; transform: scale(1); }
+  .connection-thought { font-size: 12px; }
+  .connection-particle-cloud { transform: translateX(-50%) scale(.72); }
+  .connection-signal-traveler { font-size: 18px; }
+  .connection-signal-insight { font-size: 21px; }
+  .connection-background-thought { font-size: 17px; opacity: .5; }
+  .hero-whisper { font-size: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-scroll-cue span, .thread, .signal { animation: none; }
+  .hero-scroll-cue span, .connection-thought, .connection-particle-cloud, .connection-signal-route, .connection-signal-node, .connection-signal-insight { animation: none; }
+  .connection-thought-field { display: none; }
 }
