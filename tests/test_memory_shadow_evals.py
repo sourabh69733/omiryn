@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
 
 from agent.evals.behavior.reporting.writer import save_evaluation_reports
+from agent.evals.memory.judge import MemoryEvidenceJudgment, MemoryOperationJudgment
 from agent.evals.memory.runner import (
     grade_memory_shadow_result,
     run_memory_shadow_scenario,
@@ -372,6 +373,66 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
         payload = scenario_result_payload(result, scenario=scenario)
         self.assertEqual(payload["observed"]["operations"][0]["evidence_message_indexes"], [2])
 
+    async def test_runner_fails_an_over_inferred_memory_from_semantic_judge(self) -> None:
+        scenario = get_memory_shadow_scenario(
+            "capture_explicit_work_background_as_profile_fact"
+        )
+        raw = {
+            "decision": "propose",
+            "operations": [
+                {
+                    "operation": "add",
+                    "target_memory_id": None,
+                    "data_point_type": "profile_fact",
+                    "memory_basis": "stable_user_attribute",
+                    "category": "work",
+                    "key": "job_title",
+                    "label": "Job title",
+                    "value": "Matchmaker",
+                    "confidence": 0.9,
+                    "evidence_message_indexes": [0],
+                }
+            ],
+            "thread_operation": {"operation": "none"},
+            "handoff": {
+                "summary": "The user builds Omiryn.",
+                "active_people": [],
+                "active_topics": ["work"],
+                "unresolved_references": [],
+            },
+        }
+        semantic_judge = AsyncMock()
+        semantic_judge.judge_name = "Memory evidence judge test:model"
+        semantic_judge.judge_memories.return_value = MemoryEvidenceJudgment(
+            passed=False,
+            operations=(
+                MemoryOperationJudgment(
+                    index=0,
+                    supported=False,
+                    issues=("unsupported_inference",),
+                    reason="Building a product does not establish Matchmaker as a job title.",
+                ),
+            ),
+            overall_reason="The proposed job title exceeds the cited evidence.",
+        )
+
+        with patch(
+            "agent.evals.memory.runner.analyze_background_cognition",
+            new_callable=AsyncMock,
+            return_value=raw,
+        ):
+            result = await run_memory_shadow_scenario(
+                scenario=scenario,
+                model="memory-model",
+                timeout_seconds=30,
+                semantic_judge=semantic_judge,
+            )
+
+        self.assertFalse(result.passed)
+        payload = scenario_result_payload(result, scenario=scenario)
+        self.assertFalse(payload["observed"]["semantic_judgment"]["passed"])
+        self.assertIn("unsupported_inference", " ".join(payload["findings"]))
+
     def test_memory_report_is_readable_and_saved_in_ist_day_folder(self) -> None:
         payload = {
             "stage": "memory_shadow_eval",
@@ -422,6 +483,19 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
                         "structurally_valid": True,
                         "validation_errors": [],
                         "duration_seconds": 1.0,
+                        "semantic_judgment": {
+                            "judge_name": "Memory evidence judge deepinfra:judge-model",
+                            "passed": False,
+                            "operations": [
+                                {
+                                    "index": 0,
+                                    "supported": False,
+                                    "issues": ["unsupported_inference"],
+                                    "reason": "The proposed title was not stated by the user.",
+                                }
+                            ],
+                            "overall_reason": "The memory exceeds its cited evidence.",
+                        },
                     },
                     "findings": ["Expected propose, observed no_change."],
                 }
@@ -444,6 +518,9 @@ class MemoryShadowEvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Live memory writes:** disabled", markdown)
         self.assertIn("Expected decision:** propose", markdown)
         self.assertIn("I live in Pune", markdown)
+        self.assertIn("Semantic evidence review", markdown)
+        self.assertIn("Unsupported inference", markdown)
+        self.assertIn("The proposed title was not stated by the user", markdown)
         self.assertIn("Memory shadow eval", history)
         self.assertIn("0%", history)
 
