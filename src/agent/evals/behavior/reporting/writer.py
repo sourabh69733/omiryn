@@ -565,6 +565,29 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
                 )
         else:
             lines.append("- None.")
+        semantic_judgment = observed.get("semantic_judgment") or {}
+        semantic_judge_error = observed.get("semantic_judge_error")
+        if semantic_judgment or semantic_judge_error:
+            lines.extend(["", "### Semantic evidence review", ""])
+            if semantic_judge_error:
+                lines.append(f"**Judge error:** {semantic_judge_error}")
+            else:
+                lines.extend(
+                    [
+                        f"**Judge:** {semantic_judgment.get('judge_name', 'unknown')}",
+                        f"**Result:** {'PASS' if semantic_judgment.get('passed') else 'FAIL'}",
+                        f"**Reason:** {semantic_judgment.get('overall_reason', 'not provided')}",
+                    ]
+                )
+                for item in semantic_judgment.get("operations") or []:
+                    issues = ", ".join(
+                        _plain_name(issue) for issue in item.get("issues") or []
+                    ) or "none"
+                    lines.append(
+                        f"- Operation {item.get('index', '?')}: "
+                        f"{'supported' if item.get('supported') else 'rejected'}; "
+                        f"issues={issues}; {item.get('reason', 'no reason')}"
+                    )
         lines.extend(["", "**Findings:**"])
         lines.extend(f"- {finding}" for finding in scenario.get("findings") or ["None."])
         validation_errors = observed.get("validation_errors") or []

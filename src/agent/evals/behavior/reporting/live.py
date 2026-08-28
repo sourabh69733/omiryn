@@ -35,6 +35,7 @@ class TerminalProgressReporter:
             "companion_api_call_completed",
             "simulated_user_call_started",
             "memory_call_started",
+            "memory_evidence_judge_started",
         }:
             self.api_calls += 1
         if not self.enabled:
@@ -103,6 +104,12 @@ def _render_event(event: EvalEvent) -> str | None:
         return f"    Memory model responded in {data['duration_seconds']:.1f}s."
     if event.kind == "memory_call_failed":
         return f"    Memory model failed: {data['error']}"
+    if event.kind == "memory_evidence_judge_started":
+        return f"    {data['judge_name']} is checking evidence grounding..."
+    if event.kind == "memory_evidence_judge_completed":
+        return f"    {data['judge_name']} completed its evidence review."
+    if event.kind == "memory_evidence_judge_failed":
+        return f"    {data['judge_name']} failed: {data['error']}"
     if event.kind == "simulated_conversation_started":
         return (
             f"\nAI-user scenario: {_plain_name(data['scenario_id'])} "
