@@ -72,3 +72,9 @@ Synthetic evaluation scores are grouped by day for comparison.
 | 19:44:41 | FAIL | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 75% | 3/4 scenarios |
 | 23:00:19 | FAIL | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 75% | 3/4 scenarios |
 | 23:22:42 | PASS | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 1/1 scenarios |
+
+## 2026-08-28
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 23:40:51 | PASS | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 1/1 scenarios |
