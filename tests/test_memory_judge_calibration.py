@@ -7,9 +7,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from agent.evals.behavior.reporting.live import TerminalProgressReporter
 from agent.evals.behavior.reporting.writer import render_markdown_report
 from agent.evals.memory.calibration import (
     MEMORY_JUDGE_CALIBRATION_CASES,
@@ -81,6 +83,33 @@ class MemoryJudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         payload = calibration_report_payload(report)
         self.assertTrue(payload["passed"])
         self.assertEqual(payload["completed_cases"], len(MEMORY_JUDGE_CALIBRATION_CASES))
+        self.assertEqual(
+            payload["cases"][0]["evidence_messages"],
+            ["I work as a civil engineer."],
+        )
+        self.assertEqual(payload["cases"][0]["proposed_operations"][0]["value"], "civil engineer")
+
+    async def test_streams_readable_evidence_proposal_and_judge_verdict(self) -> None:
+        stream = StringIO()
+        reporter = TerminalProgressReporter(stream=stream)
+        case = MEMORY_JUDGE_CALIBRATION_CASES[0]
+
+        await run_memory_judge_calibration(
+            _KnownVerdictJudge((case,)),
+            cases=(case,),
+            event_sink=reporter,
+        )
+
+        output = stream.getvalue()
+        self.assertIn("Memory judge check 1/1: Accept explicit profile fact", output)
+        self.assertIn("Evidence: I work as a civil engineer.", output)
+        self.assertIn(
+            "Proposed memory: profile_fact / Works as a civil engineer = 'civil engineer'",
+            output,
+        )
+        self.assertIn("Judge verdict: supported; issues=none", output)
+        self.assertIn("Expected: supported", output)
+        self.assertIn("Result: PASS", output)
 
     async def test_registers_one_owned_conversation_for_all_usage_events(self) -> None:
         judge = _KnownVerdictJudge()
@@ -93,7 +122,6 @@ class MemoryJudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(conversation["id"], judge.conversation_ids[0])
         self.assertEqual(conversation["user_id"], user_id)
         self.assertEqual(set(judge.conversation_ids), {conversation["id"]})
-
 
     async def test_rejection_with_wrong_issue_fails_calibration(self) -> None:
         case = MemoryJudgeCalibrationCase(
@@ -162,7 +190,25 @@ class MemoryJudgeCalibrationReportingTest(unittest.TestCase):
                         "passed": False,
                         "judge_error": None,
                         "failure_reason": ("Missing required issue category: incidental_content."),
-                        "operations": [],
+                        "evidence_messages": ["Can you explain Python decorators?"],
+                        "proposed_operations": [
+                            {
+                                "data_point_type": "profile_fact",
+                                "label": "Likes Python",
+                                "value": "Python",
+                            }
+                        ],
+                        "operations": [
+                            {
+                                "expected_supported": False,
+                                "observed_supported": False,
+                                "required_issues": ["incidental_content"],
+                                "observed_issues": ["unsupported_inference"],
+                                "reason": (
+                                    "The question does not establish a personal preference."
+                                ),
+                            }
+                        ],
                     }
                 ],
             },
@@ -172,6 +218,12 @@ class MemoryJudgeCalibrationReportingTest(unittest.TestCase):
 
         self.assertIn("# Background Memory Evaluation Report", markdown)
         self.assertIn("judge reliability check", markdown.casefold())
+        self.assertIn("Can you explain Python decorators?", markdown)
+        self.assertIn("Likes Python", markdown)
+        self.assertIn("Expected: rejected", markdown)
+        self.assertIn("Observed: rejected", markdown)
+        self.assertIn("Incidental content", markdown)
+        self.assertIn("The question does not establish a personal preference.", markdown)
         self.assertIn("Missing required issue category: incidental_content", markdown)
         self.assertIn("Do not trust", markdown)
 

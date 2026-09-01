@@ -135,6 +135,8 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         lines.extend(_thread_management_shadow_markdown(payload))
     elif payload.get("stage") == "memory_shadow_eval":
         lines.extend(_memory_shadow_markdown(payload))
+    elif payload.get("stage") == "memory_judge_calibration":
+        lines.extend(_memory_judge_calibration_markdown(calibration))
     else:
         lines.extend(
             [
@@ -979,3 +981,70 @@ def _suite_selection_text(selection: dict[str, Any]) -> str:
     if scenarios:
         parts.append("scenarios=" + ",".join(str(item) for item in scenarios))
     return "; ".join(parts) if parts else "default scenario"
+
+
+def _memory_judge_calibration_markdown(calibration: dict[str, Any]) -> list[str]:
+    """Render every known memory-judge example with its input and verdict."""
+    lines = [
+        "## Judge reliability check",
+        "",
+        (
+            f"The judge completed {calibration.get('completed_cases', 0)}/"
+            f"{calibration.get('total_cases', 0)} known examples. "
+            f"Errors: {calibration.get('judge_errors', 0)}. "
+            f"Result: {'PASS' if calibration.get('passed') else 'FAIL'}."
+        ),
+        "",
+        "## Memory judge calibration cases",
+    ]
+    for case in calibration.get("cases") or []:
+        lines.extend(
+            [
+                "",
+                f"### {_plain_name(case.get('id', 'unknown'))}",
+                "",
+                f"**Result:** {'PASS' if case.get('passed') else 'FAIL'}",
+                "",
+                "**Evidence:**",
+            ]
+        )
+        evidence = case.get("evidence_messages") or []
+        if evidence:
+            lines.extend(f"- {message}" for message in evidence)
+        else:
+            lines.append("- None.")
+        lines.extend(["", "**Proposed memories:**"])
+        proposals = case.get("proposed_operations") or []
+        if proposals:
+            for operation in proposals:
+                lines.append(
+                    f"- {operation.get('data_point_type', 'unknown')} / "
+                    f"{operation.get('label') or operation.get('key') or 'unlabelled'}: "
+                    f"{operation.get('value')!r}"
+                )
+        else:
+            lines.append("- None.")
+        for index, operation in enumerate(case.get("operations") or [], start=1):
+            required = (
+                ", ".join(_plain_name(issue) for issue in operation.get("required_issues") or [])
+                or "none"
+            )
+            observed_issues = (
+                ", ".join(_plain_name(issue) for issue in operation.get("observed_issues") or [])
+                or "none"
+            )
+            expected_status = "supported" if operation.get("expected_supported") else "rejected"
+            observed_status = "supported" if operation.get("observed_supported") else "rejected"
+            lines.extend(
+                [
+                    "",
+                    f"**Operation {index}:**",
+                    f"- Expected: {expected_status}; issues: {required}",
+                    f"- Observed: {observed_status}; issues: {observed_issues}",
+                    f"- Judge reason: {operation.get('reason', 'not provided')}",
+                ]
+            )
+        problem = case.get("judge_error") or case.get("failure_reason")
+        if problem:
+            lines.extend(["", f"**Problem:** {problem}"])
+    return lines

@@ -56,6 +56,50 @@ class TerminalProgressReporter:
 
 def _render_event(event: EvalEvent) -> str | None:
     data = event.data
+    if event.kind == "memory_judge_calibration_started":
+        return f"\nChecking the memory evidence judge with {data['total_cases']} known examples..."
+    if event.kind == "memory_judge_calibration_case_started":
+        lines = [
+            f"  Memory judge check {data['case_number']}/{data['total_cases']}: "
+            f"{_plain_name(data['case_id'])}"
+        ]
+        lines.extend(f"    Evidence: {message}" for message in data.get("evidence_messages") or [])
+        for operation in data.get("operations") or []:
+            lines.append(
+                "    Proposed memory: "
+                f"{operation.get('data_point_type', 'unknown')} / "
+                f"{operation.get('label') or operation.get('key') or 'unlabelled'} = "
+                f"{operation.get('value')!r}"
+            )
+        return "\n".join(lines)
+    if event.kind == "memory_judge_calibration_case_completed":
+        lines = []
+        observed = data.get("observed_verdicts") or []
+        expected = data.get("expected_verdicts") or []
+        for index, verdict in enumerate(observed):
+            label = "Judge verdict" if len(observed) == 1 else f"Judge verdict {index + 1}"
+            issues = ",".join(verdict.get("issues") or []) or "none"
+            status = "supported" if verdict.get("supported") else "rejected"
+            lines.append(f"    {label}: {status}; issues={issues} — {verdict.get('reason', '')}")
+        for index, verdict in enumerate(expected):
+            label = "Expected" if len(expected) == 1 else f"Expected {index + 1}"
+            issues = ",".join(verdict.get("required_issues") or [])
+            status = "supported" if verdict.get("supported") else "rejected"
+            detail = f"; required issues={issues}" if issues else ""
+            lines.append(f"    {label}: {status}{detail}")
+        if data.get("judge_error"):
+            lines.append(f"    Judge error: {data['judge_error']}")
+        lines.append(f"    Result: {'PASS' if data['passed'] else 'FAIL'}")
+        if data.get("failure_reason"):
+            lines.append(f"    Problem: {data['failure_reason']}")
+        return "\n".join(lines)
+    if event.kind == "memory_judge_calibration_completed":
+        status = "PASSED" if data["passed"] else "FAILED"
+        return (
+            f"Memory judge reliability check {status}: {data['completed_cases']}/"
+            f"{data['total_cases']} examples completed, {data['judge_errors']} judge errors."
+        )
+
     if event.kind == "calibration_started":
         return f"\nChecking the judge models with {data['total_cases']} known examples..."
     if event.kind == "calibration_case_started":
