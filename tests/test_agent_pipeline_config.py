@@ -18,18 +18,18 @@ from agent.cognition.background.service import background_cognition_enabled
 
 
 class AgentPipelineConfigTest(unittest.TestCase):
-    def test_default_is_v2_shadow_without_live_writes(self) -> None:
+    def test_default_is_v2_live(self) -> None:
         config = self._config({})
 
         self.assertEqual(config.version, "v2")
-        self.assertEqual(config.rollout, "shadow")
+        self.assertEqual(config.rollout, "live")
         self.assertFalse(config.structured_turn_output)
         self.assertFalse(config.inline_data_points)
         self.assertTrue(config.conversation_state_enabled)
         self.assertFalse(config.conversation_state_shadow)
         self.assertTrue(config.background_memory_enabled)
-        self.assertFalse(config.live_memory_writes)
-        self.assertFalse(config.live_thread_writes)
+        self.assertTrue(config.live_memory_writes)
+        self.assertTrue(config.live_thread_writes)
         self.assertFalse(config.legacy_rules)
 
     def test_v1_is_one_complete_legacy_rollback_mode(self) -> None:
@@ -76,9 +76,22 @@ class AgentPipelineConfigTest(unittest.TestCase):
         self.assertTrue(config.live_memory_writes)
         self.assertTrue(config.live_thread_writes)
 
+    def test_v3_is_live_by_version_and_ignores_rollout(self) -> None:
+        for rollout in ("off", "shadow", "maybe"):
+            with self.subTest(rollout=rollout):
+                config = self._config(
+                    {"AGENT_PIPELINE_VERSION": "v3", "AGENT_ROLLOUT": rollout}
+                )
+                self.assertEqual(config.rollout, "live")
+                self.assertEqual(config.memory_contract_version, 3)
+                self.assertTrue(config.background_memory_enabled)
+                self.assertTrue(config.live_v3_memory_writes)
+                self.assertTrue(config.live_thread_writes)
+                self.assertFalse(config.live_memory_writes)
+
     def test_unknown_version_or_rollout_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "AGENT_PIPELINE_VERSION"):
-            self._config({"AGENT_PIPELINE_VERSION": "v3"})
+            self._config({"AGENT_PIPELINE_VERSION": "v4"})
         with self.assertRaisesRegex(ValueError, "AGENT_ROLLOUT"):
             self._config({"AGENT_ROLLOUT": "maybe"})
 

@@ -119,6 +119,7 @@ class BackgroundCognitionTest(unittest.TestCase):
                     "operation": "add",
                     "target_memory_id": None,
                     "data_point_type": "matching_fact",
+                    "memory_basis": "explicit_matching_preference",
                     "category": "career",
                     "key": "stability",
                     "label": "Values financial stability",
