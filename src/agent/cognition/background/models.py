@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from agent.memory_engine.memories.operations import MemoryAnalysisV3
 from agent.memory_engine.processing.validation import MemoryAnalysis
 
 
@@ -13,7 +14,7 @@ class BackgroundCognitionAnalysis:
     """Validated memory and thread lanes from one provider response."""
 
     decision: str
-    memory: MemoryAnalysis
+    memory: MemoryAnalysis | MemoryAnalysisV3
     thread: dict[str, Any]
     thread_operation: str
     valid: bool
