@@ -128,6 +128,63 @@ Index(
     memory_operation_applications.c.created_at,
 )
 
+# Canonical v3 durable memories. Working context and conversation threads remain
+# separate systems because they have different lifecycles and retrieval rules.
+agent_memories = Table(
+    "agent_memories",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("kind", String, nullable=False),
+    Column("purposes_json", JSON, nullable=False),
+    Column("key", String, nullable=False),
+    Column("value_json", JSON, nullable=False),
+    Column("allowed_uses_json", JSON, nullable=False),
+    Column("status", String, nullable=False),
+    Column("sensitivity", String, nullable=False),
+    Column("confidence", Float, nullable=False),
+    Column("importance", Float, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=True),
+    Column("valid_from", DateTime(timezone=True), nullable=True),
+    Column("valid_until", DateTime(timezone=True), nullable=True),
+    Column("last_reinforced_at", DateTime(timezone=True), nullable=True),
+    Column("supersedes_memory_id", String, nullable=True),
+    Column("extractor", String, nullable=True),
+    Column("extractor_model", String, nullable=True),
+    Column("schema_version", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "ix_agent_memories_user_status_kind_updated",
+    agent_memories.c.user_id,
+    agent_memories.c.status,
+    agent_memories.c.kind,
+    agent_memories.c.updated_at,
+)
+
+# Evidence is normalized so one memory can be supported by messages from
+# multiple conversations without duplicating the memory itself.
+agent_memory_evidence = Table(
+    "agent_memory_evidence",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("memory_id", String, nullable=False),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("message_id", String, nullable=True),
+    Column("message_index", Integer, nullable=True),
+    Column("exact_quote", String, nullable=False),
+    Column("observed_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_agent_memory_evidence_memory", agent_memory_evidence.c.memory_id)
+Index(
+    "ix_agent_memory_evidence_conversation",
+    agent_memory_evidence.c.user_id,
+    agent_memory_evidence.c.conversation_id,
+)
+
 # Threads represent resumable subjects, not classifications for every message.
 # A thread is user-owned and records its first/last session so it may span chats.
 conversation_threads = Table(
