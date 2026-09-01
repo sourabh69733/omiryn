@@ -80,6 +80,9 @@ def test_evidence_requires_a_message_reference_and_exact_quote() -> None:
 
 
 def test_memory_requires_evidence_and_bounded_scores() -> None:
+    with pytest.raises(ValueError, match="value cannot be null"):
+        _memory(value=None)
+
     with pytest.raises(ValueError, match="at least one evidence"):
         _memory(evidence=())
 
