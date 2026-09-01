@@ -6,10 +6,10 @@ import os
 from dataclasses import dataclass
 from typing import Literal, cast
 
-PipelineVersion = Literal["v1", "v2"]
+PipelineVersion = Literal["v1", "v2", "v3"]
 RolloutMode = Literal["off", "shadow", "live"]
 
-_PIPELINE_VERSIONS = {"v1", "v2"}
+_PIPELINE_VERSIONS = {"v1", "v2", "v3"}
 _ROLLOUT_MODES = {"off", "shadow", "live"}
 
 
@@ -35,7 +35,9 @@ class AgentPipelineConfig:
 
     @property
     def conversation_state_enabled(self) -> bool:
-        return self.version == "v2" and self.rollout in {"shadow", "live"}
+        return self.version == "v3" or (
+            self.version == "v2" and self.rollout in {"shadow", "live"}
+        )
 
     @property
     def conversation_state_shadow(self) -> bool:
@@ -43,15 +45,27 @@ class AgentPipelineConfig:
 
     @property
     def background_memory_enabled(self) -> bool:
-        return self.version == "v2" and self.rollout in {"shadow", "live"}
+        return self.version == "v3" or (
+            self.version == "v2" and self.rollout in {"shadow", "live"}
+        )
 
     @property
     def live_memory_writes(self) -> bool:
         return self.version == "v2" and self.rollout == "live"
 
     @property
+    def live_v3_memory_writes(self) -> bool:
+        return self.version == "v3"
+
+    @property
     def live_thread_writes(self) -> bool:
-        return self.version == "v2" and self.rollout == "live"
+        return self.version == "v3" or (
+            self.version == "v2" and self.rollout == "live"
+        )
+
+    @property
+    def memory_contract_version(self) -> int:
+        return 3 if self.version == "v3" else 2
 
     @property
     def legacy_rules(self) -> bool:
@@ -61,10 +75,15 @@ class AgentPipelineConfig:
 def agent_pipeline_config() -> AgentPipelineConfig:
     """Read and validate the two public runtime settings without hidden overrides."""
     version = os.getenv("AGENT_PIPELINE_VERSION", "v2").strip().lower()
-    rollout = os.getenv("AGENT_ROLLOUT", "live").strip().lower()
+    # V3 is live by version alone. Rollout remains only for v1 and v2 compatibility.
+    rollout = (
+        "live"
+        if version == "v3"
+        else os.getenv("AGENT_ROLLOUT", "live").strip().lower()
+    )
     if version not in _PIPELINE_VERSIONS:
         raise ValueError(
-            f"Unknown AGENT_PIPELINE_VERSION '{version}'. Expected one of: v1, v2."
+            f"Unknown AGENT_PIPELINE_VERSION '{version}'. Expected one of: v1, v2, v3."
         )
     if rollout not in _ROLLOUT_MODES:
         raise ValueError(
