@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeAlias
 
 from agent.memory_engine.processing.models import MemoryHandoff
 
@@ -29,11 +29,42 @@ class MemoryAddProposal:
 
 
 @dataclass(frozen=True)
+class MemoryReinforceProposal:
+    """New evidence that strengthens an existing memory without changing it."""
+
+    target_memory_id: str
+    confidence: float
+    importance: float
+    evidence_message_indexes: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class MemorySupersedeProposal:
+    """A corrected replacement that preserves the previous memory's history."""
+
+    target_memory_id: str
+    replacement: MemoryAddProposal
+
+
+@dataclass(frozen=True)
+class MemoryRetractProposal:
+    """Evidence that an existing memory must no longer be treated as true."""
+
+    target_memory_id: str
+    evidence_message_indexes: tuple[int, ...]
+
+
+MemoryProposalV3: TypeAlias = (
+    MemoryAddProposal | MemoryReinforceProposal | MemorySupersedeProposal | MemoryRetractProposal
+)
+
+
+@dataclass(frozen=True)
 class MemoryAnalysisV3:
     """Fail-closed validation result for one v3 memory lane."""
 
     decision: str
-    operations: tuple[MemoryAddProposal, ...]
+    operations: tuple[MemoryProposalV3, ...]
     handoff: MemoryHandoff
     valid: bool
     errors: tuple[str, ...] = ()
