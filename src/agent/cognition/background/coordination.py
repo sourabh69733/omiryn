@@ -37,9 +37,7 @@ def interpret_background_cognition(
     operations = raw.get("operations")
     thread_operation = raw.get("thread_operation")
     operation_name = (
-        str(thread_operation.get("operation"))
-        if isinstance(thread_operation, dict)
-        else "invalid"
+        str(thread_operation.get("operation")) if isinstance(thread_operation, dict) else "invalid"
     )
     if decision not in {"propose", "no_change"}:
         errors.append("decision must be propose or no_change")
@@ -56,7 +54,11 @@ def interpret_background_cognition(
         "handoff": raw.get("handoff"),
     }
     memory = (
-        validate_memory_analysis_v3(memory_payload, batch=batch)
+        validate_memory_analysis_v3(
+            memory_payload,
+            batch=batch,
+            existing_memory_ids=existing_memory_ids,
+        )
         if memory_version == 3
         else validate_memory_analysis(
             memory_payload,
