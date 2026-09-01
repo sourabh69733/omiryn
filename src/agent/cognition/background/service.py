@@ -13,14 +13,13 @@ from agent.context_engine.conversation_engine.state import (
 )
 from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
-from storage import list_data_point_extraction_debug, list_profile_facts
+from storage import list_agent_memories, list_data_point_extraction_debug, list_profile_facts
 from storage.profile_facts import save_data_point_extraction_debug
 
+from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
+from agent.memory_engine.memories.operations import MemoryAddProposal
 from agent.memory_engine.processing.context import DEFAULT_CONTEXT_OVERLAP, build_memory_batch
-from agent.memory_engine.processing.application import (
-    apply_validated_memory_analysis,
-    memory_background_v2_live_writes_enabled,
-)
+from agent.memory_engine.processing.application import apply_validated_memory_analysis
 from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff, MemoryOperation, MemoryProcessingState
 from agent.memory_engine.processing.service import (
     claim_processing_batch,
@@ -160,7 +159,9 @@ async def _run_claimed_background_cognition(
     """Run the expensive work after this worker owns the batch lease."""
     conversation_id = batch.conversation_id
     user_id = batch.user_id
-    existing_memories = _existing_memory_context(user_id)
+    config = agent_pipeline_config()
+    memory_version = config.memory_contract_version
+    existing_memories = _existing_memory_context(user_id, memory_version)
     thread_candidates = background_thread_candidates(
         conversation_id,
         user_id,
@@ -173,8 +174,9 @@ async def _run_claimed_background_cognition(
     application_result = None
     thread_application_result = None
     live_attempted = (
-        agent_pipeline_config().live_memory_writes
-        or agent_pipeline_config().live_thread_writes
+        config.live_memory_writes
+        or config.live_v3_memory_writes
+        or config.live_thread_writes
     )
     try:
         raw = await analyze_background_cognition(
@@ -182,20 +184,58 @@ async def _run_claimed_background_cognition(
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
             timeout_seconds=_timeout_seconds(),
+            memory_version=memory_version,
         )
         cognition = interpret_background_cognition(
             raw,
             batch=batch,
             existing_memory_ids={str(memory["id"]) for memory in existing_memories},
             thread_candidates=thread_candidates,
+            memory_version=memory_version,
         )
         analysis = cognition.memory
-        if analysis.valid and memory_background_v2_live_writes_enabled():
+        if memory_version == 3 and not analysis.valid:
+            _save_cognition_debug_once(
+                batch=batch,
+                memory_version=memory_version,
+                decision="live_invalid",
+                candidate={
+                    "model_decision": analysis.decision,
+                    "operations": [],
+                    "thread_operation": raw.get("thread_operation"),
+                },
+                review={
+                    "valid": False,
+                    "errors": list(analysis.errors),
+                    "live_writes": False,
+                },
+                state_version=state.version if state else 0,
+            )
+            return {
+                "status": "live_invalid",
+                "batch_key": batch.batch_key,
+                "operation_count": 0,
+                "errors": list(analysis.errors),
+            }
+        if analysis.valid and (
+            config.live_memory_writes or config.live_v3_memory_writes
+        ):
             try:
-                application_result = apply_validated_memory_analysis(batch, analysis)
+                application_result = (
+                    apply_validated_memory_analysis_v3(
+                        batch,
+                        analysis,
+                        extractor_model=(
+                            os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model
+                        ),
+                    )
+                    if memory_version == 3
+                    else apply_validated_memory_analysis(batch, analysis)
+                )
             except Exception as error:
-                _save_shadow_debug_once(
+                _save_cognition_debug_once(
                     batch=batch,
+                    memory_version=memory_version,
                     decision="live_error",
                     candidate={
                         "model_decision": analysis.decision,
@@ -224,7 +264,7 @@ async def _run_claimed_background_cognition(
                     "thread_valid": bool(cognition.thread.get("valid")),
                     "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
                 }
-        if bool(cognition.thread.get("valid")) and agent_pipeline_config().live_thread_writes:
+        if bool(cognition.thread.get("valid")) and config.live_thread_writes:
             thread_application_result = apply_validated_thread_proposal(
                 batch_key=batch.batch_key,
                 conversation_id=batch.conversation_id,
@@ -245,10 +285,16 @@ async def _run_claimed_background_cognition(
                 handoff=next_handoff,
             )
         )
-        decision = _result_decision(analysis, application_result, thread_application_result)
+        decision = _result_decision(
+            analysis,
+            application_result,
+            thread_application_result,
+            memory_version=memory_version,
+        )
         live_writes = application_result is not None or thread_application_result is not None
-        _save_shadow_debug_once(
+        _save_cognition_debug_once(
             batch=batch,
+            memory_version=memory_version,
             decision=decision,
             candidate={
                 "model_decision": analysis.decision,
@@ -302,8 +348,9 @@ async def _run_claimed_background_cognition(
     except Exception as error:
         live_writes = application_result is not None or thread_application_result is not None
         decision = "live_error" if live_attempted else "shadow_error"
-        _save_shadow_debug_once(
+        _save_cognition_debug_once(
             batch=batch,
+            memory_version=memory_version,
             decision=decision,
             candidate={},
             review={
@@ -326,7 +373,25 @@ async def _run_claimed_background_cognition(
         }
 
 
-def _existing_memory_context(user_id: str) -> list[dict[str, Any]]:
+def _existing_memory_context(user_id: str, memory_version: int) -> list[dict[str, Any]]:
+    if memory_version == 3:
+        memories = [
+            memory
+            for memory in list_agent_memories(user_id)
+            if memory.get("status") == "active"
+        ]
+        return [
+            {
+                "id": memory["id"],
+                "memory_kind": memory["kind"],
+                "purposes": memory["purposes"],
+                "key": memory["key"],
+                "value": memory["value"],
+                "confidence": memory["confidence"],
+            }
+            for memory in memories[:MAX_EXISTING_MEMORIES]
+        ]
+
     memories = list_profile_facts(user_id, statuses={"active"})
     memories.sort(key=lambda memory: str(memory.get("updated_at") or ""), reverse=True)
     return [
@@ -343,16 +408,17 @@ def _existing_memory_context(user_id: str) -> list[dict[str, Any]]:
     ]
 
 
-def _save_shadow_debug_once(
+def _save_cognition_debug_once(
     *,
     batch: MemoryBatch,
+    memory_version: int,
     decision: str,
     candidate: dict[str, Any],
     review: dict[str, Any],
     state_version: int,
     live_writes: bool = False,
 ) -> None:
-    candidate_key = f"memory_shadow:{batch.batch_key}:{decision}"
+    candidate_key = f"background_cognition:{batch.batch_key}:{decision}"
     existing = list_data_point_extraction_debug(
         user_id=batch.user_id,
         source_id=batch.conversation_id,
@@ -371,8 +437,8 @@ def _save_shadow_debug_once(
             "candidate": candidate,
             "review": review,
             "metadata": {
-                "title": "Background memory shadow",
-                "extractor": "memory_background_v2_shadow",
+                "title": "Background cognition",
+                "extractor": f"background_cognition_v{memory_version}",
                 "batch_key": batch.batch_key,
                 "new_start_message_index": batch.new_start_message_index,
                 "new_end_message_index": batch.new_end_message_index,
@@ -387,7 +453,19 @@ def _save_shadow_debug_once(
     )
 
 
-def _operation_dict(operation: MemoryOperation) -> dict[str, Any]:
+def _operation_dict(operation: MemoryOperation | MemoryAddProposal) -> dict[str, Any]:
+    if isinstance(operation, MemoryAddProposal):
+        return {
+            "operation": "add",
+            "memory_kind": operation.kind.value,
+            "purposes": sorted(purpose.value for purpose in operation.purposes),
+            "key": operation.key,
+            "value": operation.value,
+            "sensitivity": operation.sensitivity.value,
+            "confidence": operation.confidence,
+            "importance": operation.importance,
+            "evidence_message_indexes": list(operation.evidence_message_indexes),
+        }
     return {
         "operation": operation.operation,
         "target_memory_id": operation.target_memory_id,
@@ -405,6 +483,8 @@ def _result_decision(
     analysis: MemoryAnalysis,
     application_result: Any,
     thread_application_result: Any,
+    *,
+    memory_version: int,
 ) -> str:
     if thread_application_result and thread_application_result.applied_count:
         return "live_applied"
@@ -416,7 +496,7 @@ def _result_decision(
         return "live_applied"
     if application_result.deferred_count:
         return "live_deferred"
-    return "shadow_valid"
+    return "no_change" if memory_version == 3 else "shadow_valid"
 
 
 def _handoff_dict(handoff: MemoryHandoff) -> dict[str, Any]:

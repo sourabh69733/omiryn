@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.context_engine.conversation_engine.state import evaluate_thread_operation_shadow
 from agent.memory_engine.processing.models import MemoryBatch
+from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.validation import validate_memory_analysis
 from agent.shared.utils import unknown_fields
 
@@ -18,6 +19,7 @@ def interpret_background_cognition(
     batch: MemoryBatch,
     existing_memory_ids: set[str],
     thread_candidates: list[dict[str, object]],
+    memory_version: int = 2,
 ) -> BackgroundCognitionAnalysis:
     """Delegate each portion of one model response to its owning domain."""
     errors: list[str] = []
@@ -48,14 +50,19 @@ def interpret_background_cognition(
     if decision == "propose" and not (has_memory_change or has_thread_change):
         errors.append("propose requires a memory or thread operation")
 
-    memory = validate_memory_analysis(
-        {
-            "decision": "propose" if has_memory_change else "no_change",
-            "operations": operations if isinstance(operations, list) else operations,
-            "handoff": raw.get("handoff"),
-        },
-        batch=batch,
-        existing_memory_ids=existing_memory_ids,
+    memory_payload = {
+        "decision": "propose" if has_memory_change else "no_change",
+        "operations": operations if isinstance(operations, list) else operations,
+        "handoff": raw.get("handoff"),
+    }
+    memory = (
+        validate_memory_analysis_v3(memory_payload, batch=batch)
+        if memory_version == 3
+        else validate_memory_analysis(
+            memory_payload,
+            batch=batch,
+            existing_memory_ids=existing_memory_ids,
+        )
     )
     candidate_ids = {
         str(candidate["id"])
