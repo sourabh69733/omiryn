@@ -118,6 +118,8 @@ class MemoryRecord:
             raise ValueError("memory status is invalid")
         if not isinstance(self.sensitivity, MemorySensitivity):
             raise ValueError("memory sensitivity is invalid")
+        if self.value is None:
+            raise ValueError("memory value cannot be null")
         if not self.evidence:
             raise ValueError("memory requires at least one evidence reference")
         if not 0.0 <= self.confidence <= 1.0:
