@@ -92,9 +92,11 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     run = payload.get("run") or {}
     companion = payload.get("companion") or {}
     calibration = payload.get("judge_calibration") or {}
-    is_memory_eval = payload.get("stage") == "memory_shadow_eval"
+    is_memory_eval = payload.get("stage") in {"memory_shadow_eval", "memory_judge_calibration"}
     lines = [
-        "# Background Memory Evaluation Report" if is_memory_eval else "# Companion Evaluation Report",
+        "# Background Memory Evaluation Report"
+        if is_memory_eval
+        else "# Companion Evaluation Report",
         "",
         f"**Result:** {result}",
         f"**Finished:** {_display_time(run.get('finished_at'))}",
@@ -152,7 +154,11 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     if failed_calibration_cases:
         lines.extend(["", "### Problems found"])
         for case in failed_calibration_cases:
-            reason = case.get("judge_error") or _calibration_failure_reason(case)
+            reason = (
+                case.get("judge_error")
+                or case.get("failure_reason")
+                or _calibration_failure_reason(case)
+            )
             lines.append(f"- **{_plain_name(case['id'])}:** {reason}")
 
     if payload.get("stage") == "behavior_evaluation":
@@ -305,8 +311,7 @@ def _simulated_conversations_markdown(payload: dict[str, Any]) -> list[str]:
         for check in checks:
             status = "PASS" if check.get("passed") else "FAIL"
             lines.append(
-                f"- {_plain_name(check.get('id', 'check'))}: {status} — "
-                f"{check.get('reason', '')}"
+                f"- {_plain_name(check.get('id', 'check'))}: {status} — {check.get('reason', '')}"
             )
             if check.get("evidence"):
                 lines.append(f"  - Evidence: {check['evidence']}")
@@ -461,7 +466,7 @@ def _thread_management_shadow_markdown(payload: dict[str, Any]) -> list[str]:
         if errors:
             lines.extend(["", "**Validation problems:**"])
             lines.extend(f"- {error}" for error in errors)
-        updates = ((observed.get("proposal") or {}).get("thread_updates") or [])
+        updates = (observed.get("proposal") or {}).get("thread_updates") or []
         if updates:
             lines.extend(["", "**Proposed updates:**"])
             for update in updates:
@@ -580,9 +585,10 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
                     ]
                 )
                 for item in semantic_judgment.get("operations") or []:
-                    issues = ", ".join(
-                        _plain_name(issue) for issue in item.get("issues") or []
-                    ) or "none"
+                    issues = (
+                        ", ".join(_plain_name(issue) for issue in item.get("issues") or [])
+                        or "none"
+                    )
                     lines.append(
                         f"- Operation {item.get('index', '?')}: "
                         f"{'supported' if item.get('supported') else 'rejected'}; "
@@ -642,6 +648,16 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             "The judge models were not reliable enough, so companion testing stopped before "
             "the conversation scenarios began."
         )
+    if payload.get("stage") == "memory_judge_calibration":
+        calibration = payload.get("judge_calibration") or {}
+        return (
+            "The memory evidence judge was checked against known correct and incorrect "
+            f"proposals. Passed cases: {sum(bool(case.get('passed')) for case in calibration.get('cases', []))}/"
+            f"{calibration.get('total_cases', 0)}; issue mismatches: "
+            f"{calibration.get('issue_mismatches', 0)}; errors: "
+            f"{calibration.get('judge_errors', 0)}."
+        )
+
     if payload.get("stage") == "simulated_conversation":
         turn_count = sum(
             len(conversation.get("turns", [])) for conversation in payload.get("conversations", [])
@@ -701,6 +717,13 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             if not payload.get("passed")
             else "The judges are ready for a companion evaluation run."
         )
+    if payload.get("stage") == "memory_judge_calibration":
+        return (
+            "The memory evidence judge is calibrated and ready for the memory suite."
+            if payload.get("passed")
+            else "Do not trust semantic memory verdicts from this judge until calibration passes."
+        )
+
     if payload.get("stage") == "simulated_conversation":
         return (payload.get("consensus") or {}).get(
             "reason",
@@ -776,6 +799,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "simulated_conversation_suite": "sim_suite",
         "conversation_judge_calibration": "conv_judge_calibration",
         "thread_management_shadow_eval": "thread_shadow",
+        "memory_judge_calibration": "memory_judge_calibration",
         "memory_shadow_eval": "memory_shadow",
         "judge_calibration": "calibration",
         "execution_error": "error",

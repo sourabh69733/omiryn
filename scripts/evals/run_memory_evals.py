@@ -32,8 +32,10 @@ from agent.evals.behavior.reporting.writer import (  # noqa: E402
 )
 from agent.evals.memory import (  # noqa: E402
     ProviderMemoryEvidenceJudge,
+    calibration_report_payload,
     get_memory_shadow_scenario,
     list_memory_shadow_scenarios,
+    run_memory_judge_calibration,
     run_memory_shadow_scenario,
     scenario_result_payload,
 )
@@ -65,6 +67,11 @@ def _parser() -> argparse.ArgumentParser:
         "--judge-model",
         default=None,
         help="Optional evidence-judge model; uses --provider when judge provider is omitted.",
+    )
+    parser.add_argument(
+        "--calibration-only",
+        action="store_true",
+        help="Calibrate the evidence judge without running memory extraction scenarios.",
     )
     parser.add_argument(
         "--scenario",
@@ -121,6 +128,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
     if not scenarios:
         raise ValueError("No memory scenarios matched the selection.")
     semantic_judge = None
+    calibration_payload = None
     if args.judge_provider or args.judge_model:
         semantic_judge = ProviderMemoryEvidenceJudge(
             provider=args.judge_provider or args.provider,
@@ -128,6 +136,22 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             timeout_seconds=args.timeout_seconds,
             event_sink=reporter,
         )
+    if args.calibration_only and semantic_judge is None:
+        raise ValueError("--calibration-only requires --judge-provider or --judge-model.")
+    if semantic_judge is not None:
+        calibration = await run_memory_judge_calibration(
+            semantic_judge,
+            event_sink=reporter,
+        )
+        calibration_payload = calibration_report_payload(calibration)
+        if args.calibration_only or not calibration.passed:
+            return {
+                "stage": "memory_judge_calibration",
+                "passed": calibration.passed,
+                "judges": [semantic_judge.judge_name],
+                "judge_calibration": calibration_payload,
+            }
+
     records = []
     for scenario in scenarios:
         result = await run_memory_shadow_scenario(
@@ -149,6 +173,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         "stage": "memory_shadow_eval",
         "passed": passed == len(records),
         "judges": judges,
+        "judge_calibration": calibration_payload,
         "summary": {
             "total": len(records),
             "passed": passed,
@@ -180,10 +205,13 @@ def _print_scenarios(*, tags: tuple[str, ...]) -> None:
         return
     print("Available memory shadow scenarios:")
     for scenario in scenarios:
-        expected = ", ".join(
-            f"{operation.operation}:{operation.data_point_type or 'existing'}"
-            for operation in scenario.expected_operations
-        ) or "no change"
+        expected = (
+            ", ".join(
+                f"{operation.operation}:{operation.data_point_type or 'existing'}"
+                for operation in scenario.expected_operations
+            )
+            or "no change"
+        )
         print(f"- {scenario.id} | expected={expected} | tags={','.join(scenario.tags)}")
         print(f"  {scenario.description}")
 
@@ -210,14 +238,25 @@ def main() -> int:
             "execution_error": f"{type(error).__name__}: {error}",
             "judges": [],
         }
-    resolved_model = args.model or provider_model(args.provider) or "provider-default"
+    calibration_stage = payload.get("stage") == "memory_judge_calibration"
+    metadata_provider = args.judge_provider or args.provider if calibration_stage else args.provider
+
+    resolved_model = (
+        args.judge_model or provider_model(metadata_provider) or "provider-default"
+        if calibration_stage
+        else args.model or provider_model(args.provider) or "provider-default"
+    )
     attach_run_metadata(
         payload,
         stats=reporter.stats(),
-        companion_provider=args.provider,
+        companion_provider=metadata_provider,
         companion_model=resolved_model,
-        prompt_version="memory-v2",
-        companion_agent_name="Background memory extractor",
+        prompt_version="memory-judge-v1" if calibration_stage else "memory-v2",
+        companion_agent_name=(
+            "Memory evidence judge calibration"
+            if calibration_stage
+            else "Background memory extractor"
+        ),
     )
     if not args.no_save:
         paths = save_evaluation_reports(
@@ -239,6 +278,16 @@ def main() -> int:
     elif payload["stage"] == "execution_error":
         print(f"Memory evaluation stopped: {payload['execution_error']}")
         return 1
+    elif payload["stage"] == "memory_judge_calibration":
+        calibration = payload["judge_calibration"]
+        status = "PASS" if payload["passed"] else "FAIL"
+        print(
+            f"Memory judge calibration: {status}; "
+            f"{calibration['completed_cases']}/{calibration['total_cases']} checked; "
+            f"{calibration['judge_errors']} judge errors; "
+            f"{calibration['issue_mismatches']} issue mismatches."
+        )
+
     else:
         summary = payload["summary"]
         status = "PASS" if payload["passed"] else "FAIL"
