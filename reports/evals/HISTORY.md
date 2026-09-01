@@ -78,3 +78,12 @@ Synthetic evaluation scores are grouped by day for comparison.
 | Time (IST) | Result | Stage | Companion | Score | Passed |
 | --- | --- | --- | --- | --- | --- |
 | 23:40:51 | PASS | Memory shadow eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 100% | 1/1 scenarios |
+
+## 2026-09-01
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 16:57:11 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+| 17:16:44 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+| 17:54:06 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+| 18:09:06 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
