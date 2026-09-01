@@ -21,60 +21,69 @@ from agent.memory_engine.memories import (
 from security.encryption import decrypt_json, maybe_encrypt_json
 
 from .database import ENGINE
-from .schema import agent_conversations, agent_memories, agent_memory_evidence
+from .schema import (
+    agent_conversations,
+    agent_memories,
+    agent_memory_evidence,
+    memory_operation_applications,
+)
 from .utils import _isoformat_utc, _protect_text, _require_user_id, _unprotect_text
 
 
 def create_agent_memory(payload: dict[str, Any]) -> dict[str, Any]:
     """Create one validated memory; storage owns its ID and audit timestamps."""
-    record = _record_from_create_payload(payload)
     with ENGINE.begin() as connection:
-        _require_owned_evidence_conversations(connection, record)
-        if record.supersedes_memory_id:
-            _require_owned_memory(connection, record.supersedes_memory_id, record.user_id)
+        return _create_agent_memory(connection, payload)
 
+
+def _create_agent_memory(connection, payload: dict[str, Any]) -> dict[str, Any]:
+    record = _record_from_create_payload(payload)
+    _require_owned_evidence_conversations(connection, record)
+    if record.supersedes_memory_id:
+        _require_owned_memory(connection, record.supersedes_memory_id, record.user_id)
+
+    connection.execute(
+        agent_memories.insert().values(
+            id=record.id,
+            user_id=record.user_id,
+            kind=record.kind.value,
+            purposes_json=sorted(purpose.value for purpose in record.purposes),
+            key=record.key,
+            value_json=maybe_encrypt_json(record.user_id, record.value),
+            allowed_uses_json=sorted(use.value for use in record.allowed_uses),
+            status=record.status.value,
+            sensitivity=record.sensitivity.value,
+            confidence=record.confidence,
+            importance=record.importance,
+            occurred_at=record.occurred_at,
+            valid_from=record.valid_from,
+            valid_until=record.valid_until,
+            last_reinforced_at=record.last_reinforced_at,
+            supersedes_memory_id=record.supersedes_memory_id,
+            extractor=record.extractor,
+            extractor_model=record.extractor_model,
+            schema_version=record.schema_version,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+    )
+    for evidence in record.evidence:
         connection.execute(
-            agent_memories.insert().values(
-                id=record.id,
+            agent_memory_evidence.insert().values(
+                id=str(uuid4()),
+                memory_id=record.id,
                 user_id=record.user_id,
-                kind=record.kind.value,
-                purposes_json=sorted(purpose.value for purpose in record.purposes),
-                key=record.key,
-                value_json=maybe_encrypt_json(record.user_id, record.value),
-                allowed_uses_json=sorted(use.value for use in record.allowed_uses),
-                status=record.status.value,
-                sensitivity=record.sensitivity.value,
-                confidence=record.confidence,
-                importance=record.importance,
-                occurred_at=record.occurred_at,
-                valid_from=record.valid_from,
-                valid_until=record.valid_until,
-                last_reinforced_at=record.last_reinforced_at,
-                supersedes_memory_id=record.supersedes_memory_id,
-                extractor=record.extractor,
-                extractor_model=record.extractor_model,
-                schema_version=record.schema_version,
-                created_at=record.created_at,
-                updated_at=record.updated_at,
+                conversation_id=evidence.conversation_id,
+                message_id=evidence.message_id,
+                message_index=evidence.message_index,
+                exact_quote=_protect_text(record.user_id, evidence.exact_quote),
+                observed_at=evidence.observed_at,
             )
         )
-        for evidence in record.evidence:
-            connection.execute(
-                agent_memory_evidence.insert().values(
-                    id=str(uuid4()),
-                    memory_id=record.id,
-                    user_id=record.user_id,
-                    conversation_id=evidence.conversation_id,
-                    message_id=evidence.message_id,
-                    message_index=evidence.message_index,
-                    exact_quote=_protect_text(record.user_id, evidence.exact_quote),
-                    observed_at=evidence.observed_at,
-                )
-            )
-        row = connection.execute(
-            select(agent_memories).where(agent_memories.c.id == record.id)
-        ).mappings().one()
-        return _memory_from_row(connection, row)
+    row = connection.execute(
+        select(agent_memories).where(agent_memories.c.id == record.id)
+    ).mappings().one()
+    return _memory_from_row(connection, row)
 
 
 def get_agent_memory(memory_id: str, user_id: str) -> dict[str, Any] | None:
@@ -99,6 +108,115 @@ def list_agent_memories(user_id: str) -> list[dict[str, Any]]:
             .order_by(agent_memories.c.updated_at.desc(), agent_memories.c.id.asc())
         ).mappings().all()
         return [_memory_from_row(connection, row) for row in rows]
+
+
+def apply_agent_memory_add_batch(payload: dict[str, Any]) -> dict[str, Any]:
+    """Atomically and idempotently insert one validated v3 addition batch."""
+    user_id = _require_user_id(str(payload.get("user_id") or ""), "memory batch")
+    conversation_id = str(payload.get("conversation_id") or "").strip()
+    batch_key = str(payload.get("batch_key") or "").strip()
+    operations = payload.get("operations")
+    if not conversation_id or not batch_key:
+        raise ValueError("memory batch requires conversation_id and batch_key")
+    if not isinstance(operations, list):
+        raise ValueError("memory batch operations must be an array")
+    _validate_add_batch_operations(operations)
+
+    with ENGINE.begin() as connection:
+        _require_owned_conversation(connection, conversation_id, user_id)
+        existing = _application_rows(connection, user_id, conversation_id, batch_key)
+        if existing:
+            _validate_idempotent_retry(existing, operations)
+            return _add_batch_result(connection, existing, idempotent=True)
+
+        for operation in operations:
+            memory_payload = operation.get("memory")
+            if not isinstance(memory_payload, dict):
+                raise ValueError("memory add operation requires a memory object")
+            saved = _create_agent_memory(
+                connection,
+                {**memory_payload, "user_id": user_id},
+            )
+            connection.execute(
+                memory_operation_applications.insert().values(
+                    id=str(uuid4()),
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    batch_key=batch_key,
+                    operation_index=operation["operation_index"],
+                    operation_fingerprint=operation["operation_fingerprint"],
+                    operation_kind="add_v3",
+                    outcome="applied",
+                    target_memory_id=None,
+                    result_memory_id=saved["id"],
+                    operation_json=maybe_encrypt_json(user_id, operation),
+                    before_json=None,
+                    after_json=maybe_encrypt_json(user_id, saved),
+                )
+            )
+        rows = _application_rows(connection, user_id, conversation_id, batch_key)
+        return _add_batch_result(connection, rows, idempotent=False)
+
+
+def _validate_add_batch_operations(operations: list[dict[str, Any]]) -> None:
+    for expected_index, operation in enumerate(operations):
+        if not isinstance(operation, dict):
+            raise ValueError("memory operation must be an object")
+        if operation.get("operation_index") != expected_index:
+            raise ValueError("memory operation indexes must be contiguous and ordered")
+        if not str(operation.get("operation_fingerprint") or "").strip():
+            raise ValueError("memory operation requires operation_fingerprint")
+
+
+def _validate_idempotent_retry(rows, operations: list[dict[str, Any]]) -> None:
+    if len(rows) != len(operations):
+        raise ValueError("memory batch retry does not match its committed operation count")
+    for row, operation in zip(rows, operations, strict=True):
+        if (
+            int(row["operation_index"]) != int(operation["operation_index"])
+            or row["operation_fingerprint"] != operation["operation_fingerprint"]
+        ):
+            raise ValueError("memory batch retry does not match its committed operations")
+
+
+def _application_rows(connection, user_id: str, conversation_id: str, batch_key: str):
+    return connection.execute(
+        select(memory_operation_applications)
+        .where(
+            memory_operation_applications.c.user_id == user_id,
+            memory_operation_applications.c.conversation_id == conversation_id,
+            memory_operation_applications.c.batch_key == batch_key,
+        )
+        .order_by(memory_operation_applications.c.operation_index.asc())
+    ).mappings().all()
+
+
+def _add_batch_result(connection, rows, *, idempotent: bool) -> dict[str, Any]:
+    memory_ids = [row["result_memory_id"] for row in rows if row["result_memory_id"]]
+    memories = []
+    for memory_id in memory_ids:
+        row = connection.execute(
+            select(agent_memories).where(agent_memories.c.id == memory_id)
+        ).mappings().one()
+        memories.append(_memory_from_row(connection, row))
+    return {
+        "batch_key": rows[0]["batch_key"] if rows else None,
+        "idempotent": idempotent,
+        "applied_count": len(memories),
+        "deferred_count": 0,
+        "memories": memories,
+    }
+
+
+def _require_owned_conversation(connection, conversation_id: str, user_id: str) -> None:
+    found = connection.execute(
+        select(agent_conversations.c.id).where(
+            agent_conversations.c.id == conversation_id,
+            agent_conversations.c.user_id == user_id,
+        )
+    ).first()
+    if not found:
+        raise ValueError("conversation was not found for this user")
 
 
 def _record_from_create_payload(payload: dict[str, Any]) -> MemoryRecord:
@@ -241,4 +359,9 @@ def _optional_text(value: Any) -> str | None:
     return text or None
 
 
-__all__ = ["create_agent_memory", "get_agent_memory", "list_agent_memories"]
+__all__ = [
+    "apply_agent_memory_add_batch",
+    "create_agent_memory",
+    "get_agent_memory",
+    "list_agent_memories",
+]
