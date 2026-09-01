@@ -17,10 +17,21 @@ from storage import list_agent_memories, list_data_point_extraction_debug, list_
 from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
-from agent.memory_engine.memories.operations import MemoryAddProposal
+from agent.memory_engine.memories.operations import (
+    MemoryAddProposal,
+    MemoryProposalV3,
+    MemoryReinforceProposal,
+    MemoryRetractProposal,
+    MemorySupersedeProposal,
+)
 from agent.memory_engine.processing.context import DEFAULT_CONTEXT_OVERLAP, build_memory_batch
 from agent.memory_engine.processing.application import apply_validated_memory_analysis
-from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff, MemoryOperation, MemoryProcessingState
+from agent.memory_engine.processing.models import (
+    MemoryBatch,
+    MemoryHandoff,
+    MemoryOperation,
+    MemoryProcessingState,
+)
 from agent.memory_engine.processing.service import (
     claim_processing_batch,
     get_processing_state,
@@ -78,10 +89,7 @@ def should_schedule_background_cognition(
         messages,
         state=get_processing_state(conversation_id, user_id),
     )
-    return bool(
-        batch
-        and batch.meaningful_user_message_count >= background_cognition_threshold()
-    )
+    return bool(batch and batch.meaningful_user_message_count >= background_cognition_threshold())
 
 
 def should_schedule_idle_background_cognition(
@@ -100,10 +108,7 @@ def should_schedule_idle_background_cognition(
         state=get_processing_state(conversation_id, user_id),
     )
     return bool(
-        batch
-        and 0
-        < batch.meaningful_user_message_count
-        < background_cognition_threshold()
+        batch and 0 < batch.meaningful_user_message_count < background_cognition_threshold()
     )
 
 
@@ -165,18 +170,12 @@ async def _run_claimed_background_cognition(
     thread_candidates = background_thread_candidates(
         conversation_id,
         user_id,
-        " ".join(
-            message.content
-            for message in batch.new_messages
-            if message.role == "user"
-        ),
+        " ".join(message.content for message in batch.new_messages if message.role == "user"),
     )
     application_result = None
     thread_application_result = None
     live_attempted = (
-        config.live_memory_writes
-        or config.live_v3_memory_writes
-        or config.live_thread_writes
+        config.live_memory_writes or config.live_v3_memory_writes or config.live_thread_writes
     )
     try:
         raw = await analyze_background_cognition(
@@ -217,9 +216,7 @@ async def _run_claimed_background_cognition(
                 "operation_count": 0,
                 "errors": list(analysis.errors),
             }
-        if analysis.valid and (
-            config.live_memory_writes or config.live_v3_memory_writes
-        ):
+        if analysis.valid and (config.live_memory_writes or config.live_v3_memory_writes):
             try:
                 application_result = (
                     apply_validated_memory_analysis_v3(
@@ -312,9 +309,7 @@ async def _run_claimed_background_cognition(
                 "thread_proposal": cognition.thread.get("proposal"),
                 "live_writes": live_writes,
                 "applied_count": application_result.applied_count if application_result else 0,
-                "deferred_count": (
-                    application_result.deferred_count if application_result else 0
-                ),
+                "deferred_count": (application_result.deferred_count if application_result else 0),
                 "idempotent": application_result.idempotent if application_result else False,
                 "thread_applied_count": (
                     thread_application_result.applied_count if thread_application_result else 0
@@ -376,9 +371,7 @@ async def _run_claimed_background_cognition(
 def _existing_memory_context(user_id: str, memory_version: int) -> list[dict[str, Any]]:
     if memory_version == 3:
         memories = [
-            memory
-            for memory in list_agent_memories(user_id)
-            if memory.get("status") == "active"
+            memory for memory in list_agent_memories(user_id) if memory.get("status") == "active"
         ]
         return [
             {
@@ -453,17 +446,26 @@ def _save_cognition_debug_once(
     )
 
 
-def _operation_dict(operation: MemoryOperation | MemoryAddProposal) -> dict[str, Any]:
+def _operation_dict(operation: MemoryOperation | MemoryProposalV3) -> dict[str, Any]:
     if isinstance(operation, MemoryAddProposal):
+        return _add_operation_dict(operation, "add")
+    if isinstance(operation, MemoryReinforceProposal):
         return {
-            "operation": "add",
-            "memory_kind": operation.kind.value,
-            "purposes": sorted(purpose.value for purpose in operation.purposes),
-            "key": operation.key,
-            "value": operation.value,
-            "sensitivity": operation.sensitivity.value,
+            "operation": "reinforce",
+            "target_memory_id": operation.target_memory_id,
             "confidence": operation.confidence,
             "importance": operation.importance,
+            "evidence_message_indexes": list(operation.evidence_message_indexes),
+        }
+    if isinstance(operation, MemorySupersedeProposal):
+        return {
+            **_add_operation_dict(operation.replacement, "supersede"),
+            "target_memory_id": operation.target_memory_id,
+        }
+    if isinstance(operation, MemoryRetractProposal):
+        return {
+            "operation": "retract",
+            "target_memory_id": operation.target_memory_id,
             "evidence_message_indexes": list(operation.evidence_message_indexes),
         }
     return {
@@ -475,6 +477,20 @@ def _operation_dict(operation: MemoryOperation | MemoryAddProposal) -> dict[str,
         "label": operation.label,
         "value": operation.value,
         "confidence": operation.confidence,
+        "evidence_message_indexes": list(operation.evidence_message_indexes),
+    }
+
+
+def _add_operation_dict(operation: MemoryAddProposal, name: str) -> dict[str, Any]:
+    return {
+        "operation": name,
+        "memory_kind": operation.kind.value,
+        "purposes": sorted(purpose.value for purpose in operation.purposes),
+        "key": operation.key,
+        "value": operation.value,
+        "sensitivity": operation.sensitivity.value,
+        "confidence": operation.confidence,
+        "importance": operation.importance,
         "evidence_message_indexes": list(operation.evidence_message_indexes),
     }
 
