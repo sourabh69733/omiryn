@@ -62,6 +62,8 @@ class MemoryJudgeCalibrationCaseResult:
 
     id: str
     passed: bool
+    evidence_messages: tuple[str, ...]
+    proposed_operations: tuple[dict[str, Any], ...]
     judge_error: str | None
     failure_reason: str | None
     operations: tuple[MemoryJudgeCalibrationOperationResult, ...]
@@ -121,6 +123,12 @@ async def run_memory_judge_calibration(
             case_id=case.id,
             case_number=case_number,
             total_cases=len(selected),
+            evidence_messages=[
+                str(message.get("content") or "")
+                for message in case.messages
+                if message.get("role") == "user"
+            ],
+            operations=[dict(operation) for operation in case.operations],
         )
         judge_error = None
         operation_results: tuple[MemoryJudgeCalibrationOperationResult, ...] = ()
@@ -149,6 +157,12 @@ async def run_memory_judge_calibration(
             MemoryJudgeCalibrationCaseResult(
                 id=case.id,
                 passed=case_passed,
+                evidence_messages=tuple(
+                    str(message.get("content") or "")
+                    for message in case.messages
+                    if message.get("role") == "user"
+                ),
+                proposed_operations=tuple(dict(operation) for operation in case.operations),
                 judge_error=judge_error,
                 failure_reason=failure_reason,
                 operations=operation_results,
@@ -162,6 +176,22 @@ async def run_memory_judge_calibration(
             case_number=case_number,
             passed=case_passed,
             judge_error=judge_error,
+            failure_reason=failure_reason,
+            expected_verdicts=[
+                {
+                    "supported": verdict.supported,
+                    "required_issues": list(verdict.required_issues),
+                }
+                for verdict in case.expected_verdicts
+            ],
+            observed_verdicts=[
+                {
+                    "supported": verdict.observed_supported,
+                    "issues": list(verdict.observed_issues),
+                    "reason": verdict.reason,
+                }
+                for verdict in operation_results
+            ],
         )
         if judge_error is not None:
             break
@@ -261,6 +291,8 @@ def calibration_report_payload(report: MemoryJudgeCalibrationReport) -> dict[str
             {
                 "id": case.id,
                 "passed": case.passed,
+                "evidence_messages": list(case.evidence_messages),
+                "proposed_operations": list(case.proposed_operations),
                 "judge_error": case.judge_error,
                 "failure_reason": case.failure_reason,
                 "operations": [
