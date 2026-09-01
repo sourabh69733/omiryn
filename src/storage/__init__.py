@@ -15,6 +15,7 @@ from .app_events import *
 from .feedback import *
 from .memory_processing import *
 from .memory_applications import *
+from .memories import *
 from .thread_applications import *
 from .user_deletion import *
 from .utils import (
