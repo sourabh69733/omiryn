@@ -19,6 +19,8 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "memory_processing_leases",
     "memory_processing_states",
     "memory_operation_applications",
+    "agent_memories",
+    "agent_memory_evidence",
     "conversation_threads",
     "thread_operation_applications",
     "agent_usage_events",

@@ -9,6 +9,8 @@ from .schema import (
     agent_context_snapshots,
     agent_conversations,
     agent_message_feedback,
+    agent_memories,
+    agent_memory_evidence,
     agent_trace_steps,
     agent_traces,
     agent_usage_events,
@@ -215,6 +217,33 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
                 memory_processing_states.c.user_id == owner_id,
             )
         )
+        memory_ids = [
+            row[0]
+            for row in connection.execute(
+                select(agent_memory_evidence.c.memory_id).where(
+                    agent_memory_evidence.c.conversation_id == conversation_id,
+                    agent_memory_evidence.c.user_id == owner_id,
+                )
+            ).all()
+        ]
+        connection.execute(
+            agent_memory_evidence.delete().where(
+                agent_memory_evidence.c.conversation_id == conversation_id,
+                agent_memory_evidence.c.user_id == owner_id,
+            )
+        )
+        if memory_ids:
+            connection.execute(
+                agent_memories.delete().where(
+                    agent_memories.c.user_id == owner_id,
+                    agent_memories.c.id.in_(memory_ids),
+                    ~agent_memories.c.id.in_(
+                        select(agent_memory_evidence.c.memory_id).where(
+                            agent_memory_evidence.c.user_id == owner_id
+                        )
+                    ),
+                )
+            )
         connection.execute(
             memory_operation_applications.delete().where(
                 memory_operation_applications.c.conversation_id == conversation_id,
