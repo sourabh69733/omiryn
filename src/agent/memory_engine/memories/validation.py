@@ -9,11 +9,18 @@ from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff
 from agent.shared.utils import is_non_empty_string, is_number, unknown_fields
 
 from .models import MemoryKind, MemoryPurpose, MemorySensitivity
-from .operations import MemoryAddProposal, MemoryAnalysisV3
+from .operations import (
+    MemoryAddProposal,
+    MemoryAnalysisV3,
+    MemoryProposalV3,
+    MemoryReinforceProposal,
+    MemoryRetractProposal,
+    MemorySupersedeProposal,
+)
 
 
 MAX_MEMORY_OPERATIONS = 12
-_OPERATION_FIELDS = {
+_ADD_FIELDS = {
     "operation",
     "memory_kind",
     "purposes",
@@ -27,10 +34,18 @@ _OPERATION_FIELDS = {
     "valid_until",
     "evidence_message_indexes",
 }
+_TARGET_FIELDS = {"operation", "target_memory_id", "evidence_message_indexes"}
+_REINFORCE_FIELDS = _TARGET_FIELDS | {"confidence", "importance"}
+_SUPERSEDE_FIELDS = _ADD_FIELDS | {"target_memory_id"}
 
 
-def validate_memory_analysis_v3(raw: Any, *, batch: MemoryBatch) -> MemoryAnalysisV3:
-    """Validate v3 additions without interpreting natural-language content."""
+def validate_memory_analysis_v3(
+    raw: Any,
+    *,
+    batch: MemoryBatch,
+    existing_memory_ids: set[str] | None = None,
+) -> MemoryAnalysisV3:
+    """Validate lifecycle proposals without interpreting natural-language content."""
     if not isinstance(raw, dict):
         return _invalid("memory analysis must be an object", batch.previous_handoff)
     errors: list[str] = []
@@ -48,13 +63,22 @@ def validate_memory_analysis_v3(raw: Any, *, batch: MemoryBatch) -> MemoryAnalys
     if len(raw_operations) > MAX_MEMORY_OPERATIONS:
         errors.append(f"operations cannot contain more than {MAX_MEMORY_OPERATIONS} items")
 
-    operations: list[MemoryAddProposal] = []
+    operations: list[MemoryProposalV3] = []
     eligible_indexes = set(batch.evidence_message_indexes)
+    known_memory_ids = existing_memory_ids or set()
+    targeted_memory_ids: set[str] = set()
     for index, raw_operation in enumerate(raw_operations[:MAX_MEMORY_OPERATIONS]):
-        operation, operation_errors = _validate_add(
+        operation, operation_errors = _validate_operation(
             raw_operation,
             eligible_indexes=eligible_indexes,
+            existing_memory_ids=known_memory_ids,
         )
+        target_memory_id = getattr(operation, "target_memory_id", None)
+        if target_memory_id in targeted_memory_ids:
+            operation_errors.append("a memory can be targeted only once per batch")
+            operation = None
+        elif target_memory_id:
+            targeted_memory_ids.add(target_memory_id)
         errors.extend(f"operations[{index}]: {error}" for error in operation_errors)
         if operation is not None:
             operations.append(operation)
@@ -82,19 +106,105 @@ def validate_memory_analysis_v3(raw: Any, *, batch: MemoryBatch) -> MemoryAnalys
     )
 
 
+def _validate_operation(
+    raw: Any,
+    *,
+    eligible_indexes: set[int],
+    existing_memory_ids: set[str],
+) -> tuple[MemoryProposalV3 | None, list[str]]:
+    if not isinstance(raw, dict):
+        return None, ["operation must be an object"]
+    operation = raw.get("operation")
+    if operation == "add":
+        return _validate_add(
+            raw,
+            eligible_indexes=eligible_indexes,
+            expected_operation="add",
+            allowed_fields=_ADD_FIELDS,
+        )
+    if operation == "reinforce":
+        return _validate_reinforce(
+            raw,
+            eligible_indexes=eligible_indexes,
+            existing_memory_ids=existing_memory_ids,
+        )
+    if operation == "supersede":
+        return _validate_supersede(
+            raw,
+            eligible_indexes=eligible_indexes,
+            existing_memory_ids=existing_memory_ids,
+        )
+    if operation == "retract":
+        return _validate_retract(
+            raw,
+            eligible_indexes=eligible_indexes,
+            existing_memory_ids=existing_memory_ids,
+        )
+    return None, ["operation must be add, reinforce, supersede, or retract"]
+
+
+def _validate_reinforce(
+    raw: dict[str, Any],
+    *,
+    eligible_indexes: set[int],
+    existing_memory_ids: set[str],
+) -> tuple[MemoryReinforceProposal | None, list[str]]:
+    errors = _unsupported_errors(raw, _REINFORCE_FIELDS)
+    target = _target_memory_id(raw, existing_memory_ids, errors)
+    confidence = _score(raw.get("confidence"), "confidence", errors)
+    importance = _score(raw.get("importance"), "importance", errors)
+    evidence = _evidence_indexes(raw.get("evidence_message_indexes"), eligible_indexes, errors)
+    if errors or target is None:
+        return None, errors
+    return MemoryReinforceProposal(target, confidence, importance, evidence), []
+
+
+def _validate_supersede(
+    raw: dict[str, Any],
+    *,
+    eligible_indexes: set[int],
+    existing_memory_ids: set[str],
+) -> tuple[MemorySupersedeProposal | None, list[str]]:
+    errors: list[str] = []
+    target = _target_memory_id(raw, existing_memory_ids, errors)
+    replacement, replacement_errors = _validate_add(
+        raw,
+        eligible_indexes=eligible_indexes,
+        expected_operation="supersede",
+        allowed_fields=_SUPERSEDE_FIELDS,
+    )
+    errors.extend(replacement_errors)
+    if errors or target is None or replacement is None:
+        return None, errors
+    return MemorySupersedeProposal(target, replacement), []
+
+
+def _validate_retract(
+    raw: dict[str, Any],
+    *,
+    eligible_indexes: set[int],
+    existing_memory_ids: set[str],
+) -> tuple[MemoryRetractProposal | None, list[str]]:
+    errors = _unsupported_errors(raw, _TARGET_FIELDS)
+    target = _target_memory_id(raw, existing_memory_ids, errors)
+    evidence = _evidence_indexes(raw.get("evidence_message_indexes"), eligible_indexes, errors)
+    if errors or target is None:
+        return None, errors
+    return MemoryRetractProposal(target, evidence), []
+
+
 def _validate_add(
     raw: Any,
     *,
     eligible_indexes: set[int],
+    expected_operation: str,
+    allowed_fields: set[str],
 ) -> tuple[MemoryAddProposal | None, list[str]]:
     if not isinstance(raw, dict):
         return None, ["operation must be an object"]
-    errors: list[str] = []
-    unsupported = unknown_fields(raw, _OPERATION_FIELDS)
-    if unsupported:
-        errors.append(f"unsupported fields: {', '.join(unsupported)}")
-    if raw.get("operation") != "add":
-        errors.append("v3 currently supports only add operations")
+    errors = _unsupported_errors(raw, allowed_fields)
+    if raw.get("operation") != expected_operation:
+        errors.append(f"operation must be {expected_operation}")
 
     kind = _enum_value(MemoryKind, raw.get("memory_kind"), "memory_kind", errors)
     sensitivity = _enum_value(
@@ -139,6 +249,26 @@ def _validate_add(
         valid_from=valid_from,
         valid_until=valid_until,
     ), []
+
+
+def _unsupported_errors(raw: dict[str, Any], allowed_fields: set[str]) -> list[str]:
+    unsupported = unknown_fields(raw, allowed_fields)
+    return [f"unsupported fields: {', '.join(unsupported)}"] if unsupported else []
+
+
+def _target_memory_id(
+    raw: dict[str, Any],
+    existing_memory_ids: set[str],
+    errors: list[str],
+) -> str | None:
+    target = raw.get("target_memory_id")
+    if not is_non_empty_string(target):
+        errors.append("target_memory_id must be a non-empty string")
+        return None
+    target_id = str(target).strip()
+    if target_id not in existing_memory_ids:
+        errors.append("target_memory_id must reference a supplied active memory")
+    return target_id
 
 
 def _purposes(value: Any, errors: list[str]) -> frozenset[MemoryPurpose]:

@@ -1,4 +1,4 @@
-"""Maps validated v3 additions to one atomic private-storage transaction."""
+"""Maps validated v3 lifecycle proposals to one atomic storage transaction."""
 
 from __future__ import annotations
 
@@ -8,11 +8,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from storage.memories import apply_agent_memory_add_batch
+from storage.memories import apply_agent_memory_operation_batch
 
 from agent.memory_engine.processing.models import MemoryBatch
 
-from .operations import MemoryAddProposal, MemoryAnalysisV3
+from .operations import (
+    MemoryAddProposal,
+    MemoryAnalysisV3,
+    MemoryProposalV3,
+    MemoryReinforceProposal,
+    MemoryRetractProposal,
+    MemorySupersedeProposal,
+)
 
 
 @dataclass(frozen=True)
@@ -30,7 +37,7 @@ def apply_validated_memory_analysis_v3(
     *,
     extractor_model: str | None,
 ) -> MemoryApplicationResultV3:
-    """Resolve trusted evidence and insert the complete batch exactly once."""
+    """Resolve trusted evidence and apply the complete lifecycle batch once."""
     if not analysis.valid:
         raise ValueError("live writes require a validated v3 memory analysis")
     observed_at = datetime.now(UTC)
@@ -44,7 +51,7 @@ def apply_validated_memory_analysis_v3(
         )
         for operation_index, operation in enumerate(analysis.operations)
     ]
-    result = apply_agent_memory_add_batch(
+    result = apply_agent_memory_operation_batch(
         {
             "user_id": batch.user_id,
             "conversation_id": batch.conversation_id,
@@ -63,30 +70,77 @@ def apply_validated_memory_analysis_v3(
 
 def _operation_payload(
     batch: MemoryBatch,
-    proposal: MemoryAddProposal,
+    proposal: MemoryProposalV3,
     operation_index: int,
     *,
     observed_at: datetime,
     extractor_model: str | None,
 ) -> dict[str, Any]:
-    evidence_by_index = {
-        message.message_index: message.content
-        for message in batch.messages
-        if message.evidence_eligible
+    if isinstance(proposal, MemoryAddProposal):
+        payload = {
+            "operation": "add",
+            "memory": _memory_payload(
+                batch,
+                proposal,
+                observed_at=observed_at,
+                extractor_model=extractor_model,
+            ),
+        }
+    elif isinstance(proposal, MemoryReinforceProposal):
+        payload = {
+            "operation": "reinforce",
+            "target_memory_id": proposal.target_memory_id,
+            "confidence": proposal.confidence,
+            "importance": proposal.importance,
+            "evidence": _trusted_evidence(batch, proposal.evidence_message_indexes, observed_at),
+        }
+    elif isinstance(proposal, MemorySupersedeProposal):
+        payload = {
+            "operation": "supersede",
+            "target_memory_id": proposal.target_memory_id,
+            "memory": {
+                **_memory_payload(
+                    batch,
+                    proposal.replacement,
+                    observed_at=observed_at,
+                    extractor_model=extractor_model,
+                ),
+                "supersedes_memory_id": proposal.target_memory_id,
+            },
+        }
+    elif isinstance(proposal, MemoryRetractProposal):
+        payload = {
+            "operation": "retract",
+            "target_memory_id": proposal.target_memory_id,
+            "evidence": _trusted_evidence(batch, proposal.evidence_message_indexes, observed_at),
+        }
+    else:  # pragma: no cover - the closed proposal union prevents this.
+        raise TypeError("unsupported v3 memory proposal")
+
+    fingerprint_payload = _without_observation_time(payload)
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            fingerprint_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "operation_index": operation_index,
+        "operation_fingerprint": fingerprint,
+        **payload,
     }
-    try:
-        evidence = [
-            {
-                "conversation_id": batch.conversation_id,
-                "message_index": message_index,
-                "exact_quote": evidence_by_index[message_index],
-                "observed_at": observed_at.isoformat(),
-            }
-            for message_index in proposal.evidence_message_indexes
-        ]
-    except KeyError as error:
-        raise ValueError("v3 memory requires eligible user evidence") from error
-    memory = {
+
+
+def _memory_payload(
+    batch: MemoryBatch,
+    proposal: MemoryAddProposal,
+    *,
+    observed_at: datetime,
+    extractor_model: str | None,
+) -> dict[str, Any]:
+    return {
         "kind": proposal.kind.value,
         "purposes": sorted(purpose.value for purpose in proposal.purposes),
         "key": proposal.key,
@@ -101,32 +155,44 @@ def _operation_payload(
         "valid_until": _isoformat(proposal.valid_until),
         "extractor": "background_cognition_v3",
         "extractor_model": extractor_model,
-        "evidence": evidence,
+        "evidence": _trusted_evidence(batch, proposal.evidence_message_indexes, observed_at),
     }
-    fingerprint_payload = {
-        "operation": "add",
-        "memory": {
-            **memory,
-            "evidence": [
-                {key: value for key, value in item.items() if key != "observed_at"}
-                for item in evidence
-            ],
-        },
+
+
+def _trusted_evidence(
+    batch: MemoryBatch,
+    message_indexes: tuple[int, ...],
+    observed_at: datetime,
+) -> list[dict[str, Any]]:
+    evidence_by_index = {
+        message.message_index: message.content
+        for message in batch.messages
+        if message.evidence_eligible
     }
-    fingerprint = hashlib.sha256(
-        json.dumps(
-            fingerprint_payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    return {
-        "operation_index": operation_index,
-        "operation_fingerprint": fingerprint,
-        "operation": "add",
-        "memory": memory,
-    }
+    try:
+        return [
+            {
+                "conversation_id": batch.conversation_id,
+                "message_index": message_index,
+                "exact_quote": evidence_by_index[message_index],
+                "observed_at": observed_at.isoformat(),
+            }
+            for message_index in message_indexes
+        ]
+    except KeyError as error:
+        raise ValueError("v3 memory requires eligible user evidence") from error
+
+
+def _without_observation_time(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _without_observation_time(item)
+            for key, item in value.items()
+            if key != "observed_at"
+        }
+    if isinstance(value, list):
+        return [_without_observation_time(item) for item in value]
+    return value
 
 
 def _isoformat(value: datetime | None) -> str | None:
