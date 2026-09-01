@@ -13,9 +13,11 @@ from agent.memory_engine.data_points.extraction.prompts import (
 )
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
+from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (
+    BACKGROUND_COGNITION,
     DATA_POINT_EXTRACT,
     MEMORY_SHADOW_EXTRACT,
     PROFILE_EXTRACT,
@@ -41,14 +43,18 @@ async def analyze_background_cognition(
     conversation_id: str,
     model: str | None = None,
     timeout_seconds: float | None = None,
+    memory_version: int = 2,
 ) -> dict[str, Any]:
     """Run the single combined memory-and-thread analytical request."""
+    request_kind = (
+        BACKGROUND_COGNITION if memory_version == 3 else MEMORY_SHADOW_EXTRACT
+    )
     provider = _provider_name()
     logger.info("agent.cognition.background provider=%s chars=%s", provider, len(extraction_text))
     if provider == "mock":
         _record_usage_event(
             conversation_id=conversation_id,
-            request_kind=MEMORY_SHADOW_EXTRACT,
+            request_kind=request_kind,
             provider=provider,
             model=model or "mock",
             success=True,
@@ -67,11 +73,15 @@ async def analyze_background_cognition(
         }
     content = await provider_chat(
         provider=provider,
-        system_prompt=BACKGROUND_COGNITION_SYSTEM_PROMPT,
+        system_prompt=(
+            BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+            if memory_version == 3
+            else BACKGROUND_COGNITION_SYSTEM_PROMPT
+        ),
         messages=[{"role": "user", "content": extraction_text}],
         temperature=0,
         conversation_id=conversation_id,
-        request_kind=MEMORY_SHADOW_EXTRACT,
+        request_kind=request_kind,
         model=model,
         timeout_seconds=timeout_seconds,
         response_format={"type": "json_object"},
