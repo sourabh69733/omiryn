@@ -10,9 +10,11 @@ from .models import (
     MemoryStatus,
     MemoryUse,
 )
+from .retrieval import DEFAULT_REPLY_MEMORY_LIMIT, retrieve_agent_memories_for_reply
 
 __all__ = [
     "MEMORY_SCHEMA_VERSION",
+    "DEFAULT_REPLY_MEMORY_LIMIT",
     "MemoryEvidence",
     "MemoryKind",
     "MemoryPurpose",
@@ -20,4 +22,5 @@ __all__ = [
     "MemorySensitivity",
     "MemoryStatus",
     "MemoryUse",
+    "retrieve_agent_memories_for_reply",
 ]
