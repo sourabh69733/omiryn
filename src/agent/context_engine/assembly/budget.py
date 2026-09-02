@@ -15,6 +15,7 @@ SOURCE_TYPE_PRIORITY = {
     # The current inline thread contract requires candidate IDs to be present.
     # Keep this above optional memories until thread classification is decoupled.
     "conversation_threads": 120,
+    "agent_memories_v3": 110,
     "agent_behavior_rules": 115,
     "data_points": 100,
     "friend_style": 90,
@@ -26,6 +27,7 @@ SOURCE_TYPE_PRIORITY = {
 }
 SOURCE_TYPE_CHAR_LIMIT = {
     "conversation_threads": 1800,
+    "agent_memories_v3": 1400,
     "agent_behavior_rules": 1400,
     "data_points": 1200,
     "friend_style": STYLE_CONTEXT_CHAR_LIMIT,
