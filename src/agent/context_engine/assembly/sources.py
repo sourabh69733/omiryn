@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
+from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
 from agent.context_engine.conversation_engine.state import (
@@ -16,8 +18,11 @@ from agent.context_engine.conversation_engine.understanding.rules.intent import 
 )
 from agent.context_engine.shared.text import memory_terms, normalized_memory_text, source_identity
 from agent.memory_engine.data_points import rank_data_points_for_context
+from agent.memory_engine.memories import retrieve_agent_memories_for_reply
 from agent.memory_engine.behavior.retrieval import retrieve_agent_behavior_rules_for_context
-from agent.memory_engine.data_points.retrieval.profile_facts import retrieve_profile_facts_for_context
+from agent.memory_engine.data_points.retrieval.profile_facts import (
+    retrieve_profile_facts_for_context,
+)
 from agent.memory_engine.data_points.retrieval.whatsapp import (
     retrieve_whatsapp_imports,
     retrieve_whatsapp_memory,
@@ -34,6 +39,7 @@ DATA_POINT_CONTEXT_LIMIT = 4
 WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT = 2
 WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
+AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 AGENT_BEHAVIOR_RULES_SOURCE_TYPE = "agent_behavior_rules"
 WHATSAPP_STRUCTURED_SOURCE_TYPE = "whatsapp_structured_context"
 MEMORY_TRIGGER_TERMS = {
@@ -131,7 +137,10 @@ def build_reply_context_sources(
     selected_styles = _selected_style_sources(all_sources, style_source_id)
     retrieved_sources = _relevant_memory_sources(attached_sources, user_text)
     agent_behavior_sources = _agent_behavior_rule_context_sources(user_id)
-    data_point_sources = _data_point_context_sources(user_id, user_text)
+    if agent_pipeline_config().memory_contract_version == 3:
+        durable_memory_sources = _agent_memory_v3_context_sources(user_id, user_text)
+    else:
+        durable_memory_sources = _data_point_context_sources(user_id, user_text)
     structured_whatsapp_sources = _structured_whatsapp_context_sources(
         all_sources,
         attached_sources,
@@ -151,18 +160,24 @@ def build_reply_context_sources(
         selected_style_ids = {_source_identity(source) for source in selected_styles}
         memory_sources = continuity_sources + _ordered_memory_context_sources(
             agent_behavior_sources,
-            data_point_sources,
+            durable_memory_sources,
             structured_whatsapp_sources,
             query_intent,
         )
-        return selected_styles + memory_sources + [
-            source for source in retrieved_sources if _source_identity(source) not in selected_style_ids
-        ]
+        return (
+            selected_styles
+            + memory_sources
+            + [
+                source
+                for source in retrieved_sources
+                if _source_identity(source) not in selected_style_ids
+            ]
+        )
 
     return continuity_sources + (
         _ordered_memory_context_sources(
             agent_behavior_sources,
-            data_point_sources,
+            durable_memory_sources,
             structured_whatsapp_sources,
             query_intent,
         )
@@ -272,6 +287,37 @@ def _data_point_context_sources(user_id: str | None, user_text: str) -> list[dic
             "metadata": {
                 "point_count": len(ranked_points),
                 "point_ids": [point.get("id") for point in ranked_points],
+            },
+        }
+    ]
+
+
+def _agent_memory_v3_context_sources(
+    user_id: str | None,
+    user_text: str,
+) -> list[dict[str, Any]]:
+    if not user_id:
+        return []
+    memories = retrieve_agent_memories_for_reply(user_id, user_text)
+    if not memories:
+        return []
+    lines = [
+        "Relevant durable memories about the user.",
+        "Use only when helpful; do not expose memory IDs, kinds, or internal keys.",
+        "A relationship memory describes lived history, not a desired partner trait.",
+    ]
+    for memory in memories:
+        value = json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True)
+        lines.append(f"- {memory.get('kind')}: {memory.get('key')} = {value}")
+    return [
+        {
+            "source_type": AGENT_MEMORIES_V3_SOURCE_TYPE,
+            "title": "Relevant durable memories",
+            "content": "\n".join(lines),
+            "metadata": {
+                "memory_count": len(memories),
+                "memory_ids": [memory.get("id") for memory in memories],
+                "memory_kinds": [memory.get("kind") for memory in memories],
             },
         }
     ]
@@ -393,9 +439,7 @@ def _structured_whatsapp_context_source(
     selected_sender = str(whatsapp_import.get("selected_sender") or "")
     ranked_chunks = _rank_whatsapp_chunks(chunks, user_text)
     chunk_limit = (
-        WHATSAPP_FUEL_RETRIEVAL_LIMIT
-        if conversation_fuel
-        else WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT
+        WHATSAPP_FUEL_RETRIEVAL_LIMIT if conversation_fuel else WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT
     )
     content = _structured_whatsapp_context_text(
         whatsapp_import,
@@ -421,13 +465,13 @@ def _structured_whatsapp_context_source(
 
 def _ordered_memory_context_sources(
     agent_behavior_sources: list[dict[str, Any]],
-    data_point_sources: list[dict[str, Any]],
+    durable_memory_sources: list[dict[str, Any]],
     structured_whatsapp_sources: list[dict[str, Any]],
     query_intent: ContextQueryIntent,
 ) -> list[dict[str, Any]]:
     if query_intent.prefer_structured_whatsapp:
-        return agent_behavior_sources + structured_whatsapp_sources + data_point_sources
-    return agent_behavior_sources + data_point_sources + structured_whatsapp_sources
+        return agent_behavior_sources + structured_whatsapp_sources + durable_memory_sources
+    return agent_behavior_sources + durable_memory_sources + structured_whatsapp_sources
 
 
 def _with_query_intent(
@@ -485,7 +529,9 @@ def _structured_whatsapp_context_text(
         for profile in selected_profiles[:4]:
             summary = profile.get("summary") or {}
             terms = ", ".join(summary.get("topic_terms") or summary.get("frequent_terms") or [])
-            samples = "; ".join(str(sample) for sample in (profile.get("sample_messages") or [])[:3])
+            samples = "; ".join(
+                str(sample) for sample in (profile.get("sample_messages") or [])[:3]
+            )
             sections.append(
                 "- "
                 f"{profile['sender']}: avg_words={summary.get('average_words')}; "
