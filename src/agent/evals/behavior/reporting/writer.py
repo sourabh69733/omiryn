@@ -92,9 +92,17 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
     run = payload.get("run") or {}
     companion = payload.get("companion") or {}
     calibration = payload.get("judge_calibration") or {}
-    is_memory_eval = payload.get("stage") in {"memory_shadow_eval", "memory_judge_calibration"}
+    is_memory_eval = payload.get("stage") in {
+        "memory_shadow_eval",
+        "memory_v3_eval",
+        "memory_judge_calibration",
+    }
     lines = [
-        "# Background Memory Evaluation Report"
+        (
+            "# Canonical V3 Memory Evaluation Report"
+            if payload.get("stage") == "memory_v3_eval"
+            else "# Background Memory Evaluation Report"
+        )
         if is_memory_eval
         else "# Companion Evaluation Report",
         "",
@@ -133,7 +141,7 @@ def render_markdown_report(payload: dict[str, Any]) -> str:
         lines.extend(_conversation_judge_calibration_markdown(payload))
     elif payload.get("stage") == "thread_management_shadow_eval":
         lines.extend(_thread_management_shadow_markdown(payload))
-    elif payload.get("stage") == "memory_shadow_eval":
+    elif payload.get("stage") in {"memory_shadow_eval", "memory_v3_eval"}:
         lines.extend(_memory_shadow_markdown(payload))
     elif payload.get("stage") == "memory_judge_calibration":
         lines.extend(_memory_judge_calibration_markdown(calibration))
@@ -481,14 +489,17 @@ def _thread_management_shadow_markdown(payload: dict[str, Any]) -> list[str]:
 def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
     """Render memory behavior in simple terms while retaining exact evidence indexes."""
     summary = payload.get("summary") or {}
+    is_v3 = payload.get("stage") == "memory_v3_eval"
     lines = [
-        "## Background-memory summary",
+        "## Canonical-memory summary" if is_v3 else "## Background-memory summary",
         "",
         f"**Scenarios:** {summary.get('total', 0)}",
         f"**Passed:** {summary.get('passed', 0)}",
         f"**Failed:** {summary.get('failed', 0)}",
         f"**Invalid model responses:** {summary.get('structural_failures', 0)}",
-        "**Live memory writes:** disabled (shadow evaluation)",
+        "**Live memory writes:** disabled (evaluation does not persist proposals)"
+        if is_v3
+        else "**Live memory writes:** disabled (shadow evaluation)",
     ]
     for scenario in payload.get("scenarios", []):
         scenario_input = scenario.get("input") or {}
@@ -520,7 +531,7 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
             for memory in existing:
                 lines.append(
                     f"- `{memory.get('id', 'unknown')}` — "
-                    f"{memory.get('label', 'unlabelled')}: {memory.get('value')!r}"
+                    f"{memory.get('label') or memory.get('key') or 'unlabelled'}: {memory.get('value')!r}"
                 )
         else:
             lines.append("- None.")
@@ -539,10 +550,16 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
         lines.append("**Expected operations:**")
         if expected_operations:
             for operation in expected_operations:
+                memory_type = (
+                    operation.get("memory_kind")
+                    or operation.get("data_point_type")
+                    or "existing memory"
+                )
+                purposes = operation.get("required_purposes") or []
+                purpose_text = f" / purposes={purposes}" if purposes else ""
                 lines.append(
                     "- "
-                    f"{operation.get('operation')} / "
-                    f"{operation.get('data_point_type') or 'existing memory'} / "
+                    f"{operation.get('operation')} / {memory_type}{purpose_text} / "
                     f"concepts={operation.get('value_concepts') or []} / "
                     f"evidence={operation.get('evidence_message_indexes') or []}"
                 )
@@ -552,10 +569,16 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
         if optional_operations:
             lines.append("**Optional valid operations:**")
             for operation in optional_operations:
+                memory_type = (
+                    operation.get("memory_kind")
+                    or operation.get("data_point_type")
+                    or "existing memory"
+                )
+                purposes = operation.get("required_purposes") or []
+                purpose_text = f" / purposes={purposes}" if purposes else ""
                 lines.append(
                     "- "
-                    f"{operation.get('operation')} / "
-                    f"{operation.get('data_point_type') or 'existing memory'} / "
+                    f"{operation.get('operation')} / {memory_type}{purpose_text} / "
                     f"concepts={operation.get('value_concepts') or []} / "
                     f"evidence={operation.get('evidence_message_indexes') or []}"
                 )
@@ -564,10 +587,18 @@ def _memory_shadow_markdown(payload: dict[str, Any]) -> list[str]:
         if observed_operations:
             for operation in observed_operations:
                 target = operation.get("target_memory_id") or "new memory"
+                memory_type = (
+                    operation.get("memory_kind")
+                    or operation.get("data_point_type")
+                    or "existing memory"
+                )
+                purposes = operation.get("purposes") or []
+                purpose_text = f" / purposes={purposes}" if purposes else ""
+                label = operation.get("label") or operation.get("key") or "unlabelled"
                 lines.append(
                     "- "
-                    f"{operation.get('operation')} / {operation.get('data_point_type')} / "
-                    f"{operation.get('label')}: {operation.get('value')!r} / "
+                    f"{operation.get('operation')} / {memory_type}{purpose_text} / "
+                    f"{label}: {operation.get('value')!r} / "
                     f"target={target} / evidence={operation.get('evidence_message_indexes') or []}"
                 )
         else:
@@ -695,10 +726,15 @@ def _simple_summary(payload: dict[str, Any]) -> str:
             f"{summary.get('passed', 0)} matched expectations and "
             f"{summary.get('failed', 0)} did not. No proposed changes were persisted."
         )
-    if payload.get("stage") == "memory_shadow_eval":
+    if payload.get("stage") in {"memory_shadow_eval", "memory_v3_eval"}:
         summary = payload.get("summary") or {}
+        lane = (
+            "canonical V3 memory model"
+            if payload.get("stage") == "memory_v3_eval"
+            else "background memory model"
+        )
         return (
-            f"The background memory model analyzed {summary.get('total', 0)} realistic "
+            f"The {lane} analyzed {summary.get('total', 0)} realistic "
             f"conversation batches: {summary.get('passed', 0)} matched expectations and "
             f"{summary.get('failed', 0)} did not. No live memories were changed."
         )
@@ -760,7 +796,7 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             + ", ".join(failed)
             + "."
         )
-    if payload.get("stage") == "memory_shadow_eval":
+    if payload.get("stage") in {"memory_shadow_eval", "memory_v3_eval"}:
         summary = payload.get("summary") or {}
         if payload.get("passed"):
             return "Every selected memory proposal matched the expected safe behavior."
@@ -770,9 +806,9 @@ def _bottom_line(payload: dict[str, Any]) -> str:
             if not item.get("passed")
         ]
         return (
-            f"Background memory needs improvement in {len(failed)} scenario(s): "
+            f"Memory extraction needs improvement in {len(failed)} scenario(s): "
             + ", ".join(failed)
-            + ". Live writes should remain disabled."
+            + "."
         )
     if payload.get("passed"):
         return "This companion configuration passed every selected release scenario."
@@ -803,6 +839,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "thread_management_shadow_eval": "thread_shadow",
         "memory_judge_calibration": "memory_judge_calibration",
         "memory_shadow_eval": "memory_shadow",
+        "memory_v3_eval": "memory_v3",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -843,6 +880,7 @@ def _append_history(
                     "simulated_conversation_suite",
                     "thread_management_shadow_eval",
                     "memory_shadow_eval",
+                    "memory_v3_eval",
                 }
                 else (
                     f"{payload.get('conversation_judge_calibration', {}).get('completed_cases', 0)}/"
@@ -884,7 +922,11 @@ def _append_history(
 
 
 def _history_score(payload: dict[str, Any]) -> str:
-    if payload.get("stage") in {"thread_management_shadow_eval", "memory_shadow_eval"}:
+    if payload.get("stage") in {
+        "thread_management_shadow_eval",
+        "memory_shadow_eval",
+        "memory_v3_eval",
+    }:
         summary = payload.get("summary") or {}
         total = summary.get("total", 0)
         passed = summary.get("passed", 0)
@@ -1017,8 +1059,13 @@ def _memory_judge_calibration_markdown(calibration: dict[str, Any]) -> list[str]
         proposals = case.get("proposed_operations") or []
         if proposals:
             for operation in proposals:
+                memory_type = (
+                    operation.get("memory_kind") or operation.get("data_point_type") or "unknown"
+                )
+                purposes = operation.get("purposes") or []
+                purpose_text = f" / purposes={purposes}" if purposes else ""
                 lines.append(
-                    f"- {operation.get('data_point_type', 'unknown')} / "
+                    f"- {memory_type}{purpose_text} / "
                     f"{operation.get('label') or operation.get('key') or 'unlabelled'}: "
                     f"{operation.get('value')!r}"
                 )

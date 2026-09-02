@@ -65,9 +65,14 @@ def _render_event(event: EvalEvent) -> str | None:
         ]
         lines.extend(f"    Evidence: {message}" for message in data.get("evidence_messages") or [])
         for operation in data.get("operations") or []:
+            memory_type = (
+                operation.get("memory_kind") or operation.get("data_point_type") or "unknown"
+            )
+            purposes = operation.get("purposes") or []
+            purpose_text = f" / purposes={purposes}" if purposes else ""
             lines.append(
                 "    Proposed memory: "
-                f"{operation.get('data_point_type', 'unknown')} / "
+                f"{memory_type}{purpose_text} / "
                 f"{operation.get('label') or operation.get('key') or 'unlabelled'} = "
                 f"{operation.get('value')!r}"
             )
@@ -261,9 +266,8 @@ def _render_event(event: EvalEvent) -> str | None:
     if event.kind == "memory_scenario_completed":
         status = "PASS" if data["passed"] else "FAIL"
         finding = "; ".join(data.get("findings") or [])
-        return (
-            f"    Memory result: {status} — {data['operation_count']} operation(s)."
-            + (f"\n    {finding}" if finding else "")
+        return f"    Memory result: {status} — {data['operation_count']} operation(s)." + (
+            f"\n    {finding}" if finding else ""
         )
     if event.kind == "evaluation_completed":
         return (
@@ -274,10 +278,7 @@ def _render_event(event: EvalEvent) -> str | None:
     if event.kind == "simulated_conversation_completed":
         passed = data.get("passed")
         status = "PENDING independent judge" if passed is None else ("PASS" if passed else "FAIL")
-        return (
-            f"\nConversation captured: {data['turn_count']} turns. "
-            f"Consensus result: {status}."
-        )
+        return f"\nConversation captured: {data['turn_count']} turns. Consensus result: {status}."
     return None
 
 
