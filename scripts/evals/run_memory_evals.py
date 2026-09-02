@@ -8,7 +8,9 @@ import asyncio
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 
@@ -20,9 +22,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # Evaluation usage events must never pollute the application database by default.
-os.environ["DATABASE_URL"] = (
-    EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_memory_eval_test.db"
-)
+os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_memory_eval_test.db"
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
 from agent.evals.behavior.reporting.live import TerminalProgressReporter  # noqa: E402
@@ -30,6 +30,7 @@ from agent.evals.behavior.reporting.writer import (  # noqa: E402
     attach_run_metadata,
     save_evaluation_reports,
 )
+from agent.config import agent_pipeline_config  # noqa: E402
 from agent.evals.memory import (  # noqa: E402
     ProviderMemoryEvidenceJudge,
     calibration_report_payload,
@@ -37,7 +38,17 @@ from agent.evals.memory import (  # noqa: E402
     list_memory_shadow_scenarios,
     run_memory_judge_calibration,
     run_memory_shadow_scenario,
-    scenario_result_payload,
+    scenario_result_payload as v2_scenario_result_payload,
+)
+from agent.evals.memory.calibration import MEMORY_JUDGE_CALIBRATION_CASES  # noqa: E402
+from agent.evals.memory.v3 import (  # noqa: E402
+    get_memory_v3_scenario,
+    list_memory_v3_scenarios,
+    run_memory_v3_scenario,
+    scenario_result_payload as v3_scenario_result_payload,
+)
+from agent.evals.memory.v3.calibration import (  # noqa: E402
+    MEMORY_V3_JUDGE_CALIBRATION_CASES,
 )
 from agent.providers.gateway.registry import (  # noqa: E402
     PROVIDER_NAMES,
@@ -93,7 +104,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout-seconds",
         type=float,
-        default=float(os.getenv("MEMORY_BACKGROUND_V2_TIMEOUT_SECONDS", "120")),
+        default=float(
+            os.getenv(
+                "MEMORY_BACKGROUND_TIMEOUT_SECONDS",
+                os.getenv("MEMORY_BACKGROUND_V2_TIMEOUT_SECONDS", "120"),
+            )
+        ),
         help="Timeout for each model call.",
     )
     parser.add_argument("--reset", action="store_true", help="Reset the evaluation database.")
@@ -110,12 +126,58 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _selected_scenarios(args: argparse.Namespace):
+@dataclass(frozen=True)
+class MemoryEvaluationContract:
+    """Version-selected evaluator behavior without adding another public flag."""
+
+    memory_version: int
+    stage: str
+    suite_label: str
+    prompt_version: str
+    get_scenario: Callable[[str], Any]
+    list_scenarios: Callable[..., tuple[Any, ...]]
+    run_scenario: Callable[..., Any]
+    result_payload: Callable[..., dict[str, Any]]
+    calibration_cases: tuple[Any, ...]
+
+
+def _evaluation_contract() -> MemoryEvaluationContract:
+    if agent_pipeline_config().memory_contract_version == 3:
+        return MemoryEvaluationContract(
+            memory_version=3,
+            stage="memory_v3_eval",
+            suite_label="Canonical V3 memory suite",
+            prompt_version="memory-v3",
+            get_scenario=get_memory_v3_scenario,
+            list_scenarios=list_memory_v3_scenarios,
+            run_scenario=run_memory_v3_scenario,
+            result_payload=v3_scenario_result_payload,
+            calibration_cases=MEMORY_V3_JUDGE_CALIBRATION_CASES,
+        )
+    return MemoryEvaluationContract(
+        memory_version=2,
+        stage="memory_shadow_eval",
+        suite_label="Memory shadow suite",
+        prompt_version="memory-v2",
+        get_scenario=get_memory_shadow_scenario,
+        list_scenarios=list_memory_shadow_scenarios,
+        run_scenario=run_memory_shadow_scenario,
+        result_payload=v2_scenario_result_payload,
+        calibration_cases=MEMORY_JUDGE_CALIBRATION_CASES,
+    )
+
+
+def _selected_scenarios(
+    args: argparse.Namespace,
+    *,
+    contract: MemoryEvaluationContract | None = None,
+):
+    selected_contract = contract or _evaluation_contract()
     if args.scenario_ids and args.scenario_tags:
         raise ValueError("Use --scenario or --scenario-tag, not both.")
     if args.scenario_ids:
-        return tuple(get_memory_shadow_scenario(item) for item in args.scenario_ids)
-    return list_memory_shadow_scenarios(tags=tuple(args.scenario_tags or ()))
+        return tuple(selected_contract.get_scenario(item) for item in args.scenario_ids)
+    return selected_contract.list_scenarios(tags=tuple(args.scenario_tags or ()))
 
 
 async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> dict:
@@ -124,7 +186,8 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
     else:
         init_db()
     os.environ["AGENT_PROVIDER"] = args.provider
-    scenarios = _selected_scenarios(args)
+    contract = _evaluation_contract()
+    scenarios = _selected_scenarios(args, contract=contract)
     if not scenarios:
         raise ValueError("No memory scenarios matched the selection.")
     semantic_judge = None
@@ -135,12 +198,14 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             model=args.judge_model,
             timeout_seconds=args.timeout_seconds,
             event_sink=reporter,
+            memory_version=contract.memory_version,
         )
     if args.calibration_only and semantic_judge is None:
         raise ValueError("--calibration-only requires --judge-provider or --judge-model.")
     if semantic_judge is not None:
         calibration = await run_memory_judge_calibration(
             semantic_judge,
+            cases=contract.calibration_cases,
             event_sink=reporter,
         )
         calibration_payload = calibration_report_payload(calibration)
@@ -154,23 +219,21 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
 
     records = []
     for scenario in scenarios:
-        result = await run_memory_shadow_scenario(
+        result = await contract.run_scenario(
             scenario=scenario,
             model=args.model,
             timeout_seconds=args.timeout_seconds,
             event_sink=reporter,
             semantic_judge=semantic_judge,
         )
-        records.append(scenario_result_payload(result, scenario=scenario))
+        records.append(contract.result_payload(result, scenario=scenario))
     passed = sum(record["passed"] is True for record in records)
-    structural_failures = sum(
-        not record["observed"]["structurally_valid"] for record in records
-    )
+    structural_failures = sum(not record["observed"]["structurally_valid"] for record in records)
     judges = ["deterministic expected-versus-proposed memory behavior"]
     if semantic_judge is not None:
         judges.append(semantic_judge.judge_name)
     return {
-        "stage": "memory_shadow_eval",
+        "stage": contract.stage,
         "passed": passed == len(records),
         "judges": judges,
         "judge_calibration": calibration_payload,
@@ -185,8 +248,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
                 for record in records
             ),
             "semantic_judge_errors": sum(
-                bool(record["observed"].get("semantic_judge_error"))
-                for record in records
+                bool(record["observed"].get("semantic_judge_error")) for record in records
             ),
             "live_memory_writes": False,
         },
@@ -199,15 +261,17 @@ def _output_dir(path: Path) -> Path:
 
 
 def _print_scenarios(*, tags: tuple[str, ...]) -> None:
-    scenarios = list_memory_shadow_scenarios(tags=tags)
+    contract = _evaluation_contract()
+    scenarios = contract.list_scenarios(tags=tags)
     if not scenarios:
         print("No memory scenarios matched the selected tags.")
         return
-    print("Available memory shadow scenarios:")
+    print(f"Available {contract.suite_label.lower()} scenarios:")
     for scenario in scenarios:
         expected = (
             ", ".join(
-                f"{operation.operation}:{operation.data_point_type or 'existing'}"
+                f"{operation.operation}:"
+                f"{getattr(operation, 'memory_kind', None) or getattr(operation, 'data_point_type', None) or 'existing'}"
                 for operation in scenario.expected_operations
             )
             or "no change"
@@ -239,6 +303,7 @@ def main() -> int:
             "judges": [],
         }
     calibration_stage = payload.get("stage") == "memory_judge_calibration"
+    contract = _evaluation_contract()
     metadata_provider = args.judge_provider or args.provider if calibration_stage else args.provider
 
     resolved_model = (
@@ -251,11 +316,19 @@ def main() -> int:
         stats=reporter.stats(),
         companion_provider=metadata_provider,
         companion_model=resolved_model,
-        prompt_version="memory-judge-v1" if calibration_stage else "memory-v2",
+        prompt_version=(
+            f"memory-judge-v{contract.memory_version}"
+            if calibration_stage
+            else contract.prompt_version
+        ),
         companion_agent_name=(
             "Memory evidence judge calibration"
             if calibration_stage
-            else "Background memory extractor"
+            else (
+                "V3 background cognition"
+                if contract.memory_version == 3
+                else "Background memory extractor"
+            )
         ),
     )
     if not args.no_save:
@@ -292,7 +365,7 @@ def main() -> int:
         summary = payload["summary"]
         status = "PASS" if payload["passed"] else "FAIL"
         print(
-            f"\nMemory shadow suite: {status}; {summary['passed']}/{summary['total']} passed; "
+            f"\n{contract.suite_label}: {status}; {summary['passed']}/{summary['total']} passed; "
             f"{summary['failed']} failed; {summary['structural_failures']} structural failures."
         )
     return 0 if payload["passed"] else 1
