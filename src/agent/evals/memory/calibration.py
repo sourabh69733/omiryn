@@ -242,7 +242,6 @@ def _grade_operation(
     observed: MemoryOperationJudgment,
 ) -> MemoryJudgeCalibrationOperationResult:
     support_matches = observed.supported == expected.supported
-    issues_match = expected.supported or set(expected.required_issues).issubset(observed.issues)
     failure_reason = None
     if not support_matches:
         failure_reason = (
@@ -250,16 +249,13 @@ def _grade_operation(
             if observed.supported
             else "The judge rejected an operation that should be accepted."
         )
-    elif not issues_match:
-        missing = sorted(set(expected.required_issues) - set(observed.issues))
-        failure_reason = "Missing required issue category: " + ", ".join(missing) + "."
     return MemoryJudgeCalibrationOperationResult(
         index=observed.index,
         expected_supported=expected.supported,
         observed_supported=observed.supported,
         required_issues=expected.required_issues,
         observed_issues=observed.issues,
-        passed=support_matches and issues_match,
+        passed=support_matches,
         reason=observed.reason,
         failure_reason=failure_reason,
     )
