@@ -87,3 +87,11 @@ Synthetic evaluation scores are grouped by day for comparison.
 | 17:16:44 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
 | 17:54:06 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
 | 18:09:06 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+
+## 2026-09-03
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 02:32:53 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+| 22:04:35 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
+| 22:13:54 | FAIL | Memory judge calibration | Qwen/Qwen3.5-397B-A17B | — | 8/8 judge checks |
