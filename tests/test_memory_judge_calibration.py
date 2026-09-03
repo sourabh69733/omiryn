@@ -123,7 +123,7 @@ class MemoryJudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(conversation["user_id"], user_id)
         self.assertEqual(set(judge.conversation_ids), {conversation["id"]})
 
-    async def test_rejection_with_wrong_issue_fails_calibration(self) -> None:
+    async def test_rejection_with_equivalent_issue_remains_a_diagnostic(self) -> None:
         case = MemoryJudgeCalibrationCase(
             id="wrong_reason",
             messages=({"role": "user", "content": "Explain decorators."},),
@@ -153,9 +153,10 @@ class MemoryJudgeCalibrationTest(unittest.IsolatedAsyncioTestCase):
         )
         report = await run_memory_judge_calibration(judge, cases=(case,))
 
-        self.assertFalse(report.passed)
+        self.assertTrue(report.passed)
         self.assertEqual(report.issue_mismatches, 1)
-        self.assertIn("incidental_content", report.cases[0].failure_reason)
+        self.assertTrue(report.cases[0].passed)
+        self.assertIsNone(report.cases[0].failure_reason)
 
 
 class MemoryJudgeCalibrationReportingTest(unittest.TestCase):
