@@ -95,3 +95,10 @@ Synthetic evaluation scores are grouped by day for comparison.
 | 02:32:53 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
 | 22:04:35 | FAIL | Memory judge calibration | deepseek-ai/DeepSeek-V4-Flash-0731 | — | 8/8 judge checks |
 | 22:13:54 | FAIL | Memory judge calibration | Qwen/Qwen3.5-397B-A17B | — | 8/8 judge checks |
+
+## 2026-09-04
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 17:47:28 | FAIL | Memory v3 eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 46% | 6/13 scenarios |
+| 18:38:43 | FAIL | Memory judge calibration | Qwen/Qwen3.5-397B-A17B | — | 17/17 judge checks |
