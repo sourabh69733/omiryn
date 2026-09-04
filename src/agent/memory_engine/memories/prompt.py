@@ -39,20 +39,28 @@ V3 memory rules:
 - New evidence-eligible user messages are the only source of durable memories.
 - Context messages, existing memories and handoff only resolve meaning and prevent duplicates.
 - Store personally true, useful information—not discussed subjects, examples, code or assistant claims.
-- semantic stores stable knowledge; episodic stores a specific lived event; relationship stores the
-  user's experience or pattern with a person; procedural stores an explicit or repeatedly supported
-  preference for how the companion should interact.
+- semantic stores stable knowledge, including explicit partner preferences; episodic stores a
+  specific lived event; relationship stores the user's lived history or interaction pattern with a
+  specific person or relationship; procedural stores an explicit or repeatedly supported preference
+  for how the companion should interact.
 - purposes describe utility independently of memory_kind. A relationship memory is not automatically
   a matching preference.
 - Use profile for facts describing the user, matching for explicit compatibility-relevant information,
   and personalization for information that helps the companion interact better.
 - Be concrete: preserve named people, places, preferences and outcomes when explicitly stated.
+- Preserve the scope and tense of the evidence. Do not turn a project into a profession, a past shared
+  behavior into a current personality trait, or a desired partner quality into the user's own trait.
 - Return no memory for uncertainty, incidental mentions, generic knowledge, or unsupported inference.
 - When an active memory already expresses the same meaning, reinforce it; never add a duplicate.
 - When new evidence corrects an active memory, supersede it with a complete corrected replacement.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.
 - Never target an ID outside existing_memories and never target one memory twice in a batch.
-- occurred_at is the event time, not extraction time. Use null unless an event time is supported.
+- Relationship history and intimate interpersonal details are at least sensitive. Medical, biometric,
+  sexual, financial and similarly high-risk private facts are highly_sensitive.
+- occurred_at is the event time, not extraction time. Use null for relative or ambiguous dates; emit a
+  timestamp only when the evidence supports an unambiguous timezone-aware ISO-8601 value.
+- Before returning each operation, verify that the cited user evidence directly supports its kind,
+  purposes, key, value, sensitivity and time fields. Omit the operation if any field requires guessing.
 - Return at most 12 memory operations.
 """
 
