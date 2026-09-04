@@ -326,6 +326,89 @@ MEMORY_V3_SCENARIOS = (
         tags=("memory_v3", "lifecycle", "retract", "correction"),
     ),
     MemoryV3Scenario(
+        id="preserve_specific_work_activity_without_job_inference",
+        description="Work activity should remain specific without inventing an occupation.",
+        messages=(
+            {"role": "user", "content": "At work I design backend systems and mentor two engineers."},
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="semantic",
+                required_purposes=("profile",),
+                forbidden_purposes=("matching",),
+                value_concepts=("backend", "mentor"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "semantic", "profile", "specific_value", "work"),
+    ),
+    MemoryV3Scenario(
+        id="preserve_relationship_participants_pattern_and_outcome",
+        description="Relationship memory should retain participants, behavior, and outcome.",
+        messages=(
+            {
+                "role": "user",
+                "content": "My former roommate and I avoided money talks, so small bills became arguments.",
+            },
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="relationship",
+                required_purposes=("personalization",),
+                forbidden_purposes=("matching",),
+                value_concepts=("roommate", "money", "arguments"),
+                evidence_message_indexes=(0,),
+                sensitivity="sensitive",
+            ),
+        ),
+        tags=("memory_v3", "relationship", "personalization", "specific_value"),
+    ),
+    MemoryV3Scenario(
+        id="keep_partner_preference_semantic_and_specific",
+        description="A partner preference is semantic matching knowledge, not procedure.",
+        messages=(
+            {
+                "role": "user",
+                "content": "I connect best with someone curious who can disagree gently.",
+            },
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="semantic",
+                required_purposes=("matching",),
+                value_concepts=("curious", "disagree", "gently"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "semantic", "matching", "specific_value"),
+    ),
+    MemoryV3Scenario(
+        id="preserve_episode_activity_place_and_subject",
+        description="An episode should retain the concrete event rather than a vague topic.",
+        messages=(
+            {
+                "role": "user",
+                "content": "During my Jaipur trip I spent a morning volunteering with rescue dogs.",
+            },
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="episodic",
+                required_purposes=("personalization",),
+                value_concepts=("jaipur", "volunteering", "dogs"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "episodic", "personalization", "specific_value"),
+    ),
+    MemoryV3Scenario(
         id="classify_explicit_medical_fact_as_highly_sensitive",
         description="If an explicit medical fact is stored, it must carry the strongest sensitivity class.",
         messages=({"role": "user", "content": "I have a severe peanut allergy."},),

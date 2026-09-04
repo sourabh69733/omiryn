@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.memory_engine.memories.taxonomy import V3_MEMORY_TAXONOMY_GUIDANCE
 from agent.providers.gateway.router import provider_chat
 from agent.providers.shared.json_utils import _parse_json_object
 
@@ -189,8 +190,7 @@ def build_memory_evidence_judge_request(
     if memory_version not in {2, 3}:
         raise ValueError("Memory evidence judge version must be 2 or 3.")
     taxonomy = (
-        """Memory kinds: semantic, episodic, relationship, procedural.
-Purposes: profile, matching, personalization. Purposes are independent of memory kind.
+        V3_MEMORY_TAXONOMY_GUIDANCE + """
 Check that sensitivity (standard, sensitive, highly_sensitive) is appropriate, especially for health,
 sexuality, religion, politics, finances, precise location, and intimate relationships."""
         if memory_version == 3
