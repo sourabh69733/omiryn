@@ -14,6 +14,50 @@ from agent.evals.memory.judge import (
 
 
 class MemorySemanticJudgeTest(unittest.TestCase):
+    def test_v3_context_is_separate_from_cited_user_evidence(self) -> None:
+        messages = (
+            {"role": "user", "content": "I want a calm partner."},
+            {"role": "assistant", "content": "You also like hiking."},
+            {"role": "user", "content": "Funny too, but not loud."},
+            {"role": "user", "content": "Later unrelated message."},
+        )
+        _, raw = build_memory_evidence_judge_request(
+            messages=messages,
+            operations=({"evidence_message_indexes": [2]},),
+            memory_version=3,
+        )
+        payload = json.loads(raw)
+        self.assertEqual(payload["evidence_messages"], [
+            {"message_index": 2, "content": "Funny too, but not loud."},
+        ])
+        self.assertEqual(payload["context_messages"], [
+            {"message_index": 0, "role": "user", "content": "I want a calm partner.",
+             "evidence_eligible": False},
+            {"message_index": 1, "role": "assistant", "content": "You also like hiking.",
+             "evidence_eligible": False},
+        ])
+
+    def test_v3_does_not_promote_cited_assistant_text_to_evidence(self) -> None:
+        _, raw = build_memory_evidence_judge_request(
+            messages=({"role": "assistant", "content": "You like hiking."},),
+            operations=({"evidence_message_indexes": [0]},),
+            memory_version=3,
+        )
+        self.assertEqual(json.loads(raw)["evidence_messages"], [])
+
+    def test_v3_preserves_all_temporal_fields_for_judging(self) -> None:
+        operation = {
+            "evidence_message_indexes": [0],
+            "occurred_at": "2024-03-01T00:00:00+05:30",
+            "valid_from": "2024-03-01T00:00:00+05:30",
+            "valid_until": None,
+        }
+        _, raw = build_memory_evidence_judge_request(
+            messages=({"role": "user", "content": "I moved last month."},),
+            operations=(operation,), memory_version=3,
+        )
+        self.assertEqual(json.loads(raw)["operations"], [operation])
+
     def test_request_contains_only_cited_user_evidence_and_complete_operations(self) -> None:
         messages = (
             {"role": "user", "content": "I build a matchmaking product called Omiryn."},
