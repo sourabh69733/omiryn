@@ -11,6 +11,7 @@ from .models import (
     MemoryUse,
 )
 from .retrieval import DEFAULT_REPLY_MEMORY_LIMIT, retrieve_agent_memories_for_reply
+from .taxonomy import V3_MEMORY_TAXONOMY_GUIDANCE, V3_MEMORY_VALUE_GUIDANCE
 
 __all__ = [
     "MEMORY_SCHEMA_VERSION",
@@ -22,5 +23,7 @@ __all__ = [
     "MemorySensitivity",
     "MemoryStatus",
     "MemoryUse",
+    "V3_MEMORY_TAXONOMY_GUIDANCE",
+    "V3_MEMORY_VALUE_GUIDANCE",
     "retrieve_agent_memories_for_reply",
 ]
