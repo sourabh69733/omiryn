@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from agent.evals.memory.calibration import (
@@ -133,6 +134,67 @@ MEMORY_V3_JUDGE_CALIBRATION_CASES = (
         supported=False,
         required_issues=("wrong_sensitivity",),
     ),
+)
+
+
+def _context_case(*, assistant_claim: bool) -> MemoryJudgeCalibrationCase:
+    """Require context resolution without treating assistant suggestions as facts."""
+    case = _case(
+        case_id=("reject_v3_assistant_context_claim" if assistant_claim
+                 else "accept_v3_cross_batch_reference"),
+        message=("That is your guess, not my preference." if assistant_claim
+                 else "Calm and funny, but not loud."),
+        memory_kind="semantic", purposes=("matching",), key="partner_personality",
+        value="calm and funny, but not loud", sensitivity="standard",
+        supported=not assistant_claim,
+        required_issues=("unsupported_inference",) if assistant_claim else (),
+    )
+    return replace(
+        case,
+        messages=(
+            {"role": "user", "content": "I want someone who makes difficult days lighter."},
+            {"role": "assistant", "content": (
+                "You want a calm, funny partner who is not loud." if assistant_claim
+                else "What does that look like to you?"
+            )},
+            *case.messages,
+        ),
+        operations=({**case.operations[0], "evidence_message_indexes": [2]},),
+    )
+
+
+def _time_case(*, field: str, mode: str) -> MemoryJudgeCalibrationCase:
+    """Exercise semantic grounding of each timestamp, not just ISO validity."""
+    supported = mode != "invented"
+    timestamp = "2026-08-12T09:30:00+05:30"
+    statements = {
+        "occurred_at": f"I arrived in Pune at {timestamp}.",
+        "valid_from": f"My temporary stay in Pune started at {timestamp}.",
+        "valid_until": f"My temporary stay in Pune ended at {timestamp}.",
+    }
+    case = _case(
+        case_id=f"{('accept' if supported else 'reject')}_v3_{mode}_{field}",
+        message=statements[field] if mode == "explicit" else "I stayed in Pune last month.",
+        memory_kind="episodic", purposes=("personalization",), key="stay_in_pune",
+        value="Stayed in Pune", sensitivity="standard", supported=supported,
+        required_issues=() if supported else ("unsupported_inference",),
+    )
+    return replace(case, operations=({
+        **case.operations[0],
+        "occurred_at": None, "valid_from": None, "valid_until": None,
+        field: timestamp if mode != "unknown" else None,
+    },))
+
+
+MEMORY_V3_JUDGE_CALIBRATION_CASES += (
+    _context_case(assistant_claim=False),
+    _context_case(assistant_claim=True),
+    *(
+        _time_case(field=field, mode=mode)
+        for field in ("occurred_at", "valid_from", "valid_until")
+        for mode in ("invented", "explicit")
+    ),
+    _time_case(field="occurred_at", mode="unknown"),
 )
 
 
