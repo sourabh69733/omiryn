@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from agent.memory_engine.memories import (
     MEMORY_SCHEMA_VERSION,
@@ -118,6 +118,50 @@ def list_agent_memories(user_id: str) -> list[dict[str, Any]]:
             .all()
         )
         return [_memory_from_row(connection, row) for row in rows]
+
+
+def delete_agent_memory(memory_id: str, user_id: str) -> bool:
+    """Permanently delete one owned memory and its private supporting records."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    with ENGINE.begin() as connection:
+        existing = connection.execute(
+            select(agent_memories.c.id).where(
+                agent_memories.c.id == memory_id,
+                agent_memories.c.user_id == owner_id,
+            )
+        ).first()
+        if not existing:
+            return False
+        connection.execute(
+            agent_memory_evidence.delete().where(
+                agent_memory_evidence.c.memory_id == memory_id,
+                agent_memory_evidence.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            memory_operation_applications.delete().where(
+                memory_operation_applications.c.user_id == owner_id,
+                or_(
+                    memory_operation_applications.c.target_memory_id == memory_id,
+                    memory_operation_applications.c.result_memory_id == memory_id,
+                ),
+            )
+        )
+        connection.execute(
+            agent_memories.update()
+            .where(
+                agent_memories.c.user_id == owner_id,
+                agent_memories.c.supersedes_memory_id == memory_id,
+            )
+            .values(supersedes_memory_id=None, updated_at=func.now())
+        )
+        result = connection.execute(
+            agent_memories.delete().where(
+                agent_memories.c.id == memory_id,
+                agent_memories.c.user_id == owner_id,
+            )
+        )
+    return bool(result.rowcount)
 
 
 def apply_agent_memory_operation_batch(payload: dict[str, Any]) -> dict[str, Any]:
@@ -638,6 +682,7 @@ __all__ = [
     "apply_agent_memory_add_batch",
     "apply_agent_memory_operation_batch",
     "create_agent_memory",
+    "delete_agent_memory",
     "get_agent_memory",
     "list_agent_memories",
 ]
