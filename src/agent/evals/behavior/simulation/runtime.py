@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from uuid import uuid4
 
 from agent.evals.behavior.core.events import EventSink, emit_event
@@ -27,12 +27,22 @@ class RuntimeDriverConfig:
     agent_mode: str = "know_me"
     agent_tone: str = "auto"
     agent_name: str = "Mira"
+    pipeline_version: str | None = None
+
+
+SampleSetup = Callable[[BehaviorScenario, str, str], None]
 
 
 class RuntimeScenarioDriver:
-    def __init__(self, config: RuntimeDriverConfig, event_sink: EventSink | None = None) -> None:
+    def __init__(
+        self,
+        config: RuntimeDriverConfig,
+        event_sink: EventSink | None = None,
+        sample_setup: SampleSetup | None = None,
+    ) -> None:
         self.config = config
         self.event_sink = event_sink
+        self.sample_setup = sample_setup
 
     async def run_sample(
         self,
@@ -58,6 +68,8 @@ class RuntimeScenarioDriver:
             ),
             user_id,
         )
+        if self.sample_setup is not None:
+            self.sample_setup(scenario, user_id, conversation_id)
 
         observed_turns: list[ObservedTurn] = []
         with _runtime_environment(self.config):
@@ -205,6 +217,8 @@ def _runtime_environment(config: RuntimeDriverConfig) -> Iterator[None]:
         "AUTH_REQUIRED": "false",
         "DATA_POINT_EXTRACTOR": "rules",
     }
+    if config.pipeline_version is not None:
+        updates["AGENT_PIPELINE_VERSION"] = config.pipeline_version
     previous = {name: os.environ.get(name) for name in updates}
     try:
         os.environ.update(updates)

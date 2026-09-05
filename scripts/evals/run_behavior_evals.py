@@ -40,6 +40,7 @@ from agent.evals.behavior.simulation.runtime import (  # noqa: E402
     RuntimeScenarioDriver,
 )
 from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS  # noqa: E402
+from agent.evals.memory.use import MEMORY_USE_SCENARIOS, setup_memory_use_sample  # noqa: E402
 from agent.providers.gateway.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
     PROVIDER_NAMES,
@@ -119,6 +120,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--suite", default="companion_behavior_v1")
     parser.add_argument(
+        "--scenario-set",
+        choices=("companion", "memory_use"),
+        default="companion",
+        help="Select companion behavior or end-to-end memory-use scenarios.",
+    )
+    parser.add_argument(
         "--scenario",
         action="append",
         dest="scenario_ids",
@@ -162,8 +169,10 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             model=args.model,
             prompt_version=args.prompt_version,
             agent_name=args.agent_name,
+            pipeline_version="v3" if args.scenario_set == "memory_use" else None,
         ),
         event_sink=reporter,
+        sample_setup=setup_memory_use_sample if args.scenario_set == "memory_use" else None,
     )
     judge, judge_names = _build_judge(args, reporter)
     _validate_run_mode(args, judge_names)
@@ -179,11 +188,15 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             "judge_calibration": calibration_payload,
         }
     report = await run_behavior_evals(
-        scenarios=_selected_scenarios(args.scenario_ids),
+        scenarios=_selected_scenarios(args.scenario_ids, scenario_set=args.scenario_set),
         driver=driver,
         judge=judge,
         config=BehaviorEvalConfig(
-            suite_name=args.suite,
+            suite_name=(
+                "memory_use_v1"
+                if args.scenario_set == "memory_use" and args.suite == "companion_behavior_v1"
+                else args.suite
+            ),
             provider=args.provider,
             model=args.model,
             prompt_version=args.prompt_version,
@@ -241,17 +254,20 @@ def _validate_run_mode(args: argparse.Namespace, judge_names: tuple[str, ...]) -
         raise ValueError("Release mode requires --samples 3 or greater.")
 
 
-def _selected_scenarios(scenario_ids: list[str] | None):
+def _selected_scenarios(
+    scenario_ids: list[str] | None,
+    *,
+    scenario_set: str = "companion",
+):
+    catalogue = MEMORY_USE_SCENARIOS if scenario_set == "memory_use" else COMPANION_BEHAVIOR_SCENARIOS
     if not scenario_ids:
-        return COMPANION_BEHAVIOR_SCENARIOS
+        return catalogue
     requested = set(scenario_ids)
-    selected = tuple(
-        scenario for scenario in COMPANION_BEHAVIOR_SCENARIOS if scenario.id in requested
-    )
+    selected = tuple(scenario for scenario in catalogue if scenario.id in requested)
     unknown = sorted(requested - {scenario.id for scenario in selected})
     if unknown:
-        available = ", ".join(scenario.id for scenario in COMPANION_BEHAVIOR_SCENARIOS)
-        raise ValueError(f"Unknown behavior scenarios {unknown}. Available: {available}")
+        available = ", ".join(scenario.id for scenario in catalogue)
+        raise ValueError(f"Unknown {scenario_set} scenarios {unknown}. Available: {available}")
     return selected
 
 
