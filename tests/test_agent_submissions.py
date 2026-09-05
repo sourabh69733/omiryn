@@ -45,6 +45,8 @@ from ingestion.whatsapp import (
 from storage import (
     _normalize_database_url,
     _reset_db_allowed,
+    create_agent_memory,
+    get_agent_memory,
     get_conversation,
     get_profile_fact,
     get_user_profile,
@@ -874,6 +876,74 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertIsNotNone(get_profile_fact(fact["id"], "user-b"))
+
+    def test_user_can_permanently_delete_own_v3_memory(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-source-a",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Pune."}],
+            },
+            "test-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "test-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Pune",
+                "evidence": [
+                    {
+                        "conversation_id": "memory-source-a",
+                        "message_index": 0,
+                        "exact_quote": "I live in Pune.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        response = self.client.delete(f"/api/me/memories/{memory['id']}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"memory_id": memory["id"], "status": "deleted"},
+        )
+        self.assertIsNone(get_agent_memory(memory["id"], "test-user"))
+
+    def test_user_cannot_delete_another_users_v3_memory(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-source-b",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Delhi."}],
+            },
+            "another-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "another-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Delhi",
+                "evidence": [
+                    {
+                        "conversation_id": "memory-source-b",
+                        "message_index": 0,
+                        "exact_quote": "I live in Delhi.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        response = self.client.delete(f"/api/me/memories/{memory['id']}")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNotNone(get_agent_memory(memory["id"], "another-user"))
 
     def test_user_can_correct_own_profile_fact(self) -> None:
         async def signed_in_user() -> CurrentUser:

@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import select
 
 import storage
+from agent.memory_engine.memories import retrieve_agent_memories_for_reply
 from security.encryption import is_encrypted_blob
 from storage.schema import agent_memories, agent_memory_evidence
 
@@ -120,6 +121,32 @@ def test_evidence_cannot_reference_another_users_conversation() -> None:
         storage.create_agent_memory(_payload(evidence=evidence))
 
     assert storage.list_agent_memories(USER_ID) == []
+
+
+def test_delete_one_memory_removes_its_evidence_and_reply_access() -> None:
+    saved = storage.create_agent_memory(_payload())
+
+    deleted = storage.delete_agent_memory(saved["id"], USER_ID)
+
+    assert deleted
+    assert storage.get_agent_memory(saved["id"], USER_ID) is None
+    assert retrieve_agent_memories_for_reply(USER_ID, "What do I build?") == []
+    with storage.ENGINE.begin() as connection:
+        evidence = connection.execute(
+            select(agent_memory_evidence).where(
+                agent_memory_evidence.c.memory_id == saved["id"]
+            )
+        ).first()
+    assert evidence is None
+
+
+def test_delete_one_memory_is_scoped_to_its_owner() -> None:
+    saved = storage.create_agent_memory(_payload())
+
+    deleted = storage.delete_agent_memory(saved["id"], "another-user")
+
+    assert not deleted
+    assert storage.get_agent_memory(saved["id"], USER_ID) is not None
 
 
 def test_user_deletion_removes_memory_and_evidence() -> None:
