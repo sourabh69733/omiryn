@@ -102,3 +102,9 @@ Synthetic evaluation scores are grouped by day for comparison.
 | --- | --- | --- | --- | --- | --- |
 | 17:47:28 | FAIL | Memory v3 eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 46% | 6/13 scenarios |
 | 18:38:43 | FAIL | Memory judge calibration | Qwen/Qwen3.5-397B-A17B | — | 17/17 judge checks |
+
+## 2026-09-05
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 18:07:22 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.0/4 | 4/5 scenarios |
