@@ -877,6 +877,59 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIsNotNone(get_profile_fact(fact["id"], "user-b"))
 
+    def test_user_can_list_only_own_v3_memories_with_traceable_evidence(self) -> None:
+        for user_id, city in (("test-user", "Pune"), ("another-user", "Delhi")):
+            conversation_id = f"memory-list-source-{user_id}"
+            quote = f"I live in {city}."
+            save_conversation(
+                {
+                    "id": conversation_id,
+                    "status": "active",
+                    "messages": [{"role": "user", "content": quote}],
+                },
+                user_id,
+            )
+            create_agent_memory(
+                {
+                    "user_id": user_id,
+                    "kind": "semantic",
+                    "purposes": ["profile"],
+                    "key": "home.location",
+                    "value": city,
+                    "sensitivity": (
+                        "highly_sensitive" if user_id == "test-user" else "standard"
+                    ),
+                    "extractor": "private-internal-name",
+                    "extractor_model": "private-internal-model",
+                    "evidence": [
+                        {
+                            "conversation_id": conversation_id,
+                            "message_index": 0,
+                            "exact_quote": quote,
+                            "observed_at": "2026-09-05T10:00:00Z",
+                        }
+                    ],
+                }
+            )
+
+        response = self.client.get("/api/me/memories")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], 1)
+        memory = payload["memories"][0]
+        self.assertEqual(memory["value"], "Pune")
+        self.assertEqual(memory["sensitivity"], "highly_sensitive")
+        self.assertEqual(memory["evidence"][0]["exact_quote"], "I live in Pune.")
+        self.assertEqual(
+            memory["evidence"][0]["conversation_id"],
+            "memory-list-source-test-user",
+        )
+        self.assertNotIn("user_id", memory)
+        self.assertNotIn("extractor", memory)
+        self.assertNotIn("extractor_model", memory)
+        self.assertNotIn("id", memory["evidence"][0])
+
     def test_user_can_permanently_delete_own_v3_memory(self) -> None:
         save_conversation(
             {
