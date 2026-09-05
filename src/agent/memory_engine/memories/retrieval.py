@@ -35,7 +35,11 @@ def retrieve_agent_memories_for_reply(
     from storage.memories import list_agent_memories
 
     current_time = now or datetime.now(UTC)
-    eligible = [memory for memory in list_agent_memories(user_id) if _reply_eligible(memory)]
+    eligible = [
+        memory
+        for memory in list_agent_memories(user_id)
+        if _reply_eligible(memory, current_time)
+    ]
     ranked = sorted(
         eligible,
         key=lambda memory: (
@@ -56,13 +60,33 @@ def retrieve_agent_memories_for_reply(
     return selected
 
 
-def _reply_eligible(memory: dict[str, Any]) -> bool:
+def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:
     return (
-        memory.get("status") == MemoryStatus.ACTIVE.value
+        _is_not_expired(memory.get("valid_until"), now)
+        and memory.get("status") == MemoryStatus.ACTIVE.value
         and MemoryUse.REPLY_CONTEXT.value in set(memory.get("allowed_uses") or [])
         and memory.get("sensitivity") != MemorySensitivity.HIGHLY_SENSITIVE.value
         and memory.get("kind") in _KIND_LIMITS
     )
+
+
+def _is_not_expired(value: Any, now: datetime) -> bool:
+    if value is None:
+        return True
+    expires_at = _aware_datetime(value)
+    return expires_at is not None and now < expires_at
+
+
+def _aware_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
 
 
 def _reply_score(memory: dict[str, Any], user_text: str, now: datetime) -> float:
@@ -127,13 +151,8 @@ def _bounded_score(value: Any) -> float:
 
 
 def _recency_score(value: Any, now: datetime) -> float:
-    if not isinstance(value, str):
-        return 0.0
-    try:
-        updated_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return 0.0
-    if updated_at.tzinfo is None or updated_at.utcoffset() is None:
+    updated_at = _aware_datetime(value)
+    if updated_at is None:
         return 0.0
     age_days = max(0.0, (now - updated_at).total_seconds() / 86_400)
     return 1.0 / (1.0 + age_days / 30.0)
