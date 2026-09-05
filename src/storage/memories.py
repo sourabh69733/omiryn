@@ -120,6 +120,38 @@ def list_agent_memories(user_id: str) -> list[dict[str, Any]]:
         return [_memory_from_row(connection, row) for row in rows]
 
 
+def update_agent_memory_allowed_uses(
+    memory_id: str,
+    user_id: str,
+    allowed_uses: list[str],
+) -> dict[str, Any] | None:
+    """Replace the product uses allowed by the memory owner."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    normalized = sorted({MemoryUse(str(value)).value for value in allowed_uses})
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            agent_memories.update()
+            .where(
+                agent_memories.c.id == memory_id,
+                agent_memories.c.user_id == owner_id,
+            )
+            .values(allowed_uses_json=normalized, updated_at=func.now())
+        )
+        if not result.rowcount:
+            return None
+        row = (
+            connection.execute(
+                select(agent_memories).where(
+                    agent_memories.c.id == memory_id,
+                    agent_memories.c.user_id == owner_id,
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return _memory_from_row(connection, row)
+
+
 def delete_agent_memory(memory_id: str, user_id: str) -> bool:
     """Permanently delete one owned memory and its private supporting records."""
     owner_id = _require_user_id(user_id, "agent memory")
@@ -685,4 +717,5 @@ __all__ = [
     "delete_agent_memory",
     "get_agent_memory",
     "list_agent_memories",
+    "update_agent_memory_allowed_uses",
 ]
