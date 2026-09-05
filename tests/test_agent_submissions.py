@@ -689,6 +689,17 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("date=2026-06-20", prompt)
         self.assertIn("timezone=Asia/Kolkata", prompt)
 
+    def test_agent_prompt_keeps_missing_location_and_timezone_unknown(self) -> None:
+        prompt = _system_prompt_with_context(
+            "System",
+            context_sources=None,
+            user_profile={"display_name": "Eval User"},
+        )
+
+        self.assertIn("location=unknown, country=unknown", prompt)
+        self.assertIn("timezone=unknown", prompt)
+        self.assertNotIn("location=India", prompt)
+
     def test_agent_user_context_uses_detected_city_before_country_default(self) -> None:
         user = CurrentUser(id="user-a", email="a@example.com", display_name="Sourabh")
         upsert_profile_fact(
