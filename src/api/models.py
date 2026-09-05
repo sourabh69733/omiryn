@@ -42,6 +42,11 @@ ContextSourceType = Literal[
 WhatsappStyleKind = Literal["user_style", "friend_style"]
 Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
 InterestedIn = Literal["men", "women", "everyone"]
+MemoryAllowedUse = Literal["reply_context", "matching"]
+
+
+class MemoryPermissionsPatch(BaseModel):
+    allowed_uses: list[MemoryAllowedUse] = Field(max_length=2)
 
 
 class SourcedString(BaseModel):
