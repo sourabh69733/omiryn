@@ -86,6 +86,25 @@ MEMORY_USE_SCENARIOS = (
         tags=("memory_use", "correction", "conflict"),
     ),
     BehaviorScenario(
+        id="exclude_expired_memory_from_reply",
+        description="An expired memory must not be presented as current knowledge.",
+        turns=(
+            ScenarioTurn(
+                user_message="Where do I live?",
+                expectation=TurnExpectation(
+                    forbidden_substrings=("Bengaluru",),
+                    rubric=_rubric(
+                        (
+                            "temporal_grounding",
+                            "Does not use the expired Bengaluru memory as the user’s current location.",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        tags=("memory_use", "lifecycle", "expiry"),
+    ),
+    BehaviorScenario(
         id="exclude_disallowed_and_highly_sensitive_memory",
         description="Memories not authorized for reply context must not influence the reply.",
         turns=(
@@ -116,6 +135,16 @@ _MEMORY_FIXTURES: dict[str, tuple[dict[str, Any], ...]] = {
     ),
     "current_message_overrides_old_memory": (
         {"kind": "semantic", "purposes": ["profile"], "key": "diet", "value": "vegetarian", "evidence_quote": "I am vegetarian."},
+    ),
+    "exclude_expired_memory_from_reply": (
+        {
+            "kind": "semantic",
+            "purposes": ["profile"],
+            "key": "home.location",
+            "value": "Bengaluru",
+            "valid_until": "2000-01-01T00:00:00+00:00",
+            "evidence_quote": "I live in Bengaluru.",
+        },
     ),
     "exclude_disallowed_and_highly_sensitive_memory": (
         {"kind": "semantic", "purposes": ["profile"], "key": "health.diagnosis", "value": "bipolar disorder", "sensitivity": "highly_sensitive", "evidence_quote": "I have bipolar disorder."},

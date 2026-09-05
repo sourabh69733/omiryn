@@ -39,6 +39,30 @@ def test_retrieval_excludes_inactive_disallowed_and_highly_sensitive_memories() 
     assert [memory["id"] for memory in selected] == [allowed["id"]]
 
 
+def test_retrieval_excludes_memory_after_valid_until() -> None:
+    expired = _save_memory(
+        key="home.location",
+        value="Bengaluru",
+        valid_until=NOW - timedelta(seconds=1),
+    )
+
+    selected = _retrieve("Where do I live?")
+
+    assert expired["id"] not in {memory["id"] for memory in selected}
+
+
+def test_retrieval_includes_memory_before_valid_until() -> None:
+    current = _save_memory(
+        key="home.location",
+        value="Pune",
+        valid_until=NOW + timedelta(days=1),
+    )
+
+    selected = _retrieve("Where do I live?")
+
+    assert current["id"] in {memory["id"] for memory in selected}
+
+
 def test_retrieval_is_kind_aware_and_ranks_relevant_memory_first() -> None:
     unrelated = _save_memory(
         key="food.preference",
@@ -144,6 +168,7 @@ def _save_memory(
     status: str = "active",
     confidence: float = 0.9,
     importance: float = 0.8,
+    valid_until: datetime | None = None,
 ) -> dict[str, object]:
     observed_at = (NOW - timedelta(days=1)).isoformat()
     return storage.create_agent_memory(
@@ -158,6 +183,7 @@ def _save_memory(
             "sensitivity": sensitivity,
             "confidence": confidence,
             "importance": importance,
+            "valid_until": valid_until.isoformat() if valid_until else None,
             "evidence": [
                 {
                     "conversation_id": CONVERSATION_ID,

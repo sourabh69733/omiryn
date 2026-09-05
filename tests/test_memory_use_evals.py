@@ -15,7 +15,7 @@ def setup_function() -> None:
 def test_catalogue_covers_relevance_privacy_correction_and_authorization() -> None:
     tags = {tag for scenario in MEMORY_USE_SCENARIOS for tag in scenario.tags}
 
-    assert {"relevant", "irrelevant", "privacy", "correction", "authorization"} <= tags
+    assert {"relevant", "irrelevant", "privacy", "correction", "authorization", "expiry"} <= tags
     assert len({scenario.id for scenario in MEMORY_USE_SCENARIOS}) == len(MEMORY_USE_SCENARIOS)
     assert all(scenario.turns[0].expectation.rubric for scenario in MEMORY_USE_SCENARIOS)
 
