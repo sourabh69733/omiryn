@@ -930,6 +930,80 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertNotIn("extractor_model", memory)
         self.assertNotIn("id", memory["evidence"][0])
 
+    def test_user_can_disable_all_uses_for_own_v3_memory(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-permission-source-a",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Pune."}],
+            },
+            "test-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "test-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Pune",
+                "evidence": [
+                    {
+                        "conversation_id": "memory-permission-source-a",
+                        "message_index": 0,
+                        "exact_quote": "I live in Pune.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        response = self.client.patch(
+            "/api/me/memories/{}/permissions".format(memory["id"]),
+            json={"allowed_uses": []},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["allowed_uses"], [])
+        self.assertEqual(get_agent_memory(memory["id"], "test-user")["allowed_uses"], [])
+
+    def test_user_cannot_change_another_users_v3_memory_permissions(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-permission-source-b",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Delhi."}],
+            },
+            "another-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "another-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Delhi",
+                "evidence": [
+                    {
+                        "conversation_id": "memory-permission-source-b",
+                        "message_index": 0,
+                        "exact_quote": "I live in Delhi.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        response = self.client.patch(
+            "/api/me/memories/{}/permissions".format(memory["id"]),
+            json={"allowed_uses": []},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            get_agent_memory(memory["id"], "another-user")["allowed_uses"],
+            ["reply_context"],
+        )
+
     def test_user_can_permanently_delete_own_v3_memory(self) -> None:
         save_conversation(
             {

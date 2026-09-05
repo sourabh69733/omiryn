@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from security.auth import CurrentUser, require_user
-from storage import delete_agent_memory, list_agent_memories
+from storage import (
+    delete_agent_memory,
+    list_agent_memories,
+    update_agent_memory_allowed_uses,
+)
+
+from ..models import MemoryPermissionsPatch
 
 
 router = APIRouter()
@@ -53,6 +59,22 @@ def _user_memory_payload(memory: dict[str, object]) -> dict[str, object]:
         if isinstance(item, dict)
     ]
     return {**{field: memory.get(field) for field in fields}, "evidence": evidence}
+
+
+@router.patch("/api/me/memories/{memory_id}/permissions")
+async def patch_me_memory_permissions(
+    memory_id: str,
+    payload: MemoryPermissionsPatch,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    memory = update_agent_memory_allowed_uses(
+        memory_id,
+        user.id,
+        payload.allowed_uses,
+    )
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+    return _user_memory_payload(memory)
 
 
 @router.delete("/api/me/memories/{memory_id}")

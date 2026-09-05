@@ -149,6 +149,35 @@ def test_delete_one_memory_is_scoped_to_its_owner() -> None:
     assert storage.get_agent_memory(saved["id"], USER_ID) is not None
 
 
+def test_update_memory_permissions_immediately_changes_reply_eligibility() -> None:
+    saved = storage.create_agent_memory(_payload())
+
+    updated = storage.update_agent_memory_allowed_uses(
+        saved["id"],
+        USER_ID,
+        ["matching"],
+    )
+
+    assert updated is not None
+    assert updated["allowed_uses"] == ["matching"]
+    assert retrieve_agent_memories_for_reply(USER_ID, "What do I build?") == []
+
+
+def test_update_memory_permissions_is_scoped_to_its_owner() -> None:
+    saved = storage.create_agent_memory(_payload())
+
+    updated = storage.update_agent_memory_allowed_uses(
+        saved["id"],
+        "another-user",
+        [],
+    )
+
+    assert updated is None
+    assert storage.get_agent_memory(saved["id"], USER_ID)["allowed_uses"] == [
+        "reply_context"
+    ]
+
+
 def test_user_deletion_removes_memory_and_evidence() -> None:
     saved = storage.create_agent_memory(_payload())
 
