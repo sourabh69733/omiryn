@@ -8,10 +8,11 @@ from security.auth import CurrentUser, require_user
 from storage import (
     delete_agent_memory,
     list_agent_memories,
+    review_agent_memory,
     update_agent_memory_allowed_uses,
 )
 
-from ..models import MemoryPermissionsPatch
+from ..models import MemoryPermissionsPatch, MemoryReviewCreate
 
 
 router = APIRouter()
@@ -72,6 +73,21 @@ async def patch_me_memory_permissions(
         user.id,
         payload.allowed_uses,
     )
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+    return _user_memory_payload(memory)
+
+
+@router.post("/api/me/memories/{memory_id}/review")
+async def review_me_memory(
+    memory_id: str,
+    payload: MemoryReviewCreate,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    try:
+        memory = review_agent_memory(memory_id, user.id, payload.rating)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found.")
     return _user_memory_payload(memory)

@@ -49,6 +49,10 @@ class MemoryPermissionsPatch(BaseModel):
     allowed_uses: list[MemoryAllowedUse] = Field(max_length=2)
 
 
+class MemoryReviewCreate(BaseModel):
+    rating: DataPointFeedbackRating
+
+
 class SourcedString(BaseModel):
     value: str
     source: Literal["user_stated", "inferred", "unknown"] = "unknown"
