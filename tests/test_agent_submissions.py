@@ -1004,6 +1004,85 @@ class AgentSubmissionApiTest(unittest.TestCase):
             ["reply_context"],
         )
 
+    def test_user_review_reinforces_or_retracts_own_v3_memory(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-review-source-a",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Pune."}],
+            },
+            "test-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "test-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Pune",
+                "confidence": 0.6,
+                "evidence": [
+                    {
+                        "conversation_id": "memory-review-source-a",
+                        "message_index": 0,
+                        "exact_quote": "I live in Pune.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        confirmed = self.client.post(
+            f"/api/me/memories/{memory['id']}/review",
+            json={"rating": "agree"},
+        )
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertEqual(confirmed.json()["status"], "active")
+        self.assertGreaterEqual(confirmed.json()["confidence"], 0.9)
+        self.assertIsNotNone(confirmed.json()["last_reinforced_at"])
+
+        rejected = self.client.post(
+            f"/api/me/memories/{memory['id']}/review",
+            json={"rating": "disagree"},
+        )
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(rejected.json()["status"], "retracted")
+        self.assertEqual(get_agent_memory(memory["id"], "test-user")["status"], "retracted")
+
+    def test_user_cannot_review_another_users_v3_memory(self) -> None:
+        save_conversation(
+            {
+                "id": "memory-review-source-b",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Delhi."}],
+            },
+            "another-user",
+        )
+        memory = create_agent_memory(
+            {
+                "user_id": "another-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "home.location",
+                "value": "Delhi",
+                "evidence": [
+                    {
+                        "conversation_id": "memory-review-source-b",
+                        "message_index": 0,
+                        "exact_quote": "I live in Delhi.",
+                        "observed_at": "2026-09-05T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        response = self.client.post(
+            f"/api/me/memories/{memory['id']}/review",
+            json={"rating": "agree"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(get_agent_memory(memory["id"], "another-user")["confidence"], 0.5)
+
     def test_user_can_permanently_delete_own_v3_memory(self) -> None:
         save_conversation(
             {
