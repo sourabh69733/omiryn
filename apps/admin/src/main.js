@@ -1,4 +1,5 @@
 import { adminFetch, ensureAdminSession, signInWithGoogle, signOut } from "./auth.js";
+import { cognitionResultLabel } from "./usagePresentation.js";
 
 const state = {
   data: null,
@@ -1290,9 +1291,10 @@ function renderUsageEvents(events) {
       const statusText = event.success ? "Success" : "Failed";
       const cost = event.estimated_cost_usd ? formatUsd(event.estimated_cost_usd) : "-";
       const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+      const resultSummary = cognitionResultLabel(event);
       return `
         <tr>
-          <td>${escapeHtml(usageKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small></td>
+          <td>${escapeHtml(usageKindLabel(event.request_kind))}<small>${escapeHtml(createdAt)}</small>${resultSummary ? `<small>${escapeHtml(resultSummary)}</small>` : ""}</td>
           <td>${escapeHtml(event.provider || "-")}<small>${escapeHtml(event.model || "-")}</small></td>
           <td class="mono">${formatNumber(event.total_tokens || 0)}<small>${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out</small></td>
           <td class="mono">${formatNumber(event.latency_ms || 0)} ms</td>
