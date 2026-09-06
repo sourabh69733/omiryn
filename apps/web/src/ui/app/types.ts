@@ -70,6 +70,30 @@ export type ProfileFact = {
     updated_at?: string;
   } | null;
 };
+export type CanonicalMemory = {
+  id: string;
+  kind: "semantic" | "episodic" | "relationship" | "procedural";
+  purposes?: string[];
+  key: string;
+  value: unknown;
+  allowed_uses?: string[];
+  status?: string;
+  sensitivity?: string;
+  confidence?: number;
+  importance?: number;
+  occurred_at?: string | null;
+  valid_until?: string | null;
+  updated_at?: string | null;
+  evidence?: Array<{
+    conversation_id?: string;
+    message_id?: string | null;
+    message_index?: number | null;
+    exact_quote?: string;
+    observed_at?: string;
+  }>;
+};
+export type MemoryResponse = { count?: number; memories?: CanonicalMemory[] };
+
 export type ProfileResponse = {
   user?: AuthUser;
   profile?: Profile;
@@ -101,6 +125,13 @@ export type UsageEvent = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  result_summary?: {
+    status?: string;
+    memory_operations?: number;
+    memories_applied?: number;
+    memories_deferred?: number;
+    thread_operations_applied?: number;
+  };
 };
 export type ConversationUsage = {
   summary?: UsageSummary;

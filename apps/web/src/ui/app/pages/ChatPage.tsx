@@ -8,6 +8,7 @@ import { AvatarImage } from "../AvatarImage";
 import { assetUrl, canShowUsage } from "../appUtils";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
+import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 300;
@@ -565,7 +566,8 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                   const createdAt = event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
                   const tokenText = event.total_tokens ? `${formatNumber(event.prompt_tokens || 0)} in / ${formatNumber(event.completion_tokens || 0)} out` : "tokens unavailable";
                   const totalText = event.total_tokens ? formatNumber(event.total_tokens) : "-";
-                  return <div className={`sidebar-usage-item ${event.success ? "ok" : "failed"}`} key={`${event.created_at || "event"}-${index}`}><div><strong>#{usageEvents.length - index} {usageRequestKindLabel(event.request_kind)}</strong><span>{createdAt} · {event.model || event.provider || "-"}</span></div><div className="sidebar-usage-tokens"><strong>{totalText}</strong><span>{tokenText}</span></div></div>;
+                  const resultLabel = cognitionResultLabel(event);
+                  return <div className={`sidebar-usage-item ${event.success ? "ok" : "failed"}`} key={`${event.created_at || "event"}-${index}`}><div><strong>#{usageEvents.length - index} {usageRequestKindLabel(event.request_kind)}</strong><span>{createdAt} · {event.model || event.provider || "-"}</span>{resultLabel ? <span>{resultLabel}</span> : null}</div><div className="sidebar-usage-tokens"><strong>{totalText}</strong><span>{tokenText}</span></div></div>;
                 })}
               </div>
             </section>

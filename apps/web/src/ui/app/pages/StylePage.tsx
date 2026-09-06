@@ -1,10 +1,12 @@
 import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
-import type { ContextSource, ProfileFact, ProfileResponse } from "../types";
+import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
+import { canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories } from "../memoryPresentation";
 
 export function StylePage() {
   const [data, setData] = useState<ProfileResponse | null>(null);
+  const [canonicalMemories, setCanonicalMemories] = useState<CanonicalMemory[]>([]);
   const [error, setError] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importMode, setImportMode] = useState<"memory" | "whatsapp">("memory");
@@ -13,23 +15,30 @@ export function StylePage() {
   const [userSender, setUserSender] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingFactId, setSavingFactId] = useState<string | null>(null);
-  const [reviewFact, setReviewFact] = useState<ProfileFact | null>(null);
+  const [reviewItem, setReviewItem] = useState<ProfileFact | CanonicalMemory | null>(null);
   const [reviewMode, setReviewMode] = useState<"feedback" | "privacy" | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<"agree" | "disagree">("agree");
   const [reviewReason, setReviewReason] = useState("");
   const [privacyForChat, setPrivacyForChat] = useState(false);
   const [privacyForMatching, setPrivacyForMatching] = useState(false);
   const [visibleSectionCounts, setVisibleSectionCounts] = useState<Record<string, number>>({});
-  const [evidenceFact, setEvidenceFact] = useState<ProfileFact | null>(null);
+  const [evidenceItem, setEvidenceItem] = useState<ProfileFact | CanonicalMemory | null>(null);
 
   async function load() {
-    const response = await apiFetch("/api/me/profile");
-    if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load saved memories."));
-    setData(await response.json());
+    const [profileResponse, memoryResponse] = await Promise.all([
+      apiFetch("/api/me/profile"),
+      apiFetch("/api/me/memories")
+    ]);
+    if (!profileResponse.ok) throw new Error(await apiErrorMessage(profileResponse, "Could not load saved memories."));
+    if (!memoryResponse.ok) throw new Error(await apiErrorMessage(memoryResponse, "Could not load V3 memories."));
+    const memoryData = await memoryResponse.json() as MemoryResponse;
+    setData(await profileResponse.json());
+    setCanonicalMemories(memoryData.memories || []);
   }
   useEffect(() => { load().catch((caught) => setError(caught.message)); }, []);
 
   const sources = [...(data?.memory_sources || []), ...(data?.style_sources || [])];
+  const canonicalSections = groupCanonicalMemories(canonicalMemories);
   const facts = data?.learned_facts || [];
   const activeFacts = facts.filter((fact) => fact.status !== "rejected");
   const rejectedFacts = facts.filter((fact) => fact.status === "rejected");
@@ -103,7 +112,7 @@ export function StylePage() {
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update that signal."));
       trackAppEvent(eventName, { fact_category: fact.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: fact.id });
-      setReviewFact(null);
+      setReviewItem(null);
       setReviewMode(null);
       setReviewReason("");
       await load();
@@ -114,39 +123,45 @@ export function StylePage() {
     }
   }
 
-  function openFeedbackFlow(fact: ProfileFact, initialRating?: "agree" | "disagree") {
-    setReviewFact(fact);
+  function openFeedbackFlow(item: ProfileFact | CanonicalMemory, initialRating?: "agree" | "disagree") {
+    setReviewItem(item);
     setReviewMode("feedback");
-    setFeedbackRating(initialRating || (fact.feedback?.rating === "disagree" ? "disagree" : "agree"));
+    const savedRating = isCanonicalMemory(item) ? undefined : item.feedback?.rating;
+    setFeedbackRating(initialRating || (savedRating === "disagree" ? "disagree" : "agree"));
     setReviewReason("");
     setError("");
   }
 
-  function openPrivacyFlow(fact: ProfileFact) {
-    setReviewFact(fact);
+  function openPrivacyFlow(item: ProfileFact | CanonicalMemory) {
+    setReviewItem(item);
     setReviewMode("privacy");
-    setPrivacyForChat(Boolean(fact.used_for_chat_context));
-    setPrivacyForMatching(Boolean(fact.used_for_matching));
+    setPrivacyForChat(isCanonicalMemory(item) ? (item.allowed_uses || []).includes("reply_context") : Boolean(item.used_for_chat_context));
+    setPrivacyForMatching(isCanonicalMemory(item) ? (item.allowed_uses || []).includes("matching") : Boolean(item.used_for_matching));
     setReviewReason("");
     setError("");
   }
 
-  async function saveSignalFeedback(fact: ProfileFact, rating: "agree" | "disagree", comment = "") {
-    setSavingFactId(fact.id);
+  async function saveSignalFeedback(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree", comment = "") {
+    setSavingFactId(item.id);
     setError("");
     try {
-      const response = await apiFetch(`/api/me/profile-facts/${fact.id}/feedback`, {
+      const canonical = isCanonicalMemory(item);
+      const endpoint = canonical
+        ? "/api/me/memories/" + item.id + "/review"
+        : "/api/me/profile-facts/" + item.id + "/feedback";
+      const response = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(canonical ? { rating } : {
           rating,
           reason: rating === "disagree" ? "wrong" : "feels_right",
           comment: comment.trim() || null
         })
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save feedback."));
-      trackAppEvent("learned_signal_feedback_sent", { fact_category: fact.category || "unknown", rating }, { page: "style", target_type: "profile_fact", target_id: fact.id });
-      setReviewFact(null);
+      const factCategory = isCanonicalMemory(item) ? item.kind : item.category || "unknown";
+      trackAppEvent("learned_signal_feedback_sent", { fact_category: factCategory, rating }, { page: "style", target_type: canonical ? "agent_memory" : "profile_fact", target_id: item.id });
+      setReviewItem(null);
       setReviewMode(null);
       setReviewReason("");
       await load();
@@ -159,25 +174,103 @@ export function StylePage() {
 
   async function submitFeedbackFlow(event: FormEvent) {
     event.preventDefault();
-    if (!reviewFact) return;
-    if (feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 && reviewReason.trim().length < 8) {
+    if (!reviewItem) return;
+    if (requiresReviewReason(reviewItem, feedbackRating) && reviewReason.trim().length < 8) {
       setError("Add a short reason so Omiryn can correct a high-confidence signal.");
       return;
     }
-    await saveSignalFeedback(reviewFact, feedbackRating, reviewReason);
+    await saveSignalFeedback(reviewItem, feedbackRating, reviewReason);
   }
 
   async function submitPrivacyFlow(event: FormEvent) {
     event.preventDefault();
-    if (!reviewFact) return;
+    if (!reviewItem) return;
+    if (isCanonicalMemory(reviewItem)) {
+      setSavingFactId(reviewItem.id);
+      setError("");
+      try {
+        const allowedUses = [
+          ...(privacyForChat ? ["reply_context"] : []),
+          ...(privacyForMatching ? ["matching"] : [])
+        ];
+        const response = await apiFetch("/api/me/memories/" + reviewItem.id + "/permissions", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ allowed_uses: allowedUses })
+        });
+        if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update memory usage."));
+        trackAppEvent("learned_signal_privacy_updated", { fact_category: reviewItem.kind }, { page: "style", target_type: "agent_memory", target_id: reviewItem.id });
+        setReviewItem(null);
+        setReviewMode(null);
+        await load();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Could not update memory usage.");
+      } finally {
+        setSavingFactId(null);
+      }
+      return;
+    }
     await patchFact(
-      reviewFact,
+      reviewItem,
       {
         status: "active",
         used_for_chat_context: privacyForChat,
         used_for_matching: privacyForMatching
       },
       "learned_signal_privacy_updated"
+    );
+  }
+
+  function renderCanonicalMemory(memory: CanonicalMemory) {
+    const confidence = Math.round((memory.confidence || 0) * 100);
+    const value = canonicalMemoryValueText(memory.value);
+    const controls = canonicalMemoryControls(memory.evidence?.length || 0);
+    const evidenceControl = controls.find((control) => control.id === "evidence");
+    const reviewControl = controls.find((control) => control.id === "review");
+    const usageControl = controls.find((control) => control.id === "usage");
+    const active = !memory.status || memory.status === "active";
+    const isSaving = savingFactId === memory.id;
+    return (
+      <article className="profile-fact-card signal-review-card" key={memory.id}>
+        <div className="profile-fact-card-top">
+          <div>
+            <strong>{humanizeLabel(memory.key)}</strong>
+            {value ? <p className="profile-fact-values">{value}</p> : null}
+            <div className="profile-fact-meta">
+              <span className={"confidence-pill " + confidenceLevel(memory.confidence)}>{confidenceLabel(memory.confidence)} · {confidence}%</span>
+              <span className="fact-tag fact-tag-type">{humanizeLabel(memory.kind)}</span>
+              {(memory.purposes || []).map((purpose) => <span className="fact-tag fact-tag-key" key={purpose}>{humanizeLabel(purpose)}</span>)}
+              {memory.status && memory.status !== "active" ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.status)}</span> : null}
+              {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.sensitivity)}</span> : null}
+              {evidenceControl ? (
+                <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceItem(memory)}>
+                  {evidenceControl.label}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        {/* <p className="privacy-note">Allowed for: {(memory.allowed_uses || []).map(humanizeLabel).join(" · ") || "not currently used"}</p> */}
+        {active ? (
+          <div className="signal-card-actions">
+            <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(memory)}>{reviewControl?.label}</button>
+            <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(memory)}>{usageControl?.label}</button>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
+
+  function renderCanonicalSection(section: ReturnType<typeof groupCanonicalMemories>[number]) {
+    const sectionKey = `memory-${section.id}`;
+    const visibleCount = visibleSectionCounts[sectionKey] || 5;
+    const hasMore = visibleCount < section.memories.length;
+    return (
+      <section className={`profile-fact-group signal-section signal-section-${section.id}`} key={section.id}>
+        <div className="profile-fact-group-heading"><div><h3>{section.title}</h3><p>{section.summary}</p></div><span>{section.memories.length}</span></div>
+        <div className="profile-fact-list">{section.memories.slice(0, visibleCount).map(renderCanonicalMemory)}</div>
+        {section.memories.length > 5 ? <button className="secondary-button signal-show-more" type="button" onClick={() => setVisibleSectionCounts((current) => ({ ...current, [sectionKey]: hasMore ? visibleCount + 5 : 5 }))}>{hasMore ? `Show ${Math.min(5, section.memories.length - visibleCount)} more` : "Show less"}</button> : null}
+      </section>
     );
   }
 
@@ -199,7 +292,7 @@ export function StylePage() {
               {fact.category ? <span className="fact-tag fact-tag-key">{humanizeLabel(fact.category)}</span> : null}
               {fact.confidence_state && fact.confidence_state !== "active" ? <span className="fact-tag fact-tag-status">{humanizeLabel(fact.confidence_state)}</span> : null}
               {hasEvidence ? (
-                <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceFact(fact)}>
+                <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceItem(fact)}>
                   {fact.evidence?.length} evidence
                 </button>
               ) : null}
@@ -269,35 +362,49 @@ export function StylePage() {
           <p>Review AI-inferred signals, confirm what feels right, and control what Omiryn can use.</p>
         </div>
       </div>
-      <div className="style-snapshot-grid" aria-label="Signal summary">
+      <div className="style-snapshot-grid" aria-label="Memory summary">
         <div className="style-snapshot-card">
-          <span>Active signals</span>
+          <span>V3 memories</span>
+          <strong>{canonicalMemories.length}</strong>
+          <small>Canonical memories currently stored</small>
+        </div>
+        <div className="style-snapshot-card">
+          <span>Active</span>
+          <strong>{canonicalMemories.filter((memory) => memory.status === "active").length}</strong>
+          <small>Available under their usage permissions</small>
+        </div>
+        <div className="style-snapshot-card">
+          <span>Matching use</span>
+          <strong>{canonicalMemories.filter((memory) => memory.allowed_uses?.includes("matching")).length}</strong>
+          <small>Allowed to support future matching</small>
+        </div>
+        <div className="style-snapshot-card">
+          <span>Legacy signals</span>
           <strong>{activeFacts.length}</strong>
-          <small>Available for personalization</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>To review</span>
-          <strong>{needsReviewFacts.length}</strong>
-          <small>Low-confidence or unconfirmed</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>Used for matching</span>
-          <strong>{matchingFacts.length}</strong>
-          <small>Can affect future suggestions</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>Chat learning</span>
-          <strong>{chatFacts.length}</strong>
-          <small>Can shape Omiryn's replies</small>
+          <small>Saved by the previous data-point system</small>
         </div>
       </div>
       <div className="style-layout">
         <section className="profile-panel profile-panel-wide style-learning-panel">
           <div className="panel-heading profile-facts-heading">
             <div>
-              <p className="eyebrow">AI signals</p>
-              <h2>Review what Omiryn thinks</h2>
-              <p>Each point is an AI inference, not a permanent label. Sections show the saved data-point type Omiryn is using internally.</p>
+              <p className="eyebrow">V3 memory</p>
+              <h2>What Omiryn remembers</h2>
+              <p>These are canonical memories created by background cognition and grouped by their real memory kind.</p>
+              <p className="privacy-note">Purpose describes why a memory matters. Allowed use controls where Omiryn may use it.</p>
+            </div>
+            <span className="profile-fact-total">{canonicalMemories.length} memories</span>
+          </div>
+          <div className="profile-fact-groups">
+            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <div className="profile-facts-empty"><strong>No V3 memories yet.</strong><span>Background cognition creates them after enough meaningful conversation.</span></div>}
+          </div>
+        </section>
+        <section className="profile-panel profile-panel-wide style-learning-panel">
+          <div className="panel-heading profile-facts-heading">
+            <div>
+              <p className="eyebrow">Legacy signals</p>
+              <h2>Earlier learned data points</h2>
+              <p>These were saved by the earlier data-point system and remain visible for review.</p>
               <p className="privacy-note">Marked-wrong signals are not used for personalization or matching. High-confidence rejections ask for a correction to help the AI improve.</p>
             </div>
             <span className="profile-fact-total">{facts.length} signals</span>
@@ -367,13 +474,13 @@ export function StylePage() {
           {error ? <p className="legacy-inline-error">{error}</p> : null}
         </section> */}
       </div>
-      {reviewFact && reviewMode ? (
-        <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewFact.id) { setReviewFact(null); setReviewMode(null); setError(""); } }}>
+      {reviewItem && reviewMode ? (
+        <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewItem.id) { setReviewItem(null); setReviewMode(null); setError(""); } }}>
           <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title">
             <div className="confirm-copy">
               <p className="eyebrow">{reviewMode === "feedback" ? "Review signal" : "Usage control"}</p>
               <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omiryn use this?"}</h2>
-              <p>{reviewFact.label || reviewFact.key}</p>
+              <p>{reviewItemTitle(reviewItem)}</p>
             </div>
             {reviewMode === "feedback" ? (
               <form className="signal-review-form" onSubmit={(event) => void submitFeedbackFlow(event)}>
@@ -387,12 +494,18 @@ export function StylePage() {
                     <span><strong>Not true</strong><small>Omiryn should stop using this.</small></span>
                   </label>
                 </div>
-                <p className="privacy-note">{feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 ? "This is a high-confidence signal, so a short correction is required." : "Optional: add a correction or context, especially if the signal is only partly right."}</p>
-                <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder={feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 ? "Required: what did Omiryn get wrong?" : "Optional note"} />
+                {isCanonicalMemory(reviewItem) ? (
+                  <p className="privacy-note">Marking this as not true retracts it without deleting its evidence history.</p>
+                ) : (
+                  <>
+                    <p className="privacy-note">{requiresReviewReason(reviewItem, feedbackRating) ? "This is a high-confidence signal, so a short correction is required." : "Optional: add a correction or context, especially if the signal is only partly right."}</p>
+                    <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder={requiresReviewReason(reviewItem, feedbackRating) ? "Required: what did Omiryn get wrong?" : "Optional note"} />
+                  </>
+                )}
                 {error ? <p className="legacy-inline-error">{error}</p> : null}
                 <div className="confirm-actions">
-                  <button className="secondary-button" type="button" onClick={() => { setReviewFact(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewFact.id}>Cancel</button>
-                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewFact.id || (feedbackRating === "disagree" && (reviewFact.confidence || 0) >= 0.9 && reviewReason.trim().length < 8)}>{savingFactId === reviewFact.id ? "Saving..." : "Save feedback"}</button>
+                  <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
+                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id || (requiresReviewReason(reviewItem, feedbackRating) && reviewReason.trim().length < 8)}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
                 </div>
               </form>
             ) : (
@@ -408,39 +521,39 @@ export function StylePage() {
                 </label>
                 {error ? <p className="legacy-inline-error">{error}</p> : null}
                 <div className="confirm-actions">
-                  <button className="secondary-button" type="button" onClick={() => { setReviewFact(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewFact.id}>Cancel</button>
-                  <button type="submit" disabled={savingFactId === reviewFact.id}>{savingFactId === reviewFact.id ? "Saving..." : "Save privacy"}</button>
+                  <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
+                  <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save privacy"}</button>
                 </div>
               </form>
             )}
           </section>
         </div>
       ) : null}
-      {evidenceFact ? (
-        <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEvidenceFact(null); }}>
+      {evidenceItem ? (
+        <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEvidenceItem(null); }}>
           <section className="evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="evidence-title">
             <div className="evidence-dialog-header">
               <div>
                 <p className="eyebrow">Evidence</p>
-                <h2 id="evidence-title">{evidenceFact.label || evidenceFact.key}</h2>
+                <h2 id="evidence-title">{reviewItemTitle(evidenceItem)}</h2>
                 <p>These are the messages or source snippets Omiryn used for this signal.</p>
               </div>
-              <button className="evidence-close" type="button" onClick={() => setEvidenceFact(null)} aria-label="Close evidence"><span /></button>
+              <button className="evidence-close" type="button" onClick={() => setEvidenceItem(null)} aria-label="Close evidence"><span /></button>
             </div>
             <div className="evidence-summary">
-              <span>{confidenceLabel(evidenceFact.confidence)} · {Math.round((evidenceFact.confidence || 0) * 100)}%</span>
-              <span>{evidenceFact.evidence?.length || 0} evidence</span>
+              <span>{confidenceLabel(evidenceItem.confidence)} · {Math.round((evidenceItem.confidence || 0) * 100)}%</span>
+              <span>{evidenceItem.evidence?.length || 0} evidence</span>
             </div>
             <div className="evidence-list">
-              {evidenceFact.evidence?.length ? evidenceFact.evidence.map((item, index) => {
-                const href = evidenceHref(evidenceFact, item);
+              {evidenceItem.evidence?.length ? evidenceItem.evidence.map((item, index) => {
+                const href = evidenceHref(evidenceItem, item);
                 return (
                   <article className="evidence-item" key={index}>
                     <div className="evidence-item-body">
                       <span className="evidence-item-index">{index + 1}</span>
                       <blockquote>{evidenceText(item)}</blockquote>
                       <p>
-                        {evidenceSourceLabel(evidenceFact, item)}
+                        {evidenceSourceLabel(evidenceItem, item)}
                         {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open source</a></> : null}
                       </p>
                     </div>
@@ -536,32 +649,54 @@ function collectSignalValues(
   else output.push(text);
 }
 
+function isCanonicalMemory(item: ProfileFact | CanonicalMemory): item is CanonicalMemory {
+  return "kind" in item;
+}
+
+function reviewItemTitle(item: ProfileFact | CanonicalMemory) {
+  return isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key;
+}
+
+function requiresReviewReason(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree") {
+  return !isCanonicalMemory(item) && rating === "disagree" && (item.confidence || 0) >= 0.9;
+}
+
 function evidenceText(item: unknown) {
   if (typeof item === "string") return item;
   if (!item || typeof item !== "object") return "Evidence saved without preview text.";
   const row = item as Record<string, unknown>;
-  return String(row.text || row.quote || row.message || row.preview || "Evidence saved without preview text.");
+  return String(row.exact_quote || row.text || row.quote || row.message || row.preview || "Evidence saved without preview text.");
 }
 
-function evidenceSourceLabel(fact: ProfileFact, item: unknown) {
-  if (!item || typeof item !== "object") return humanizeLabel(fact.source_kind || "source");
+function evidenceSourceLabel(fact: ProfileFact | CanonicalMemory, item: unknown) {
+  const sourceKind = isCanonicalMemory(fact) ? "" : fact.source_kind || "";
+  if (!item || typeof item !== "object") return isCanonicalMemory(fact) ? "Source" : humanizeLabel(sourceKind || "source");
   const row = item as Record<string, unknown>;
-  if (row.conversation_id || fact.source_kind === "agent_chat") return "User message";
-  if (fact.source_kind === "whatsapp_import") return "WhatsApp import";
+  if (row.conversation_id || sourceKind === "agent_chat") return "User message";
+  if (sourceKind === "whatsapp_import") return "WhatsApp import";
   if (row.context_source_id) return "Saved memory";
-  if (fact.source_kind === "agent_deep_memory") return "Conversation memory";
-  return humanizeLabel(String(row.source_kind || fact.source_kind || "source"));
+  if (sourceKind === "agent_deep_memory") return "Conversation memory";
+  return humanizeLabel(String(row.source_kind || sourceKind || "source"));
 }
 
-function evidenceHref(fact: ProfileFact, item: unknown) {
+function evidenceHref(fact: ProfileFact | CanonicalMemory, item: unknown) {
   const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+  if (isCanonicalMemory(fact)) {
+    return canonicalMemoryEvidenceHref(
+      {
+        conversation_id: typeof row.conversation_id === "string" ? row.conversation_id : undefined,
+        message_index: typeof row.message_index === "number" ? row.message_index : null
+      },
+      window.location.origin
+    );
+  }
   const conversationId = String(row.conversation_id || (["agent_chat", "agent_deep_memory", "agent_conversation"].includes(String(fact.source_kind)) ? fact.source_id || "" : ""));
   if (!conversationId) return "";
   const url = new URL("/", window.location.origin);
   url.searchParams.set("conversation_id", conversationId);
   const messageIndex = row.message_index;
   if (typeof messageIndex === "number" || typeof messageIndex === "string") {
-    url.hash = `message-${messageIndex}`;
+    url.hash = "message-" + messageIndex;
   }
   return url.toString();
 }
