@@ -152,6 +152,67 @@ def update_agent_memory_allowed_uses(
         return _memory_from_row(connection, row)
 
 
+def review_agent_memory(
+    memory_id: str,
+    user_id: str,
+    rating: str,
+) -> dict[str, Any] | None:
+    """Apply an explicit owner review without deleting the memory audit trail."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    normalized_rating = str(rating).strip().lower()
+    if normalized_rating not in {"agree", "disagree"}:
+        raise ValueError("memory review rating must be agree or disagree")
+
+    with ENGINE.begin() as connection:
+        row = (
+            connection.execute(
+                select(agent_memories).where(
+                    agent_memories.c.id == memory_id,
+                    agent_memories.c.user_id == owner_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+
+        now = datetime.now(UTC)
+        if normalized_rating == "agree":
+            if row["status"] != MemoryStatus.ACTIVE.value:
+                raise ValueError("only active memories can be reinforced")
+            values = {
+                "confidence": max(float(row["confidence"]), 0.9),
+                "last_reinforced_at": now,
+                "updated_at": now,
+            }
+        else:
+            values = {
+                "status": MemoryStatus.RETRACTED.value,
+                "updated_at": now,
+            }
+
+        connection.execute(
+            agent_memories.update()
+            .where(
+                agent_memories.c.id == memory_id,
+                agent_memories.c.user_id == owner_id,
+            )
+            .values(**values)
+        )
+        updated = (
+            connection.execute(
+                select(agent_memories).where(
+                    agent_memories.c.id == memory_id,
+                    agent_memories.c.user_id == owner_id,
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return _memory_from_row(connection, updated)
+
+
 def delete_agent_memory(memory_id: str, user_id: str) -> bool:
     """Permanently delete one owned memory and its private supporting records."""
     owner_id = _require_user_id(user_id, "agent memory")
@@ -717,5 +778,6 @@ __all__ = [
     "delete_agent_memory",
     "get_agent_memory",
     "list_agent_memories",
+    "review_agent_memory",
     "update_agent_memory_allowed_uses",
 ]
