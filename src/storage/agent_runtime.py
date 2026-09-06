@@ -466,6 +466,68 @@ def list_agent_usage_events(
     return [_agent_usage_event_from_row(row) for row in rows]
 
 
+def latest_agent_usage_event_id(
+    conversation_id: str,
+    user_id: str,
+    request_kind: str,
+) -> str | None:
+    """Return the latest matching event ID without exposing its payload."""
+    owner_id = _require_user_id(user_id, "agent usage event")
+    with ENGINE.begin() as connection:
+        return connection.execute(
+            select(agent_usage_events.c.id)
+            .where(
+                agent_usage_events.c.conversation_id == conversation_id,
+                agent_usage_events.c.user_id == owner_id,
+                agent_usage_events.c.request_kind == request_kind,
+            )
+            .order_by(
+                agent_usage_events.c.created_at.desc(),
+                agent_usage_events.c.id.desc(),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+
+
+def attach_agent_usage_result(
+    conversation_id: str,
+    user_id: str,
+    request_kind: str,
+    result_summary: dict[str, Any],
+    *,
+    previous_event_id: str | None = None,
+) -> bool:
+    """Attach post-call outcome counts to the latest matching model usage event."""
+    owner_id = _require_user_id(user_id, "agent usage result")
+    with ENGINE.begin() as connection:
+        row = (
+            connection.execute(
+                select(agent_usage_events)
+                .where(
+                    agent_usage_events.c.conversation_id == conversation_id,
+                    agent_usage_events.c.user_id == owner_id,
+                    agent_usage_events.c.request_kind == request_kind,
+                )
+                .order_by(
+                    agent_usage_events.c.created_at.desc(),
+                    agent_usage_events.c.id.desc(),
+                )
+                .limit(1)
+            )
+            .mappings()
+            .first()
+        )
+        if row is None or row["id"] == previous_event_id:
+            return False
+        raw_usage = {**(row["raw_usage_json"] or {}), "result_summary": result_summary}
+        connection.execute(
+            agent_usage_events.update()
+            .where(agent_usage_events.c.id == row["id"])
+            .values(raw_usage_json=raw_usage)
+        )
+    return True
+
+
 def _agent_usage_event_from_row(row: Any) -> dict[str, Any]:
     raw_usage = row["raw_usage_json"] or {}
     prompt_tokens = _usage_token_value(
@@ -499,6 +561,7 @@ def _agent_usage_event_from_row(row: Any) -> dict[str, Any]:
         "latency_ms": row["latency_ms"],
         "estimated_cost_usd": row["estimated_cost_usd"],
         "error": row["error"],
+        "result_summary": raw_usage.get("result_summary"),
         "raw_usage": raw_usage,
         "created_at": _isoformat_utc(row["created_at"]),
     }

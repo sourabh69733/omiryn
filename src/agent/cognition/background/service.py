@@ -7,13 +7,20 @@ from dataclasses import replace
 from typing import Any
 
 from agent.config import agent_pipeline_config
+from agent.observability.usage import BACKGROUND_COGNITION, MEMORY_SHADOW_EXTRACT
 from agent.context_engine.conversation_engine.state import (
     apply_validated_thread_proposal,
     background_thread_candidates,
 )
 from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
-from storage import list_agent_memories, list_data_point_extraction_debug, list_profile_facts
+from storage import (
+    attach_agent_usage_result,
+    latest_agent_usage_event_id,
+    list_agent_memories,
+    list_data_point_extraction_debug,
+    list_profile_facts,
+)
 from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
@@ -145,14 +152,38 @@ async def run_background_cognition(
             "operation_count": 0,
         }
 
+    memory_version = agent_pipeline_config().memory_contract_version
+    request_kind = BACKGROUND_COGNITION if memory_version == 3 else MEMORY_SHADOW_EXTRACT
+    previous_usage_event_id = latest_agent_usage_event_id(
+        conversation_id, user_id, request_kind
+    )
     try:
-        return await _run_claimed_background_cognition(
+        result = await _run_claimed_background_cognition(
             batch=batch,
             state=state,
             model=model,
         )
+        attach_agent_usage_result(
+            conversation_id,
+            user_id,
+            request_kind,
+            _usage_result_summary(result),
+            previous_event_id=previous_usage_event_id,
+        )
+        return result
     finally:
         release_processing_batch(batch.batch_key, user_id, lease_owner)
+
+
+def _usage_result_summary(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep the usage-facing cognition result small and non-sensitive."""
+    return {
+        "status": str(result.get("status") or "unknown"),
+        "memory_operations": int(result.get("operation_count") or 0),
+        "memories_applied": int(result.get("applied_count") or 0),
+        "memories_deferred": int(result.get("deferred_count") or 0),
+        "thread_operations_applied": int(result.get("thread_applied_count") or 0),
+    }
 
 
 async def _run_claimed_background_cognition(
