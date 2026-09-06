@@ -88,6 +88,10 @@ def save_evaluation_reports(
 
 
 def render_markdown_report(payload: dict[str, Any]) -> str:
+    if payload.get("stage") == "memory_retrieval_stress_eval":
+        from agent.evals.memory.retrieval_report import render_retrieval_stress_markdown
+
+        return render_retrieval_stress_markdown(payload)
     result = _result_label(payload)
     run = payload.get("run") or {}
     companion = payload.get("companion") or {}
@@ -840,6 +844,7 @@ def _report_stem(payload: dict[str, Any], timestamp: datetime) -> str:
         "memory_judge_calibration": "memory_judge_calibration",
         "memory_shadow_eval": "memory_shadow",
         "memory_v3_eval": "memory_v3",
+        "memory_retrieval_stress_eval": "memory_retrieval",
         "judge_calibration": "calibration",
         "execution_error": "error",
     }.get(str(payload.get("stage") or ""), "evaluation")
@@ -881,6 +886,7 @@ def _append_history(
                     "thread_management_shadow_eval",
                     "memory_shadow_eval",
                     "memory_v3_eval",
+                    "memory_retrieval_stress_eval",
                 }
                 else (
                     f"{payload.get('conversation_judge_calibration', {}).get('completed_cases', 0)}/"
@@ -926,6 +932,7 @@ def _history_score(payload: dict[str, Any]) -> str:
         "thread_management_shadow_eval",
         "memory_shadow_eval",
         "memory_v3_eval",
+        "memory_retrieval_stress_eval",
     }:
         summary = payload.get("summary") or {}
         total = summary.get("total", 0)
