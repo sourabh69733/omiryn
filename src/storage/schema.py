@@ -185,6 +185,26 @@ Index(
     agent_memory_evidence.c.conversation_id,
 )
 
+# User reviews are append-only so later corrections never erase earlier feedback.
+agent_memory_reviews = Table(
+    "agent_memory_reviews",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("memory_id", String, nullable=False),
+    Column("rating", String, nullable=False),
+    Column("reason", String, nullable=True),
+    Column("comment", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "ix_agent_memory_reviews_user_memory_created",
+    agent_memory_reviews.c.user_id,
+    agent_memory_reviews.c.memory_id,
+    agent_memory_reviews.c.created_at,
+)
+
 # Threads represent resumable subjects, not classifications for every message.
 # A thread is user-owned and records its first/last session so it may span chats.
 conversation_threads = Table(
