@@ -13,3 +13,14 @@ test("canonical memory cards expose evidence review and usage controls", () => {
     { id: "usage", label: "Usage" }
   ]);
 });
+
+
+test("describes the latest saved canonical memory review", () => {
+  const reviewText = (presentation as unknown as {
+    canonicalMemoryReviewText?: (feedback?: { rating?: string } | null) => string;
+  }).canonicalMemoryReviewText;
+  assert.equal(typeof reviewText, "function");
+  assert.equal(reviewText!({ rating: "agree" }), "Review saved: feels right.");
+  assert.equal(reviewText!({ rating: "disagree" }), "Review saved: not true.");
+  assert.equal(reviewText!(null), "");
+});
