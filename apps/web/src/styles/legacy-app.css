@@ -6795,8 +6795,14 @@ p {
   box-shadow: 0 12px 28px rgba(38, 53, 59, 0.08);
 }
 
+.signal-review-card.is-approved {
+  border-color: #b9ddd1;
+  background: #f8fcfb;
+}
+
 .signal-review-card.is-rejected {
-  background: #fffafa;
+  border-color: #edcaca;
+  background: #fff8f8;
 }
 
 .profile-fact-card-top {
@@ -7111,6 +7117,31 @@ p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.signal-review-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.signal-review-reasons button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 7px 10px;
+}
+
+.signal-review-reasons button.selected {
+  border-color: #d8b2b2;
+  color: #8a3f3f;
+  background: #fff1f1;
 }
 
 .signal-review-form textarea {
