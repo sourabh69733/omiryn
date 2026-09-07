@@ -1040,6 +1040,14 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(confirmed.json()["status"], "active")
         self.assertGreaterEqual(confirmed.json()["confidence"], 0.9)
         self.assertIsNotNone(confirmed.json()["last_reinforced_at"])
+        self.assertEqual(confirmed.json()["feedback"]["rating"], "agree")
+        self.assertEqual(confirmed.json()["feedback"]["review_count"], 1)
+        self.assertIsNotNone(confirmed.json()["feedback"]["created_at"])
+        self.assertIsNotNone(confirmed.json()["feedback"]["updated_at"])
+
+        listed = self.client.get("/api/me/memories").json()["memories"][0]
+        self.assertEqual(listed["feedback"]["rating"], "agree")
+        self.assertEqual(listed["feedback"]["review_count"], 1)
 
         rejected = self.client.post(
             f"/api/me/memories/{memory['id']}/review",
@@ -1047,7 +1055,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         )
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.json()["status"], "retracted")
+        self.assertEqual(rejected.json()["feedback"]["rating"], "disagree")
+        self.assertEqual(rejected.json()["feedback"]["review_count"], 2)
         self.assertEqual(get_agent_memory(memory["id"], "test-user")["status"], "retracted")
+
+        listed = self.client.get("/api/me/memories").json()["memories"][0]
+        self.assertEqual(listed["feedback"]["rating"], "disagree")
+        self.assertEqual(listed["feedback"]["review_count"], 2)
 
     def test_user_cannot_review_another_users_v3_memory(self) -> None:
         save_conversation(
