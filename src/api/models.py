@@ -51,6 +51,8 @@ class MemoryPermissionsPatch(BaseModel):
 
 class MemoryReviewCreate(BaseModel):
     rating: DataPointFeedbackRating
+    reason: str | None = Field(default=None, max_length=80)
+    comment: str | None = Field(default=None, max_length=1000)
 
 
 class SourcedString(BaseModel):
