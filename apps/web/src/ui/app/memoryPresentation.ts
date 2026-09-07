@@ -58,3 +58,33 @@ export function canonicalMemoryEvidenceHref(
   }
   return url.toString();
 }
+
+
+export function partitionCanonicalMemories(memories: CanonicalMemory[]): {
+  active: CanonicalMemory[];
+  rejected: CanonicalMemory[];
+} {
+  return {
+    active: memories.filter((memory) => memory.status !== "retracted"),
+    rejected: memories.filter((memory) => memory.status === "retracted")
+  };
+}
+
+export function canonicalMemoryCardTone(memory: CanonicalMemory): "is-approved" | "is-rejected" | "" {
+  if (memory.status === "retracted") return "is-rejected";
+  if (memory.feedback?.rating === "agree") return "is-approved";
+  return "";
+}
+
+
+export function canonicalMemoryReviewPayload(
+  rating: "agree" | "disagree",
+  reason: string,
+  comment: string
+): { rating: "agree" | "disagree"; reason: string | null; comment: string | null } {
+  return {
+    rating,
+    reason: reason.trim() || null,
+    comment: comment.trim() || null
+  };
+}

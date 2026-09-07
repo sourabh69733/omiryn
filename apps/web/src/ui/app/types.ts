@@ -84,6 +84,14 @@ export type CanonicalMemory = {
   occurred_at?: string | null;
   valid_until?: string | null;
   updated_at?: string | null;
+  feedback?: {
+    rating?: "agree" | "disagree";
+    reason?: string | null;
+    comment?: string | null;
+    review_count?: number;
+    created_at?: string;
+    updated_at?: string;
+  } | null;
   evidence?: Array<{
     conversation_id?: string;
     message_id?: string | null;

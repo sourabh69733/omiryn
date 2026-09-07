@@ -2,7 +2,14 @@ import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, partitionCanonicalMemories } from "../memoryPresentation";
+
+const memoryReviewReasons = [
+  { value: "incorrect", label: "Incorrect" },
+  { value: "outdated", label: "Outdated" },
+  { value: "missing_context", label: "Missing context" },
+  { value: "not_about_me", label: "Not about me" }
+];
 
 export function StylePage() {
   const [data, setData] = useState<ProfileResponse | null>(null);
@@ -18,6 +25,7 @@ export function StylePage() {
   const [reviewItem, setReviewItem] = useState<ProfileFact | CanonicalMemory | null>(null);
   const [reviewMode, setReviewMode] = useState<"feedback" | "privacy" | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<"agree" | "disagree">("agree");
+  const [feedbackReason, setFeedbackReason] = useState("");
   const [reviewReason, setReviewReason] = useState("");
   const [privacyForChat, setPrivacyForChat] = useState(false);
   const [privacyForMatching, setPrivacyForMatching] = useState(false);
@@ -38,7 +46,9 @@ export function StylePage() {
   useEffect(() => { load().catch((caught) => setError(caught.message)); }, []);
 
   const sources = [...(data?.memory_sources || []), ...(data?.style_sources || [])];
-  const canonicalSections = groupCanonicalMemories(canonicalMemories);
+  const canonicalMemoryGroups = partitionCanonicalMemories(canonicalMemories);
+  const canonicalSections = groupCanonicalMemories(canonicalMemoryGroups.active);
+  const showRejectedCanonical = visibleSectionCounts["rejected-canonical"] !== undefined;
   const facts = data?.learned_facts || [];
   const activeFacts = facts.filter((fact) => fact.status !== "rejected");
   const rejectedFacts = facts.filter((fact) => fact.status === "rejected");
@@ -114,6 +124,7 @@ export function StylePage() {
       trackAppEvent(eventName, { fact_category: fact.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: fact.id });
       setReviewItem(null);
       setReviewMode(null);
+      setFeedbackReason("");
       setReviewReason("");
       await load();
     } catch (caught) {
@@ -126,9 +137,10 @@ export function StylePage() {
   function openFeedbackFlow(item: ProfileFact | CanonicalMemory, initialRating?: "agree" | "disagree") {
     setReviewItem(item);
     setReviewMode("feedback");
-    const savedRating = isCanonicalMemory(item) ? undefined : item.feedback?.rating;
+    const savedRating = item.feedback?.rating;
     setFeedbackRating(initialRating || (savedRating === "disagree" ? "disagree" : "agree"));
-    setReviewReason("");
+    setFeedbackReason(item.feedback?.reason || "");
+    setReviewReason(item.feedback?.comment || "");
     setError("");
   }
 
@@ -141,7 +153,7 @@ export function StylePage() {
     setError("");
   }
 
-  async function saveSignalFeedback(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree", comment = "") {
+  async function saveSignalFeedback(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree", comment = "", reason = "") {
     setSavingFactId(item.id);
     setError("");
     try {
@@ -152,9 +164,9 @@ export function StylePage() {
       const response = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(canonical ? { rating } : {
+        body: JSON.stringify(canonical ? canonicalMemoryReviewPayload(rating, reason, comment) : {
           rating,
-          reason: rating === "disagree" ? "wrong" : "feels_right",
+          reason: reason || (rating === "disagree" ? "wrong" : "feels_right"),
           comment: comment.trim() || null
         })
       });
@@ -163,6 +175,7 @@ export function StylePage() {
       trackAppEvent("learned_signal_feedback_sent", { fact_category: factCategory, rating }, { page: "style", target_type: canonical ? "agent_memory" : "profile_fact", target_id: item.id });
       setReviewItem(null);
       setReviewMode(null);
+      setFeedbackReason("");
       setReviewReason("");
       await load();
     } catch (caught) {
@@ -175,11 +188,7 @@ export function StylePage() {
   async function submitFeedbackFlow(event: FormEvent) {
     event.preventDefault();
     if (!reviewItem) return;
-    if (requiresReviewReason(reviewItem, feedbackRating) && reviewReason.trim().length < 8) {
-      setError("Add a short reason so Omiryn can correct a high-confidence signal.");
-      return;
-    }
-    await saveSignalFeedback(reviewItem, feedbackRating, reviewReason);
+    await saveSignalFeedback(reviewItem, feedbackRating, reviewReason, feedbackReason);
   }
 
   async function submitPrivacyFlow(event: FormEvent) {
@@ -230,8 +239,9 @@ export function StylePage() {
     const usageControl = controls.find((control) => control.id === "usage");
     const active = !memory.status || memory.status === "active";
     const isSaving = savingFactId === memory.id;
+    const cardTone = canonicalMemoryCardTone(memory);
     return (
-      <article className="profile-fact-card signal-review-card" key={memory.id}>
+      <article className={`profile-fact-card signal-review-card ${cardTone}`} key={memory.id}>
         <div className="profile-fact-card-top">
           <div>
             <strong>{humanizeLabel(memory.key)}</strong>
@@ -250,13 +260,10 @@ export function StylePage() {
             </div>
           </div>
         </div>
-        {/* <p className="privacy-note">Allowed for: {(memory.allowed_uses || []).map(humanizeLabel).join(" · ") || "not currently used"}</p> */}
-        {active ? (
-          <div className="signal-card-actions">
-            <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(memory)}>{reviewControl?.label}</button>
-            <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(memory)}>{usageControl?.label}</button>
-          </div>
-        ) : null}
+        <div className="signal-card-actions">
+          <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(memory)}>{reviewControl?.label}</button>
+          {active ? <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(memory)}>{usageControl?.label}</button> : null}
+        </div>
       </article>
     );
   }
@@ -396,7 +403,29 @@ export function StylePage() {
             <span className="profile-fact-total">{canonicalMemories.length} memories</span>
           </div>
           <div className="profile-fact-groups">
-            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <div className="profile-facts-empty"><strong>No V3 memories yet.</strong><span>Background cognition creates them after enough meaningful conversation.</span></div>}
+            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <div className="profile-facts-empty"><strong>No active V3 memories yet.</strong><span>Background cognition creates them after enough meaningful conversation.</span></div>}
+            {canonicalMemoryGroups.rejected.length ? (
+              <div className="signal-archive-toggle-row">
+                <button
+                  className="secondary-button signal-show-more"
+                  type="button"
+                  onClick={() => setVisibleSectionCounts((current) => {
+                    const next = { ...current };
+                    if (showRejectedCanonical) delete next["rejected-canonical"];
+                    else next["rejected-canonical"] = 1;
+                    return next;
+                  })}
+                >
+                  {showRejectedCanonical ? "Hide rejected memories" : `Show rejected memories (${canonicalMemoryGroups.rejected.length})`}
+                </button>
+              </div>
+            ) : null}
+            {showRejectedCanonical ? (
+              <section className="profile-fact-group signal-section signal-section-not-used">
+                <div className="profile-fact-group-heading"><div><h3>Rejected memories</h3><p>Memories you marked as not true. Review one again to restore it.</p></div><span>{canonicalMemoryGroups.rejected.length}</span></div>
+                <div className="profile-fact-list">{canonicalMemoryGroups.rejected.map(renderCanonicalMemory)}</div>
+              </section>
+            ) : null}
           </div>
         </section>
         <section className="profile-panel profile-panel-wide style-learning-panel">
@@ -486,7 +515,7 @@ export function StylePage() {
               <form className="signal-review-form" onSubmit={(event) => void submitFeedbackFlow(event)}>
                 <div className="signal-feedback-options" role="radiogroup" aria-label="Signal feedback">
                   <label className={feedbackRating === "agree" ? "selected" : ""}>
-                    <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => setFeedbackRating("agree")} />
+                    <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => { setFeedbackRating("agree"); setFeedbackReason(""); }} />
                     <span><strong>Feels right</strong><small>Omiryn can trust this more.</small></span>
                   </label>
                   <label className={feedbackRating === "disagree" ? "selected" : ""}>
@@ -494,18 +523,29 @@ export function StylePage() {
                     <span><strong>Not true</strong><small>Omiryn should stop using this.</small></span>
                   </label>
                 </div>
-                {isCanonicalMemory(reviewItem) ? (
-                  <p className="privacy-note">Marking this as not true retracts it without deleting its evidence history.</p>
-                ) : (
-                  <>
-                    <p className="privacy-note">{requiresReviewReason(reviewItem, feedbackRating) ? "This is a high-confidence signal, so a short correction is required." : "Optional: add a correction or context, especially if the signal is only partly right."}</p>
-                    <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder={requiresReviewReason(reviewItem, feedbackRating) ? "Required: what did Omiryn get wrong?" : "Optional note"} />
-                  </>
-                )}
+                {feedbackRating === "disagree" ? (
+                  <div>
+                    <p className="privacy-note">What needs correcting? Choose a tag if helpful.</p>
+                    <div className="signal-review-reasons" aria-label="Correction reason">
+                      {memoryReviewReasons.map((reason) => (
+                        <button
+                          className={feedbackReason === reason.value ? "selected" : ""}
+                          key={reason.value}
+                          type="button"
+                          onClick={() => setFeedbackReason((current) => current === reason.value ? "" : reason.value)}
+                        >
+                          {reason.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder="Add context or a correction (optional)" />
+                {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">This moves the memory to the hidden rejected section without deleting its evidence.</p> : null}
                 {error ? <p className="legacy-inline-error">{error}</p> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
-                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id || (requiresReviewReason(reviewItem, feedbackRating) && reviewReason.trim().length < 8)}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
+                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
                 </div>
               </form>
             ) : (
@@ -655,10 +695,6 @@ function isCanonicalMemory(item: ProfileFact | CanonicalMemory): item is Canonic
 
 function reviewItemTitle(item: ProfileFact | CanonicalMemory) {
   return isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key;
-}
-
-function requiresReviewReason(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree") {
-  return !isCanonicalMemory(item) && rating === "disagree" && (item.confidence || 0) >= 0.9;
 }
 
 function evidenceText(item: unknown) {
