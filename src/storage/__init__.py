@@ -16,6 +16,7 @@ from .feedback import *
 from .memory_processing import *
 from .memory_applications import *
 from .memories import *
+from .memory_reviews import *
 from .thread_applications import *
 from .user_deletion import *
 from .utils import (
