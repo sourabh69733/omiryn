@@ -13,7 +13,7 @@ from sqlalchemy import select
 import storage
 from agent.memory_engine.memories import retrieve_agent_memories_for_reply
 from security.encryption import is_encrypted_blob
-from storage.schema import agent_memories, agent_memory_evidence
+from storage.schema import agent_memories, agent_memory_evidence, agent_memory_reviews
 
 
 USER_ID = "memory-v3-user"
@@ -125,6 +125,7 @@ def test_evidence_cannot_reference_another_users_conversation() -> None:
 
 def test_delete_one_memory_removes_its_evidence_and_reply_access() -> None:
     saved = storage.create_agent_memory(_payload())
+    storage.review_agent_memory(saved["id"], USER_ID, "agree")
 
     deleted = storage.delete_agent_memory(saved["id"], USER_ID)
 
@@ -137,7 +138,13 @@ def test_delete_one_memory_removes_its_evidence_and_reply_access() -> None:
                 agent_memory_evidence.c.memory_id == saved["id"]
             )
         ).first()
+        review = connection.execute(
+            select(agent_memory_reviews).where(
+                agent_memory_reviews.c.memory_id == saved["id"]
+            )
+        ).first()
     assert evidence is None
+    assert review is None
 
 
 def test_delete_one_memory_is_scoped_to_its_owner() -> None:
@@ -180,9 +187,11 @@ def test_update_memory_permissions_is_scoped_to_its_owner() -> None:
 
 def test_user_deletion_removes_memory_and_evidence() -> None:
     saved = storage.create_agent_memory(_payload())
+    storage.review_agent_memory(saved["id"], USER_ID, "agree")
 
     result = storage.delete_user_private_data(USER_ID)
 
+    assert result["deleted"]["agent_memory_reviews"] == 1
     assert result["deleted"]["agent_memory_evidence"] == 1
     assert result["deleted"]["agent_memories"] == 1
     assert storage.get_agent_memory(saved["id"], USER_ID) is None

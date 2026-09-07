@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import storage
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -1050,18 +1051,39 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(listed["feedback"]["review_count"], 1)
 
         rejected = self.client.post(
-            f"/api/me/memories/{memory['id']}/review",
-            json={"rating": "disagree"},
+            f"/api/me/memories/{memory["id"]}/review",
+            json={
+                "rating": "disagree",
+                "reason": "outdated",
+                "comment": "I moved recently.",
+            },
         )
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.json()["status"], "retracted")
         self.assertEqual(rejected.json()["feedback"]["rating"], "disagree")
+        self.assertEqual(rejected.json()["feedback"]["reason"], "outdated")
+        self.assertEqual(rejected.json()["feedback"]["comment"], "I moved recently.")
         self.assertEqual(rejected.json()["feedback"]["review_count"], 2)
         self.assertEqual(get_agent_memory(memory["id"], "test-user")["status"], "retracted")
 
+        restored = self.client.post(
+            f"/api/me/memories/{memory["id"]}/review",
+            json={"rating": "agree"},
+        )
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.json()["status"], "active")
+        self.assertEqual(restored.json()["feedback"]["review_count"], 3)
+
         listed = self.client.get("/api/me/memories").json()["memories"][0]
-        self.assertEqual(listed["feedback"]["rating"], "disagree")
-        self.assertEqual(listed["feedback"]["review_count"], 2)
+        self.assertEqual(listed["feedback"]["rating"], "agree")
+        self.assertEqual(listed["feedback"]["review_count"], 3)
+        reviews = storage.list_agent_memory_reviews("test-user", memory["id"])
+        self.assertEqual(
+            [review["rating"] for review in reviews],
+            ["agree", "disagree", "agree"],
+        )
+        self.assertEqual(reviews[1]["reason"], "outdated")
+        self.assertEqual(reviews[1]["comment"], "I moved recently.")
 
     def test_user_cannot_review_another_users_v3_memory(self) -> None:
         save_conversation(
