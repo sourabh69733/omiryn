@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from security.auth import CurrentUser, require_user
 from storage import (
     delete_agent_memory,
+    latest_agent_memory_reviews,
     list_agent_memories,
     review_agent_memory,
     update_agent_memory_allowed_uses,
@@ -22,11 +23,22 @@ router = APIRouter()
 async def get_me_memories(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
-    memories = [_user_memory_payload(memory) for memory in list_agent_memories(user.id)]
+    stored_memories = list_agent_memories(user.id)
+    reviews = latest_agent_memory_reviews(
+        user.id,
+        [str(memory["id"]) for memory in stored_memories],
+    )
+    memories = [
+        _user_memory_payload(memory, reviews.get(str(memory["id"])))
+        for memory in stored_memories
+    ]
     return {"count": len(memories), "memories": memories}
 
 
-def _user_memory_payload(memory: dict[str, object]) -> dict[str, object]:
+def _user_memory_payload(
+    memory: dict[str, object],
+    feedback: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Expose user-controlled memory fields without runtime implementation details."""
     fields = (
         "id",
@@ -59,7 +71,14 @@ def _user_memory_payload(memory: dict[str, object]) -> dict[str, object]:
         for item in memory.get("evidence") or []
         if isinstance(item, dict)
     ]
-    return {**{field: memory.get(field) for field in fields}, "evidence": evidence}
+    latest_feedback = feedback or (
+        memory.get("feedback") if isinstance(memory.get("feedback"), dict) else None
+    )
+    return {
+        **{field: memory.get(field) for field in fields},
+        "evidence": evidence,
+        "feedback": latest_feedback,
+    }
 
 
 @router.patch("/api/me/memories/{memory_id}/permissions")
@@ -75,7 +94,8 @@ async def patch_me_memory_permissions(
     )
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found.")
-    return _user_memory_payload(memory)
+    feedback = latest_agent_memory_reviews(user.id, [memory_id]).get(memory_id)
+    return _user_memory_payload(memory, feedback)
 
 
 @router.post("/api/me/memories/{memory_id}/review")
@@ -85,7 +105,13 @@ async def review_me_memory(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
     try:
-        memory = review_agent_memory(memory_id, user.id, payload.rating)
+        memory = review_agent_memory(
+            memory_id,
+            user.id,
+            payload.rating,
+            reason=payload.reason,
+            comment=payload.comment,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if memory is None:
