@@ -21,6 +21,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "memory_operation_applications",
     "agent_memories",
     "agent_memory_evidence",
+    "agent_memory_reviews",
     "conversation_threads",
     "thread_operation_applications",
     "agent_usage_events",
@@ -155,6 +156,7 @@ def _ensure_runtime_columns() -> None:
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
         "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
+        "agent_memory_reviews": ("reason", "comment"),
         "agent_conversations": (
             "user_id",
             "agent_provider",
