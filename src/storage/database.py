@@ -156,7 +156,7 @@ def _ensure_runtime_columns() -> None:
         "agent_usage_events": ("user_id",),
         "conversation_context_sources": ("user_id",),
         "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
-        "agent_memory_reviews": ("reason", "comment"),
+        "agent_memory_reviews": ("reasons", "comment"),
         "agent_conversations": (
             "user_id",
             "agent_provider",
@@ -175,7 +175,7 @@ def _ensure_runtime_columns() -> None:
                     column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
                     if column_name == "age":
                         column_type = "INTEGER"
-                    if column_name in {"profile_photo_urls", "profile_photo_file_names"}:
+                    if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
                     if column_name == "fact_type":

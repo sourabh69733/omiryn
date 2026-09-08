@@ -193,7 +193,7 @@ agent_memory_reviews = Table(
     Column("user_id", String, nullable=False),
     Column("memory_id", String, nullable=False),
     Column("rating", String, nullable=False),
-    Column("reason", String, nullable=True),
+    Column("reasons", JSON, nullable=False, default=list),
     Column("comment", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),

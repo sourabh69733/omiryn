@@ -21,7 +21,7 @@ def review_agent_memory(
     user_id: str,
     rating: str,
     *,
-    reason: str | None = None,
+    reasons: list[str] | None = None,
     comment: str | None = None,
 ) -> dict[str, Any] | None:
     """Record owner feedback and update the reviewed memory in one transaction."""
@@ -29,7 +29,11 @@ def review_agent_memory(
     normalized_rating = str(rating).strip().lower()
     if normalized_rating not in {"agree", "disagree"}:
         raise ValueError("memory review rating must be agree or disagree")
-    normalized_reason = str(reason or "").strip().lower().replace(" ", "_")[:80] or None
+    normalized_reasons: list[str] = []
+    for reason in reasons or []:
+        normalized_reason = str(reason).strip().lower().replace(" ", "_")[:80]
+        if normalized_reason and normalized_reason not in normalized_reasons:
+            normalized_reasons.append(normalized_reason)
     normalized_comment = str(comment or "").strip()[:1000] or None
 
     with ENGINE.begin() as connection:
@@ -75,7 +79,7 @@ def review_agent_memory(
                 user_id=owner_id,
                 memory_id=memory_id,
                 rating=normalized_rating,
-                reason=normalized_reason,
+                reasons=normalized_reasons,
                 comment=normalized_comment,
                 created_at=now,
                 updated_at=now,
@@ -164,7 +168,7 @@ def list_agent_memory_reviews(user_id: str, memory_id: str) -> list[dict[str, An
 def _review_payload(row: Any, review_count: int) -> dict[str, Any]:
     return {
         "rating": row["rating"],
-        "reason": row["reason"],
+        "reasons": list(row["reasons"] or []),
         "comment": row["comment"],
         "review_count": review_count,
         "created_at": _isoformat_utc(row["created_at"]),

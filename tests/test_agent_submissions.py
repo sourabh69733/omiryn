@@ -1054,14 +1054,17 @@ class AgentSubmissionApiTest(unittest.TestCase):
             f"/api/me/memories/{memory["id"]}/review",
             json={
                 "rating": "disagree",
-                "reason": "outdated",
+                "reasons": ["outdated", "missing_context"],
                 "comment": "I moved recently.",
             },
         )
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.json()["status"], "retracted")
         self.assertEqual(rejected.json()["feedback"]["rating"], "disagree")
-        self.assertEqual(rejected.json()["feedback"]["reason"], "outdated")
+        self.assertEqual(
+            rejected.json()["feedback"]["reasons"],
+            ["outdated", "missing_context"],
+        )
         self.assertEqual(rejected.json()["feedback"]["comment"], "I moved recently.")
         self.assertEqual(rejected.json()["feedback"]["review_count"], 2)
         self.assertEqual(get_agent_memory(memory["id"], "test-user")["status"], "retracted")
@@ -1082,7 +1085,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
             [review["rating"] for review in reviews],
             ["agree", "disagree", "agree"],
         )
-        self.assertEqual(reviews[1]["reason"], "outdated")
+        self.assertEqual(
+            reviews[1]["reasons"],
+            ["outdated", "missing_context"],
+        )
         self.assertEqual(reviews[1]["comment"], "I moved recently.")
 
     def test_user_cannot_review_another_users_v3_memory(self) -> None:

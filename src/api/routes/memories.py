@@ -109,7 +109,7 @@ async def review_me_memory(
             memory_id,
             user.id,
             payload.rating,
-            reason=payload.reason,
+            reasons=payload.reasons,
             comment=payload.comment,
         )
     except ValueError as exc:
