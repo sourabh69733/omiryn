@@ -2,7 +2,7 @@ import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, partitionCanonicalMemories } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
 
 const memoryReviewReasons = [
   { value: "incorrect", label: "Incorrect" },
@@ -25,7 +25,7 @@ export function StylePage() {
   const [reviewItem, setReviewItem] = useState<ProfileFact | CanonicalMemory | null>(null);
   const [reviewMode, setReviewMode] = useState<"feedback" | "privacy" | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<"agree" | "disagree">("agree");
-  const [feedbackReason, setFeedbackReason] = useState("");
+  const [feedbackReasons, setFeedbackReasons] = useState<string[]>([]);
   const [reviewReason, setReviewReason] = useState("");
   const [privacyForChat, setPrivacyForChat] = useState(false);
   const [privacyForMatching, setPrivacyForMatching] = useState(false);
@@ -124,7 +124,7 @@ export function StylePage() {
       trackAppEvent(eventName, { fact_category: fact.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: fact.id });
       setReviewItem(null);
       setReviewMode(null);
-      setFeedbackReason("");
+      setFeedbackReasons([]);
       setReviewReason("");
       await load();
     } catch (caught) {
@@ -139,7 +139,7 @@ export function StylePage() {
     setReviewMode("feedback");
     const savedRating = item.feedback?.rating;
     setFeedbackRating(initialRating || (savedRating === "disagree" ? "disagree" : "agree"));
-    setFeedbackReason(item.feedback?.reason || "");
+    setFeedbackReasons(isCanonicalMemory(item) ? (item.feedback?.reasons || []) : (item.feedback?.reason ? [item.feedback.reason] : []));
     setReviewReason(item.feedback?.comment || "");
     setError("");
   }
@@ -153,7 +153,7 @@ export function StylePage() {
     setError("");
   }
 
-  async function saveSignalFeedback(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree", comment = "", reason = "") {
+  async function saveSignalFeedback(item: ProfileFact | CanonicalMemory, rating: "agree" | "disagree", comment = "", reasons: string[] = []) {
     setSavingFactId(item.id);
     setError("");
     try {
@@ -164,9 +164,9 @@ export function StylePage() {
       const response = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(canonical ? canonicalMemoryReviewPayload(rating, reason, comment) : {
+        body: JSON.stringify(canonical ? canonicalMemoryReviewPayload(rating, reasons, comment) : {
           rating,
-          reason: reason || (rating === "disagree" ? "wrong" : "feels_right"),
+          reason: reasons[0] || (rating === "disagree" ? "wrong" : "feels_right"),
           comment: comment.trim() || null
         })
       });
@@ -175,7 +175,7 @@ export function StylePage() {
       trackAppEvent("learned_signal_feedback_sent", { fact_category: factCategory, rating }, { page: "style", target_type: canonical ? "agent_memory" : "profile_fact", target_id: item.id });
       setReviewItem(null);
       setReviewMode(null);
-      setFeedbackReason("");
+      setFeedbackReasons([]);
       setReviewReason("");
       await load();
     } catch (caught) {
@@ -188,7 +188,7 @@ export function StylePage() {
   async function submitFeedbackFlow(event: FormEvent) {
     event.preventDefault();
     if (!reviewItem) return;
-    await saveSignalFeedback(reviewItem, feedbackRating, reviewReason, feedbackReason);
+    await saveSignalFeedback(reviewItem, feedbackRating, reviewReason, feedbackReasons);
   }
 
   async function submitPrivacyFlow(event: FormEvent) {
@@ -515,7 +515,7 @@ export function StylePage() {
               <form className="signal-review-form" onSubmit={(event) => void submitFeedbackFlow(event)}>
                 <div className="signal-feedback-options" role="radiogroup" aria-label="Signal feedback">
                   <label className={feedbackRating === "agree" ? "selected" : ""}>
-                    <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => { setFeedbackRating("agree"); setFeedbackReason(""); }} />
+                    <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => { setFeedbackRating("agree"); setFeedbackReasons([]); }} />
                     <span><strong>Feels right</strong><small>Omiryn can trust this more.</small></span>
                   </label>
                   <label className={feedbackRating === "disagree" ? "selected" : ""}>
@@ -529,10 +529,10 @@ export function StylePage() {
                     <div className="signal-review-reasons" aria-label="Correction reason">
                       {memoryReviewReasons.map((reason) => (
                         <button
-                          className={feedbackReason === reason.value ? "selected" : ""}
+                          className={feedbackReasons.includes(reason.value) ? "selected" : ""}
                           key={reason.value}
                           type="button"
-                          onClick={() => setFeedbackReason((current) => current === reason.value ? "" : reason.value)}
+                          onClick={() => setFeedbackReasons((current) => toggleCanonicalMemoryReviewReason(current, reason.value))}
                         >
                           {reason.label}
                         </button>

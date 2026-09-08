@@ -70,6 +70,12 @@ export function partitionCanonicalMemories(memories: CanonicalMemory[]): {
   };
 }
 
+export function toggleCanonicalMemoryReviewReason(selected: string[], reason: string): string[] {
+  return selected.includes(reason)
+    ? selected.filter((value) => value !== reason)
+    : [...selected, reason];
+}
+
 export function canonicalMemoryCardTone(memory: CanonicalMemory): "is-approved" | "is-rejected" | "" {
   if (memory.status === "retracted") return "is-rejected";
   if (memory.feedback?.rating === "agree") return "is-approved";
@@ -79,12 +85,12 @@ export function canonicalMemoryCardTone(memory: CanonicalMemory): "is-approved" 
 
 export function canonicalMemoryReviewPayload(
   rating: "agree" | "disagree",
-  reason: string,
+  reasons: string[],
   comment: string
-): { rating: "agree" | "disagree"; reason: string | null; comment: string | null } {
+): { rating: "agree" | "disagree"; reasons: string[]; comment: string | null } {
   return {
     rating,
-    reason: reason.trim() || null,
+    reasons,
     comment: comment.trim() || null
   };
 }

@@ -45,17 +45,27 @@ test("maps review state to a quiet card color state", () => {
 
 test("builds a canonical review payload from a tag and optional note", () => {
   const buildPayload = (presentation as unknown as {
-    canonicalMemoryReviewPayload?: (rating: "agree" | "disagree", reason: string, comment: string) => object;
+    canonicalMemoryReviewPayload?: (rating: "agree" | "disagree", reasons: string[], comment: string) => object;
   }).canonicalMemoryReviewPayload;
   assert.equal(typeof buildPayload, "function");
-  assert.deepEqual(buildPayload!("disagree", "outdated", "  I moved recently.  "), {
+  assert.deepEqual(buildPayload!("disagree", ["outdated", "missing_context"], "  I moved recently.  "), {
     rating: "disagree",
-    reason: "outdated",
+    reasons: ["outdated", "missing_context"],
     comment: "I moved recently."
   });
-  assert.deepEqual(buildPayload!("agree", "", ""), {
+  assert.deepEqual(buildPayload!("agree", [], ""), {
     rating: "agree",
-    reason: null,
+    reasons: [],
     comment: null
   });
+});
+
+
+test("toggles canonical review reasons independently", () => {
+  const toggle = (presentation as unknown as {
+    toggleCanonicalMemoryReviewReason?: (selected: string[], reason: string) => string[];
+  }).toggleCanonicalMemoryReviewReason;
+  assert.equal(typeof toggle, "function");
+  assert.deepEqual(toggle!(["outdated"], "missing_context"), ["outdated", "missing_context"]);
+  assert.deepEqual(toggle!(["outdated", "missing_context"], "outdated"), ["missing_context"]);
 });

@@ -86,7 +86,7 @@ export type CanonicalMemory = {
   updated_at?: string | null;
   feedback?: {
     rating?: "agree" | "disagree";
-    reason?: string | null;
+    reasons?: string[];
     comment?: string | null;
     review_count?: number;
     created_at?: string;
