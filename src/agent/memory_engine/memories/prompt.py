@@ -41,6 +41,16 @@ V3 memory rules:
 - New evidence-eligible user messages are the only source of durable memories.
 - Context messages, existing memories and handoff only resolve meaning and prevent duplicates.
 - Store personally true, useful information—not discussed subjects, examples, code or assistant claims.
+- Apply this admission test before proposing any memory. Every answer must be yes:
+  1. Attribution: does the evidence state something about this user or their lived relationships?
+  2. Entailment: does the evidence directly support the complete proposed meaning without inference?
+  3. Future utility: could remembering it materially improve later personalization, matching, or profile accuracy?
+  4. Specificity: is the value concrete enough to be useful rather than a topic name or conversational state?
+  5. Information gain: does it add or update knowledge rather than repeat the current request or existing memory?
+- Quoted third-party views, hypotheticals, role-play, tentative acknowledgements, task content and transient
+  conversational reactions fail admission unless the user separately makes an explicit durable self-statement.
+- A subject may still belong in thread_operation or handoff even when it must not become memory.
+- Prefer no memory over a weak or speculative memory; omission can be corrected later, false memory causes harm.
 {taxonomy_guidance}
 {value_guidance}
 - Be concrete: preserve named people, places, preferences and outcomes when explicitly stated.
