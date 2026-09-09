@@ -24,6 +24,7 @@ from storage import (
 from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
+from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
     MemoryProposalV3,
@@ -197,7 +198,10 @@ async def _run_claimed_background_cognition(
     user_id = batch.user_id
     config = agent_pipeline_config()
     memory_version = config.memory_contract_version
-    existing_memories = _existing_memory_context(user_id, memory_version)
+    evidence_text = " ".join(
+        message.content for message in batch.new_messages if message.role == "user"
+    )
+    existing_memories = _existing_memory_context(user_id, memory_version, evidence_text)
     thread_candidates = background_thread_candidates(
         conversation_id,
         user_id,
@@ -399,11 +403,15 @@ async def _run_claimed_background_cognition(
         }
 
 
-def _existing_memory_context(user_id: str, memory_version: int) -> list[dict[str, Any]]:
+def _existing_memory_context(
+    user_id: str, memory_version: int, evidence_text: str = ""
+) -> list[dict[str, Any]]:
     if memory_version == 3:
-        memories = [
-            memory for memory in list_agent_memories(user_id) if memory.get("status") == "active"
-        ]
+        memories = select_reconciliation_candidates(
+            list_agent_memories(user_id),
+            evidence_text,
+            limit=MAX_EXISTING_MEMORIES,
+        )
         return [
             {
                 "id": memory["id"],
@@ -411,9 +419,12 @@ def _existing_memory_context(user_id: str, memory_version: int) -> list[dict[str
                 "purposes": memory["purposes"],
                 "key": memory["key"],
                 "value": memory["value"],
+                "sensitivity": memory["sensitivity"],
                 "confidence": memory["confidence"],
+                "importance": memory["importance"],
+                "updated_at": memory["updated_at"],
             }
-            for memory in memories[:MAX_EXISTING_MEMORIES]
+            for memory in memories
         ]
 
     memories = list_profile_facts(user_id, statuses={"active"})
