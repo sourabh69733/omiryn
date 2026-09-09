@@ -409,6 +409,68 @@ MEMORY_V3_SCENARIOS = (
         tags=("memory_v3", "episodic", "personalization", "specific_value"),
     ),
     MemoryV3Scenario(
+        id="ignore_quoted_third_party_preference",
+        description="A quoted preference belongs to its speaker and must not become the user's memory.",
+        messages=(
+            {
+                "role": "user",
+                "content": 'My friend said, "I only date doctors." What do you think about that?',
+            },
+        ),
+        expected_decision="no_change",
+        tags=("memory_v3", "admission_quality", "attribution", "no_change"),
+    ),
+    MemoryV3Scenario(
+        id="ignore_hypothetical_self_description",
+        description="A conditional possibility is not durable knowledge about the user.",
+        messages=(
+            {
+                "role": "user",
+                "content": "If I moved to Goa someday, I might want someone who loves beaches.",
+            },
+        ),
+        expected_decision="no_change",
+        tags=("memory_v3", "admission_quality", "hypothetical", "no_change"),
+    ),
+    MemoryV3Scenario(
+        id="ignore_transient_task_content",
+        description="Content requested for a temporary task is not a user fact or preference.",
+        messages=({"role": "user", "content": "For this example, print hello world in Python."},),
+        expected_decision="no_change",
+        tags=("memory_v3", "admission_quality", "task_content", "no_change"),
+    ),
+    MemoryV3Scenario(
+        id="ignore_ambiguous_acknowledgement",
+        description="A tentative reaction to an assistant inference does not confirm that inference.",
+        messages=(
+            {"role": "assistant", "content": "It sounds like you prefer adventurous people."},
+            {"role": "user", "content": "Maybe, I guess."},
+        ),
+        expected_decision="no_change",
+        tags=("memory_v3", "admission_quality", "uncertainty", "no_change"),
+    ),
+    MemoryV3Scenario(
+        id="capture_explicit_durable_preference",
+        description="A clear durable relationship constraint is useful matching memory.",
+        messages=(
+            {
+                "role": "user",
+                "content": "I am certain I want a long-term relationship with someone who does not want children.",
+            },
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="semantic",
+                required_purposes=("matching",),
+                value_concepts=("long-term", "children"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "admission_quality", "matching", "explicit_preference"),
+    ),
+    MemoryV3Scenario(
         id="classify_explicit_medical_fact_as_highly_sensitive",
         description="If an explicit medical fact is stored, it must carry the strongest sensitivity class.",
         messages=({"role": "user", "content": "I have a severe peanut allergy."},),
