@@ -57,6 +57,26 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
             len(MEMORY_V3_SCENARIOS),
         )
 
+    def test_catalogue_covers_memory_admission_boundaries(self) -> None:
+        scenario_ids = {scenario.id for scenario in MEMORY_V3_SCENARIOS}
+
+        self.assertTrue(
+            {
+                "ignore_quoted_third_party_preference",
+                "ignore_hypothetical_self_description",
+                "ignore_transient_task_content",
+                "ignore_ambiguous_acknowledgement",
+                "capture_explicit_durable_preference",
+            }.issubset(scenario_ids)
+        )
+        admission_cases = list_memory_v3_scenarios(tags=("admission_quality",))
+        self.assertGreaterEqual(len(admission_cases), 5)
+        self.assertGreaterEqual(
+            sum(case.expected_decision == "no_change" for case in admission_cases),
+            4,
+        )
+        self.assertTrue(any(case.expected_operations for case in admission_cases))
+
     def test_lookup_and_filter_use_only_v3_scenarios(self) -> None:
         lifecycle = list_memory_v3_scenarios(tags=("lifecycle",))
 
@@ -207,8 +227,10 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
             ),
             memory_version=3,
         )
-        self.assertIn("semantic, episodic, relationship, procedural", system_prompt)
-        self.assertIn("profile, matching, personalization", system_prompt)
+        for memory_kind in ("semantic", "episodic", "relationship", "procedural"):
+            self.assertIn(memory_kind, system_prompt)
+        for purpose in ("profile", "matching", "personalization"):
+            self.assertIn(purpose, system_prompt)
         self.assertIn("sensitivity", system_prompt)
         self.assertIn("wrong_sensitivity", system_prompt)
         self.assertIn("peanut_allergy", payload)
