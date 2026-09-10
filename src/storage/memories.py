@@ -24,6 +24,7 @@ from .database import ENGINE
 from .schema import (
     agent_conversations,
     agent_memories,
+    agent_memory_embeddings,
     agent_memory_evidence,
     agent_memory_reviews,
     memory_operation_applications,
@@ -175,6 +176,12 @@ def delete_agent_memory(memory_id: str, user_id: str) -> bool:
             agent_memory_evidence.delete().where(
                 agent_memory_evidence.c.memory_id == memory_id,
                 agent_memory_evidence.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            agent_memory_embeddings.delete().where(
+                agent_memory_embeddings.c.memory_id == memory_id,
+                agent_memory_embeddings.c.user_id == owner_id,
             )
         )
         connection.execute(

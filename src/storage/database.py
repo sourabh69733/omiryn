@@ -20,6 +20,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "memory_processing_states",
     "memory_operation_applications",
     "agent_memories",
+    "agent_memory_embeddings",
     "agent_memory_evidence",
     "agent_memory_reviews",
     "conversation_threads",
