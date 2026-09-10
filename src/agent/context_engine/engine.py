@@ -39,6 +39,7 @@ def build_model_context_package(
     user_message_index: int,
     assistant_message_index: int,
     prompt_version_id: str | None = None,
+    memory_query_embedding: dict[str, Any] | None = None,
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
     listener_first = prompt_version.version_id in {"v3", "v3-1"}
@@ -54,6 +55,7 @@ def build_model_context_package(
         user_profile=user_profile,
         style_source_id=style_source_id,
         strict_intent=listener_first,
+        memory_query_embedding=memory_query_embedding,
     )
     if prompt_version.version_id in {"v2", "v3", "v3-1"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)

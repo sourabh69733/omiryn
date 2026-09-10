@@ -102,6 +102,7 @@ def build_reply_context(
     user_profile: dict[str, Any] | None = None,
     style_source_id: str | None = None,
     strict_intent: bool = False,
+    memory_query_embedding: dict[str, Any] | None = None,
 ) -> AgentContext:
     thread_guidance = conversation_thread_guidance(
         conversation_id,
@@ -117,6 +118,7 @@ def build_reply_context(
             user_id,
             strict_intent=strict_intent,
             thread_guidance=thread_guidance,
+            memory_query_embedding=memory_query_embedding,
         ),
         thread_guidance=thread_guidance,
     )
@@ -130,6 +132,7 @@ def build_reply_context_sources(
     *,
     strict_intent: bool = False,
     thread_guidance: ThreadGuidance | None = None,
+    memory_query_embedding: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     query_intent = context_query_intent(user_text, strict_whatsapp=strict_intent)
     all_sources = list_context_sources(conversation_id, user_id)
@@ -138,7 +141,9 @@ def build_reply_context_sources(
     retrieved_sources = _relevant_memory_sources(attached_sources, user_text)
     agent_behavior_sources = _agent_behavior_rule_context_sources(user_id)
     if agent_pipeline_config().memory_contract_version == 3:
-        durable_memory_sources = _agent_memory_v3_context_sources(user_id, user_text)
+        durable_memory_sources = _agent_memory_v3_context_sources(
+            user_id, user_text, memory_query_embedding
+        )
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
     structured_whatsapp_sources = _structured_whatsapp_context_sources(
@@ -295,10 +300,13 @@ def _data_point_context_sources(user_id: str | None, user_text: str) -> list[dic
 def _agent_memory_v3_context_sources(
     user_id: str | None,
     user_text: str,
+    query_embedding: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if not user_id:
         return []
-    memories = retrieve_agent_memories_for_reply(user_id, user_text)
+    memories = retrieve_agent_memories_for_reply(
+        user_id, user_text, query_embedding=query_embedding
+    )
     if not memories:
         return []
     lines = [
