@@ -37,6 +37,31 @@ def text_relevance(query: str, candidate: str) -> float:
     return max(token_score, gram_score)
 
 
+def embedding_similarity(
+    query: dict[str, Any] | None,
+    candidate: dict[str, Any] | None,
+) -> float | None:
+    """Return cosine similarity only for the same provider/model vector space."""
+    if not query or not candidate:
+        return None
+    if (
+        query.get("provider") != candidate.get("provider")
+        or query.get("model") != candidate.get("model")
+        or query.get("dimensions") != candidate.get("dimensions")
+    ):
+        return None
+    left = query.get("values")
+    right = candidate.get("values")
+    if not isinstance(left, list) or not isinstance(right, list) or len(left) != len(right):
+        return None
+    left_norm = math.sqrt(sum(float(value) ** 2 for value in left))
+    right_norm = math.sqrt(sum(float(value) ** 2 for value in right))
+    if not left_norm or not right_norm:
+        return None
+    similarity = sum(float(a) * float(b) for a, b in zip(left, right, strict=True))
+    return max(0.0, min(1.0, similarity / (left_norm * right_norm)))
+
+
 def bounded_score(value: Any) -> float:
     try:
         return min(1.0, max(0.0, float(value)))
@@ -78,6 +103,7 @@ def _character_ngrams(value: str, size: int = 3) -> set[str]:
 __all__ = [
     "aware_datetime",
     "bounded_score",
+    "embedding_similarity",
     "recency_score",
     "searchable_memory_text",
     "text_relevance",
