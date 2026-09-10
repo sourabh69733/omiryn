@@ -163,6 +163,36 @@ Index(
     agent_memories.c.updated_at,
 )
 
+# Embeddings are stored separately from canonical memory content so models can be
+# changed or re-indexed without rewriting the user's memory record.
+agent_memory_embeddings = Table(
+    "agent_memory_embeddings",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("memory_id", String, nullable=False),
+    Column("user_id", String, nullable=False),
+    Column("provider", String, nullable=False),
+    Column("model", String, nullable=False),
+    Column("dimensions", Integer, nullable=False),
+    Column("values_json", JSON, nullable=False),
+    Column("content_hash", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "ix_agent_memory_embeddings_memory_model",
+    agent_memory_embeddings.c.memory_id,
+    agent_memory_embeddings.c.provider,
+    agent_memory_embeddings.c.model,
+    unique=True,
+)
+Index(
+    "ix_agent_memory_embeddings_user_model",
+    agent_memory_embeddings.c.user_id,
+    agent_memory_embeddings.c.provider,
+    agent_memory_embeddings.c.model,
+)
+
 # Evidence is normalized so one memory can be supported by messages from
 # multiple conversations without duplicating the memory itself.
 agent_memory_evidence = Table(
