@@ -48,6 +48,11 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
             ) as provider,
+            patch(
+                "agent.cognition.background.service.index_agent_memories",
+                new_callable=AsyncMock,
+                return_value=1,
+            ) as index_memories,
         ):
             first = await run_background_cognition(
                 self.conversation_id,
@@ -68,6 +73,10 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(repeated["status"], "no_pending_messages")
         self.assertEqual(provider.await_count, 1)
         self.assertEqual(provider.await_args.kwargs["memory_version"], 3)
+        index_memories.assert_awaited_once()
+        self.assertEqual(
+            index_memories.await_args.kwargs["conversation_id"], self.conversation_id
+        )
         self.assertEqual(len(memories), 1)
         self.assertEqual(memories[0]["kind"], "semantic")
         self.assertEqual(memories[0]["purposes"], ["profile"])

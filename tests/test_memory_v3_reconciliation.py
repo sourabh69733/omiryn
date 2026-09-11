@@ -77,6 +77,31 @@ def test_selection_keeps_fields_needed_for_lifecycle_reasoning() -> None:
     assert selected == [memory]
 
 
+def test_semantic_similarity_finds_cross_language_reconciliation_candidate() -> None:
+    relevant = _memory("calm-partner", "partner_temperament", "prefers a calm partner")
+    unrelated = _memory("food", "food_preference", "likes pasta", importance=1.0)
+    query_embedding = {
+        "provider": "deepinfra",
+        "model": "multilingual",
+        "dimensions": 2,
+        "values": [1.0, 0.0],
+    }
+    embeddings = {
+        "calm-partner": {**query_embedding, "memory_id": "calm-partner"},
+        "food": {**query_embedding, "memory_id": "food", "values": [0.0, 1.0]},
+    }
+
+    selected = select_reconciliation_candidates(
+        [unrelated, relevant],
+        "मुझे शांत साथी पसंद है",
+        limit=1,
+        query_embedding=query_embedding,
+        embeddings_by_memory_id=embeddings,
+    )
+
+    assert selected[0]["id"] == "calm-partner"
+
+
 def test_cognition_context_uses_related_candidates_instead_of_first_rows() -> None:
     unrelated = [
         _memory(f"unrelated-{index}", f"topic_{index}", f"value {index}")
