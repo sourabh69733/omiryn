@@ -24,6 +24,7 @@ from storage import (
 from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
+from agent.memory_engine.memories.embeddings import index_agent_memories
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
@@ -264,6 +265,11 @@ async def _run_claimed_background_cognition(
                     if memory_version == 3
                     else apply_validated_memory_analysis(batch, analysis)
                 )
+                if memory_version == 3:
+                    await index_agent_memories(
+                        application_result.memories,
+                        conversation_id=conversation_id,
+                    )
             except Exception as error:
                 _save_cognition_debug_once(
                     batch=batch,
