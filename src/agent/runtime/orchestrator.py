@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
+from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
+from agent.memory_engine.memories.embeddings import embed_memory_query
 from agent.providers import (
     AgentProviderError,
     AgentProviderTruncationError,
@@ -144,18 +146,23 @@ async def run_agent_turn(
         )
         return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
 
-    context_package = build_model_context_package(
-        conversation_id=conversation_id,
-        user_text=user_text,
-        user_id=user_id,
-        user_profile=user_profile,
-        model=model,
-        agent_tone=agent_tone,
-        agent_name=agent_name,
-        style_source_id=style_source_id,
-        user_message_index=len(updated_messages) - 1,
-        assistant_message_index=len(updated_messages),
-    )
+    context_arguments = {
+        "conversation_id": conversation_id,
+        "user_text": user_text,
+        "user_id": user_id,
+        "user_profile": user_profile,
+        "model": model,
+        "agent_tone": agent_tone,
+        "agent_name": agent_name,
+        "style_source_id": style_source_id,
+        "user_message_index": len(updated_messages) - 1,
+        "assistant_message_index": len(updated_messages),
+    }
+    if agent_pipeline_config().memory_contract_version == 3:
+        context_arguments["memory_query_embedding"] = await embed_memory_query(
+            user_text, conversation_id=conversation_id
+        )
+    context_package = build_model_context_package(**context_arguments)
     system_prompt = context_package.system_prompt
     save_agent_trace_step(
         {
