@@ -44,6 +44,16 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
                 clear=True,
             ),
             patch(
+                "agent.cognition.background.service.embed_memory_query",
+                new_callable=AsyncMock,
+                return_value={
+                    "provider": "deepinfra",
+                    "model": "multilingual",
+                    "dimensions": 2,
+                    "values": [1.0, 0.0],
+                },
+            ) as embed_query,
+            patch(
                 "agent.cognition.background.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
@@ -73,6 +83,10 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(repeated["status"], "no_pending_messages")
         self.assertEqual(provider.await_count, 1)
         self.assertEqual(provider.await_args.kwargs["memory_version"], 3)
+        embed_query.assert_awaited_once_with(
+            "I build a matchmaking product called Omiryn.",
+            conversation_id=self.conversation_id,
+        )
         index_memories.assert_awaited_once()
         self.assertEqual(
             index_memories.await_args.kwargs["conversation_id"], self.conversation_id

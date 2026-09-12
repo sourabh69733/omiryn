@@ -102,6 +102,42 @@ def test_semantic_similarity_finds_cross_language_reconciliation_candidate() -> 
     assert selected[0]["id"] == "calm-partner"
 
 
+def test_cognition_context_loads_matching_memory_embedding_versions() -> None:
+    query_embedding = {
+        "provider": "deepinfra",
+        "model": "multilingual",
+        "dimensions": 2,
+        "values": [1.0, 0.0],
+    }
+    memories = [
+        _memory("food", "food_preference", "likes pasta", importance=1.0),
+        _memory("calm", "partner_temperament", "prefers a calm partner"),
+    ]
+    stored_embeddings = [
+        {**query_embedding, "memory_id": "food", "values": [0.0, 1.0]},
+        {**query_embedding, "memory_id": "calm"},
+    ]
+
+    with (
+        patch(
+            "agent.cognition.background.service.list_agent_memories",
+            return_value=memories,
+        ),
+        patch(
+            "agent.cognition.background.service.list_agent_memory_embeddings",
+            return_value=stored_embeddings,
+        ),
+    ):
+        context = _existing_memory_context(
+            "user-1",
+            3,
+            "मुझे शांत साथी पसंद है",
+            query_embedding=query_embedding,
+        )
+
+    assert context[0]["id"] == "calm"
+
+
 def test_cognition_context_uses_related_candidates_instead_of_first_rows() -> None:
     unrelated = [
         _memory(f"unrelated-{index}", f"topic_{index}", f"value {index}")
