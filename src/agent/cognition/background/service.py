@@ -18,13 +18,14 @@ from storage import (
     attach_agent_usage_result,
     latest_agent_usage_event_id,
     list_agent_memories,
+    list_agent_memory_embeddings,
     list_data_point_extraction_debug,
     list_profile_facts,
 )
 from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
-from agent.memory_engine.memories.embeddings import index_agent_memories
+from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
@@ -202,7 +203,17 @@ async def _run_claimed_background_cognition(
     evidence_text = " ".join(
         message.content for message in batch.new_messages if message.role == "user"
     )
-    existing_memories = _existing_memory_context(user_id, memory_version, evidence_text)
+    query_embedding = (
+        await embed_memory_query(evidence_text, conversation_id=conversation_id)
+        if memory_version == 3
+        else None
+    )
+    existing_memories = _existing_memory_context(
+        user_id,
+        memory_version,
+        evidence_text,
+        query_embedding=query_embedding,
+    )
     thread_candidates = background_thread_candidates(
         conversation_id,
         user_id,
@@ -410,13 +421,31 @@ async def _run_claimed_background_cognition(
 
 
 def _existing_memory_context(
-    user_id: str, memory_version: int, evidence_text: str = ""
+    user_id: str,
+    memory_version: int,
+    evidence_text: str = "",
+    *,
+    query_embedding: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if memory_version == 3:
+        all_memories = list_agent_memories(user_id)
+        stored_embeddings = (
+            list_agent_memory_embeddings(
+                user_id,
+                [str(memory["id"]) for memory in all_memories],
+            )
+            if query_embedding
+            else []
+        )
         memories = select_reconciliation_candidates(
-            list_agent_memories(user_id),
+            all_memories,
             evidence_text,
             limit=MAX_EXISTING_MEMORIES,
+            query_embedding=query_embedding,
+            embeddings_by_memory_id={
+                str(embedding["memory_id"]): embedding
+                for embedding in stored_embeddings
+            },
         )
         return [
             {
