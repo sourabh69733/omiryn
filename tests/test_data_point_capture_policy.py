@@ -85,6 +85,28 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         save_fact.assert_not_called()
         behavior.assert_called_once()
 
+    def test_v3_skips_legacy_fact_and_behavior_rules(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_PIPELINE_VERSION": "v3"},
+                clear=True,
+            ),
+            patch("agent.memory_engine.engine.extract_profile_facts_from_message") as facts,
+            patch(
+                "agent.memory_engine.engine.extract_agent_behavior_rules_from_message",
+                return_value=[],
+            ) as behavior,
+            patch("agent.memory_engine.engine.upsert_profile_fact") as save_fact,
+            patch("agent.memory_engine.engine.upsert_agent_behavior_rule") as save_behavior,
+        ):
+            capture_profile_facts_from_user_message("c", "u", "remember this", 1, True)
+
+        facts.assert_not_called()
+        behavior.assert_not_called()
+        save_fact.assert_not_called()
+        save_behavior.assert_not_called()
+
     def test_old_interval_extractor_is_not_scheduled_by_the_main_pipeline(self) -> None:
         messages = [{"role": "user", "content": "A useful durable preference."}]
         modes = (("v1", "off"), ("v2", "off"), ("v2", "shadow"), ("v2", "live"))

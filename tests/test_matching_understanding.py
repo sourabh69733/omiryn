@@ -1,14 +1,16 @@
 import unittest
+from unittest.mock import patch
 
 from agent.context_engine.engine import build_model_context_package
 from agent.context_engine.conversation_engine.planning import build_conversation_plan
 from agent.context_engine.contracts.models import ContextQueryIntent, ConversationalStance, EmotionState
 from agent.context_engine.assembly.matching import (
     MATCHING_DIMENSIONS,
+    build_matching_understanding,
     calculate_matching_understanding,
 )
 from agent.memory_engine.data_points import normalize_data_point
-from storage import reset_db, upsert_profile_fact
+from storage import create_agent_memory, reset_db, save_conversation, upsert_profile_fact
 
 
 def matching_fact(
@@ -184,6 +186,85 @@ class MatchingUnderstandingUnitTest(unittest.TestCase):
 class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_db()
+
+    def test_v3_projects_canonical_matching_memory_into_progress(self) -> None:
+        save_conversation(
+            {
+                "id": "matching-conversation",
+                "status": "active",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "I want a serious relationship.",
+                    }
+                ],
+            },
+            "matching-user",
+        )
+        create_agent_memory(
+            {
+                "user_id": "matching-user",
+                "kind": "semantic",
+                "purposes": ["matching"],
+                "key": "relationship_intent",
+                "value": "serious relationship",
+                "allowed_uses": ["reply_context"],
+                "confidence": 0.9,
+                "importance": 0.9,
+                "evidence": [
+                    {
+                        "conversation_id": "matching-conversation",
+                        "message_index": 0,
+                        "exact_quote": "I want a serious relationship.",
+                        "observed_at": "2026-09-16T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v3"}, clear=True):
+            progress = build_matching_understanding(user_id="matching-user")
+
+        relationship_intent = next(
+            item for item in progress.dimensions if item.id == "relationship_intent"
+        )
+        self.assertEqual(relationship_intent.depth, "clear")
+        self.assertEqual(progress.foundation_covered, 1)
+
+    def test_v3_profile_only_memory_does_not_advance_matching_progress(self) -> None:
+        save_conversation(
+            {
+                "id": "matching-conversation",
+                "status": "active",
+                "messages": [{"role": "user", "content": "I live in Bengaluru."}],
+            },
+            "matching-user",
+        )
+        create_agent_memory(
+            {
+                "user_id": "matching-user",
+                "kind": "semantic",
+                "purposes": ["profile"],
+                "key": "location_preference",
+                "value": "Bengaluru",
+                "allowed_uses": ["reply_context"],
+                "confidence": 0.95,
+                "importance": 0.7,
+                "evidence": [
+                    {
+                        "conversation_id": "matching-conversation",
+                        "message_index": 0,
+                        "exact_quote": "I live in Bengaluru.",
+                        "observed_at": "2026-09-16T10:00:00Z",
+                    }
+                ],
+            }
+        )
+
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v3"}, clear=True):
+            progress = build_matching_understanding(user_id="matching-user")
+
+        self.assertEqual(progress.foundation_covered, 0)
 
     def test_v3_1_adds_quiet_progress_awareness_without_changing_v3(self) -> None:
         upsert_profile_fact(normalize_data_point(matching_fact("relationship_intent")))
