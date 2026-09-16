@@ -60,6 +60,9 @@ V3 memory rules:
 - When an active memory already expresses the same meaning, reinforce it; never add a duplicate.
 - When new evidence corrects an active memory, supersede it with a complete corrected replacement.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.
+- existing_memories with targetable=false are rejected or superseded history. Never target their IDs.
+  Do not recreate their meaning from an incidental repeat. Add a fresh memory only when new eligible user
+  evidence explicitly renews or reverses that old meaning.
 - Never target an ID outside existing_memories and never target one memory twice in a batch.
 - Relationship history and intimate interpersonal details are at least sensitive. Medical, biometric,
   sexual, financial and similarly high-risk private facts are highly_sensitive.
