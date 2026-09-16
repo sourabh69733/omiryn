@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
+from agent.config import agent_pipeline_config
 from agent.memory_engine.data_points.extraction.service import (
     capture_hybrid_conversation_data_points,
 )
@@ -54,13 +55,14 @@ def capture_profile_facts_from_user_message(
         )
         for fact in facts:
             upsert_profile_fact(normalize_data_point(fact))
-    for rule in extract_agent_behavior_rules_from_message(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message=message,
-        message_index=message_index,
-    ):
-        upsert_agent_behavior_rule(rule)
+    if agent_pipeline_config().memory_contract_version != 3:
+        for rule in extract_agent_behavior_rules_from_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message=message,
+            message_index=message_index,
+        ):
+            upsert_agent_behavior_rule(rule)
 
 
 def should_run_deep_profile_fact_extraction(
