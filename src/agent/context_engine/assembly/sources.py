@@ -134,13 +134,18 @@ def build_reply_context_sources(
     thread_guidance: ThreadGuidance | None = None,
     memory_query_embedding: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    pipeline = agent_pipeline_config()
     query_intent = context_query_intent(user_text, strict_whatsapp=strict_intent)
     all_sources = list_context_sources(conversation_id, user_id)
     attached_sources = _valid_attached_context_sources(all_sources, user_id)
     selected_styles = _selected_style_sources(all_sources, style_source_id)
     retrieved_sources = _relevant_memory_sources(attached_sources, user_text)
-    agent_behavior_sources = _agent_behavior_rule_context_sources(user_id)
-    if agent_pipeline_config().memory_contract_version == 3:
+    agent_behavior_sources = (
+        []
+        if pipeline.memory_contract_version == 3
+        else _agent_behavior_rule_context_sources(user_id)
+    )
+    if pipeline.memory_contract_version == 3:
         durable_memory_sources = _agent_memory_v3_context_sources(
             user_id, user_text, memory_query_embedding
         )

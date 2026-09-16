@@ -6,7 +6,9 @@ import re
 from collections import defaultdict
 from typing import Any
 
+from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import MatchingDimensionProgress, MatchingUnderstanding
+from agent.memory_engine.memories import matching_progress_memories
 from storage import list_profile_facts
 
 
@@ -113,11 +115,12 @@ def build_matching_understanding(
     user_id: str | None,
     user_profile: dict[str, Any] | None = None,
 ) -> MatchingUnderstanding:
-    facts = (
-        list_profile_facts(user_id, statuses={"active"}, used_for_matching=True)
-        if user_id
-        else []
-    )
+    if not user_id:
+        facts: list[dict[str, Any]] = []
+    elif agent_pipeline_config().memory_contract_version == 3:
+        facts = matching_progress_memories(user_id)
+    else:
+        facts = list_profile_facts(user_id, statuses={"active"}, used_for_matching=True)
     return calculate_matching_understanding(facts, user_profile=user_profile)
 
 
@@ -128,7 +131,7 @@ def calculate_matching_understanding(
 ) -> MatchingUnderstanding:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for fact in facts:
-        if fact.get("status") != "active" or not fact.get("used_for_matching", False):
+        if not _eligible_matching_source(fact):
             continue
         dimension = _fact_dimension(fact)
         if dimension:
@@ -185,6 +188,14 @@ def calculate_matching_understanding(
         unexplored_dimensions=unexplored,
         can_deepen_dimensions=can_deepen,
     )
+
+
+def _eligible_matching_source(fact: dict[str, Any]) -> bool:
+    if fact.get("status") != "active":
+        return False
+    if "purposes" in fact:
+        return "matching" in set(fact.get("purposes") or [])
+    return bool(fact.get("used_for_matching", False))
 
 
 def _fact_dimension(fact: dict[str, Any]) -> str | None:
