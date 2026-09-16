@@ -7,11 +7,13 @@ import unittest
 from unittest.mock import patch
 
 from agent.config import agent_pipeline_config
+from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
 from agent.memory_engine.engine import (
     capture_profile_facts_from_user_message,
     should_run_conversation_data_point_extraction,
 )
+from storage import list_agent_behavior_rules, reset_db
 
 
 class DataPointCapturePolicyTest(unittest.TestCase):
@@ -106,6 +108,40 @@ class DataPointCapturePolicyTest(unittest.TestCase):
         behavior.assert_not_called()
         save_fact.assert_not_called()
         save_behavior.assert_not_called()
+
+    def test_v3_does_not_use_preexisting_legacy_behavior_rules(self) -> None:
+        reset_db()
+        with patch.dict(
+            os.environ,
+            {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
+            clear=True,
+        ):
+            capture_profile_facts_from_user_message(
+                "conversation-a",
+                "user-a",
+                "first of all, u r not sunata hoon, you are sunati hoon.",
+                2,
+                True,
+            )
+        self.assertEqual(len(list_agent_behavior_rules("user-a")), 1)
+
+        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3"}, clear=True):
+            package = build_model_context_package(
+                conversation_id="conversation-a",
+                user_text="haan ab ek funny story sunao",
+                user_id="user-a",
+                user_profile={"user_id": "user-a", "interested_in": "women"},
+                model="llama-70b",
+                agent_tone="auto",
+                agent_name="Annie",
+                style_source_id=None,
+                user_message_index=3,
+                assistant_message_index=4,
+                prompt_version_id="v3",
+            )
+
+        self.assertNotIn("User-taught behavior rules", package.system_prompt)
+        self.assertFalse(package.snapshot["summary"]["used_agent_behavior_rules"])
 
     def test_old_interval_extractor_is_not_scheduled_by_the_main_pipeline(self) -> None:
         messages = [{"role": "user", "content": "A useful durable preference."}]
