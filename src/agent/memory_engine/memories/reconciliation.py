@@ -24,15 +24,16 @@ def select_reconciliation_candidates(
     query_embedding: dict[str, Any] | None = None,
     embeddings_by_memory_id: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return active memories most useful for add/reinforce/correct decisions."""
+    """Return related active memories and inactive lifecycle history."""
     if limit <= 0:
         return []
     current_time = now or datetime.now(UTC)
-    eligible = [
-        memory
-        for memory in memories
-        if memory.get("status") == MemoryStatus.ACTIVE.value
-    ]
+    lifecycle_statuses = {
+        MemoryStatus.ACTIVE.value,
+        MemoryStatus.RETRACTED.value,
+        MemoryStatus.SUPERSEDED.value,
+    }
+    eligible = [memory for memory in memories if memory.get("status") in lifecycle_statuses]
     return sorted(
         eligible,
         key=lambda memory: (
