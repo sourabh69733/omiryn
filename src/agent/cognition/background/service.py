@@ -26,6 +26,7 @@ from storage.profile_facts import save_data_point_extraction_debug
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
 from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories
+from agent.memory_engine.memories.models import MemoryStatus
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
@@ -235,7 +236,11 @@ async def _run_claimed_background_cognition(
         cognition = interpret_background_cognition(
             raw,
             batch=batch,
-            existing_memory_ids={str(memory["id"]) for memory in existing_memories},
+            existing_memory_ids={
+                str(memory["id"])
+                for memory in existing_memories
+                if memory.get("targetable") is not False
+            },
             thread_candidates=thread_candidates,
             memory_version=memory_version,
         )
@@ -457,6 +462,9 @@ def _existing_memory_context(
                 "sensitivity": memory["sensitivity"],
                 "confidence": memory["confidence"],
                 "importance": memory["importance"],
+                "status": memory["status"],
+                "targetable": memory["status"] == MemoryStatus.ACTIVE.value,
+                "supersedes_memory_id": memory.get("supersedes_memory_id"),
                 "updated_at": memory["updated_at"],
             }
             for memory in memories
