@@ -185,6 +185,20 @@ def test_update_memory_permissions_is_scoped_to_its_owner() -> None:
     ]
 
 
+def test_agree_review_does_not_reactivate_a_retracted_memory() -> None:
+    saved = storage.create_agent_memory(_payload())
+
+    rejected = storage.review_agent_memory(saved["id"], USER_ID, "disagree")
+    reviewed_again = storage.review_agent_memory(saved["id"], USER_ID, "agree")
+
+    assert rejected is not None
+    assert rejected["status"] == "retracted"
+    assert reviewed_again is not None
+    assert reviewed_again["status"] == "retracted"
+    assert reviewed_again["feedback"]["rating"] == "agree"
+    assert reviewed_again["feedback"]["review_count"] == 2
+
+
 def test_user_deletion_removes_memory_and_evidence() -> None:
     saved = storage.create_agent_memory(_payload())
     storage.review_agent_memory(saved["id"], USER_ID, "agree")

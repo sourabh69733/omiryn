@@ -1051,7 +1051,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(listed["feedback"]["review_count"], 1)
 
         rejected = self.client.post(
-            f"/api/me/memories/{memory["id"]}/review",
+            f"/api/me/memories/{memory['id']}/review",
             json={
                 "rating": "disagree",
                 "reasons": ["outdated", "missing_context"],
@@ -1069,13 +1069,13 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(rejected.json()["feedback"]["review_count"], 2)
         self.assertEqual(get_agent_memory(memory["id"], "test-user")["status"], "retracted")
 
-        restored = self.client.post(
-            f"/api/me/memories/{memory["id"]}/review",
+        reviewed_again = self.client.post(
+            f"/api/me/memories/{memory['id']}/review",
             json={"rating": "agree"},
         )
-        self.assertEqual(restored.status_code, 200)
-        self.assertEqual(restored.json()["status"], "active")
-        self.assertEqual(restored.json()["feedback"]["review_count"], 3)
+        self.assertEqual(reviewed_again.status_code, 200)
+        self.assertEqual(reviewed_again.json()["status"], "retracted")
+        self.assertEqual(reviewed_again.json()["feedback"]["review_count"], 3)
 
         listed = self.client.get("/api/me/memories").json()["memories"][0]
         self.assertEqual(listed["feedback"]["rating"], "agree")

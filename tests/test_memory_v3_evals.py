@@ -83,6 +83,8 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             {scenario.id for scenario in lifecycle},
             {
+                "explicitly_renew_retracted_preference",
+                "ignore_incidental_repeat_of_retracted_memory",
                 "reinforce_existing_preference_without_duplicate",
                 "supersede_corrected_location",
                 "retract_withdrawn_preference",
@@ -96,6 +98,49 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaisesRegex(ValueError, "Unknown v3 memory scenario"):
             get_memory_v3_scenario("missing")
+
+    def test_retracted_fixture_is_history_not_a_lifecycle_target(self) -> None:
+        scenario = get_memory_v3_scenario("ignore_incidental_repeat_of_retracted_memory")
+
+        context = scenario.existing_memories[0].as_context()
+
+        self.assertEqual(context["status"], "retracted")
+        self.assertFalse(context["targetable"])
+
+    async def test_runner_rejects_operations_targeting_inactive_history(self) -> None:
+        scenario = get_memory_v3_scenario("ignore_incidental_repeat_of_retracted_memory")
+        raw = {
+            "decision": "propose",
+            "operations": [
+                {
+                    "operation": "reinforce",
+                    "target_memory_id": "retracted-weekend-memory",
+                    "confidence": 0.9,
+                    "importance": 0.7,
+                    "evidence_message_indexes": [0],
+                }
+            ],
+            "thread_operation": {"operation": "none"},
+            "handoff": {
+                "summary": "",
+                "active_people": [],
+                "active_topics": [],
+                "unresolved_references": [],
+            },
+        }
+        with patch(
+            "agent.evals.memory.v3.runner.analyze_background_cognition",
+            new_callable=AsyncMock,
+            return_value=raw,
+        ):
+            result = await run_memory_v3_scenario(
+                scenario=scenario,
+                model="memory-model",
+                timeout_seconds=30,
+            )
+
+        self.assertFalse(result.structurally_valid)
+        self.assertIn("supplied active memory", " ".join(result.validation_errors))
 
     def test_grader_accepts_semantic_wording_but_requires_kind_purpose_and_evidence(self) -> None:
         scenario = get_memory_v3_scenario("capture_partner_location_preference")

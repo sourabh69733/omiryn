@@ -48,17 +48,24 @@ def test_related_older_memory_outranks_unrelated_recent_memory() -> None:
     assert [memory["id"] for memory in selected] == ["older-location"]
 
 
-def test_selection_excludes_inactive_memories_and_respects_limit() -> None:
+def test_selection_keeps_relevant_inactive_history_for_reconciliation() -> None:
     memories = [
-        _memory("active-1", "partner_values", "kindness"),
-        _memory("active-2", "partner_values", "curiosity"),
-        _memory("retracted", "partner_values", "adventure", status="retracted"),
+        _memory("active", "food_preference", "pasta"),
+        _memory(
+            "retracted",
+            "partner_values",
+            "adventure",
+            status="retracted",
+        ),
     ]
 
-    selected = select_reconciliation_candidates(memories, "partner values", limit=1)
+    selected = select_reconciliation_candidates(
+        memories,
+        "I value adventure in a partner again.",
+        limit=1,
+    )
 
-    assert len(selected) == 1
-    assert selected[0]["status"] == "active"
+    assert [memory["id"] for memory in selected] == ["retracted"]
 
 
 def test_selection_keeps_fields_needed_for_lifecycle_reasoning() -> None:
@@ -164,3 +171,26 @@ def test_cognition_context_uses_related_candidates_instead_of_first_rows() -> No
     selected = next(memory for memory in context if memory["id"] == "related-location")
     assert selected["sensitivity"] == "sensitive"
     assert selected["importance"] == 0.95
+
+
+def test_cognition_context_marks_only_active_memories_as_targetable() -> None:
+    memories = [
+        _memory("active", "home_location", "Pune"),
+        _memory("retracted", "home_location", "Bengaluru", status="retracted"),
+    ]
+
+    with patch(
+        "agent.cognition.background.service.list_agent_memories",
+        return_value=memories,
+    ):
+        context = _existing_memory_context(
+            "user-1",
+            3,
+            "I live in Bengaluru again, not Pune.",
+        )
+
+    by_id = {memory["id"]: memory for memory in context}
+    assert by_id["active"]["status"] == "active"
+    assert by_id["active"]["targetable"] is True
+    assert by_id["retracted"]["status"] == "retracted"
+    assert by_id["retracted"]["targetable"] is False
