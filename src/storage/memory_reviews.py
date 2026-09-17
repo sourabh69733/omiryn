@@ -51,18 +51,23 @@ def review_agent_memory(
             return None
 
         now = datetime.now(UTC)
-        if normalized_rating == "agree":
+        if (
+            normalized_rating == "agree"
+            and memory["status"] == MemoryStatus.ACTIVE.value
+        ):
             update_values = {
-                "status": MemoryStatus.ACTIVE.value,
                 "confidence": max(float(memory["confidence"]), 0.9),
                 "last_reinforced_at": now,
                 "updated_at": now,
             }
-        else:
+        elif normalized_rating == "disagree":
             update_values = {
                 "status": MemoryStatus.RETRACTED.value,
                 "updated_at": now,
             }
+        else:
+            # Reviews remain append-only, but cannot revive lifecycle history.
+            update_values = {"updated_at": now}
 
         connection.execute(
             agent_memories.update()
