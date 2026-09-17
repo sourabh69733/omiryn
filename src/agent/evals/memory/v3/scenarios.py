@@ -10,7 +10,7 @@ from agent.memory_engine.processing import MemoryHandoff
 
 @dataclass(frozen=True)
 class ExistingMemoryV3Fixture:
-    """One active memory supplied to the model for lifecycle decisions."""
+    """One memory supplied as active state or inactive lifecycle history."""
 
     id: str
     memory_kind: str
@@ -20,6 +20,7 @@ class ExistingMemoryV3Fixture:
     sensitivity: str = "standard"
     confidence: float = 0.9
     importance: float = 0.7
+    status: str = "active"
 
     def as_context(self) -> dict[str, Any]:
         return {
@@ -31,7 +32,8 @@ class ExistingMemoryV3Fixture:
             "sensitivity": self.sensitivity,
             "confidence": self.confidence,
             "importance": self.importance,
-            "status": "active",
+            "status": self.status,
+            "targetable": self.status == "active",
         }
 
 
@@ -324,6 +326,62 @@ MEMORY_V3_SCENARIOS = (
             ),
         ),
         tags=("memory_v3", "lifecycle", "retract", "correction"),
+    ),
+    MemoryV3Scenario(
+        id="ignore_incidental_repeat_of_retracted_memory",
+        description="A rejected memory remains history and is not recreated from related conversation.",
+        messages=(
+            {
+                "role": "user",
+                "content": "Pune has plenty of popular weekend hiking routes.",
+            },
+        ),
+        existing_memories=(
+            ExistingMemoryV3Fixture(
+                id="retracted-weekend-memory",
+                memory_kind="semantic",
+                purposes=("matching",),
+                key="preferred_partner_activity",
+                value="enjoys weekend hikes together",
+                status="retracted",
+            ),
+        ),
+        expected_decision="no_change",
+        tags=("memory_v3", "lifecycle", "retraction_history", "no_change"),
+    ),
+    MemoryV3Scenario(
+        id="explicitly_renew_retracted_preference",
+        description="An explicit reversal creates a fresh evidence-backed memory instead of reviving history.",
+        messages=(
+            {
+                "role": "user",
+                "content": (
+                    "I rejected this before, but that was a mistake: I do want a partner "
+                    "who enjoys weekend hikes with me."
+                ),
+            },
+        ),
+        existing_memories=(
+            ExistingMemoryV3Fixture(
+                id="retracted-weekend-memory",
+                memory_kind="semantic",
+                purposes=("matching",),
+                key="preferred_partner_activity",
+                value="enjoys weekend hikes together",
+                status="retracted",
+            ),
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="semantic",
+                required_purposes=("matching",),
+                value_concepts=("partner", "weekend", "hike"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "lifecycle", "retraction_history", "explicit_reversal"),
     ),
     MemoryV3Scenario(
         id="preserve_specific_work_activity_without_job_inference",

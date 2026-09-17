@@ -138,7 +138,9 @@ async def run_memory_v3_scenario(
     cognition = interpret_background_cognition(
         raw,
         batch=batch,
-        existing_memory_ids={memory.id for memory in scenario.existing_memories},
+        existing_memory_ids={
+            memory.id for memory in scenario.existing_memories if memory.status == "active"
+        },
         thread_candidates=[],
         memory_version=3,
     )
