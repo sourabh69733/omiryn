@@ -34,7 +34,7 @@ def test_retrieval_excludes_inactive_disallowed_and_highly_sensitive_memories() 
     _save_memory(key="matching.only", value="vegetarian", allowed_uses=["matching"])
     _save_memory(key="old.location", value="Bengaluru", status="superseded")
 
-    selected = _retrieve("Where am I based?")
+    selected = _retrieve("What is my home location in Pune?")
 
     assert [memory["id"] for memory in selected] == [allowed["id"]]
 
@@ -46,7 +46,7 @@ def test_retrieval_excludes_memory_after_valid_until() -> None:
         valid_until=NOW - timedelta(seconds=1),
     )
 
-    selected = _retrieve("Where do I live?")
+    selected = _retrieve("What is my home location in Pune?")
 
     assert expired["id"] not in {memory["id"] for memory in selected}
 
@@ -58,9 +58,46 @@ def test_retrieval_includes_memory_before_valid_until() -> None:
         valid_until=NOW + timedelta(days=1),
     )
 
-    selected = _retrieve("Where do I live?")
+    selected = _retrieve("What is my home location in Pune?")
 
     assert current["id"] in {memory["id"] for memory in selected}
+
+
+def test_retrieval_excludes_memory_before_valid_from() -> None:
+    future = _save_memory(
+        key="home.location",
+        value="Pune",
+        valid_from=NOW + timedelta(seconds=1),
+    )
+
+    selected = _retrieve("What is my home location in Pune?")
+
+    assert future["id"] not in {memory["id"] for memory in selected}
+
+
+def test_retrieval_returns_no_unrelated_content_memories() -> None:
+    _save_memory(key="favorite.dessert", value="tiramisu")
+    _save_memory(
+        key="relationship.riya",
+        value={"person": "Riya", "pattern": "easy conversations"},
+        kind="relationship",
+        purposes=["personalization"],
+    )
+
+    assert _retrieve("Why did my deployment fail?") == []
+
+
+def test_retrieval_keeps_procedural_guidance_without_topic_overlap() -> None:
+    procedural = _save_memory(
+        key="conversation.style",
+        value="Ask one question at a time",
+        kind="procedural",
+        purposes=["personalization"],
+    )
+
+    selected = _retrieve("Why did my deployment fail?")
+
+    assert [memory["id"] for memory in selected] == [procedural["id"]]
 
 
 def test_retrieval_is_kind_aware_and_ranks_relevant_memory_first() -> None:
@@ -88,7 +125,8 @@ def test_retrieval_is_kind_aware_and_ranks_relevant_memory_first() -> None:
     selected = _retrieve("Riya called me again")
 
     ids = [memory["id"] for memory in selected]
-    assert ids.index(relevant["id"]) < ids.index(unrelated["id"])
+    assert relevant["id"] in ids
+    assert unrelated["id"] not in ids
     assert procedural["id"] in ids
 
 
@@ -108,7 +146,7 @@ def test_retrieval_limits_each_kind_and_total_context() -> None:
             importance=1.0 - index / 10,
         )
 
-    selected = _retrieve("Tell me what you remember", limit=5)
+    selected = _retrieve("Tell me about my profile facts and events", limit=5)
 
     assert len(selected) <= 5
     assert sum(item["kind"] == "semantic" for item in selected) == 2
@@ -168,6 +206,7 @@ def _save_memory(
     status: str = "active",
     confidence: float = 0.9,
     importance: float = 0.8,
+    valid_from: datetime | None = None,
     valid_until: datetime | None = None,
 ) -> dict[str, object]:
     observed_at = (NOW - timedelta(days=1)).isoformat()
@@ -183,6 +222,7 @@ def _save_memory(
             "sensitivity": sensitivity,
             "confidence": confidence,
             "importance": importance,
+            "valid_from": valid_from.isoformat() if valid_from else None,
             "valid_until": valid_until.isoformat() if valid_until else None,
             "evidence": [
                 {
