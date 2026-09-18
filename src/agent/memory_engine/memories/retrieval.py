@@ -18,6 +18,9 @@ from .ranking import (
 
 
 DEFAULT_REPLY_MEMORY_LIMIT = 5
+# Quality metadata may rank candidates, but only query relevance admits content memories.
+_LEXICAL_RELEVANCE_FLOOR = 0.05
+_SEMANTIC_RELEVANCE_FLOOR = 0.4
 _KIND_LIMITS = {
     MemoryKind.SEMANTIC.value: 2,
     MemoryKind.EPISODIC.value: 1,
@@ -57,22 +60,39 @@ def retrieve_agent_memories_for_reply(
     )
     embeddings_by_memory_id = {str(item["memory_id"]): item for item in embeddings}
     ranked = sorted(
-        eligible,
-        key=lambda memory: (
-            -_reply_score(
+        (
+            (
                 memory,
-                user_text,
+                *_calculate_reply_relevance(
+                    memory,
+                    user_text,
+                    query_embedding=query_embedding,
+                    memory_embedding=embeddings_by_memory_id.get(
+                        str(memory.get("id") or "")
+                    ),
+                ),
+            )
+            for memory in eligible
+        ),
+        key=lambda item: (
+            -_reply_score(
+                item[0],
                 current_time,
-                query_embedding=query_embedding,
-                memory_embedding=embeddings_by_memory_id.get(str(memory.get("id") or "")),
+                lexical_relevance=item[1],
+                semantic_relevance=item[2],
             ),
-            str(memory.get("id") or ""),
+            str(item[0].get("id") or ""),
         ),
     )
     selected: list[dict[str, Any]] = []
     kind_counts: dict[str, int] = defaultdict(int)
-    for memory in ranked:
+    for memory, lexical_relevance, semantic_relevance in ranked:
         kind = str(memory.get("kind") or "")
+        if kind != MemoryKind.PROCEDURAL.value and not _meets_relevance_threshold(
+            lexical_relevance,
+            semantic_relevance,
+        ):
+            continue
         if kind_counts[kind] >= _KIND_LIMITS.get(kind, 0):
             continue
         selected.append(memory)
@@ -84,7 +104,7 @@ def retrieve_agent_memories_for_reply(
 
 def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:
     return (
-        _is_not_expired(memory.get("valid_until"), now)
+        _is_current(memory.get("valid_from"), memory.get("valid_until"), now)
         and memory.get("status") == MemoryStatus.ACTIVE.value
         and MemoryUse.REPLY_CONTEXT.value in set(memory.get("allowed_uses") or [])
         and memory.get("sensitivity") != MemorySensitivity.HIGHLY_SENSITIVE.value
@@ -92,24 +112,24 @@ def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:
     )
 
 
-def _is_not_expired(value: Any, now: datetime) -> bool:
-    if value is None:
-        return True
-    expires_at = aware_datetime(value)
-    return expires_at is not None and now < expires_at
-
-
+def _is_current(valid_from: Any, valid_until: Any, now: datetime) -> bool:
+    starts_at = aware_datetime(valid_from) if valid_from is not None else None
+    expires_at = aware_datetime(valid_until) if valid_until is not None else None
+    if valid_from is not None and starts_at is None:
+        return False
+    if valid_until is not None and expires_at is None:
+        return False
+    return (starts_at is None or starts_at <= now) and (
+        expires_at is None or now < expires_at
+    )
 
 def _reply_score(
     memory: dict[str, Any],
-    user_text: str,
     now: datetime,
     *,
-    query_embedding: dict[str, Any] | None = None,
-    memory_embedding: dict[str, Any] | None = None,
+    lexical_relevance: float,
+    semantic_relevance: float | None,
 ) -> float:
-    lexical_relevance = text_relevance(user_text, searchable_memory_text(memory))
-    semantic_relevance = embedding_similarity(query_embedding, memory_embedding)
     relevance = (
         lexical_relevance
         if semantic_relevance is None
@@ -124,6 +144,46 @@ def _reply_score(
         + bounded_score(memory.get("importance")) * 0.15
         + recency_score(memory.get("updated_at"), now) * 0.1
         + procedural_priority
+    )
+
+
+def _calculate_reply_relevance(
+    memory: dict[str, Any],
+    user_text: str,
+    *,
+    query_embedding: dict[str, Any] | None,
+    memory_embedding: dict[str, Any] | None,
+) -> tuple[float, float | None]:
+    """
+    calculates how closely a memory relates to the current user message:
+
+    - Lexical relevance: shared words/text.
+    - Semantic relevance: embedding similarity.
+    """
+    return (
+        text_relevance(user_text, searchable_memory_text(memory)),
+        embedding_similarity(query_embedding, memory_embedding),
+    )
+
+
+def _meets_relevance_threshold(
+    lexical_relevance: float,
+    semantic_relevance: float | None,
+) -> bool:
+    """
+    It checks whether either score is high enough to include that memory in the prompt.
+
+    Flow:
+
+    calculate relevance -> reject unrelated memory -> rank accepted memories
+
+    Without the gate, an unrelated memory could still be selected merely because it ranked highest among poor candidates.
+
+    The names are slightly repetitive. Clearer names would be:
+    """
+    return lexical_relevance >= _LEXICAL_RELEVANCE_FLOOR or (
+        semantic_relevance is not None
+        and semantic_relevance >= _SEMANTIC_RELEVANCE_FLOOR
     )
 
 
