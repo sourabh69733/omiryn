@@ -25,6 +25,7 @@ async def provider_embeddings(
     inputs: list[str],
     conversation_id: str | None = None,
     request_kind: str = "memory_embedding",
+    user_id: str | None = None,
 ) -> list[list[float]]:
     """Embed a non-empty text batch using an OpenAI-compatible provider."""
     normalized_provider = provider.strip().casefold()
@@ -60,6 +61,7 @@ async def provider_embeddings(
         usage = data.get("usage") or {}
         _record_usage_event(
             conversation_id=conversation_id,
+            user_id=user_id,
             request_kind=request_kind,
             provider=normalized_provider,
             model=normalized_model,
@@ -74,6 +76,7 @@ async def provider_embeddings(
     except Exception as error:
         _record_usage_event(
             conversation_id=conversation_id,
+            user_id=user_id,
             request_kind=request_kind,
             provider=normalized_provider,
             model=normalized_model,

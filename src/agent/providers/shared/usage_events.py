@@ -27,8 +27,10 @@ def _record_usage_event(
     completion_tokens: int | None = None,
     total_tokens: int | None = None,
     error: str | None = None,
+    user_id: str | None = None,
 ) -> None:
     event = {
+        "user_id": user_id,
         "conversation_id": conversation_id,
         "request_kind": request_kind,
         "provider": provider,
