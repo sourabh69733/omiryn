@@ -573,6 +573,14 @@ user_profiles = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+agent_user_settings = Table(
+    "agent_user_settings",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("proactive_enabled", Boolean, nullable=False, default=True),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 profile_facts = Table(
     "profile_facts",
     metadata,
