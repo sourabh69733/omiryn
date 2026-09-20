@@ -89,6 +89,18 @@ class InMemoryRealtimeHub:
             await self.unregister(connection)
         return delivered
 
+    async def live_conversations(self) -> list[tuple[str, str]]:
+        """Return (user_id, conversation_id) pairs that have a socket watching right now."""
+        async with self._lock:
+            return sorted(
+                {
+                    (connection.user_id, room.removeprefix("conversation:"))
+                    for connection in self._connections.values()
+                    for room in connection.rooms
+                    if room.startswith("conversation:")
+                }
+            )
+
     async def reset(self) -> None:
         """Clear live state for deterministic tests and development shutdowns."""
         async with self._lock:
