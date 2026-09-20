@@ -20,7 +20,7 @@ if str(SRC_DIR) not in sys.path:
 
 # Synthetic memories must never enter the application database by default.
 os.environ["DATABASE_URL"] = (
-    EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_memory_retrieval_eval.db"
+    EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_memory_retrieval_test.db"
 )
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
@@ -28,6 +28,9 @@ from agent.evals.behavior.reporting.live import TerminalProgressReporter  # noqa
 from agent.evals.behavior.reporting.writer import (  # noqa: E402
     attach_run_metadata,
     save_evaluation_reports,
+)
+from agent.evals.memory.retrieval_cases import (  # noqa: E402
+    run_retrieval_cases_evaluation,
 )
 from agent.evals.memory.retrieval_stress import (  # noqa: E402
     run_retrieval_stress_evaluation,
@@ -38,6 +41,17 @@ from storage import init_db, reset_db  # noqa: E402
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Stress-test deterministic memory retrieval with 100 synthetic memories."
+    )
+    parser.add_argument(
+        "--suite",
+        choices=("stress", "cases"),
+        default="stress",
+        help="stress: 100-memory fixture (default); cases: follow-up, paraphrase, Hinglish cases.",
+    )
+    parser.add_argument(
+        "--keyword-only",
+        action="store_true",
+        help="cases suite: skip embeddings (no API calls) to measure keyword retrieval alone.",
     )
     parser.add_argument("--reset", action="store_true", help="Reset the evaluation database.")
     parser.add_argument(
@@ -65,7 +79,11 @@ def main() -> int:
     reporter = TerminalProgressReporter(enabled=False)
     try:
         reset_db() if args.reset else init_db()
-        payload = run_retrieval_stress_evaluation()
+        payload = (
+            run_retrieval_cases_evaluation(semantic=not args.keyword_only)
+            if args.suite == "cases"
+            else run_retrieval_stress_evaluation()
+        )
     except Exception as error:
         payload = {
             "stage": "execution_error",
@@ -102,6 +120,14 @@ def main() -> int:
     elif payload["stage"] == "execution_error":
         print(f"Memory retrieval evaluation stopped: {payload['execution_error']}")
         return 1
+    elif payload["stage"] == "memory_retrieval_cases_eval":
+        summary = payload["summary"]
+        print(
+            f"Memory retrieval cases ({payload['retrieval_mode']}): "
+            f"{'PASS' if payload['passed'] else 'FAIL'}; "
+            f"keyword {summary['keyword_passed']}/{summary['keyword_total']}; "
+            f"semantic {summary['semantic_passed']}/{summary['semantic_total']}."
+        )
     else:
         metrics = payload["scenario"]["metrics"]
         status = "PASS" if payload["passed"] else "FAIL"

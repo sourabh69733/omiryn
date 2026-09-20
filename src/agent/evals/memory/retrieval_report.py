@@ -93,6 +93,68 @@ def render_retrieval_stress_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_retrieval_cases_markdown(payload: dict[str, Any]) -> str:
+    """Render per-case retrieval outcomes, separating keyword-solvable and semantic cases."""
+    run = payload.get("run") or {}
+    summary = payload.get("summary") or {}
+    cases = payload.get("cases") or []
+    lines = [
+        "# Memory Retrieval Case Report",
+        "",
+        f"**Result:** {'PASS' if payload.get('passed') else 'FAIL'}",
+        f"**Finished:** {_display_time(run.get('finished_at'))}",
+        "**Model API calls:** 0",
+        "",
+        "## Simple summary",
+        "",
+        (
+            f"Keyword-solvable cases: {summary.get('keyword_passed', 0)}/"
+            f"{summary.get('keyword_total', 0)} passed. "
+            f"Meaning-level (semantic) cases: {summary.get('semantic_passed', 0)}/"
+            f"{summary.get('semantic_total', 0)} passed. Retrieval mode: "
+            f"{payload.get('retrieval_mode', 'unknown')} (semantic cases gate the result "
+            "only in semantic mode)."
+        ),
+        "",
+        "| Case | Kind | Result | Query | Recalled | Problems |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for case in cases:
+        recalled = ", ".join(item["key"] for item in case.get("selected") or []) or "nothing"
+        lines.append(
+            f"| {case.get('case_id')} | "
+            f"{'semantic' if case.get('needs_semantic') else 'keyword'} | "
+            f"{'pass' if case.get('passed') else 'FAIL'} | "
+            f"{_table_text(str(case.get('query', '')))} | {_table_text(recalled)} | "
+            f"{_table_text('; '.join(case.get('problems') or []) or '-')} |"
+        )
+    lines.extend(["", "## Relevance scores (lexical / semantic; floors are 0.05 / 0.45)", ""])
+    for case in cases:
+        scores = ", ".join(
+            f"{item['key']} {item['lexical']:.2f}/"
+            f"{'-' if item['semantic'] is None else format(item['semantic'], '.2f')}"
+            for item in case.get("scores") or []
+        )
+        lines.append(f"- **{case.get('case_id')}**: {scores or 'none'}")
+    lines.extend(
+        [
+            "",
+            "## Bottom line",
+            "",
+            (
+                "Every gating case passed."
+                if payload.get("passed")
+                else "A gating case failed; see the Problems column."
+            ),
+            "",
+            "---",
+            "This report uses synthetic memories and makes no model calls.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _display_time(value: Any) -> str:
     if not isinstance(value, str):
         return "unknown"
@@ -111,4 +173,4 @@ def _table_text(value: str) -> str:
     return value.replace("|", "\\|").replace("\n", " ")
 
 
-__all__ = ["render_retrieval_stress_markdown"]
+__all__ = ["render_retrieval_cases_markdown", "render_retrieval_stress_markdown"]
