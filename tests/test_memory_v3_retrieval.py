@@ -188,6 +188,25 @@ def test_context_uses_v3_memories_only_for_v3_pipeline() -> None:
     assert all(source["source_type"] != "agent_memories_v3" for source in v2_sources)
 
 
+def test_context_shows_event_and_expiry_dates_to_the_model() -> None:
+    _save_memory(
+        key="relationship.riya",
+        value="Met Riya at a wedding",
+        kind="episodic",
+        purposes=["personalization"],
+        occurred_at=datetime(2025, 3, 14, 10, 0, tzinfo=UTC),
+        valid_until=datetime.now(UTC) + timedelta(days=30),
+    )
+
+    with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3"}, clear=False):
+        sources = build_reply_context_sources(CONVERSATION_ID, None, "Riya wedding", USER_ID)
+
+    content = next(s for s in sources if s["source_type"] == "agent_memories_v3")["content"]
+    assert "happened 2025-03-14" in content
+    assert "valid until" in content
+    assert "do not present past events as current" in content
+
+
 def _retrieve(user_text: str, *, limit: int = 5) -> list[dict[str, object]]:
     package = importlib.import_module("agent.memory_engine.memories")
     function = getattr(package, "retrieve_agent_memories_for_reply", None)
@@ -208,6 +227,7 @@ def _save_memory(
     importance: float = 0.8,
     valid_from: datetime | None = None,
     valid_until: datetime | None = None,
+    occurred_at: datetime | None = None,
 ) -> dict[str, object]:
     observed_at = (NOW - timedelta(days=1)).isoformat()
     return storage.create_agent_memory(
@@ -222,6 +242,7 @@ def _save_memory(
             "sensitivity": sensitivity,
             "confidence": confidence,
             "importance": importance,
+            "occurred_at": occurred_at.isoformat() if occurred_at else None,
             "valid_from": valid_from.isoformat() if valid_from else None,
             "valid_until": valid_until.isoformat() if valid_until else None,
             "evidence": [

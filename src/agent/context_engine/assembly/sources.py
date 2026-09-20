@@ -318,10 +318,13 @@ def _agent_memory_v3_context_sources(
         "Relevant durable memories about the user.",
         "Use only when helpful; do not expose memory IDs, kinds, or internal keys.",
         "A relationship memory describes lived history, not a desired partner trait.",
+        "A date shows when something happened; do not present past events as current.",
     ]
     for memory in memories:
         value = json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True)
-        lines.append(f"- {memory.get('kind')}: {memory.get('key')} = {value}")
+        lines.append(
+            f"- {memory.get('kind')}: {memory.get('key')} = {value}{_memory_time_note(memory)}"
+        )
     return [
         {
             "source_type": AGENT_MEMORIES_V3_SOURCE_TYPE,
@@ -334,6 +337,16 @@ def _agent_memory_v3_context_sources(
             },
         }
     ]
+
+
+def _memory_time_note(memory: dict[str, Any]) -> str:
+    """Give the model event and expiry dates so old events are not read as current."""
+    notes = [
+        f"{label} {str(memory[field])[:10]}"
+        for field, label in (("occurred_at", "happened"), ("valid_until", "valid until"))
+        if memory.get(field)
+    ]
+    return f" ({', '.join(notes)})" if notes else ""
 
 
 def _agent_behavior_rule_context_sources(user_id: str | None) -> list[dict[str, Any]]:
