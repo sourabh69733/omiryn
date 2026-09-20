@@ -9,7 +9,7 @@ from agent.context_engine.conversation_engine.policy import direct_turn_reply, s
 from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
-from agent.memory_engine.memories.embeddings import embed_memory_query
+from agent.memory_engine.memories.embeddings import embed_memory_query, memory_query_text
 from agent.providers import (
     AgentProviderError,
     AgentProviderTruncationError,
@@ -160,7 +160,7 @@ async def run_agent_turn(
     }
     if agent_pipeline_config().memory_contract_version == 3:
         context_arguments["memory_query_embedding"] = await embed_memory_query(
-            user_text, conversation_id=conversation_id
+            memory_query_text(user_text, messages), conversation_id=conversation_id
         )
     context_package = build_model_context_package(**context_arguments)
     system_prompt = context_package.system_prompt

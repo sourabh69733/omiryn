@@ -20,7 +20,9 @@ from .ranking import (
 DEFAULT_REPLY_MEMORY_LIMIT = 5
 # Quality metadata may rank candidates, but only query relevance admits content memories.
 _LEXICAL_RELEVANCE_FLOOR = 0.05
-_SEMANTIC_RELEVANCE_FLOOR = 0.4
+# Calibrated on bge-m3 (retrieval case eval, 2026-09-20): related memories scored 0.48-0.63,
+# unrelated ones up to 0.44. The margin is thin, so re-check when the model or fixtures change.
+_SEMANTIC_RELEVANCE_FLOOR = 0.45
 _KIND_LIMITS = {
     MemoryKind.SEMANTIC.value: 2,
     MemoryKind.EPISODIC.value: 1,

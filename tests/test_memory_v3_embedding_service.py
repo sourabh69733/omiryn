@@ -18,8 +18,14 @@ def test_embedding_target_uses_one_provider_model_setting(monkeypatch) -> None:
     assert memory_embedding_target() == ("deepinfra", "BAAI/bge-m3")
 
 
-def test_embedding_target_is_disabled_when_setting_is_absent(monkeypatch) -> None:
+def test_embedding_target_defaults_when_setting_is_absent(monkeypatch) -> None:
     monkeypatch.delenv("MEMORY_EMBEDDING_MODEL", raising=False)
+
+    assert memory_embedding_target() == ("deepinfra", "BAAI/bge-m3")
+
+
+def test_embedding_target_can_be_disabled_explicitly(monkeypatch) -> None:
+    monkeypatch.setenv("MEMORY_EMBEDDING_MODEL", "off")
 
     assert memory_embedding_target() is None
 

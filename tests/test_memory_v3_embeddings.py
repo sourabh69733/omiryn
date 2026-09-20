@@ -108,3 +108,19 @@ def _save_memory(key: str, value: object, *, importance: float = 0.8) -> dict[st
             ],
         }
     )
+
+
+def test_memory_query_text_adds_recent_turns_only_for_short_messages() -> None:
+    from agent.memory_engine.memories.embeddings import memory_query_text
+
+    history = [
+        {"role": "user", "content": "Riya called me again"},
+        {"role": "assistant", "content": "How did that feel?"},
+    ]
+
+    assert memory_query_text("what about her?", history) == (
+        "Riya called me again\nHow did that feel?\nwhat about her?"
+    )
+    long_text = "I would like to talk about my deployment failing in production today"
+    assert memory_query_text(long_text, history) == long_text
+    assert memory_query_text("what about her?", []) == "what about her?"
