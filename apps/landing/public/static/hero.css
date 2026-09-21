@@ -1,0 +1,151 @@
+/* Landing hero: two portraits, conversation strands between them.
+   Scoped with the hx- prefix so it never collides with the older landing.css. */
+:root {
+  --hx-bg: #060e13;
+  --hx-ink: #f2ebe1;
+  --hx-muted: #a9b4b7;
+  --hx-gold: #d9b26f;
+  --hx-gold-ink: #1b1307;
+  --hx-serif: "Newsreader", "Playfair Display", Georgia, "Times New Roman", serif;
+  --hx-sans: "Instrument Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --hx-delay: 1.35s; /* waits for the boot loader */
+}
+
+.hx {
+  position: relative;
+  padding: 0; /* landing.css sets a global section padding */
+  background: var(--hx-bg);
+  color: var(--hx-ink);
+  overflow: hidden;
+  font-family: var(--hx-sans);
+}
+
+.hx-stage {
+  position: relative;
+  max-width: 1600px;
+  margin: 0 auto;
+  height: clamp(680px, 92svh, 860px);
+}
+
+/* Portraits fade into the page on their inner edge and at the bottom. */
+.hx-photo {
+  position: absolute;
+  bottom: 0;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  animation: hx-fade 1.8s ease-out both, hx-breathe 14s ease-in-out infinite alternate;
+  animation-delay: 0.2s, 2s;
+}
+.hx-man {
+  left: 0;
+  -webkit-mask-image: linear-gradient(to right, #000 62%, transparent 100%), linear-gradient(to top, transparent 0, #000 22%), linear-gradient(to bottom, transparent 0, #000 16%);
+  -webkit-mask-composite: source-in, source-in;
+  mask-image: linear-gradient(to right, #000 62%, transparent 100%), linear-gradient(to top, transparent 0, #000 22%), linear-gradient(to bottom, transparent 0, #000 16%);
+  mask-composite: intersect, intersect;
+  transform-origin: 30% 60%;
+}
+.hx-woman {
+  right: 0;
+  -webkit-mask-image: linear-gradient(to left, #000 62%, transparent 100%), linear-gradient(to top, transparent 0, #000 22%), linear-gradient(to bottom, transparent 0, #000 16%);
+  -webkit-mask-composite: source-in, source-in;
+  mask-image: linear-gradient(to left, #000 62%, transparent 100%), linear-gradient(to top, transparent 0, #000 22%), linear-gradient(to bottom, transparent 0, #000 16%);
+  mask-composite: intersect, intersect;
+  transform-origin: 70% 60%;
+  animation-direction: normal, alternate-reverse;
+}
+
+.hx-strands {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.hx-copy {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: clamp(104px, 15vh, 150px);
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 32px));
+  text-align: center;
+}
+.hx-copy h1 {
+  font-family: var(--hx-serif);
+  font-weight: 300;
+  font-size: clamp(38px, 5.2vw, 70px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+  text-wrap: balance;
+  text-shadow: 0 2px 30px rgba(6, 14, 19, 0.8);
+}
+.hx-copy h1 em {
+  font-style: italic;
+  font-weight: 300;
+  color: #f6dcae;
+}
+.hx-sub {
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.5;
+  color: var(--hx-muted);
+  margin: 0 0 28px;
+}
+.hx-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 32px;
+  border-radius: 999px;
+  background: var(--hx-gold);
+  color: var(--hx-gold-ink);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(217, 178, 111, 0.22);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.hx-cta:hover { transform: translateY(-2px); background: #e4c082; box-shadow: 0 12px 40px rgba(217, 178, 111, 0.32); }
+.hx-cta:focus-visible { outline: 2px solid #f6dcae; outline-offset: 4px; }
+
+.hx-copy > * { animation: hx-rise 1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.hx-copy h1 { animation-delay: var(--hx-delay); }
+.hx-copy .hx-sub { animation-delay: calc(var(--hx-delay) + 0.15s); }
+.hx-copy .hx-cta { animation-delay: calc(var(--hx-delay) + 0.3s); }
+
+/* Soft edge vignette so the hero melts into the next section. */
+.hx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(6, 14, 19, 0.55) 0, transparent 18%),
+    linear-gradient(to top, var(--hx-bg) 0, transparent 14%);
+  z-index: 3;
+}
+
+@keyframes hx-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes hx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hx-breathe { from { transform: scale(1); } to { transform: scale(1.025); } }
+
+@media (max-width: 860px) {
+  .hx-stage { height: clamp(700px, 96svh, 880px); }
+  /* Each portrait is pushed past its edge so the two faces stay in their own half. */
+  .hx-photo { height: 52%; }
+  .hx-man { left: -16%; }
+  .hx-woman { right: -16%; }
+  .hx-copy { top: clamp(92px, 13vh, 120px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-photo, .hx-copy > * { animation: none; }
+  .hx-cta { transition: none; }
+}

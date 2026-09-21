@@ -30,13 +30,12 @@
   <link rel="icon" href="/static/assets/omiryn-app-icon-light.png" type="image/png">
   <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon-light.png">
   <link rel="preload" href="/static/assets/omiryn-logo-neon-light.png" as="image">
-  <link rel="preload" href="/static/assets/omiryn-indian-connection-hero-v2.webp" as="image" type="image/webp" media="(min-width: 621px)">
-  <link rel="preload" href="/static/assets/omiryn-indian-connection-hero-mobile-v2.webp" as="image" type="image/webp" media="(max-width: 620px)">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260711-natural-network-hero">
   <link rel="stylesheet" href="/static/landing-theme-connection.css?v=20260828-meaning-signals">
+  <link rel="stylesheet" href="/static/hero.css?v=20260920-portraits">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body>
@@ -62,94 +61,17 @@
   </nav>
 
   <!-- ═══════════ HERO ═══════════ -->
-  <section class="hero hero--connection" id="hero">
-    <div class="connection-scene" aria-hidden="true">
-      <picture class="connection-art">
-        <source media="(max-width: 620px)" srcset="/static/assets/omiryn-indian-connection-hero-mobile-v2.webp">
-        <img src="/static/assets/omiryn-indian-connection-hero-v2.webp" alt="" width="1672" height="944" fetchpriority="high">
-      </picture>
+  <section class="hx" id="hero" aria-labelledby="hero-title">
+    <div class="hx-stage">
+      <img class="hx-photo hx-man" src="/static/assets/hero-man.webp" width="1122" height="1402" alt="A young man smiling and looking off to the side" fetchpriority="high" decoding="async">
+      <img class="hx-photo hx-woman" src="/static/assets/hero-woman.webp" width="1122" height="1402" alt="A young woman smiling with her chin resting on her hand" fetchpriority="high" decoding="async">
+      <canvas class="hx-strands" aria-hidden="true"></canvas>
 
-      <div class="connection-thought-field" aria-hidden="true">
-        <!-- Only the center-zone SVG word streams — no face-overlapping spans -->
-        <svg class="connection-signal-field" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <!-- Word stream arcs — constrained to center band (x 360→1080) between the two faces -->
-            <path id="word-stream-upper" d="M 360 340 C 500 280, 940 380, 1080 330" />
-            <path id="word-stream-mid"   d="M 360 450 C 520 520, 900 370, 1080 450" />
-            <path id="word-stream-lower" d="M 360 560 C 540 490, 880 600, 1080 555" />
-
-            <!-- Soft fade: words dissolve near face edges -->
-            <linearGradient id="threadFade" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stop-color="#f3d394" stop-opacity="0" />
-              <stop offset="18%"  stop-color="#f3d394" stop-opacity="0.6" />
-              <stop offset="50%"  stop-color="#f3d394" stop-opacity="0.75" />
-              <stop offset="82%"  stop-color="#f3d394" stop-opacity="0.6" />
-              <stop offset="100%" stop-color="#f3d394" stop-opacity="0" />
-            </linearGradient>
-            <linearGradient id="threadFadeMid" x1="100%" y1="0%" x2="0%" y2="0%">
-              <stop offset="0%"   stop-color="#b4a9e8" stop-opacity="0" />
-              <stop offset="18%"  stop-color="#b4a9e8" stop-opacity="0.55" />
-              <stop offset="50%"  stop-color="#b4a9e8" stop-opacity="0.7" />
-              <stop offset="82%"  stop-color="#b4a9e8" stop-opacity="0.55" />
-              <stop offset="100%" stop-color="#b4a9e8" stop-opacity="0" />
-            </linearGradient>
-
-            <!-- JS traveler signal paths (unchanged) -->
-            <path id="signal-left-rhythm"    d="M130 300 Q390 235 702 306" />
-            <path id="signal-right-rhythm"   d="M1310 300 Q1050 235 738 306" />
-            <path id="signal-left-comfort"   d="M130 420 Q410 505 702 423" />
-            <path id="signal-right-comfort"  d="M1310 420 Q1030 505 738 423" />
-            <path id="signal-left-curiosity"  d="M130 540 Q390 472 702 540" />
-            <path id="signal-right-curiosity" d="M1310 540 Q1050 472 738 540" />
-          </defs>
-
-          <!-- Stream 1: gold, left→right, 36s -->
-          <text class="connection-word-thread connection-word-thread--gold">
-            <textPath href="#word-stream-upper" class="stream-ltr-slow">
-              what we never say out loud • the honest version • laughing until late • asking better questions •
-            </textPath>
-          </text>
-
-          <!-- Stream 2: lavender, right→left, 44s -->
-          <text class="connection-word-thread connection-word-thread--lavender">
-            <textPath href="#word-stream-mid" class="stream-rtl-mid">
-              room to breathe • music that feels like home • old Hindi songs • a softer pace • long train rides •
-            </textPath>
-          </text>
-
-          <!-- Stream 3: mist/gold, left→right, 28s -->
-          <text class="connection-word-thread connection-word-thread--mist">
-            <textPath href="#word-stream-lower" class="stream-ltr-fast">
-              small dinners • people who listen • slow Sundays • city lights after rain • more than small talk •
-            </textPath>
-          </text>
-
-          <!-- JS-driven signal routes & nodes -->
-          <g class="connection-signal-routes">
-            <use class="connection-signal-route" data-signal-route="left rhythm"     href="#signal-left-rhythm" />
-            <use class="connection-signal-route" data-signal-route="right rhythm"    href="#signal-right-rhythm" />
-            <use class="connection-signal-route" data-signal-route="left comfort"    href="#signal-left-comfort" />
-            <use class="connection-signal-route" data-signal-route="right comfort"   href="#signal-right-comfort" />
-            <use class="connection-signal-route" data-signal-route="left curiosity"  href="#signal-left-curiosity" />
-            <use class="connection-signal-route" data-signal-route="right curiosity" href="#signal-right-curiosity" />
-          </g>
-          <g class="connection-signal-nodes">
-            <circle class="connection-signal-node" data-signal-node="rhythm"    cx="720" cy="306" r="4" />
-            <circle class="connection-signal-node" data-signal-node="comfort"   cx="720" cy="423" r="4" />
-            <circle class="connection-signal-node" data-signal-node="curiosity" cx="720" cy="540" r="4" />
-          </g>
-          <text class="connection-signal-traveler" data-signal-traveler="left"></text>
-          <text class="connection-signal-traveler" data-signal-traveler="right"></text>
-          <text class="connection-signal-insight" data-signal-insight></text>
-        </svg>
+      <div class="hx-copy">
+        <h1 id="hero-title">Someone might see<br><em>life a little like you.</em></h1>
+        <p class="hx-sub">Start with a conversation.</p>
+        <a href="#" data-app-link data-track="hero_meet_omiryn" class="hx-cta">Meet Omiryn</a>
       </div>
-
-    </div>
-
-    <div class="hero-copy hero-copy--art">
-      <p class="hero-kicker reveal">OMIRYN</p>
-      <p class="hero-whisper reveal reveal-delay-1">Some connections begin in conversation.</p>
-      <a class="hero-scroll-cue reveal reveal-delay-2" href="#how-it-works">Explore the difference <span aria-hidden="true">↓</span></a>
     </div>
   </section>
 
@@ -400,7 +322,7 @@
     }
   </script>
   <script src="/static/landing.js?v=20260713-auth-callback"></script>
-  <script type="module" src="/static/connection-signal-field.js?v=20260828-signal-choreography"></script>
+  <script src="/static/hero.js?v=20260920-portraits" defer></script>
 
 </body>
 </html>

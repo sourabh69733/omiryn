@@ -3,35 +3,32 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const indexPath = new URL('../index.html', import.meta.url);
-const themePath = new URL('../public/static/landing-theme-connection.css', import.meta.url);
-const signalPath = new URL('../public/static/connection-signal-field.js', import.meta.url);
+const cssPath = new URL('../public/static/hero.css', import.meta.url);
+const jsPath = new URL('../public/static/hero.js', import.meta.url);
 
-test('connection hero makes the thought field the focal point', async () => {
-  const [index, theme, signal] = await Promise.all([
+test('hero puts two portraits and a conversation strand canvas around one headline and one button', async () => {
+  const [index, css, js] = await Promise.all([
     readFile(indexPath, 'utf8'),
-    readFile(themePath, 'utf8'),
-    readFile(signalPath, 'utf8'),
+    readFile(cssPath, 'utf8'),
+    readFile(jsPath, 'utf8'),
   ]);
 
-  assert.match(index, /omiryn-indian-connection-hero-v2\.webp/);
-  assert.match(index, /connection-thought-field/);
-  assert.match(index, /connection-thought--left/);
-  assert.match(index, /connection-thought--right/);
-  assert.match(index, /connection-particle-cloud/);
-  assert.match(index, /connection-signal-field/);
-  assert.match(index, /data-signal-traveler/);
-  assert.match(index, /connection-signal-field\.js/);
-  assert.match(index, /hero-whisper/);
-  const hero = index.match(/<section class="hero hero--connection"[\s\S]*?<\/section>/)?.[0] ?? '';
-  assert.doesNotMatch(hero, /<h1/);
-  assert.doesNotMatch(hero, /hero-actions/);
-  assert.match(theme, /@keyframes connection-thought-drift-left/);
-  assert.match(theme, /connection-signal-route/);
-  assert.match(theme, /box-shadow: -32px -13px 0 -1px currentColor/);
-  assert.match(theme, /transform: scale\(1\)/);
-  assert.match(theme, /prefers-reduced-motion: reduce[\s\S]*\.connection-thought-field/);
-  assert.match(signal, /const signalCycles/);
-  assert.match(signal, /const backgroundThoughts/);
-  assert.match(signal, /same pace/);
-  assert.match(signal, /getAttribute\('href'\)/);
+  const hero = index.match(/<section class="hx"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.match(hero, /hero-man\.webp/);
+  assert.match(hero, /hero-woman\.webp/);
+  assert.match(hero, /<canvas class="hx-strands" aria-hidden="true">/);
+  assert.match(hero, /<h1 id="hero-title">Someone might see/);
+  assert.match(hero, /class="hx-cta"[^>]*>Meet Omiryn</);
+  assert.match(hero, /data-app-link/);
+  assert.match(index, /hero\.js/);
+
+  // Both portraits carry alt text, since they are content, not decoration.
+  const alts = [...hero.matchAll(/<img[^>]*alt="([^"]+)"/g)];
+  assert.equal(alts.length, 2);
+
+  // Landing.css gives every section 120px/48px padding; the hero must opt out.
+  assert.match(css, /\.hx \{[^}]*padding: 0;/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(js, /prefers-reduced-motion: reduce/);
+  assert.match(js, /IntersectionObserver/);
 });
