@@ -6,16 +6,22 @@ nudge needs recent silence, a small daily cap, and proof the user answered the l
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
 from agent.context_engine.conversation_engine.state.models import ConversationThread
 
 
+def _default_min_silence() -> timedelta:
+    """PROACTIVE_MIN_SILENCE_SECONDS shortens the wait for manual testing."""
+    return timedelta(seconds=float(os.getenv("PROACTIVE_MIN_SILENCE_SECONDS", 30 * 60)))
+
+
 @dataclass(frozen=True)
 class ProactiveLimits:
-    min_silence: timedelta = timedelta(minutes=30)
+    min_silence: timedelta = field(default_factory=_default_min_silence)
     window: timedelta = timedelta(hours=24)
     max_per_window: int = 2
 
@@ -23,9 +29,10 @@ class ProactiveLimits:
 def nudge_block_reason(
     messages: list[dict[str, Any]],
     now: datetime,
-    limits: ProactiveLimits = ProactiveLimits(),
+    limits: ProactiveLimits | None = None,
 ) -> str | None:
     """Return why a nudge must not be sent now, or None when it is allowed."""
+    limits = limits or ProactiveLimits()
     if not any(message.get("role") == "user" for message in messages):
         return "no_user_message"
     last_sent = _parse_time(messages[-1].get("created_at"))

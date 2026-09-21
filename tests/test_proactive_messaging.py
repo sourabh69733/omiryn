@@ -35,6 +35,13 @@ def test_allows_a_nudge_after_silence() -> None:
     assert nudge_block_reason([_msg("user", 90), _msg("assistant", 89)], NOW) is None
 
 
+def test_min_silence_can_be_shortened_for_testing(monkeypatch) -> None:
+    monkeypatch.setenv("PROACTIVE_MIN_SILENCE_SECONDS", "60")
+
+    assert nudge_block_reason([_msg("user", 5)], NOW) is None
+    assert nudge_block_reason([_msg("user", 0.5)], NOW) == "recently_active"
+
+
 def test_blocks_when_user_was_just_active() -> None:
     assert nudge_block_reason([_msg("user", 5)], NOW) == "recently_active"
 
