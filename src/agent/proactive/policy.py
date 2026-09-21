@@ -61,12 +61,22 @@ def nudge_block_reason(
     return None
 
 
-def pick_thread(threads: list[ConversationThread]) -> ConversationThread | None:
-    """Choose the open thread most worth reopening; never one the user is cool on."""
+def pick_thread(
+    threads: list[ConversationThread],
+    exclude_ids: set[str | None] | frozenset[str | None] = frozenset(),
+) -> ConversationThread | None:
+    """Choose the open thread most worth reopening.
+
+    Skips threads the user is cool on and threads already nudged once, so the agent never
+    circles back to the same topic.
+    """
     candidates = [
         thread
         for thread in threads
-        if thread.status == "open" and thread.next_angle and thread.user_interest != "low"
+        if thread.status == "open"
+        and thread.next_angle
+        and thread.user_interest != "low"
+        and thread.id not in exclude_ids
     ]
     return max(candidates, key=lambda thread: thread.salience, default=None)
 

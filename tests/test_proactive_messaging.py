@@ -89,6 +89,20 @@ def test_thread_pick_skips_paused_low_interest_and_angleless() -> None:
     assert pick_thread(threads[:3]) is None
 
 
+def test_thread_pick_never_repeats_a_thread_already_nudged() -> None:
+    threads = [_thread(id="a", salience=0.9), _thread(id="b", salience=0.5)]
+
+    assert pick_thread(threads, exclude_ids={"a"}).id == "b"
+    assert pick_thread(threads, exclude_ids={"a", "b"}) is None
+
+
+def test_model_can_decline_to_speak() -> None:
+    from agent.proactive.service import _is_skip
+
+    assert _is_skip("SKIP") and _is_skip(" skip. ") and _is_skip('"SKIP"')
+    assert not _is_skip("Skip the boring part, how did the call go?")
+
+
 class _Socket:
     def __init__(self) -> None:
         self.sent: list[dict] = []

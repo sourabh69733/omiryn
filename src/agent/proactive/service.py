@@ -31,10 +31,15 @@ DEFAULT_INTERVAL_SECONDS = 300.0
 _PROACTIVE_INSTRUCTIONS = """
 
 PROACTIVE MESSAGE
-The user is online but has been quiet. Write ONE short, warm message (one or two sentences)
-that gently reopens this topic. Make it easy to ignore; never pressure or guilt them.
+The user is online but quiet. First decide whether there is a natural reason to speak first.
+- If the last exchange was in the middle of something (a story, a game, a task, a question
+  waiting for them), or nothing specific is worth reopening, reply with exactly: SKIP
+- Otherwise write ONE short message (one or two sentences) that refers to something concrete
+  from the topic below or the recent chat. Never a generic opener, such as asking about their
+  day or what is on their mind.
+- Make it easy to ignore. No pressure, no guilt. Ask a light question only if it follows from
+  the topic. Do not mention timers, follow-ups, memory or being automated.
 Topic: {title}. What was said: {summary}. Suggested angle: {angle}.
-Ask at most one light question. Do not mention timers, follow-ups, memory or being automated.
 """
 _CUE = "(The user has said nothing new. Send your own short opening message now.)"
 
@@ -65,7 +70,10 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
     messages = conversation["messages"]
     if nudge_block_reason(messages, now):
         return False
-    thread = pick_thread(list_threads(user_id, statuses=("open",)))
+    already_nudged = {m.get("thread_id") for m in messages if m.get("proactive")}
+    thread = pick_thread(
+        list_threads(user_id, statuses=("open",)), exclude_ids=already_nudged
+    )
     if thread is None:
         return False
 
@@ -140,8 +148,15 @@ async def _generate(
         max_tokens=300,
     )
     text = _visible_companion_reply(raw, structured_companion_reply(raw))
+    if _is_skip(text):
+        return None
     parts = split_assistant_reply(text, user_text="")
     return parts[0].strip() if parts else None
+
+
+def _is_skip(text: str) -> bool:
+    """The model may decline to speak; SKIP is its answer for "no natural reason"."""
+    return text.strip().strip(".!\"'`").upper() == "SKIP"
 
 
 class ProactiveScheduler:
