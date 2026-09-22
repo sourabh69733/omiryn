@@ -140,7 +140,11 @@ async def _generate(
     raw = await generate_agent_reply(
         [
             *_provider_messages(
-                reply_window(messages, summarized_through(package.context_sources))
+                reply_window(
+                    messages,
+                    summarized_through(package.context_sources),
+                    (package.user_profile or {}).get("timezone"),
+                )
             ),
             {"role": "user", "content": _CUE},
         ],

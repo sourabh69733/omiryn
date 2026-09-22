@@ -192,7 +192,9 @@ async def run_agent_turn(
     context_snapshot = context_package.snapshot or {}
     # Older messages the background summary already covers stay out of the chat history.
     reply_messages = reply_window(
-        updated_messages, summarized_through(context_package.context_sources)
+        updated_messages,
+        summarized_through(context_package.context_sources),
+        (context_package.user_profile or {}).get("timezone"),
     )
     provider_messages = _provider_messages(reply_messages)
     if context_snapshot:
