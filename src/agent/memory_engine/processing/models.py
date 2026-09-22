@@ -18,6 +18,7 @@ class MemoryMessage:
     content: str
     scope: MemoryScope
     evidence_eligible: bool
+    sent_at: str | None = None
 
 
 @dataclass(frozen=True)

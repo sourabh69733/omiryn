@@ -33,6 +33,12 @@ def valid_timezone_name(name: str | None) -> str | None:
     return cleaned
 
 
+def user_zone(timezone_name: str | None) -> ZoneInfo:
+    """The user's timezone, falling back to AGENT_DEFAULT_TIMEZONE and then UTC."""
+    name = valid_timezone_name(timezone_name) or valid_timezone_name(default_timezone_name())
+    return ZoneInfo(name or _FALLBACK_TIMEZONE)
+
+
 def session_gap() -> timedelta:
     """Silence after which the next message starts a new session (AGENT_SESSION_GAP_HOURS)."""
     try:
@@ -43,7 +49,11 @@ def session_gap() -> timedelta:
 
 
 def message_time(message: dict[str, Any]) -> datetime | None:
-    value = message.get("created_at")
+    return parse_time(message.get("created_at"))
+
+
+def parse_time(value: Any) -> datetime | None:
+    """Parse a timezone-aware ISO-8601 string; naive or invalid values give None."""
     if not isinstance(value, str) or not value.strip():
         return None
     try:
@@ -118,8 +128,7 @@ def conversation_time(
     now: datetime | None = None,
 ) -> ConversationTime:
     """Summarize the current time and the gap since the user last wrote in this chat."""
-    name = valid_timezone_name(timezone_name) or valid_timezone_name(default_timezone_name())
-    zone = ZoneInfo(name or _FALLBACK_TIMEZONE)
+    zone = user_zone(timezone_name)
     current = now or utc_now()
     last_user_at = next(
         (
@@ -131,7 +140,7 @@ def conversation_time(
     )
     gap = max(current - last_user_at, timedelta(0)) if last_user_at else None
     return ConversationTime(
-        timezone=name or _FALLBACK_TIMEZONE,
+        timezone=zone.key,
         now_local=current.astimezone(zone),
         last_user_message_local=last_user_at.astimezone(zone) if last_user_at else None,
         gap_since_last_user_message=gap,
@@ -149,6 +158,11 @@ def gap_marker(previous: dict[str, Any] | None, message: dict[str, Any]) -> str 
     return f"({humanize_gap(after - before)} later)"
 
 
+def date_label(local: datetime) -> str:
+    """Short date such as '12 Sep 2026'."""
+    return f"{local.day} {local.strftime('%b')} {local.year}"
+
+
 def _local_label(local: datetime, *, with_year: bool = False) -> str:
     # Built by hand so the output does not depend on the server's locale.
     time_text = local.strftime("%I:%M %p").lstrip("0").lower()
@@ -161,11 +175,14 @@ def _local_label(local: datetime, *, with_year: bool = False) -> str:
 __all__ = [
     "ConversationTime",
     "conversation_time",
+    "date_label",
     "day_part",
     "default_timezone_name",
     "gap_marker",
     "humanize_gap",
     "message_time",
+    "parse_time",
     "session_gap",
+    "user_zone",
     "valid_timezone_name",
 ]

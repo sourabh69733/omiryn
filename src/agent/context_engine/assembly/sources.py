@@ -27,7 +27,9 @@ from agent.memory_engine.data_points.retrieval.whatsapp import (
     retrieve_whatsapp_imports,
     retrieve_whatsapp_memory,
 )
+from agent.shared.timeline import date_label, parse_time, user_zone
 from storage import (
+    get_user_timezone,
     list_context_sources,
     list_user_context_sources,
 )
@@ -314,16 +316,19 @@ def _agent_memory_v3_context_sources(
     )
     if not memories:
         return []
+    zone = user_zone(get_user_timezone(user_id))
     lines = [
         "Relevant durable memories about the user.",
         "Use only when helpful; do not expose memory IDs, kinds, or internal keys.",
         "A relationship memory describes lived history, not a desired partner trait.",
         "A date shows when something happened; do not present past events as current.",
+        "'told you' is when the user said it; use it to answer when they mentioned something.",
     ]
     for memory in memories:
         value = json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True)
         lines.append(
-            f"- {memory.get('kind')}: {memory.get('key')} = {value}{_memory_time_note(memory)}"
+            f"- {memory.get('kind')}: {memory.get('key')} = {value}"
+            f"{_memory_time_note(memory, zone)}"
         )
     return [
         {
@@ -339,14 +344,32 @@ def _agent_memory_v3_context_sources(
     ]
 
 
-def _memory_time_note(memory: dict[str, Any]) -> str:
-    """Give the model event and expiry dates so old events are not read as current."""
-    notes = [
-        f"{label} {str(memory[field])[:10]}"
-        for field, label in (("occurred_at", "happened"), ("valid_until", "valid until"))
-        if memory.get(field)
-    ]
-    return f" ({', '.join(notes)})" if notes else ""
+def _memory_time_note(memory: dict[str, Any], zone: Any) -> str:
+    """Give the model event, mention and expiry dates, in the user's timezone."""
+
+    def local_date(value: Any) -> str | None:
+        parsed = parse_time(value)
+        return date_label(parsed.astimezone(zone)) if parsed else None
+
+    notes = []
+    mentioned = sorted(
+        {
+            (parsed, date_label(parsed.astimezone(zone)))
+            for evidence in memory.get("evidence") or []
+            if (parsed := parse_time(evidence.get("observed_at")))
+        }
+    )
+    mention_days = list(dict.fromkeys(label for _, label in mentioned))
+    if mention_days:
+        told = f"told you {mention_days[0]}"
+        if len(mention_days) > 1:
+            told += f", again {mention_days[-1]}"
+        notes.append(told)
+    if happened := local_date(memory.get("occurred_at")):
+        notes.append(f"happened {happened}")
+    if valid_until := local_date(memory.get("valid_until")):
+        notes.append(f"valid until {valid_until}")
+    return f" ({'; '.join(notes)})" if notes else ""
 
 
 def _agent_behavior_rule_context_sources(user_id: str | None) -> list[dict[str, Any]]:

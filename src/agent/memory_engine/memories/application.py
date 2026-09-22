@@ -12,6 +12,7 @@ from storage.memories import apply_agent_memory_operation_batch
 
 from agent.memory_engine.processing.models import MemoryBatch
 from agent.shared.clock import utc_now
+from agent.shared.timeline import parse_time
 
 from .operations import (
     MemoryAddProposal,
@@ -166,7 +167,7 @@ def _trusted_evidence(
     observed_at: datetime,
 ) -> list[dict[str, Any]]:
     evidence_by_index = {
-        message.message_index: message.content
+        message.message_index: message
         for message in batch.messages
         if message.evidence_eligible
     }
@@ -175,8 +176,11 @@ def _trusted_evidence(
             {
                 "conversation_id": batch.conversation_id,
                 "message_index": message_index,
-                "exact_quote": evidence_by_index[message_index],
-                "observed_at": observed_at.isoformat(),
+                "exact_quote": evidence_by_index[message_index].content,
+                # When the user said it; extraction time only for messages without a timestamp.
+                "observed_at": (
+                    parse_time(evidence_by_index[message_index].sent_at) or observed_at
+                ).isoformat(),
             }
             for message_index in message_indexes
         ]

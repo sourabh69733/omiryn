@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .models import MemoryBatch
+from agent.shared.timeline import parse_time, user_zone
+
+from .models import MemoryBatch, MemoryMessage
 
 
 MEMORY_OPERATION_RULES = """Rules:
@@ -66,11 +68,14 @@ Output shape:
 def memory_batch_prompt(
     batch: MemoryBatch,
     existing_memories: list[dict[str, Any]],
+    timezone_name: str | None = None,
 ) -> str:
     """Serialize trusted batch metadata separately from model-generated operations."""
+    zone = user_zone(timezone_name)
     payload = {
         "conversation_id": batch.conversation_id,
         "batch_key": batch.batch_key,
+        "user_timezone": zone.key,
         "messages": [
             {
                 "message_index": message.message_index,
@@ -78,6 +83,7 @@ def memory_batch_prompt(
                 "content": message.content,
                 "scope": message.scope,
                 "evidence_eligible": message.evidence_eligible,
+                **_sent_fields(message, zone),
             }
             for message in batch.messages
         ],
@@ -90,3 +96,15 @@ def memory_batch_prompt(
         "existing_memories": existing_memories,
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _sent_fields(message: MemoryMessage, zone: Any) -> dict[str, str]:
+    """Local send time, so relative dates like 'yesterday' can be resolved."""
+    sent = parse_time(message.sent_at)
+    if sent is None:
+        return {}
+    local = sent.astimezone(zone)
+    return {
+        "sent_at": local.isoformat(timespec="minutes"),
+        "sent_weekday": local.strftime("%A"),
+    }

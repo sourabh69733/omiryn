@@ -66,8 +66,13 @@ V3 memory rules:
 - Never target an ID outside existing_memories and never target one memory twice in a batch.
 - Relationship history and intimate interpersonal details are at least sensitive. Medical, biometric,
   sexual, financial and similarly high-risk private facts are highly_sensitive.
-- occurred_at is the event time, not extraction time. Use null for relative or ambiguous dates; emit a
-  timestamp only when the evidence supports an unambiguous timezone-aware ISO-8601 value.
+- occurred_at is the event time, not extraction time or send time. Resolve relative dates ("today",
+  "yesterday", "last Friday", "next Monday") against the evidence message's sent_at and sent_weekday,
+  in user_timezone. Write the resolved day as an ISO-8601 timestamp with that timezone's UTC offset,
+  using 12:00 when no time of day is stated. Use null when the day cannot be pinned down, such as
+  "recently", "a while ago" or "last year", or when the message has no sent_at.
+- For plans and temporary states, set valid_until only when the evidence gives a clear end
+  (for example "this week" ends at the end of that week); otherwise use null.
 - Before returning each operation, verify that the cited user evidence directly supports its kind,
   purposes, key, value, sensitivity and time fields. Omit the operation if any field requires guessing.
 - Return at most 12 memory operations.

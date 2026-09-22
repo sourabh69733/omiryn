@@ -16,6 +16,7 @@ from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import (
     attach_agent_usage_result,
+    get_user_timezone,
     latest_agent_usage_event_id,
     list_agent_memories,
     list_agent_memory_embeddings,
@@ -227,7 +228,12 @@ async def _run_claimed_background_cognition(
     )
     try:
         raw = await analyze_background_cognition(
-            background_cognition_prompt(batch, existing_memories, thread_candidates),
+            background_cognition_prompt(
+                batch,
+                existing_memories,
+                thread_candidates,
+                get_user_timezone(user_id),
+            ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
             timeout_seconds=_timeout_seconds(),

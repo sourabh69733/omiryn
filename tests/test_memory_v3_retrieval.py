@@ -202,7 +202,8 @@ def test_context_shows_event_and_expiry_dates_to_the_model() -> None:
         sources = build_reply_context_sources(CONVERSATION_ID, None, "Riya wedding", USER_ID)
 
     content = next(s for s in sources if s["source_type"] == "agent_memories_v3")["content"]
-    assert "happened 2025-03-14" in content
+    assert "happened 14 Mar 2025" in content
+    assert "told you 1 Sep 2026" in content
     assert "valid until" in content
     assert "do not present past events as current" in content
 
