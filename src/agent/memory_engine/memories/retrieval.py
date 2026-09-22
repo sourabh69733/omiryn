@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
+from agent.shared.clock import utc_now
 from .models import MemoryKind, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import (
     aware_datetime,
@@ -46,7 +47,7 @@ def retrieve_agent_memories_for_reply(
     from storage.memory_embeddings import list_agent_memory_embeddings
     from storage.memories import list_agent_memories
 
-    current_time = now or datetime.now(UTC)
+    current_time = now or utc_now()
     eligible = [
         memory
         for memory in list_agent_memories(user_id)

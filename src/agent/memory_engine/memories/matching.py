@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
+from agent.shared.clock import utc_now
 from .models import MemoryPurpose, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import aware_datetime
 
@@ -17,7 +18,7 @@ def matching_progress_memories(
     """Return active matching knowledge permitted for companion reply planning."""
     from storage.memories import list_agent_memories
 
-    current_time = now or datetime.now(UTC)
+    current_time = now or utc_now()
     return [
         memory
         for memory in list_agent_memories(user_id)

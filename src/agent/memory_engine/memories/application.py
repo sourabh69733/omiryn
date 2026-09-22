@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from storage.memories import apply_agent_memory_operation_batch
 
 from agent.memory_engine.processing.models import MemoryBatch
+from agent.shared.clock import utc_now
 
 from .operations import (
     MemoryAddProposal,
@@ -40,7 +41,7 @@ def apply_validated_memory_analysis_v3(
     """Resolve trusted evidence and apply the complete lifecycle batch once."""
     if not analysis.valid:
         raise ValueError("live writes require a validated v3 memory analysis")
-    observed_at = datetime.now(UTC)
+    observed_at = utc_now()
     operations = [
         _operation_payload(
             batch,

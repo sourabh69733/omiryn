@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
+from agent.shared.clock import utc_now
 from .models import MemoryStatus
 from .ranking import (
     bounded_score,
@@ -27,7 +28,7 @@ def select_reconciliation_candidates(
     """Return related active memories and inactive lifecycle history."""
     if limit <= 0:
         return []
-    current_time = now or datetime.now(UTC)
+    current_time = now or utc_now()
     lifecycle_statuses = {
         MemoryStatus.ACTIVE.value,
         MemoryStatus.RETRACTED.value,

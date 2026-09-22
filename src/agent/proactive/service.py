@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import split_assistant_reply
@@ -15,6 +15,7 @@ from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import _provider_messages, generate_agent_reply
 from agent.runtime.orchestrator import _visible_companion_reply
+from agent.shared.clock import utc_now
 from realtime import conversation_event, realtime_hub
 from storage import (
     get_conversation,
@@ -54,7 +55,7 @@ async def run_proactive_pass(*, now: datetime | None = None) -> int:
     sent = 0
     for user_id, conversation_id in await realtime_hub.live_conversations():
         try:
-            if await _nudge(user_id, conversation_id, now or datetime.now(UTC)):
+            if await _nudge(user_id, conversation_id, now or utc_now()):
                 sent += 1
         except Exception:
             logger.exception("agent.proactive.failed conversation_id=%s", conversation_id)
