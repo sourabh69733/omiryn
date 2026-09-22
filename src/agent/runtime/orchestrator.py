@@ -19,6 +19,7 @@ from agent.providers import (
     assess_user_message_quality,
     generate_agent_reply,
 )
+from agent.providers.shared.messages import reply_window, summarized_through
 from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from storage import (
@@ -189,7 +190,11 @@ async def run_agent_turn(
         }
     )
     context_snapshot = context_package.snapshot or {}
-    provider_messages = _provider_messages(updated_messages)
+    # Older messages the background summary already covers stay out of the chat history.
+    reply_messages = reply_window(
+        updated_messages, summarized_through(context_package.context_sources)
+    )
+    provider_messages = _provider_messages(reply_messages)
     if context_snapshot:
         context_snapshot.setdefault("context", {})["prompt"] = {
             "system_prompt": system_prompt,
@@ -221,13 +226,13 @@ async def run_agent_turn(
         fallback_reason = None
         try:
             raw_reply = await generate_agent_reply(
-                updated_messages,
+                reply_messages,
                 **generation_arguments,
             )
         except AgentProviderTruncationError:
             fallback_reason = "output_truncated"
             raw_reply = await generate_agent_reply(
-                updated_messages,
+                reply_messages,
                 **generation_arguments,
                 max_tokens=400,
             )
@@ -240,7 +245,7 @@ async def run_agent_turn(
         ):
             fallback_reason = "malformed_structured_output"
             raw_reply = await generate_agent_reply(
-                updated_messages,
+                reply_messages,
                 **generation_arguments,
                 max_tokens=400,
             )

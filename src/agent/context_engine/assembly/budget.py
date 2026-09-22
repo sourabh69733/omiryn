@@ -6,12 +6,15 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
-CONTEXT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_CONTEXT_TOTAL_CHAR_BUDGET", "5600"))
+# Room for the conversation summary on top of the five earlier source slots.
+CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "6"))
+CONTEXT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_CONTEXT_TOTAL_CHAR_BUDGET", "7500"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
 
 SOURCE_TYPE_PRIORITY = {
+    # Older parts of this chat; without it the companion forgets beyond the recent window.
+    "conversation_summary": 125,
     # The current inline thread contract requires candidate IDs to be present.
     # Keep this above optional memories until thread classification is decoupled.
     "conversation_threads": 120,
@@ -26,6 +29,7 @@ SOURCE_TYPE_PRIORITY = {
     "chat_export": 45,
 }
 SOURCE_TYPE_CHAR_LIMIT = {
+    "conversation_summary": 1900,
     "conversation_threads": 1800,
     "agent_memories_v3": 1400,
     "agent_behavior_rules": 1400,

@@ -20,6 +20,7 @@ from .operations import (
 
 
 MAX_MEMORY_OPERATIONS = 12
+MAX_CONVERSATION_SUMMARY_CHARS = 1800
 _ADD_FIELDS = {
     "operation",
     "memory_kind",
@@ -88,7 +89,7 @@ def validate_memory_analysis_v3(
     if decision == "propose" and not raw_operations:
         errors.append("propose requires at least one operation")
 
-    handoff, handoff_errors = _validate_handoff(raw.get("handoff"))
+    handoff, handoff_errors = _validate_handoff(raw.get("handoff"), batch.previous_handoff)
     errors.extend(f"handoff: {error}" for error in handoff_errors)
     if errors:
         return MemoryAnalysisV3(
@@ -339,13 +340,22 @@ def _evidence_indexes(
     return indexes
 
 
-def _validate_handoff(raw: Any) -> tuple[MemoryHandoff, list[str]]:
+def _validate_handoff(
+    raw: Any,
+    previous: MemoryHandoff | None = None,
+) -> tuple[MemoryHandoff, list[str]]:
     if not isinstance(raw, dict):
         return MemoryHandoff(), ["must be an object"]
     errors: list[str] = []
     unsupported = unknown_fields(
         raw,
-        {"summary", "active_people", "active_topics", "unresolved_references"},
+        {
+            "summary",
+            "active_people",
+            "active_topics",
+            "unresolved_references",
+            "conversation_summary",
+        },
     )
     if unsupported:
         errors.append(f"unsupported fields: {', '.join(unsupported)}")
@@ -368,7 +378,23 @@ def _validate_handoff(raw: Any) -> tuple[MemoryHandoff, list[str]]:
         active_people=values.get("active_people", ()),
         active_topics=values.get("active_topics", ()),
         unresolved_references=values.get("unresolved_references", ()),
+        conversation_summary=_conversation_summary(
+            raw.get("conversation_summary"),
+            previous.conversation_summary if previous else "",
+        ),
     ), errors
+
+
+def _conversation_summary(raw: Any, previous: str) -> str:
+    """Keep the previous summary when this one is missing; trim instead of failing the batch."""
+    if not isinstance(raw, str) or not raw.strip():
+        return previous
+    summary = raw.strip()
+    if len(summary) <= MAX_CONVERSATION_SUMMARY_CHARS:
+        return summary
+    cut = summary[:MAX_CONVERSATION_SUMMARY_CHARS]
+    sentence_end = cut.rfind(". ")
+    return cut[: sentence_end + 1] if sentence_end > 0 else cut
 
 
 def _invalid(error: str, handoff: MemoryHandoff) -> MemoryAnalysisV3:

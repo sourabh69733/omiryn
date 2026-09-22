@@ -39,6 +39,30 @@ def _user_messages_for_memory_extraction(messages: list[dict[str, str]]) -> list
         and message.get("content")
     ]
 
+def reply_window(
+    messages: list[dict[str, Any]],
+    summarized_through: int | None,
+) -> list[dict[str, Any]]:
+    """Drop messages the conversation summary already covers.
+
+    Keeps at least the recent window, plus every message the summary has not reached yet;
+    `_provider_messages` then compacts only that unsummarized overflow.
+    """
+    if summarized_through is None or summarized_through < 0:
+        return messages
+    start = min(max(0, len(messages) - RECENT_CHAT_MESSAGE_LIMIT), summarized_through + 1)
+    return messages[start:]
+
+
+def summarized_through(context_sources: list[dict[str, Any]] | None) -> int | None:
+    """Last message index covered by the conversation summary included in context, if any."""
+    for source in context_sources or []:
+        if source.get("source_type") == "conversation_summary":
+            value = (source.get("metadata") or {}).get("processed_through_message_index")
+            return value if isinstance(value, int) else None
+    return None
+
+
 def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     provider_messages = []
     previous: dict[str, Any] | None = None

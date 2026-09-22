@@ -2201,6 +2201,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(debug["rough_tokens"], 5)
         self.assertEqual(debug["provider_message_count"], 2)
 
+    @patch("agent.providers.shared.messages.RECENT_CHAT_MESSAGE_LIMIT", 8)
     def test_provider_messages_compact_old_history(self) -> None:
         messages = [
             {"role": "user" if index % 2 else "assistant", "content": f"message {index}"}
@@ -2214,6 +2215,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("Earlier conversation summary", compacted[0]["content"])
         self.assertEqual(compacted[-1]["content"], "message 17")
 
+    @patch("agent.providers.shared.messages.RECENT_CHAT_MESSAGE_LIMIT", 8)
     def test_provider_messages_skip_low_signal_summary_duplicates(self) -> None:
         messages = [
             {"role": "user", "content": "chill now talking to u"},

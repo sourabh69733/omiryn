@@ -14,6 +14,7 @@ from agent.context_engine.conversation_engine.state.service import list_threads
 from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import _provider_messages, generate_agent_reply
+from agent.providers.shared.messages import reply_window, summarized_through
 from agent.runtime.orchestrator import _visible_companion_reply
 from agent.shared.clock import utc_now
 from realtime import conversation_event, realtime_hub
@@ -137,7 +138,12 @@ async def _generate(
         title=thread.title, summary=thread.summary, angle=thread.next_angle
     )
     raw = await generate_agent_reply(
-        [*_provider_messages(messages), {"role": "user", "content": _CUE}],
+        [
+            *_provider_messages(
+                reply_window(messages, summarized_through(package.context_sources))
+            ),
+            {"role": "user", "content": _CUE},
+        ],
         conversation_id=conversation["id"],
         model=conversation.get("agent_model"),
         agent_mode=conversation.get("agent_mode") or "know_me",

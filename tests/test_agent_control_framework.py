@@ -19,7 +19,7 @@ from agent.memory_engine.data_points.extraction.service import (
     normalize_llm_data_points,
 )
 from agent.memory_engine.data_points import normalize_data_point, rank_data_points_for_context
-from agent.context_engine.assembly.budget import budget_context_sources
+from agent.context_engine.assembly.budget import CONTEXT_TOTAL_CHAR_BUDGET, budget_context_sources
 from agent.memory_engine.data_points.extraction.legacy_rules import (
     extract_profile_facts_from_message,
 )
@@ -934,7 +934,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertIn("[data_points] Relevant data points", context_text)
         self.assertIn("[whatsapp_structured_context] Structured WhatsApp context", context_text)
-        self.assertLess(len(context_text), 5900)
+        self.assertLess(len(context_text), CONTEXT_TOTAL_CHAR_BUDGET + 300)
 
     def test_style_adapter_turns_metrics_into_reply_guidance(self) -> None:
         guide = style_adaptation_guide(

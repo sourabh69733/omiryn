@@ -43,7 +43,7 @@ We will not adopt a graph database now. Postgres plus the current V3 memory is e
 | Layer | Responsibility |
 |---|---|
 | 1. Clock | Message timestamps, user timezone, current local time, gap since the last message, session start. One injectable `now()` so tests can fake time. |
-| 2. Working memory | 20 to 30 recent messages word for word, a model-written summary of this session, and a summary of the previous session. |
+| 2. Working memory | 24 recent messages word for word plus a rolling, dated summary of the whole chat written in the background. |
 | 3. Long-term memory | V3 memories, formatted as plain sentences with dates ("told me on 12 Sep: ..."). Flexible selection instead of fixed per-kind caps. |
 | 4. Self | Persona card per character. Agent self-notes: opinions it gave, running jokes, promises ("tell me how the interview goes"). |
 | 5. Reply shaping | Up to 3 short bubbles. A question only when it is earned. A check against stock phrases and repeats of its own recent lines, with one retry. |
@@ -67,7 +67,7 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 4. **Gap markers in history.** Insert short notes such as "(2 days later)" between messages where the gap exceeds the session gap. No per-message timestamps, because small models tend to copy them into replies.
 5. **Message time in memory.** Background cognition receives each message's time and the timezone and resolves relative dates. Evidence stores the message's sent time and message ID.
 6. **"When did I tell you" support.** Memory lines include the date the user said it.
-7. **Bigger window.** Raise recent messages from 8 to about 24. Replace the local fragment summary with the background handoff summary, and add a previous-session summary.
+7. **Bigger window.** Raise recent messages from 8 to 24. Background cognition keeps a rolling, dated summary of the whole chat (earlier sessions included); messages it covers leave the chat history. The local fragment summary remains only for messages the background job has not reached yet.
 8. **Token budget.** Budget context by estimated tokens across all sections instead of characters for optional sources only.
 9. **Durable job table.** Replace in-process idle timers with database jobs that survive restarts.
 

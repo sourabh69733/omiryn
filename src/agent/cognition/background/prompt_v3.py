@@ -27,7 +27,8 @@ Output shape:
     "summary": "context needed by the next batch",
     "active_people": [],
     "active_topics": [],
-    "unresolved_references": []
+    "unresolved_references": [],
+    "conversation_summary": "rolling summary of the whole conversation so far"
   }
 }
 
@@ -40,6 +41,17 @@ Thread rules:
 - Choose the clearest primary transition; keep other unresolved subjects in handoff.
 - decision=no_change requires operations=[] and thread_operation=none.
 - Any memory or thread proposal requires decision=propose.
+
+Conversation summary rules:
+- conversation_summary is read by the companion to remember older parts of this chat. Always return it,
+  even when decision=no_change.
+- Start from previous_handoff.conversation_summary and fold in the new messages. Never drop an earlier
+  point unless the user corrected it.
+- Keep what a close friend would remember: events, plans, decisions, feelings, people by name, questions
+  still open, and anything the companion promised, suggested, or gave an opinion on.
+- Date events with the day from sent_at, e.g. "On Tue 22 Sep the user said the interview went well".
+- Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
+- Stay under 1500 characters. When it gets long, compress the oldest points first.
 
 """ + V3_MEMORY_OUTPUT_SHAPE
 

@@ -62,6 +62,7 @@ def _state_from_row(row: dict[str, Any]) -> MemoryProcessingState:
         unresolved_references=tuple(
             str(value) for value in raw_handoff.get("unresolved_references") or ()
         ),
+        conversation_summary=str(raw_handoff.get("conversation_summary") or ""),
     )
     return MemoryProcessingState(
         conversation_id=str(row["conversation_id"]),

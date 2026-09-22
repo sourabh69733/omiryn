@@ -612,6 +612,7 @@ def _handoff_dict(handoff: MemoryHandoff) -> dict[str, Any]:
         "active_people": list(handoff.active_people),
         "active_topics": list(handoff.active_topics),
         "unresolved_references": list(handoff.unresolved_references),
+        "conversation_summary": handoff.conversation_summary,
     }
 
 

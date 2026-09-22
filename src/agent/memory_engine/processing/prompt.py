@@ -92,6 +92,7 @@ def memory_batch_prompt(
             "active_people": list(batch.previous_handoff.active_people),
             "active_topics": list(batch.previous_handoff.active_topics),
             "unresolved_references": list(batch.previous_handoff.unresolved_references),
+            "conversation_summary": batch.previous_handoff.conversation_summary,
         },
         "existing_memories": existing_memories,
     }

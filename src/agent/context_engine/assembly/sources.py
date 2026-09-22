@@ -27,6 +27,7 @@ from agent.memory_engine.data_points.retrieval.whatsapp import (
     retrieve_whatsapp_imports,
     retrieve_whatsapp_memory,
 )
+from agent.memory_engine.processing.service import get_processing_state
 from agent.shared.timeline import date_label, parse_time, user_zone
 from storage import (
     get_user_timezone,
@@ -42,6 +43,7 @@ WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT = 2
 WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
 AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
+CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 AGENT_BEHAVIOR_RULES_SOURCE_TYPE = "agent_behavior_rules"
 WHATSAPP_STRUCTURED_SOURCE_TYPE = "whatsapp_structured_context"
 MEMORY_TRIGGER_TERMS = {
@@ -161,7 +163,9 @@ def build_reply_context_sources(
         user_id,
         query_intent,
     )
-    continuity_sources = conversation_thread_context_sources(
+    continuity_sources = _conversation_summary_sources(
+        conversation_id, user_id
+    ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
         user_text,
@@ -300,6 +304,30 @@ def _data_point_context_sources(user_id: str | None, user_text: str) -> list[dic
                 "point_count": len(ranked_points),
                 "point_ids": [point.get("id") for point in ranked_points],
             },
+        }
+    ]
+
+
+def _conversation_summary_sources(
+    conversation_id: str,
+    user_id: str | None,
+) -> list[dict[str, Any]]:
+    """The background-written summary of this chat, for parts beyond the recent messages."""
+    if not user_id or agent_pipeline_config().memory_contract_version != 3:
+        return []
+    state = get_processing_state(conversation_id, user_id)
+    summary = state.handoff.conversation_summary if state else ""
+    if not summary:
+        return []
+    return [
+        {
+            "source_type": CONVERSATION_SUMMARY_SOURCE_TYPE,
+            "title": "Earlier in this chat",
+            "content": (
+                "Summary of older parts of this conversation. The recent messages are more "
+                "exact; trust them when they differ.\n" + summary
+            ),
+            "metadata": {"processed_through_message_index": state.processed_through_message_index},
         }
     ]
 

@@ -29,6 +29,8 @@ class MemoryHandoff:
     active_people: tuple[str, ...] = ()
     active_topics: tuple[str, ...] = ()
     unresolved_references: tuple[str, ...] = ()
+    # Rolling summary of the whole conversation so far, read by the companion (V3).
+    conversation_summary: str = ""
 
 
 @dataclass(frozen=True)
