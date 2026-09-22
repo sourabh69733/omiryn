@@ -84,7 +84,8 @@ class ReplyWindowTest(unittest.TestCase):
         self.messages = [{"role": "user", "content": f"m{index}"} for index in range(40)]
 
     def test_without_summary_all_messages_are_kept(self) -> None:
-        self.assertEqual(reply_window(self.messages, None), self.messages)
+        window = reply_window(self.messages, None)
+        self.assertEqual([m["content"] for m in window], [m["content"] for m in self.messages])
 
     @patch("agent.providers.shared.messages.RECENT_CHAT_MESSAGE_LIMIT", 24)
     def test_summarized_messages_outside_the_window_are_dropped(self) -> None:

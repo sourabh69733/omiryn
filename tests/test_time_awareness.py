@@ -8,11 +8,12 @@ from fastapi.testclient import TestClient
 from agent.context_engine.engine import build_model_context_package
 from agent.context_engine.prompt_engine.modules.behavior import time_awareness_prompt
 from agent.providers import _provider_messages
+from agent.providers.shared.messages import reply_window
 from agent.shared.clock import frozen_time, utc_now
 from agent.shared.timeline import (
     conversation_time,
     day_part,
-    gap_marker,
+    day_notes,
     humanize_gap,
     valid_timezone_name,
 )
@@ -99,16 +100,26 @@ class TimelineTest(unittest.TestCase):
             self.assertTrue(conversation_time(messages, "UTC", NOW).new_session)
 
 
-class GapMarkerTest(unittest.TestCase):
-    def test_marker_only_after_a_long_gap(self) -> None:
-        earlier = _message("assistant", "good night", NOW - timedelta(days=3))
-        self.assertEqual(gap_marker(earlier, _message("user", "hey", NOW)), "(3 days later)")
-        recent = _message("assistant", "ok", NOW - timedelta(minutes=10))
-        self.assertIsNone(gap_marker(recent, _message("user", "hey", NOW)))
-        self.assertIsNone(gap_marker(None, _message("user", "hey", NOW)))
-        self.assertIsNone(gap_marker(earlier, {"role": "user", "content": "no time"}))
+class DayNotesTest(unittest.TestCase):
+    def test_first_user_message_gets_its_day_and_later_ones_only_on_change(self) -> None:
+        monday = datetime(2026, 9, 14, 14, 30, tzinfo=UTC)  # 8 pm IST
+        messages = [
+            _message("assistant", "hey!", monday),
+            _message("user", "long day", monday),
+            _message("user", "interview next Friday", monday + timedelta(minutes=3)),
+            _message("user", "still up", monday + timedelta(hours=4)),  # past midnight IST
+            _message("assistant", "go sleep!", monday + timedelta(hours=4)),
+            _message("user", "hey, back", monday + timedelta(days=2)),
+            {"role": "user", "content": "no time"},
+        ]
+        notes = day_notes(messages, "Asia/Kolkata")
 
-    def test_provider_messages_mark_user_turns_but_never_assistant_turns(self) -> None:
+        self.assertEqual(
+            notes,
+            [None, "(Mon 14 Sep)", None, "(Tue 15 Sep)", None, "(Wed 16 Sep, 1 day later)", None],
+        )
+
+    def test_provider_messages_prefix_user_turns_but_never_assistant_turns(self) -> None:
         messages = [
             _message("user", "going to sleep", NOW - timedelta(days=4)),
             _message("assistant", "good night", NOW - timedelta(days=4)),
@@ -117,9 +128,15 @@ class GapMarkerTest(unittest.TestCase):
         ]
         provider = _provider_messages(messages)
 
-        self.assertEqual(provider[-1]["content"], "(1 day later) I'm back")
-        self.assertTrue(all("later)" not in m["content"] for m in provider if m["role"] == "assistant"))
+        self.assertTrue(provider[0]["content"].startswith("(Fri 18 Sep)"))
+        self.assertEqual(provider[-1]["content"], "(Tue 22 Sep, 1 day later) I'm back")
+        self.assertTrue(all(m["content"][0] != "(" for m in provider if m["role"] == "assistant"))
         self.assertEqual(messages[-1]["content"], "I'm back")
+
+    def test_reply_window_notes_use_the_user_timezone(self) -> None:
+        late_utc = datetime(2026, 9, 21, 20, 0, tzinfo=UTC)  # Tue 22 Sep, 1:30 am in IST
+        window = reply_window([_message("user", "can't sleep", late_utc)], None, "Asia/Kolkata")
+        self.assertEqual(_provider_messages(window)[0]["content"], "(Tue 22 Sep) can't sleep")
 
 
 class TimeAwarenessPromptTest(unittest.TestCase):
