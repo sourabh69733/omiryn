@@ -148,14 +148,39 @@ def conversation_time(
     )
 
 
-def gap_marker(previous: dict[str, Any] | None, message: dict[str, Any]) -> str | None:
-    """Return '(2 days later)' when a long silence separates two messages."""
-    if previous is None:
-        return None
-    before, after = message_time(previous), message_time(message)
-    if before is None or after is None or after - before < session_gap():
-        return None
-    return f"({humanize_gap(after - before)} later)"
+def day_notes(
+    messages: list[dict[str, Any]],
+    timezone_name: str | None = None,
+) -> list[str | None]:
+    """One note per message: a day anchor on selected user messages, otherwise None.
+
+    The first dated user message gets its day, e.g. "(Mon 14 Sep)", so older lines are not
+    read as today. Later user messages get one only when the day changes, or after a long
+    silence, e.g. "(Wed 16 Sep, 2 days later)". Assistant messages never carry notes, so the
+    model does not learn to write them.
+    """
+    zone = user_zone(timezone_name)
+    notes: list[str | None] = []
+    anchored = False
+    previous_sent: datetime | None = None
+    for message in messages:
+        sent = message_time(message)
+        note = None
+        if message.get("role") == "user" and sent is not None:
+            local = sent.astimezone(zone)
+            label = f"{local.strftime('%a')} {local.day} {local.strftime('%b')}"
+            gap = sent - previous_sent if previous_sent else None
+            if gap is not None and gap >= session_gap():
+                note = f"({label}, {humanize_gap(gap)} later)"
+            elif not anchored or (
+                previous_sent is not None and previous_sent.astimezone(zone).date() != local.date()
+            ):
+                note = f"({label})"
+            anchored = True
+        notes.append(note)
+        if sent is not None:
+            previous_sent = sent
+    return notes
 
 
 def date_label(local: datetime) -> str:
@@ -178,7 +203,7 @@ __all__ = [
     "date_label",
     "day_part",
     "default_timezone_name",
-    "gap_marker",
+    "day_notes",
     "humanize_gap",
     "message_time",
     "parse_time",
