@@ -154,8 +154,10 @@ def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
     else:
         lines.append("This is the user's first message in this chat.")
     lines.append(
-        "Notes like (2 days later) in the chat mark time gaps between messages. Never write "
-        "such notes yourself. Use these times for questions about when something happened; "
-        "if a time is not shown, say you are not sure instead of guessing."
+        "Notes like (Mon 14 Sep) or (Wed 16 Sep, 2 days later) at the start of a user message "
+        "give the day it was sent; messages after it are from that day until the next note. "
+        "Never write such notes yourself. Use these days, memory dates and the conversation "
+        "summary for questions about when something happened or was said; if no date is "
+        "shown, say you are not sure instead of guessing."
     )
     return "\n".join(lines)
