@@ -3,10 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from datetime import datetime
 from urllib.parse import quote
 from uuid import uuid4
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException
 
@@ -16,17 +14,19 @@ from agent.context_engine.assembly import (
     build_reply_context_sources,
     selected_style_source_exists,
 )
+from agent.shared.timeline import valid_timezone_name
 from security.auth import CurrentUser
 from storage import (
     get_conversation as storage_get_conversation,
     get_draft as storage_get_draft,
     get_user_profile,
+    get_user_timezone,
     list_profile_facts,
+    set_user_timezone,
 )
 
 from .config import (
     DEFAULT_AGENT_COUNTRY,
-    DEFAULT_AGENT_TIMEZONE,
     PROFILE_PHOTO_GCS_BUCKET,
     PROFILE_PHOTO_GCS_PREFIX,
     PROFILE_PHOTO_GCS_PUBLIC_BASE_URL,
@@ -355,7 +355,6 @@ def _agent_user_context(user: CurrentUser | None) -> dict[str, object] | None:
         return {
             "country": DEFAULT_AGENT_COUNTRY,
             "location": DEFAULT_AGENT_COUNTRY,
-            **_current_agent_time_context(),
         }
     profile = _profile_with_auth_defaults(get_user_profile(user.id), user) or {}
     city = str(profile.get("city") or _detected_user_city(user.id) or "").strip()
@@ -367,7 +366,6 @@ def _agent_user_context(user: CurrentUser | None) -> dict[str, object] | None:
         "display_name": display_name or None,
         "country": profile.get("country") or DEFAULT_AGENT_COUNTRY,
         "location": city or profile.get("location") or DEFAULT_AGENT_COUNTRY,
-        **_current_agent_time_context(),
     }
 
 
@@ -381,19 +379,11 @@ def _detected_user_city(user_id: str) -> str | None:
     return None
 
 
-def _current_agent_time_context() -> dict[str, str]:
-    timezone_name = DEFAULT_AGENT_TIMEZONE
-    try:
-        current = datetime.now(ZoneInfo(timezone_name))
-    except ZoneInfoNotFoundError:
-        timezone_name = "UTC"
-        current = datetime.now(ZoneInfo("UTC"))
-    return {
-        "timezone": timezone_name,
-        "current_date": current.strftime("%Y-%m-%d"),
-        "current_time": current.strftime("%H:%M"),
-        "current_weekday": current.strftime("%A"),
-    }
+def _remember_user_timezone(user: CurrentUser | None, timezone_header: str | None) -> None:
+    """Save the browser-reported timezone when it is valid and has changed."""
+    timezone_name = valid_timezone_name(timezone_header)
+    if user and timezone_name and get_user_timezone(user.id) != timezone_name:
+        set_user_timezone(user.id, timezone_name)
 
 
 def _auth_user_payload(user: CurrentUser) -> dict[str, str | None]:

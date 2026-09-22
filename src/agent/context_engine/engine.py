@@ -23,7 +23,8 @@ from agent.context_engine.prompt_engine.builder import (
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.context_engine.assembly.sources import build_reply_context
 from agent.context_engine.state.turn import active_turn_state
-from storage import get_conversation
+from agent.shared.timeline import conversation_time
+from storage import get_conversation, get_user_timezone
 
 
 def build_model_context_package(
@@ -42,6 +43,7 @@ def build_model_context_package(
     memory_query_embedding: dict[str, Any] | None = None,
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
+    user_profile = _with_conversation_time(conversation_id, user_id, user_profile)
     listener_first = prompt_version.version_id in {"v3", "v3-1"}
     matching_understanding = (
         build_matching_understanding(user_id=user_id, user_profile=user_profile)
@@ -161,6 +163,20 @@ def build_model_context_package(
         thread_guidance=reply_context.thread_guidance,
         snapshot=snapshot,
     )
+
+
+def _with_conversation_time(
+    conversation_id: str,
+    user_id: str | None,
+    user_profile: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Add the user's local time and the gap since their last message in this chat."""
+    conversation = get_conversation(conversation_id, user_id)
+    timing = conversation_time(
+        (conversation or {}).get("messages") or [],
+        get_user_timezone(user_id) if user_id else None,
+    )
+    return {**(user_profile or {}), **timing.profile_fields()}
 
 
 def _planning_messages(

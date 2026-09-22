@@ -680,16 +680,15 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "location": "India",
                 "country": "India",
                 "timezone": "Asia/Kolkata",
-                "current_date": "2026-06-20",
-                "current_time": "10:30",
-                "current_weekday": "Saturday",
+                "current_local_label": "Saturday 20 Jun 2026, 10:30 am",
+                "current_day_part": "morning",
             },
         )
 
         self.assertIn("display_name=Sourabh", prompt)
         self.assertIn("email=sourabh@example.com", prompt)
         self.assertIn("location=India", prompt)
-        self.assertIn("date=2026-06-20", prompt)
+        self.assertIn("Saturday 20 Jun 2026, 10:30 am (morning)", prompt)
         self.assertIn("timezone=Asia/Kolkata", prompt)
 
     def test_agent_prompt_keeps_missing_location_and_timezone_unknown(self) -> None:

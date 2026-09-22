@@ -158,6 +158,7 @@ def _ensure_runtime_columns() -> None:
         "conversation_context_sources": ("user_id",),
         "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
         "agent_memory_reviews": ("reasons", "comment"),
+        "agent_user_settings": ("timezone",),
         "agent_conversations": (
             "user_id",
             "agent_provider",

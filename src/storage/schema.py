@@ -578,6 +578,8 @@ agent_user_settings = Table(
     metadata,
     Column("user_id", String, primary_key=True),
     Column("proactive_enabled", Boolean, nullable=False, default=True),
+    # IANA name reported by the user's browser, e.g. Asia/Kolkata.
+    Column("timezone", String, nullable=True),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 

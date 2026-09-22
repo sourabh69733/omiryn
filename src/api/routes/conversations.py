@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
 from agent.feedback import normalize_message_feedback
 from agent.memory_engine.engine import (
@@ -18,6 +17,7 @@ from agent.cognition.background.service import (
     should_schedule_idle_background_cognition,
 )
 from agent.runtime.orchestrator import run_agent_turn
+from agent.shared.clock import utc_now_iso
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
@@ -42,6 +42,7 @@ from ..helpers import (
     _normalize_agent_name,
     _normalize_selected_model,
     _profile_extraction_context_sources,
+    _remember_user_timezone,
     _reusable_context_sources,
     _sync_conversation_runtime,
     _user_id,
@@ -62,12 +63,8 @@ from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
 router = APIRouter()
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _stamp_new_messages(messages: list[dict[str, object]], start_index: int = 0) -> None:
-    timestamp = _utc_now_iso()
+    timestamp = utc_now_iso()
     for message in messages[start_index:]:
         message.setdefault("created_at", timestamp)
         if message.get("role") == "user":
@@ -85,7 +82,9 @@ def _run_agent_turn_callable():
 async def create_agent_conversation(
     payload: AgentConversationCreate | None = None,
     user: CurrentUser = Depends(require_user),
+    timezone_header: str | None = Header(default=None, alias="X-Timezone"),
 ) -> AgentConversation:
+    _remember_user_timezone(user, timezone_header)
     conversation_id = str(uuid4())
     runtime = agent_runtime_status()
     selected_model = _normalize_selected_model(
@@ -107,7 +106,7 @@ async def create_agent_conversation(
             {
                 "role": "assistant",
                 "content": _initial_agent_message({**persona, "name": agent_name}, user_profile),
-                "created_at": _utc_now_iso(),
+                "created_at": utc_now_iso(),
             }
         ],
     )
@@ -254,11 +253,13 @@ async def send_agent_message(
     payload: UserMessage,
     background_tasks: BackgroundTasks,
     user: CurrentUser = Depends(require_user),
+    timezone_header: str | None = Header(default=None, alias="X-Timezone"),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+    _remember_user_timezone(user, timezone_header)
     runtime = agent_runtime_status()
     _sync_conversation_runtime(conversation, runtime)
 

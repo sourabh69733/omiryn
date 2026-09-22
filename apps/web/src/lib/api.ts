@@ -51,6 +51,8 @@ async function getAuthClient() {
 
 export async function apiFetch(input: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
+  const timeZone = browserTimeZone();
+  if (timeZone) headers.set("X-Timezone", timeZone);
   const authClient = await getAuthClient();
 
   if (authClient) {
@@ -103,5 +105,14 @@ export async function apiErrorMessage(response: Response, fallback: string) {
     return body.detail || fallback;
   } catch {
     return fallback;
+  }
+}
+
+// IANA name such as "Asia/Kolkata"; the agent uses it to know the user's local time.
+function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
   }
 }

@@ -10,6 +10,7 @@ from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.memory_engine.memories.embeddings import embed_memory_query, memory_query_text
+from agent.shared.clock import utc_now_iso
 from agent.providers import (
     AgentProviderError,
     AgentProviderTruncationError,
@@ -66,7 +67,12 @@ async def run_agent_turn(
     )
     trace_id = trace["id"]
 
-    user_message: dict[str, Any] = {"role": "user", "content": user_text}
+    # Stamped on arrival so gap notes and time context see when the user actually wrote.
+    user_message: dict[str, Any] = {
+        "role": "user",
+        "content": user_text,
+        "created_at": utc_now_iso(),
+    }
     quality = assess_user_message_quality(updated_messages + [user_message])
     quality_valid = bool(quality["valid"])
     if not quality_valid:

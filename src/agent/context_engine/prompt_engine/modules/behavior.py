@@ -61,10 +61,6 @@ def behavior_module_prompt(
     email = (user_profile or {}).get("email") or "unknown"
     location = (user_profile or {}).get("location") or "unknown"
     country = (user_profile or {}).get("country") or "unknown"
-    timezone = (user_profile or {}).get("timezone") or "unknown"
-    current_date = (user_profile or {}).get("current_date") or "unknown"
-    current_time = (user_profile or {}).get("current_time") or "unknown"
-    current_weekday = (user_profile or {}).get("current_weekday") or "unknown"
     playful_rule = (
         "Light playfulness is allowed when natural."
         if behavior.allow_light_playful
@@ -84,8 +80,7 @@ def behavior_module_prompt(
         f"User identity: display_name={display_name}, email={email}.\n"
         f"User basics: gender={gender}, interested_in={interested_in}, "
         f"location={location}, country={country}.\n"
-        f"Current context: date={current_date}, time={current_time}, "
-        f"weekday={current_weekday}, timezone={timezone}.\n"
+        f"{time_awareness_prompt(user_profile)}\n"
         f"Agent persona: name={behavior.persona_name}, "
         f"presentation={behavior.persona_presentation}.\n"
         f"Reply budget: usually <= {behavior.max_reply_words} words.\n"
@@ -132,3 +127,35 @@ def _allow_mild_adult_humor(prompt_version: PromptBehaviorVersion | None) -> boo
 
 def _env_bool(value: object) -> bool:
     return str(value).strip().lower() == "true"
+
+
+def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
+    """State the user's local time and how long they were away, computed in code."""
+    profile = user_profile or {}
+    timezone = profile.get("timezone") or "unknown"
+    now_label = profile.get("current_local_label")
+    if not now_label:
+        return f"Time for the user: unknown (timezone={timezone})."
+    lines = [
+        f"Time for the user now: {now_label} ({profile.get('current_day_part')}), "
+        f"timezone={timezone}."
+    ]
+    last_label = profile.get("last_user_message_label")
+    if last_label:
+        lines.append(
+            f"The user's previous message in this chat was {profile.get('last_user_message_ago')} "
+            f"ago ({last_label})."
+        )
+        if profile.get("new_session"):
+            lines.append(
+                "They are back after a break. You may notice that once, briefly and naturally, "
+                "if it fits; do not make a big deal of it."
+            )
+    else:
+        lines.append("This is the user's first message in this chat.")
+    lines.append(
+        "Notes like (2 days later) in the chat mark time gaps between messages. Never write "
+        "such notes yourself. Use these times for questions about when something happened; "
+        "if a time is not shown, say you are not sure instead of guessing."
+    )
+    return "\n".join(lines)

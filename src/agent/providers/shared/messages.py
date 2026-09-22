@@ -14,6 +14,7 @@ from agent.context_engine.conversation_engine.policy.replies import (
 from .config import CHAT_ADVICE_REPLY_WORD_LIMIT, CHAT_REPLY_WORD_LIMIT, RECENT_CHAT_MESSAGE_LIMIT
 from agent.providers.companion.prompts import _context_sources_text, _truncate_for_context
 from agent.providers.companion.quality import _normalized_user_text
+from agent.shared.timeline import gap_marker
 
 
 def _user_message_count(messages: list[dict[str, str]]) -> int:
@@ -40,12 +41,19 @@ def _user_messages_for_memory_extraction(messages: list[dict[str, str]]) -> list
 
 def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     provider_messages = []
+    previous: dict[str, Any] | None = None
     for message in messages:
         role = message.get("role")
         content = message.get("content")
         if role not in {"assistant", "user", "system"} or content is None:
             continue
-        provider_messages.append({"role": role, "content": str(content)})
+        text = str(content)
+        # Only user turns carry gap notes, so the model never learns to write them itself.
+        marker = gap_marker(previous, message) if role == "user" else None
+        if marker:
+            text = f"{marker} {text}"
+        provider_messages.append({"role": role, "content": text})
+        previous = message
     provider_messages = _merge_adjacent_assistant_messages(provider_messages)
     if len(provider_messages) <= RECENT_CHAT_MESSAGE_LIMIT:
         return provider_messages
