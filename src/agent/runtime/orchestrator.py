@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
+from agent.context_engine.conversation_engine.policy.freshness import (
+    recent_assistant_replies,
+    rewrite_instruction,
+    stale_reply_reason,
+)
 from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
@@ -254,6 +260,12 @@ async def run_agent_turn(
             sanitized_structured_reply = structured_companion_reply(raw_reply)
 
         reply = _visible_companion_reply(raw_reply, sanitized_structured_reply)
+        reply, freshness = await _freshen_reply(
+            reply,
+            previous_replies=recent_assistant_replies(messages),
+            reply_messages=reply_messages,
+            generation_arguments=generation_arguments,
+        )
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -293,6 +305,7 @@ async def run_agent_turn(
                 "agent_tone": agent_tone,
                 "foreground_contract": "reply_only",
                 "fallback_reason": fallback_reason,
+                "freshness": freshness,
             },
         }
     )
@@ -337,6 +350,47 @@ async def run_agent_turn(
         },
     )
     return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
+
+
+async def _freshen_reply(
+    reply: str,
+    *,
+    previous_replies: list[str],
+    reply_messages: list[dict[str, Any]],
+    generation_arguments: dict[str, Any],
+) -> tuple[str, dict[str, Any] | None]:
+    """Ask for one rewrite when the draft is stock filler or repeats itself.
+
+    The rewrite is best effort: any failure keeps the original draft.
+    """
+    if not freshness_check_enabled():
+        return reply, None
+    reason = stale_reply_reason(reply, previous_replies)
+    if reason is None:
+        return reply, None
+    try:
+        raw = await generate_agent_reply(
+            reply_messages,
+            **{
+                **generation_arguments,
+                "system_prompt": generation_arguments["system_prompt"]
+                + rewrite_instruction(reply, reason),
+            },
+        )
+        rewritten = _visible_companion_reply(raw, structured_companion_reply(raw))
+    except Exception as error:
+        return reply, {"reason": reason, "rewritten": False, "error": type(error).__name__}
+    if not rewritten.strip():
+        return reply, {"reason": reason, "rewritten": False}
+    return rewritten, {
+        "reason": reason,
+        "rewritten": True,
+        "still_stale": stale_reply_reason(rewritten, previous_replies) is not None,
+    }
+
+
+def freshness_check_enabled() -> bool:
+    return os.getenv("AGENT_FRESHNESS_CHECK", "true").strip().lower() != "false"
 
 
 def _source_type_counts(sources: list[dict[str, Any]]) -> dict[str, int]:
