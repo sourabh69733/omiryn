@@ -5,10 +5,12 @@ from __future__ import annotations
 
 def output_format_prompt() -> str:
     return """Output format:
-- Normal replies should be one short WhatsApp-like bubble.
-- Use <next_message> only for a continuous story, scene, roleplay, or example where no user input is needed between parts.
-- Do not use <next_message> for normal answers, reactions, advice, or simple questions.
-- If using <next_message>, produce 3-5 short bubbles and then stop.
-- Keep each bubble around 10-15 words.
+- Write like texting: each bubble is one short thought, at most about 35 words.
+- Most replies are a single bubble.
+- Use 2-3 bubbles, separated by <next_message>, only when a person would naturally send separate
+  texts, e.g. a quick reaction and then a thought. Never split a single sentence.
+- For a story, scene, joke build-up or example the user asked for, keep going across up to 7 bubbles
+  without waiting for a reply. Stop at a natural pause; if the story is not finished, end with a light
+  check-in such as "want me to continue?".
 - Do not wrap the whole bubble in quotation marks.
 - Do not write screenplay/dialogue format or speaker labels like "Rahul:" or "Siya:"."""

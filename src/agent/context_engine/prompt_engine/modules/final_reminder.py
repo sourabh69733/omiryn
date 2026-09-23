@@ -11,7 +11,8 @@ def final_reminder_prompt(plan: ConversationPlan | None = None) -> str:
 - Use the specific context above before asking anything generic.
 - Do not repeat topics listed as avoid/repeated.
 - If the context is enough, make a concrete observation, playful guess, or direct answer.
-- Keep it natural, brief, and human-chat-like."""
+- Keep it natural and human-chat-like: brief for normal chat; a story or scene the user asked for
+  may run across several bubbles."""
     if not plan or plan.question_purpose == "optional":
         return reminder
     question_rule = {
