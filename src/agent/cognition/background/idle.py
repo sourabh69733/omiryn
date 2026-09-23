@@ -1,146 +1,97 @@
-"""Debounces sub-threshold cognition and flushes it when a chat session ends."""
+"""Debounces sub-threshold cognition with a durable job that survives restarts.
+
+Every new message pushes the job's run time back, so the flush happens once the chat has
+been quiet for the idle delay. The job also backs up the threshold run: if that run is lost
+to a crash, the flush still processes whatever is pending.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import logging
+import os
 from typing import Any
 
+from agent.jobs.queue import cancel_job, schedule_job
+from agent.memory_engine.processing.service import get_processing_state
 from storage import get_conversation
 
 from .service import (
     background_cognition_enabled,
+    has_pending_background_cognition,
     run_background_cognition,
-    should_schedule_idle_background_cognition,
 )
 
-
+MEMORY_FLUSH_JOB = "memory_flush"
 DEFAULT_IDLE_FLUSH_SECONDS = 120.0
+# When another worker holds the batch lease, check back after it should have finished.
+_BUSY_RETRY_SECONDS = 60.0
 logger = logging.getLogger(__name__)
-SchedulerKey = tuple[str, str]
 
 
-class IdleCognitionScheduler:
-    """Owns one replaceable in-process idle timer per user conversation."""
+def idle_flush_seconds() -> float:
+    try:
+        return max(0.0, float(os.getenv("MEMORY_IDLE_FLUSH_SECONDS", DEFAULT_IDLE_FLUSH_SECONDS)))
+    except ValueError:
+        return DEFAULT_IDLE_FLUSH_SECONDS
 
-    def __init__(self, *, delay_seconds: float = DEFAULT_IDLE_FLUSH_SECONDS) -> None:
-        if delay_seconds < 0:
-            raise ValueError("delay_seconds cannot be negative")
-        self._delay_seconds = delay_seconds
-        self._tasks: dict[SchedulerKey, asyncio.Task[dict[str, Any]]] = {}
 
-    def schedule(
-        self,
-        conversation_id: str,
-        user_id: str,
-        *,
-        expected_message_count: int,
-    ) -> asyncio.Task[dict[str, Any]]:
-        """Replace the conversation timer and return the new task for observability."""
-        key = (conversation_id, user_id)
-        self.cancel(conversation_id, user_id)
-        task = asyncio.create_task(
-            self._wait_and_flush(
-                key,
-                expected_message_count=expected_message_count,
-            ),
-            name=f"idle-cognition:{conversation_id}",
+def schedule_idle_flush(conversation_id: str, user_id: str) -> None:
+    """(Re)start the idle countdown for this conversation."""
+    schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=idle_flush_seconds())
+
+
+def request_flush_now(conversation_id: str, user_id: str) -> None:
+    """Flush at the next worker pass, e.g. when the user ends the chat session."""
+    schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=0)
+
+
+def cancel_idle_flush(conversation_id: str, user_id: str) -> None:
+    cancel_job(MEMORY_FLUSH_JOB, user_id, conversation_id)
+
+
+async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
+    """Process pending messages for one conversation; errors let the worker retry."""
+    conversation_id, user_id = job["conversation_id"], job["user_id"]
+    if not background_cognition_enabled():
+        return {"status": "disabled", "operation_count": 0}
+    conversation = get_conversation(conversation_id, user_id)
+    if conversation is None:
+        return {"status": "conversation_unavailable", "operation_count": 0}
+    messages = list(conversation.get("messages") or [])
+    if not has_pending_background_cognition(conversation_id, user_id, messages):
+        return {"status": "no_pending_messages", "operation_count": 0}
+
+    cursor_before = _processed_through(conversation_id, user_id)
+    result = await run_background_cognition(
+        conversation_id, user_id, messages, conversation.get("agent_model")
+    )
+    if result.get("status") == "already_processing":
+        schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=_BUSY_RETRY_SECONDS)
+    elif _processed_through(conversation_id, user_id) == cursor_before:
+        # Invalid output or a write error leaves the batch pending; the worker retries with backoff.
+        raise RuntimeError(
+            f"background cognition made no progress: {result.get('status')} "
+            f"{'; '.join(result.get('errors') or [])}"[:400]
         )
-        self._tasks[key] = task
-        return task
-
-    def cancel(
-        self,
-        conversation_id: str,
-        user_id: str,
-    ) -> asyncio.Task[dict[str, Any]] | None:
-        """Cancel and forget a pending timer without touching cognition state."""
-        task = self._tasks.pop((conversation_id, user_id), None)
-        if task is not None and not task.done():
-            task.cancel()
-        return task
-
-    async def flush_now(self, conversation_id: str, user_id: str) -> dict[str, Any]:
-        """Cancel the idle wait and flush current durable messages immediately."""
-        timer = self.cancel(conversation_id, user_id)
-        if timer is not None and timer is not asyncio.current_task():
-            await asyncio.gather(timer, return_exceptions=True)
-        if not background_cognition_enabled():
-            return {"status": "disabled", "operation_count": 0}
-        return await self._flush_fresh(conversation_id, user_id)
-
-    async def shutdown(self) -> None:
-        """Cancel all timers so application shutdown does not leak tasks."""
-        tasks = list(self._tasks.values())
-        self._tasks.clear()
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-    async def _wait_and_flush(
-        self,
-        key: SchedulerKey,
-        *,
-        expected_message_count: int,
-    ) -> dict[str, Any]:
-        try:
-            await asyncio.sleep(self._delay_seconds)
-            conversation_id, user_id = key
-            conversation = get_conversation(conversation_id, user_id)
-            if conversation is None or conversation.get("status") != "active":
-                return {"status": "conversation_unavailable", "operation_count": 0}
-            messages = list(conversation.get("messages") or [])
-            if len(messages) != expected_message_count:
-                return {"status": "stale_timer", "operation_count": 0}
-            if not should_schedule_idle_background_cognition(
-                conversation_id,
-                user_id,
-                messages,
-                True,
-            ):
-                return {"status": "no_pending_messages", "operation_count": 0}
-            return await run_background_cognition(
-                conversation_id,
-                user_id,
-                messages,
-                conversation.get("agent_model"),
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:
-            logger.exception(
-                "agent.idle_cognition_failed conversation_id=%s user_id=%s",
-                key[0],
-                key[1],
-            )
-            return {
-                "status": "scheduler_error",
-                "operation_count": 0,
-                "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
-            }
-        finally:
-            if self._tasks.get(key) is asyncio.current_task():
-                self._tasks.pop(key, None)
-
-    async def _flush_fresh(self, conversation_id: str, user_id: str) -> dict[str, Any]:
-        conversation = get_conversation(conversation_id, user_id)
-        if conversation is None:
-            return {"status": "conversation_unavailable", "operation_count": 0}
-        return await run_background_cognition(
-            conversation_id,
-            user_id,
-            list(conversation.get("messages") or []),
-            conversation.get("agent_model"),
-        )
+    elif has_pending_background_cognition(conversation_id, user_id, messages):
+        # One run handles one bounded batch; queue the next straight away.
+        schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=0)
+    logger.info(
+        "agent.memory_flush conversation_id=%s status=%s", conversation_id, result.get("status")
+    )
+    return result
 
 
-idle_cognition_scheduler = IdleCognitionScheduler()
+def _processed_through(conversation_id: str, user_id: str) -> int:
+    state = get_processing_state(conversation_id, user_id)
+    return state.processed_through_message_index if state else -1
 
 
 __all__ = [
     "DEFAULT_IDLE_FLUSH_SECONDS",
-    "IdleCognitionScheduler",
-    "idle_cognition_scheduler",
+    "MEMORY_FLUSH_JOB",
+    "cancel_idle_flush",
+    "request_flush_now",
+    "run_memory_flush_job",
+    "schedule_idle_flush",
 ]

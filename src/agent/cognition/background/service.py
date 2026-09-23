@@ -104,6 +104,21 @@ def should_schedule_background_cognition(
     return bool(batch and batch.meaningful_user_message_count >= background_cognition_threshold())
 
 
+def has_pending_background_cognition(
+    conversation_id: str,
+    user_id: str,
+    messages: list[dict[str, object]],
+) -> bool:
+    """True when meaningful user messages are waiting for background cognition."""
+    batch = _pending_background_cognition_batch(
+        conversation_id,
+        user_id,
+        messages,
+        state=get_processing_state(conversation_id, user_id),
+    )
+    return bool(batch and batch.meaningful_user_message_count > 0)
+
+
 def should_schedule_idle_background_cognition(
     conversation_id: str,
     user_id: str | None,
