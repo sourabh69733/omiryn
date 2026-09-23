@@ -1730,15 +1730,12 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(message_response.status_code, 200)
         self.assertGreaterEqual(len(message_response.json()["messages"]), 3)
 
-        with patch(
-            "api.routes.conversations.idle_cognition_scheduler.flush_now",
-            new_callable=AsyncMock,
-        ) as flush_now:
+        with patch("api.routes.conversations.request_flush_now") as flush_now:
             extract_response = self.client.post(
                 f"/api/agent/conversations/{conversation_id}/extract"
             )
         self.assertEqual(extract_response.status_code, 200)
-        flush_now.assert_awaited_once_with(conversation_id, "test-user")
+        flush_now.assert_called_once_with(conversation_id, "test-user")
         draft_id = extract_response.json()["draft_id"]
         draft_response = self.client.get(f"/api/drafts/{draft_id}")
         self.assertEqual(draft_response.status_code, 200)
@@ -3690,9 +3687,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 },
             ),
             patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)),
-            patch(
-                "api.routes.conversations.idle_cognition_scheduler.schedule"
-            ) as schedule,
+            patch("api.routes.conversations.schedule_idle_flush") as schedule,
         ):
             response = self.client.post(
                 f"/api/agent/conversations/{conversation['id']}/messages",
@@ -3700,11 +3695,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        schedule.assert_called_once_with(
-            conversation["id"],
-            "test-user",
-            expected_message_count=len(turn_result.messages),
-        )
+        schedule.assert_called_once_with(conversation["id"], "test-user")
 
     def test_chat_messages_are_limited_per_user_month(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")
