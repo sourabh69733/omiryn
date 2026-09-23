@@ -11,10 +11,16 @@ from agent.context_engine.conversation_engine.policy.replies import (
     REPLY_PART_WORD_LIMIT,
 )
 
-from .config import CHAT_ADVICE_REPLY_WORD_LIMIT, CHAT_REPLY_WORD_LIMIT, RECENT_CHAT_MESSAGE_LIMIT
+from .config import (
+    CHAT_ADVICE_REPLY_WORD_LIMIT,
+    CHAT_REPLY_WORD_LIMIT,
+    HISTORY_TOKEN_BUDGET,
+    RECENT_CHAT_MESSAGE_LIMIT,
+)
 from agent.providers.companion.prompts import _context_sources_text, _truncate_for_context
 from agent.providers.companion.quality import _normalized_user_text
 from agent.shared.timeline import day_notes
+from agent.shared.tokens import estimate_tokens
 
 
 def _user_message_count(messages: list[dict[str, str]]) -> int:
@@ -88,11 +94,43 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         provider_messages.append({"role": role, "content": text})
     provider_messages = _merge_adjacent_assistant_messages(provider_messages)
     if len(provider_messages) <= RECENT_CHAT_MESSAGE_LIMIT:
-        return provider_messages
+        return _fit_history(provider_messages, HISTORY_TOKEN_BUDGET)
 
     older_messages = provider_messages[:-RECENT_CHAT_MESSAGE_LIMIT]
     recent_messages = provider_messages[-RECENT_CHAT_MESSAGE_LIMIT:]
-    return [_conversation_summary_message(older_messages)] + recent_messages
+    return _fit_history(
+        [_conversation_summary_message(older_messages)] + recent_messages,
+        HISTORY_TOKEN_BUDGET,
+    )
+
+
+# The newest messages are never shortened or dropped; they carry the current exchange.
+_PROTECTED_RECENT_MESSAGES = 4
+_LONG_MESSAGE_CHARS = 1200
+
+
+def _fit_history(messages: list[dict[str, str]], budget: int) -> list[dict[str, str]]:
+    """Keep chat history within an estimated token budget.
+
+    Long pasted messages outside the newest few are shortened first; if that is not
+    enough, the oldest messages are dropped, starting with the local summary line.
+    """
+
+    def total(items: list[dict[str, str]]) -> int:
+        return sum(estimate_tokens(item["content"]) for item in items)
+
+    if budget <= 0 or total(messages) <= budget:
+        return messages
+    protected_from = max(0, len(messages) - _PROTECTED_RECENT_MESSAGES)
+    fitted = [
+        {**message, "content": _truncate_for_context(message["content"], _LONG_MESSAGE_CHARS)}
+        if index < protected_from
+        else message
+        for index, message in enumerate(messages)
+    ]
+    while len(fitted) > _PROTECTED_RECENT_MESSAGES and total(fitted) > budget:
+        fitted.pop(0)
+    return fitted
 
 def _conversation_summary_message(messages: list[dict[str, str]]) -> dict[str, str]:
     user_lines = _summary_lines(messages, role="user", limit=5, char_limit=140)
