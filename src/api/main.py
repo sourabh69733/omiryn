@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.routes import router as admin_router
-from agent.cognition.background.idle import idle_cognition_scheduler
+from agent.jobs.worker import job_worker
 from agent.proactive import proactive_scheduler
 from security.auth import current_user, production_runtime_enabled, validate_production_security_config
 from storage import init_db, validate_private_data_ownership
@@ -94,12 +94,13 @@ def startup() -> None:
 async def start_proactive_messaging() -> None:
     # Async so the scheduler task attaches to the server's event loop, next to the sockets.
     proactive_scheduler.start()
+    job_worker.start()
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
     await proactive_scheduler.shutdown()
-    await idle_cognition_scheduler.shutdown()
+    await job_worker.shutdown()
 
 
 __all__ = [

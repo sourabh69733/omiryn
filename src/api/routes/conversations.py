@@ -10,7 +10,7 @@ from agent.memory_engine.engine import (
     capture_deep_profile_facts_from_conversation,
     should_run_conversation_data_point_extraction,
 )
-from agent.cognition.background.idle import idle_cognition_scheduler
+from agent.cognition.background.idle import request_flush_now, schedule_idle_flush
 from agent.cognition.background.service import (
     run_background_cognition,
     should_schedule_background_cognition,
@@ -210,7 +210,7 @@ async def delete_agent_conversation(
     conversation_id: str,
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
-    idle_cognition_scheduler.cancel(conversation_id, _user_id(user))
+    # Deleting the conversation also deletes its pending jobs.
     if not storage_delete_conversation(conversation_id, _user_id(user)):
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
     return {"conversation_id": conversation_id, "status": "deleted"}
@@ -304,7 +304,6 @@ async def send_agent_message(
         turn.quality_valid,
     )
     if run_cognition_now:
-        idle_cognition_scheduler.cancel(conversation.id, _user_id(user))
         background_tasks.add_task(
             run_background_cognition,
             conversation.id,
@@ -312,17 +311,15 @@ async def send_agent_message(
             conversation.messages,
             conversation.agent_model,
         )
-    elif should_schedule_idle_background_cognition(
+    if run_cognition_now or should_schedule_idle_background_cognition(
         conversation.id,
         _user_id(user),
         conversation.messages,
         turn.quality_valid,
     ):
-        idle_cognition_scheduler.schedule(
-            conversation.id,
-            _user_id(user),
-            expected_message_count=len(conversation.messages),
-        )
+        # Durable idle flush; after a threshold run it is a backstop that finds nothing
+        # pending unless that run was lost to a crash or restart.
+        schedule_idle_flush(conversation.id, _user_id(user))
     return conversation
 
 
@@ -371,7 +368,6 @@ async def get_agent_message_feedback(
 @router.post("/api/agent/conversations/{conversation_id}/extract")
 async def extract_agent_conversation(
     conversation_id: str,
-    background_tasks: BackgroundTasks,
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id, user)
@@ -394,11 +390,7 @@ async def extract_agent_conversation(
     )
     conversation.status = "extracted"
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
-    background_tasks.add_task(
-        idle_cognition_scheduler.flush_now,
-        conversation.id,
-        _user_id(user),
-    )
+    request_flush_now(conversation.id, _user_id(user))
     return {
         "draft_id": draft_id,
         "status": "draft",
