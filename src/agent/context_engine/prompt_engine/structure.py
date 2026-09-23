@@ -10,7 +10,9 @@ from agent.context_engine.assembly.budget import truncate_for_context
 
 PromptIncludeWhen = Callable[["PromptStructureContext"], bool]
 
-PROMPT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_PROMPT_TOTAL_CHAR_BUDGET", "12000"))
+# About 6k tokens. At 12000 the fixed sections alone overflowed, silently cutting the tone,
+# output-format and memory-usage rules; raise further only with the prompt trimmed.
+PROMPT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_PROMPT_TOTAL_CHAR_BUDGET", "24000"))
 PROMPT_SECTION_CHAR_LIMIT = int(os.getenv("AGENT_PROMPT_SECTION_CHAR_LIMIT", "2600"))
 
 SECTION_MODES: dict[str, str] = {
@@ -38,10 +40,11 @@ SECTION_CHAR_LIMITS: dict[str, int] = {
     "base_identity": 2600,
     "prompt_contract": 2200,
     "behavior": 2200,
-    "conversation_plan": 2200,
+    "conversation_plan": 2600,
     "empathy": 1500,
     "matching_understanding": 1600,
-    "context_sources": 5600,
+    # Matches the 7500-char context source budget in assembly/budget.py, plus headings.
+    "context_sources": 7800,
     "boredom_recovery": 1200,
     "output_format": 1200,
     "final_reminder": 900,
