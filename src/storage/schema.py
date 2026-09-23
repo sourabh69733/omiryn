@@ -573,6 +573,27 @@ user_profiles = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# Durable background work (memory flushes today; follow-ups later). One row per dedupe_key:
+# rescheduling moves run_after instead of adding rows, which debounces bursts of activity.
+agent_jobs = Table(
+    "agent_jobs",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("kind", String, nullable=False),
+    Column("dedupe_key", String, nullable=False, unique=True),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=True),
+    Column("status", String, nullable=False, default="pending"),
+    Column("run_after", DateTime(timezone=True), nullable=False),
+    Column("locked_until", DateTime(timezone=True), nullable=True),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("last_error", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_agent_jobs_due", agent_jobs.c.status, agent_jobs.c.run_after)
+Index("ix_agent_jobs_user", agent_jobs.c.user_id)
+
 agent_user_settings = Table(
     "agent_user_settings",
     metadata,
