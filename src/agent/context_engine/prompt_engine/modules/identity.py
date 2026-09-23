@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import cache
 from pathlib import Path
 
@@ -27,6 +28,12 @@ def agent_persona_for_interest(interested_in: str) -> dict[str, str]:
     return {"name": "Omi", "presentation": "warm neutral companion", "card": "omi"}
 
 
+def persona_cards_enabled() -> bool:
+    """Off by default: the current cards give the agent a human backstory, which users read as
+    a lie. Kept for a later AI-true persona (AGENT_PERSONA_CARDS_ENABLED=true to try them)."""
+    return os.getenv("AGENT_PERSONA_CARDS_ENABLED", "false").strip().lower() == "true"
+
+
 def persona_card_prompt(card: str, name: str) -> str:
     """The character card with the configured display name, plus shared usage rules."""
     return f"{_card_text(card).replace('{name}', name)}\n\n{PERSONALITY_USAGE}"
@@ -37,4 +44,9 @@ def _card_text(card: str) -> str:
     return (_PERSONA_DIR / f"{card}.md").read_text(encoding="utf-8").strip()
 
 
-__all__ = ["PERSONALITY_USAGE", "agent_persona_for_interest", "persona_card_prompt"]
+__all__ = [
+    "PERSONALITY_USAGE",
+    "agent_persona_for_interest",
+    "persona_card_prompt",
+    "persona_cards_enabled",
+]
