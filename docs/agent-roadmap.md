@@ -68,7 +68,7 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 5. **Message time in memory.** Background cognition receives each message's time and the timezone and resolves relative dates. Evidence stores the message's sent time and message ID.
 6. **"When did I tell you" support.** Memory lines include the date the user said it.
 7. **Bigger window.** Raise recent messages from 8 to 24. Background cognition keeps a rolling, dated summary of the whole chat (earlier sessions included); messages it covers leave the chat history. The local fragment summary remains only for messages the background job has not reached yet.
-8. **Token budget.** Budget context by estimated tokens across all sections instead of characters for optional sources only.
+8. **Token budget.** Chat history has an estimated token cap (`AGENT_HISTORY_TOKEN_BUDGET`); long old messages are shortened, then the oldest dropped, never the newest four. Context sources keep their existing character budget.
 9. **Durable job table.** Replace in-process idle timers with database jobs that survive restarts.
 
 ### Phase 2: Voice and character
