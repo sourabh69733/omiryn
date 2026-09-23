@@ -5,6 +5,7 @@ import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AvatarImage } from "../AvatarImage";
+import { nextBubbleDelay } from "../bubbleReveal";
 import { assetUrl, canShowUsage } from "../appUtils";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
@@ -19,6 +20,9 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  // How many messages are on screen; later bubbles of one reply are revealed one by one.
+  const [shownCount, setShownCount] = useState(0);
+  const shownConversationIdRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
   const [pauseNow, setPauseNow] = useState(() => Date.now());
@@ -223,9 +227,30 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   }
 
   useLayoutEffect(() => {
+    const messages = conversation?.messages ?? [];
+    // A newly opened conversation, or a rolled-back one, shows everything at once.
+    if (shownConversationIdRef.current !== (conversation?.id ?? null) || messages.length < shownCount) {
+      shownConversationIdRef.current = conversation?.id ?? null;
+      setShownCount(messages.length);
+      return;
+    }
+    if (messages.length <= shownCount) return;
+    const delay = nextBubbleDelay(messages, shownCount);
+    if (delay === 0) {
+      setShownCount(shownCount + 1);
+      return;
+    }
+    const timer = window.setTimeout(() => setShownCount((count) => count + 1), delay);
+    return () => window.clearTimeout(timer);
+  }, [conversation, shownCount]);
+
+  const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
+  const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
+
+  useLayoutEffect(() => {
     if (!shouldStickToBottomRef.current) return;
     syncChatToBottomAfterRender();
-  }, [conversation?.id, conversation?.messages.length, loading, sending]);
+  }, [conversation?.id, shownCount, loading, sending]);
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -585,11 +610,11 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
-            {!loading && conversation?.messages.map((message, index) => {
+            {!loading && visibleMessages.map((message, index) => {
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);
-              const previous = index > 0 ? conversation.messages[index - 1] : null;
-              const next = index < conversation.messages.length - 1 ? conversation.messages[index + 1] : null;
+              const previous = index > 0 ? visibleMessages[index - 1] : null;
+              const next = index < visibleMessages.length - 1 ? visibleMessages[index + 1] : null;
               const previousDate = previous ? messageDateKey(previous, index - 1) : "";
               const nextDate = next ? messageDateKey(next, index + 1) : "";
               const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
@@ -610,7 +635,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 </Fragment>
               );
             })}
-            {sending ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {sending || revealingBubbles ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
