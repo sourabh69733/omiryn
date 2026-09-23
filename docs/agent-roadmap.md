@@ -69,7 +69,8 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 6. **"When did I tell you" support.** Memory lines include the date the user said it.
 7. **Bigger window.** Raise recent messages from 8 to 24. Background cognition keeps a rolling, dated summary of the whole chat (earlier sessions included); messages it covers leave the chat history. The local fragment summary remains only for messages the background job has not reached yet.
 8. **Token budget.** Chat history has an estimated token cap (`AGENT_HISTORY_TOKEN_BUDGET`); long old messages are shortened, then the oldest dropped, never the newest four. Context sources keep their existing character budget.
-9. **Durable job table.** Replace in-process idle timers with database jobs that survive restarts.
+9. **Durable job table.** Done for the idle memory flush: `agent_jobs` rows (one per kind and conversation, debounced by moving `run_after`), claimed atomically by an in-process worker that also runs at startup, with retry backoff (60s, 120s, then failed). Phase 4 follow-ups and story parts will use the same table.
+   Deployment note: on Cloud Run with `min_instance_count = 0` and default CPU throttling, the worker only runs while the instance serves traffic. Jobs are no longer lost, but may wait until the next request. For timely jobs, set `cpu_idle = false` with a minimum instance, or have Cloud Scheduler call a small job-runner endpoint.
 
 ### Phase 2: Voice and character
 
