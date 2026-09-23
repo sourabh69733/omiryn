@@ -74,7 +74,7 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 
 ### Phase 2: Voice and character
 
-1. Persona cards for Annie, Kabir and Omi: background, voice, tastes, opinions, humor, quirks, limits, sample lines, lines they never say.
+1. Persona cards for Annie, Kabir and Omi (`prompt_engine/personas/*.md`): vibe, voice, gendered Hindi grammar, tastes, opinions, humor, honesty limits, plus shared usage rules and stock lines to avoid. System prompt cap raised to 24000 chars; at 12000 the tone, output-format and memory-usage sections were being cut.
 2. Multi-bubble replies: split on a blank line, at most 3, with typing delays.
 3. Anti-template check: banned phrase list plus overlap with the agent's own last 20 replies; regenerate once if hit.
 4. Question policy: react or share an opinion first; ask only when it moves the conversation forward.
