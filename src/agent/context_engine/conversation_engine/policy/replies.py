@@ -8,8 +8,9 @@ import re
 from agent.context_engine.conversation_engine.policy.script import normalize_assistant_script
 
 REPLY_PART_SEPARATOR = "<next_message>"
-MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "5"))
-REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "15"))
+# Normal replies use 1-3 bubbles by prompt; 7 leaves room for a story or scene told in one go.
+MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "7"))
+REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "35"))
 
 
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
@@ -34,15 +35,29 @@ def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[s
 
 
 def _word_limited_parts(text: str, word_limit: int) -> list[str]:
+    """Split an overlong bubble at sentence ends; only a single huge sentence is cut by words."""
     words = text.split()
     if not words or word_limit <= 0:
         return [text.strip()] if text.strip() else []
     if len(words) <= word_limit:
         return [text.strip()]
-    return [
-        " ".join(words[index : index + word_limit]).strip()
-        for index in range(0, len(words), word_limit)
-    ]
+    parts: list[str] = []
+    current: list[str] = []
+    for sentence in re.split(r"(?<=[.!?।])\s+", text.strip()):
+        sentence_words = sentence.split()
+        if current and len(current) + len(sentence_words) > word_limit:
+            parts.append(" ".join(current))
+            current = []
+        if len(sentence_words) > word_limit:
+            parts.extend(
+                " ".join(sentence_words[index : index + word_limit])
+                for index in range(0, len(sentence_words), word_limit)
+            )
+            continue
+        current.extend(sentence_words)
+    if current:
+        parts.append(" ".join(current))
+    return [part for part in parts if part]
 
 
 def _limit_parts(parts: list[str], max_parts: int) -> list[str]:
