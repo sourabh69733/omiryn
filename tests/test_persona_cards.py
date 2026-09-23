@@ -28,11 +28,17 @@ class PersonaCardTest(unittest.TestCase):
                 self.assertIn("What's on your mind today?", card)  # listed as a line to avoid
                 self.assertIn("Say you are an AI if asked", card)
 
+    @patch.dict(os.environ, {"AGENT_PERSONA_CARDS_ENABLED": "true"})
     def test_renamed_agent_keeps_character_with_new_name(self) -> None:
         behavior = build_companion_behavior({"interested_in": "men"}, agent_name="Rohan")
         self.assertTrue(behavior.persona_card.startswith("You are Rohan."))
         self.assertIn("Test cricket", behavior.persona_card)
         self.assertNotIn("{name}", behavior.persona_card)
+
+    def test_cards_are_off_by_default(self) -> None:
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENT_PERSONA_CARDS_ENABLED", None)
+            self.assertEqual(build_companion_behavior({"interested_in": "men"}).persona_card, "")
 
 
 class PersonaPromptTest(unittest.TestCase):
@@ -40,8 +46,13 @@ class PersonaPromptTest(unittest.TestCase):
         reset_db()
         save_conversation({"id": "c", "status": "active", "messages": []}, "u")
 
-    def _prompt(self) -> str:
-        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
+    def _prompt(self, cards: str = "false") -> str:
+        env = {
+            "AGENT_PIPELINE_VERSION": "v3",
+            "MEMORY_EMBEDDING_MODEL": "off",
+            "AGENT_PERSONA_CARDS_ENABLED": cards,
+        }
+        with patch.dict(os.environ, env):
             return build_model_context_package(
                 conversation_id="c",
                 user_text="chai or coffee?",
@@ -55,14 +66,17 @@ class PersonaPromptTest(unittest.TestCase):
                 assistant_message_index=1,
             ).system_prompt
 
-    def test_card_follows_core_identity(self) -> None:
-        prompt = self._prompt()
+    def test_disabled_cards_leave_no_character_section(self) -> None:
+        self.assertNotIn("## Your Character", self._prompt())
+
+    def test_enabled_card_follows_core_identity(self) -> None:
+        prompt = self._prompt(cards="true")
         self.assertLess(prompt.index("## Core Identity"), prompt.index("## Your Character"))
         self.assertLess(prompt.index("## Your Character"), prompt.index("## Prompt Contract"))
         self.assertIn("Team chai, strongly.", prompt)
 
     def test_prompt_budget_keeps_every_fixed_section_whole(self) -> None:
-        prompt = self._prompt()
+        prompt = self._prompt(cards="true")
         for heading in ("## Tone", "## Output Format", "## Final Reminder"):
             with self.subTest(heading=heading):
                 start = prompt.index(heading)
