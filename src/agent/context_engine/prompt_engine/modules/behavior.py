@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
-from agent.context_engine.prompt_engine.modules.identity import agent_persona_for_interest
+from agent.context_engine.prompt_engine.modules.identity import (
+    agent_persona_for_interest,
+    persona_card_prompt,
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +28,7 @@ class CompanionBehavior:
     version: str = "v1"
     version_name: str = "v1_companion_basic"
     data_point_targets: tuple[str, ...] = ()
+    persona_card: str = ""
 
 
 def build_companion_behavior(
@@ -40,6 +44,7 @@ def build_companion_behavior(
     return CompanionBehavior(
         persona_name=persona["name"],
         persona_presentation=persona["presentation"],
+        persona_card=persona_card_prompt(persona["card"], persona["name"]),
         tone=tone,
         max_reply_words=int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35")),
         allow_light_playful=_allow_light_playful(prompt_version),

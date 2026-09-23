@@ -191,6 +191,15 @@ def _v2_prompt_sections(
             can_skip=False,
         ),
         PromptSection(
+            id="persona",
+            title="Your Character",
+            content=behavior.persona_card,
+            position="start",
+            priority=97,
+            can_skip=False,
+            include_when=lambda _context: bool(behavior.persona_card),
+        ),
+        PromptSection(
             id="prompt_contract",
             title="Prompt Contract",
             content=prompt_version.prompt_contract,
