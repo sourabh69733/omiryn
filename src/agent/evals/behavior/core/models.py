@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal, Protocol
 
 FindingSeverity = Literal["error", "warning"]
@@ -38,6 +39,13 @@ class TurnExpectation:
     forbid_repeating_prior_reply: bool = False
     rubric: tuple[RubricDimension, ...] = ()
     minimum_weighted_score: float = 3.0
+    # Chat bubbles in this turn's reply (split on <next_message>).
+    minimum_bubbles: int = 1
+    maximum_bubbles: int | None = None
+    # Fail on the stock lines the runtime freshness check targets.
+    forbid_stock_phrases: bool = False
+    # Share of replies so far (this turn included) that contain a question.
+    maximum_question_reply_ratio: float | None = None
 
     def __post_init__(self) -> None:
         if self.minimum_words < 0:
@@ -48,6 +56,12 @@ class TurnExpectation:
             raise ValueError("maximum_questions cannot be negative.")
         if not 0 <= self.minimum_weighted_score <= 4:
             raise ValueError("minimum_weighted_score must be 0-4.")
+        if self.minimum_bubbles < 1:
+            raise ValueError("minimum_bubbles must be at least 1.")
+        if self.maximum_bubbles is not None and self.maximum_bubbles < self.minimum_bubbles:
+            raise ValueError("maximum_bubbles cannot be lower than minimum_bubbles.")
+        if self.maximum_question_reply_ratio is not None and not 0 <= self.maximum_question_reply_ratio <= 1:
+            raise ValueError("maximum_question_reply_ratio must be 0-1.")
         rubric_ids = [dimension.id for dimension in self.rubric]
         if len(rubric_ids) != len(set(rubric_ids)):
             raise ValueError("Rubric dimension ids must be unique within a turn.")
@@ -57,10 +71,16 @@ class TurnExpectation:
 class ScenarioTurn:
     user_message: str
     expectation: TurnExpectation
+    # Used only when the scenario has start_at: minutes since the previous turn.
+    after_minutes: float = 1.0
+    # Run real background cognition (memories, summary) before this turn.
+    run_background_before: bool = False
 
     def __post_init__(self) -> None:
         if not self.user_message.strip():
             raise ValueError("Scenario user_message is required.")
+        if self.after_minutes < 0:
+            raise ValueError("after_minutes cannot be negative.")
 
 
 @dataclass(frozen=True)
@@ -74,6 +94,10 @@ class BehaviorScenario:
     samples: int = 1
     minimum_sample_pass_rate: float = 1.0
     schema_version: int = 1
+    # Timezone-aware ISO time of the first message. When set, every turn runs on a frozen
+    # clock, so scenarios can test gaps, dates and time of day.
+    start_at: str | None = None
+    timezone: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip():
@@ -90,6 +114,10 @@ class BehaviorScenario:
             )
         if self.schema_version != 1:
             raise ValueError(f"Unsupported behavior scenario schema version: {self.schema_version}.")
+        if self.start_at is not None:
+            parsed = datetime.fromisoformat(self.start_at)
+            if parsed.tzinfo is None:
+                raise ValueError(f"Scenario '{self.id}' start_at must include a UTC offset.")
 
 
 @dataclass(frozen=True)
@@ -103,6 +131,8 @@ class ObservedTurn:
     context_summary: dict[str, Any] = field(default_factory=dict)
     conversation_id: str | None = None
     user_id: str | None = None
+    # Local send time label, e.g. "Mon 14 Sep, 8:03 pm", when the scenario is timed.
+    sent_at: str | None = None
 
 
 @dataclass(frozen=True)

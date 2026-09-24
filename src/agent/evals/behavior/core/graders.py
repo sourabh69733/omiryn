@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from agent.context_engine.conversation_engine.policy.freshness import STOCK_PHRASES
 from agent.context_engine.shared.text import normalized_memory_text
 from agent.evals.behavior.core.models import (
     BehaviorScenario,
@@ -124,6 +125,48 @@ def hard_rule_findings(
                 evidence=observed.direct_reply_reason,
             )
         )
+
+    bubble_count = len(observed.assistant_messages) or 1
+    if bubble_count < expectation.minimum_bubbles or (
+        expectation.maximum_bubbles is not None and bubble_count > expectation.maximum_bubbles
+    ):
+        findings.append(
+            GradeFinding(
+                code="bubble_count",
+                message=(
+                    f"Reply used {bubble_count} bubbles; expected {expectation.minimum_bubbles}"
+                    f"-{expectation.maximum_bubbles or 'any'}."
+                ),
+                evidence=reply,
+            )
+        )
+
+    if expectation.forbid_stock_phrases:
+        normalized_reply = reply.casefold().replace("\u2019", "'")
+        stock = next((phrase for phrase in STOCK_PHRASES if phrase in normalized_reply), None)
+        if stock:
+            findings.append(
+                GradeFinding(
+                    code="stock_phrase",
+                    message=f"Reply used the stock line {stock!r}.",
+                    evidence=reply,
+                )
+            )
+
+    if expectation.maximum_question_reply_ratio is not None:
+        replies = [prior.assistant_reply for prior in prior_turns] + [reply]
+        asking = sum(1 for item in replies if any(mark in item for mark in QUESTION_MARKS))
+        ratio = asking / len(replies)
+        if ratio > expectation.maximum_question_reply_ratio:
+            findings.append(
+                GradeFinding(
+                    code="too_many_question_replies",
+                    message=(
+                        f"{asking} of {len(replies)} replies asked a question; maximum share is "
+                        f"{expectation.maximum_question_reply_ratio:.0%}."
+                    ),
+                )
+            )
 
     if expectation.forbid_repeating_prior_reply and any(
         _canonical_exact(prior.assistant_reply) == canonical_exact_reply

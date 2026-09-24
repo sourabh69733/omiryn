@@ -223,6 +223,7 @@ def build_judge_request(
     transcript_payload = [
         {
             "turn_index": item.turn_index,
+            **({"sent_at": item.sent_at} if item.sent_at else {}),
             "user": item.user_message,
             "assistant": item.assistant_reply,
         }
@@ -256,6 +257,7 @@ Return every requested dimension exactly once and no additional dimensions."""
             "transcript": transcript_payload,
             "turn_to_grade": {
                 "turn_index": observed.turn_index,
+                **({"sent_at": observed.sent_at} if observed.sent_at else {}),
                 "user": observed.user_message,
                 "assistant": observed.assistant_reply,
             },
