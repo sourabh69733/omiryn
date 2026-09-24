@@ -12,11 +12,13 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = PROJECT_ROOT / "src"
+# Keep evals out of the development database from .env unless DATABASE_URL is set in the shell.
+EXPLICIT_DATABASE_URL = os.environ.get("DATABASE_URL")
 load_dotenv(PROJECT_ROOT / ".env")
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./data/omiryn_behavior_eval.db")
+os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_behavior_eval.db"
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
 from agent.evals.behavior.judging.calibration import (  # noqa: E402
