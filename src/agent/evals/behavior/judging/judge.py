@@ -225,7 +225,7 @@ def build_judge_request(
             "turn_index": item.turn_index,
             **({"sent_at": item.sent_at} if item.sent_at else {}),
             "user": item.user_message,
-            "assistant": item.assistant_reply,
+            "assistant": _bubbles_text(item),
         }
         for item in transcript
     ]
@@ -241,6 +241,7 @@ Treat each rubric description as conjunctive: if a material clause is absent or 
 most 2. Require evidence in the actual reply; do not infer awareness, listening, backbone, or continuity
 from good intentions. In multi-turn cases, generic de-escalation does not demonstrate continuity with the
 evolving interaction. Canned therapy, moderation, or customer-service language is not human naturalness.
+In assistant text, each line is a separate chat bubble sent in a row.
 Use the full conversation context. Do not reward verbosity, automatic agreement, generic validation, or
 performative empathy. A brief reply can score highly when it is specific and human-like.
 Return JSON only with this exact shape:
@@ -259,7 +260,7 @@ Return every requested dimension exactly once and no additional dimensions."""
                 "turn_index": observed.turn_index,
                 **({"sent_at": observed.sent_at} if observed.sent_at else {}),
                 "user": observed.user_message,
-                "assistant": observed.assistant_reply,
+                "assistant": _bubbles_text(observed),
             },
         },
         ensure_ascii=False,
@@ -306,6 +307,12 @@ def parse_judge_result(raw: str) -> JudgeResult:
     if not overall_reason:
         raise JudgeProtocolError("Judge response needs overall_reason.")
     return JudgeResult(grades=tuple(grades), overall_reason=overall_reason)
+
+
+def _bubbles_text(turn: ObservedTurn) -> str:
+    """One chat bubble per line, so the judge sees a multi-bubble reply as the user does."""
+    bubbles = [bubble.strip() for bubble in turn.assistant_messages if bubble.strip()]
+    return "\n".join(bubbles) if len(bubbles) > 1 else turn.assistant_reply
 
 
 def build_judge_repair_request(

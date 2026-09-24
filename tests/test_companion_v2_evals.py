@@ -133,6 +133,21 @@ class TimedRuntimeTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn('"sent_at": "Mon 14 Sep, 8:01 pm"', payload)
 
+    def test_judge_sees_each_bubble_on_its_own_line(self) -> None:
+        turn = ScenarioTurn("tell me a story", TurnExpectation())
+        observed = ObservedTurn(
+            turn_index=0,
+            user_message="tell me a story",
+            assistant_reply="once upon a time there was Raju",
+            assistant_messages=("once upon a time", "there was Raju"),
+        )
+        scenario = BehaviorScenario(id="s", description="d", turns=(turn,))
+        system, payload = build_judge_request(
+            scenario=scenario, turn=turn, observed=observed, transcript=(observed,)
+        )
+        self.assertIn("once upon a time\\nthere was Raju", payload)
+        self.assertIn("each line is a separate chat bubble", system)
+
 
 class CompanionV2CatalogueTest(unittest.TestCase):
     def test_scenarios_are_timed_tagged_and_unique(self) -> None:
