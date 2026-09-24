@@ -58,7 +58,7 @@ TOPIC_CATALOG: tuple[TopicDefinition, ...] = (
         bucket="personal_story",
         label="Personal stories: childhood, school, first crush, embarrassing/funny memory.",
         data_targets=("personality", "attraction_preferences", "social_lifestyle"),
-        trigger_terms=("school", "childhood", "story", "memory", "crush"),
+        trigger_terms=("school", "childhood", "memory", "crush"),
     ),
     TopicDefinition(
         id="social_life",
@@ -121,8 +121,6 @@ def _topic_score(
         score += 5
     if "adult_flirty" in labels and topic.bucket == "intimate_safe":
         score += 6
-    if "story_or_long_reply" in labels and topic.bucket == "personal_story":
-        score += 4
     if (
         {"low_information", "boredom_complaint"} & labels
         and topic.bucket in {"romantic", "personal_story", "intimate_safe"}
