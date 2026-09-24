@@ -12,7 +12,7 @@ import type { ContextSource, Conversation, ConversationSummary, ConversationUsag
 import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
-const CHAT_INPUT_MAX_LENGTH = 300;
+const CHAT_INPUT_MAX_LENGTH = 800;
 
 export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { initialConversationId?: string | null; userAvatar?: string | null, interestedIn?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
