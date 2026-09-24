@@ -42,6 +42,7 @@ from agent.evals.behavior.simulation.runtime import (  # noqa: E402
     RuntimeScenarioDriver,
 )
 from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS  # noqa: E402
+from agent.evals.behavior.core.scenarios_v2 import COMPANION_V2_SCENARIOS  # noqa: E402
 from agent.evals.memory.use import MEMORY_USE_SCENARIOS, setup_memory_use_sample  # noqa: E402
 from agent.providers.gateway.registry import (  # noqa: E402
     EVAL_PROVIDER_NAMES,
@@ -123,9 +124,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--suite", default="companion_behavior_v1")
     parser.add_argument(
         "--scenario-set",
-        choices=("companion", "memory_use"),
+        choices=("companion", "memory_use", "companion_v2"),
         default="companion",
-        help="Select companion behavior or end-to-end memory-use scenarios.",
+        help=(
+            "companion: behavior regressions; memory_use: memory-use scenarios; "
+            "companion_v2: time, memory continuity, reply style and honesty on a frozen clock."
+        ),
     )
     parser.add_argument(
         "--scenario",
@@ -171,7 +175,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             model=args.model,
             prompt_version=args.prompt_version,
             agent_name=args.agent_name,
-            pipeline_version="v3" if args.scenario_set == "memory_use" else None,
+            pipeline_version="v3" if args.scenario_set in {"memory_use", "companion_v2"} else None,
         ),
         event_sink=reporter,
         sample_setup=setup_memory_use_sample if args.scenario_set == "memory_use" else None,
@@ -195,8 +199,8 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
         judge=judge,
         config=BehaviorEvalConfig(
             suite_name=(
-                "memory_use_v1"
-                if args.scenario_set == "memory_use" and args.suite == "companion_behavior_v1"
+                _SET_SUITE_NAMES.get(args.scenario_set, args.suite)
+                if args.suite == "companion_behavior_v1"
                 else args.suite
             ),
             provider=args.provider,
@@ -256,12 +260,18 @@ def _validate_run_mode(args: argparse.Namespace, judge_names: tuple[str, ...]) -
         raise ValueError("Release mode requires --samples 3 or greater.")
 
 
+_SET_SUITE_NAMES = {"memory_use": "memory_use_v1", "companion_v2": "companion_v2"}
+
+
 def _selected_scenarios(
     scenario_ids: list[str] | None,
     *,
     scenario_set: str = "companion",
 ):
-    catalogue = MEMORY_USE_SCENARIOS if scenario_set == "memory_use" else COMPANION_BEHAVIOR_SCENARIOS
+    catalogue = {
+        "memory_use": MEMORY_USE_SCENARIOS,
+        "companion_v2": COMPANION_V2_SCENARIOS,
+    }.get(scenario_set, COMPANION_BEHAVIOR_SCENARIOS)
     if not scenario_ids:
         return catalogue
     requested = set(scenario_ids)
