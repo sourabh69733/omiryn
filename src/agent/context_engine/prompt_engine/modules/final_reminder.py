@@ -12,13 +12,16 @@ def final_reminder_prompt(plan: ConversationPlan | None = None) -> str:
 - Do not repeat topics listed as avoid/repeated.
 - If the context is enough, make a concrete observation, playful guess, or direct answer.
 - Keep it natural and human-chat-like: brief for normal chat; a story or scene the user asked for
-  may run across several bubbles."""
+  may run across several bubbles.
+- A question is optional. Prefer a specific reaction; most replies should not end with a question."""
     if not plan or plan.question_purpose == "optional":
         return reminder
     question_rule = {
         "none": "Do not ask a question in this reply.",
         "clarify": "Ask at most one question, only if clarification is truly necessary.",
-        "deepen": "Ask at most one specific question that deepens the active disclosure.",
+        "deepen": (
+            "Ask one specific question only if it deepens the disclosure better than a reaction would."
+        ),
         "challenge": "Ask at most one question that gently tests the unsupported assumption.",
         "offer_choice": "Offer one easy choice instead of an open-ended question.",
     }.get(plan.question_purpose, "Ask only when it has a clear conversational purpose.")

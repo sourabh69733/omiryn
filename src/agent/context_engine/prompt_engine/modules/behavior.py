@@ -23,7 +23,7 @@ class CompanionBehavior:
     allow_light_playful: bool = True
     allow_mild_adult_humor: bool = True
     allow_romantic_roleplay: bool = False
-    ask_question_policy: str = "at_most_one_soft_question"
+    ask_question_policy: str = "optional; most replies end without a question"
     dating_focus: str = "gradual_understanding_for_matching"
     safety_level: str = "high_trust_no_impersonation"
     version: str = "v1"
