@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from typing import Any
+
 from agent.context_engine.contracts.models import (
     ContextQueryIntent,
     ConversationalStance,
@@ -76,6 +79,48 @@ def build_conversation_plan(
             guidance=thread_guidance,
         ),
     )
+
+
+# Purposes a streak may silence; clarify and challenge stay, since they serve the user.
+_COOLDOWN_PURPOSES = {"optional", "deepen", "offer_choice"}
+_QUESTION_STREAK_LIMIT = 2
+
+
+def apply_question_cooldown(
+    plan: ConversationPlan,
+    messages: list[dict[str, Any]],
+) -> ConversationPlan:
+    """Forbid a question this turn when the last two agent replies both asked one."""
+    if plan.question_purpose not in _COOLDOWN_PURPOSES:
+        return plan
+    if recent_question_streak(messages) < _QUESTION_STREAK_LIMIT:
+        return plan
+    return replace(plan, question_purpose="none")
+
+
+def recent_question_streak(messages: list[dict[str, Any]]) -> int:
+    """How many of the latest agent replies in a row contained a question.
+
+    Consecutive agent bubbles count as one reply; the streak stops at the first reply
+    without a question mark.
+    """
+    replies: list[str] = []
+    previous_role = None
+    for message in messages:
+        role = message.get("role")
+        if role == "assistant":
+            text = str(message.get("content") or "")
+            if previous_role == "assistant":
+                replies[-1] += " " + text
+            else:
+                replies.append(text)
+        previous_role = role
+    streak = 0
+    for reply in reversed(replies):
+        if "?" not in reply:
+            break
+        streak += 1
+    return streak
 
 
 def _build_listener_first_plan(
@@ -424,7 +469,10 @@ def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
         return "Bring energy with one fresh playful angle; do not sound like an interview or use generic common topics."
     if "whatsapp" in labels:
         return "Be concrete. Use stored WhatsApp context if available and admit uncertainty only when needed."
-    return "React first, use known context, and ask at most one natural question."
+    return (
+        "React to the specific thing the user said: notice a detail, make a playful guess, or give "
+        "your honest take. A question is optional; most replies should not end with one."
+    )
 
 
 def _plan_reason(labels: set[str], active: TopicState | None, emotion: EmotionState) -> str:

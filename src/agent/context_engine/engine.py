@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.context_engine.assembly.snapshot import build_context_snapshot, build_context_snapshot_v2
 from agent.context_engine.conversation_engine.planning import (
+    apply_question_cooldown,
     build_conversation_plan,
     build_topic_state,
 )
@@ -94,6 +95,7 @@ def build_model_context_package(
             thread_guidance=reply_context.thread_guidance,
             listener_first=listener_first,
         )
+        conversation_plan = apply_question_cooldown(conversation_plan, planning_messages[:-1])
         system_prompt = build_companion_system_prompt_v2(
             context_sources=reply_context.context_sources,
             user_profile=reply_context.user_profile,
