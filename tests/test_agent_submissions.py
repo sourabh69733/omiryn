@@ -2670,7 +2670,10 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertTrue(snapshot_detail["messages"]["assistant"]["content"])
         self.assertIn("system_prompt", snapshot_detail["messages"])
         self.assertIn("provider", snapshot_detail["messages"])
-        self.assertEqual(snapshot_detail["messages"]["provider"][-1]["role"], "user")
+        # The user's message is the last turn; only per-turn system notes may follow it.
+        roles = [message["role"] for message in snapshot_detail["messages"]["provider"]]
+        last_user = len(roles) - 1 - roles[::-1].index("user")
+        self.assertTrue(all(role == "system" for role in roles[last_user + 1 :]))
         self.assertIn("prompt_debug", snapshot_detail["messages"])
         self.assertTrue(detail["conversations"][0]["latest_context_snapshot"])
         self.assertEqual(detail["agent_trace_summary"]["total"], 1)

@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.conversation_engine.policy.freshness import (
+    question_rule_reason,
     recent_assistant_replies,
     rewrite_instruction,
     stale_reply_reason,
@@ -37,6 +38,12 @@ class StaleReplyTest(unittest.TestCase):
     def test_bubble_separator_does_not_hide_a_stock_line(self) -> None:
         self.assertIsNotNone(stale_reply_reason("hmm<next_message>I'm here for you", []))
 
+    def test_question_limits(self) -> None:
+        self.assertIsNone(question_rule_reason("which one?", 1))
+        self.assertIn("2 questions", question_rule_reason("best part?<next_message>new trail?", 1))
+        self.assertIn("must not ask any", question_rule_reason("which one?", 0))
+        self.assertIsNone(question_rule_reason("fair enough", 0))
+
     def test_recent_replies_and_rewrite_instruction(self) -> None:
         messages = [
             {"role": "assistant", "content": "hey"},
@@ -60,10 +67,10 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_stale_draft_is_rewritten_once(self) -> None:
-        generate = AsyncMock(return_value="your manager noticed? that's a big deal, what did they say?")
+        generate = AsyncMock(return_value="your manager noticed, that's a big deal. what did they say?")
         reply, freshness = await self._freshen("That sounds amazing!", generate)
 
-        self.assertEqual(reply, "your manager noticed? that's a big deal, what did they say?")
+        self.assertEqual(reply, "your manager noticed, that's a big deal. what did they say?")
         self.assertTrue(freshness["rewritten"])
         self.assertFalse(freshness["still_stale"])
         generate.assert_awaited_once()
@@ -81,6 +88,20 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(reply, "That sounds amazing!")
         self.assertEqual(freshness["error"], "RuntimeError")
+
+    async def test_question_limit_breaks_trigger_a_rewrite(self) -> None:
+        generate = AsyncMock(return_value="a week of launches, you've earned a quiet night")
+        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
+            reply, freshness = await _freshen_reply(
+                "hope it calms down, how's Bruno handling it?",
+                previous_replies=[],
+                reply_messages=[{"role": "user", "content": "work was hectic"}],
+                generation_arguments={"system_prompt": "SYSTEM"},
+                question_limit=0,
+            )
+        self.assertEqual(reply, "a week of launches, you've earned a quiet night")
+        self.assertIn("must not ask any", freshness["reason"])
+        self.assertFalse(freshness["still_stale"])
 
     async def test_check_can_be_switched_off(self) -> None:
         generate = AsyncMock()
