@@ -66,7 +66,8 @@ V3 memory rules:
 - Never target an ID outside existing_memories and never target one memory twice in a batch.
 - Relationship history and intimate interpersonal details are at least sensitive. Medical, biometric,
   sexual, financial and similarly high-risk private facts are highly_sensitive.
-- occurred_at is the event time, not extraction time or send time. Resolve relative dates ("today",
+- occurred_at is the event time, past or scheduled (an interview next Friday, a trip in May), not
+  extraction time or send time. Resolve relative dates ("today",
   "yesterday", "last Friday", "next Monday") against the evidence message's sent_at and sent_weekday,
   in user_timezone. Write the resolved day as an ISO-8601 timestamp with that timezone's UTC offset,
   using 12:00 when no time of day is stated. Use null when the day cannot be pinned down, such as
