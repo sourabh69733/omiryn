@@ -22,9 +22,17 @@ class LiveRunStats:
 class TerminalProgressReporter:
     """Renders evaluation events in simple language as work completes."""
 
-    def __init__(self, stream: TextIOBase | None = None, *, enabled: bool = True) -> None:
+    def __init__(
+        self,
+        stream: TextIOBase | None = None,
+        *,
+        enabled: bool = True,
+        tag_samples: bool = False,
+    ) -> None:
         self.stream = stream or sys.stderr
         self.enabled = enabled
+        # With parallel samples, lines from different conversations interleave; tag each one.
+        self.tag_samples = tag_samples
         self.started_at = datetime.now(timezone.utc)
         self._started_clock = perf_counter()
         self.api_calls = 0
@@ -42,6 +50,12 @@ class TerminalProgressReporter:
             return
         rendered = _render_event(event)
         if rendered:
+            label = event.data.get("sample_label")
+            if self.tag_samples and label:
+                rendered = "\n".join(
+                    f"[{label}] {line.strip()}" if line.strip() else line
+                    for line in rendered.split("\n")
+                )
             print(rendered, file=self.stream, flush=True)
 
     def stats(self) -> LiveRunStats:
