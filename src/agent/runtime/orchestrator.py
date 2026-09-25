@@ -12,6 +12,7 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     recent_assistant_replies,
     rewrite_instruction,
     stale_reply_reason,
+    trim_questions,
 )
 from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
@@ -204,7 +205,10 @@ async def run_agent_turn(
         (context_package.user_profile or {}).get("timezone"),
     )
     # The last thing the model reads; it follows this more reliably than rules in the prompt.
-    reply_messages = reply_messages + _turn_notes(context_package.question_limit)
+    reply_messages = reply_messages + _turn_notes(
+        context_package.question_limit,
+        context_package.query_intent.labels if context_package.query_intent else (),
+    )
     provider_messages = _provider_messages(reply_messages)
     if context_snapshot:
         context_snapshot.setdefault("context", {})["prompt"] = {
@@ -394,9 +398,15 @@ async def _freshen_reply(
         return reply, {"reason": reason, "rewritten": False, "error": type(error).__name__}
     if not rewritten.strip():
         return reply, {"reason": reason, "rewritten": False}
+    trimmed = False
+    if question_rule_reason(rewritten, question_limit):
+        # The model tends to copy the questions in its own history, even when asked not to.
+        rewritten = trim_questions(rewritten, question_limit)
+        trimmed = True
     return rewritten, {
         "reason": reason,
         "rewritten": True,
+        "questions_trimmed": trimmed,
         "still_stale": problem(rewritten) is not None,
     }
 
@@ -406,11 +416,21 @@ _NO_QUESTION_NOTE = (
 )
 
 
-def _turn_notes(question_limit: int) -> list[dict[str, str]]:
+_STORY_NOTE = (
+    "For this reply: the user asked for a story. Tell it yourself now in 4-7 short bubbles "
+    "separated by <next_message>: a character, a setting and something that happens. End with "
+    "an ending or a light 'want more?'. Do not ask the user what should happen."
+)
+
+
+def _turn_notes(question_limit: int, intent_labels: tuple[str, ...] = ()) -> list[dict[str, str]]:
     """Per-turn rules placed after the user's message."""
-    if question_limit == 0:
-        return [{"role": "system", "content": _NO_QUESTION_NOTE}]
-    return []
+    notes = []
+    if "story_or_long_reply" in intent_labels:
+        notes.append({"role": "system", "content": _STORY_NOTE})
+    elif question_limit == 0:
+        notes.append({"role": "system", "content": _NO_QUESTION_NOTE})
+    return notes
 
 
 def freshness_check_enabled() -> bool:

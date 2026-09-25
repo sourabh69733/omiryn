@@ -97,6 +97,8 @@ def build_model_context_package(
         )
         conversation_plan = apply_question_cooldown(conversation_plan, planning_messages[:-1])
         question_limit = 0 if conversation_plan.question_purpose == "none" else 1
+        if "story_or_long_reply" in query_intent.labels:
+            question_limit = 1  # room for the "want more?" check-in at the end of a story
         system_prompt = build_companion_system_prompt_v2(
             context_sources=reply_context.context_sources,
             user_profile=reply_context.user_profile,

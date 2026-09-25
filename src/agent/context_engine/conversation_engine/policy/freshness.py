@@ -70,6 +70,33 @@ def question_rule_reason(reply: str, question_limit: int) -> str | None:
     return f"it asks {questions} questions; ask at most {question_limit}"
 
 
+def trim_questions(reply: str, question_limit: int) -> str:
+    """Last resort when a rewrite still breaks the limit: drop question sentences past it.
+
+    Works on whole sentences and bubbles, so nothing is cut mid-sentence. A reply is never
+    emptied: if only questions remain, the first question is kept.
+    """
+    kept_bubbles: list[str] = []
+    questions_kept = 0
+    first_question: str | None = None
+    for bubble in reply.split(REPLY_PART_SEPARATOR):
+        kept_sentences = []
+        for sentence in re.split(r"(?<=[.!?\u0964])\s+", bubble.strip()):
+            if not sentence:
+                continue
+            if "?" in sentence:
+                first_question = first_question or sentence
+                if questions_kept >= question_limit:
+                    continue
+                questions_kept += 1
+            kept_sentences.append(sentence)
+        if kept_sentences:
+            kept_bubbles.append(" ".join(kept_sentences))
+    if not kept_bubbles:
+        return first_question or reply
+    return REPLY_PART_SEPARATOR.join(kept_bubbles)
+
+
 def recent_assistant_replies(messages: list[dict[str, Any]]) -> list[str]:
     return [
         str(message.get("content") or "")
@@ -122,4 +149,5 @@ __all__ = [
     "recent_assistant_replies",
     "rewrite_instruction",
     "stale_reply_reason",
+    "trim_questions",
 ]
