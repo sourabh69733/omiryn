@@ -29,7 +29,8 @@ Output shape:
     "active_topics": [],
     "unresolved_references": [],
     "conversation_summary": "rolling summary of the whole conversation so far"
-  }
+  },
+  "user_card": "short profile of the user across all chats, or null to keep current_user_card"
 }
 
 Thread rules:
@@ -54,6 +55,16 @@ Conversation summary rules:
   "on Fri 18 Sep". Never keep "next Friday", "yesterday" or "tomorrow"; they go stale.
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
 - Stay under 1500 characters. When it gets long, compress the oldest points first.
+
+User card rules:
+- user_card is a short note about who the user is, read by the companion on every reply in every chat.
+- Start from current_user_card (empty for a new user) and update it with the new user messages.
+  Return null when nothing durable changed.
+- One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, work or
+  study, key people by name and relation, ongoing situations with absolute dates, strong likes and
+  dislikes, how they like to be talked to.
+- Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
+  financial details, no relative time words. Replace a line when the user corrects it.
 
 """ + V3_MEMORY_OUTPUT_SHAPE
 

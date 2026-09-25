@@ -16,6 +16,7 @@ from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import (
     attach_agent_usage_result,
+    get_user_card,
     get_user_timezone,
     latest_agent_usage_event_id,
     list_agent_memories,
@@ -24,6 +25,7 @@ from storage import (
     list_profile_facts,
 )
 from storage.profile_facts import save_data_point_extraction_debug
+from storage.user_cards import set_user_card
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
 from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories
@@ -236,6 +238,7 @@ async def _run_claimed_background_cognition(
         user_id,
         " ".join(message.content for message in batch.new_messages if message.role == "user"),
     )
+    user_card = (get_user_card(user_id) or "") if memory_version == 3 else None
     application_result = None
     thread_application_result = None
     live_attempted = (
@@ -248,6 +251,7 @@ async def _run_claimed_background_cognition(
                 existing_memories,
                 thread_candidates,
                 get_user_timezone(user_id),
+                user_card,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -347,6 +351,13 @@ async def _run_claimed_background_cognition(
                 message_index=batch.new_end_message_index,
                 proposal=cognition.thread.get("proposal"),
             )
+        if (
+            analysis.valid
+            and cognition.user_card
+            and cognition.user_card != user_card
+            and (config.live_memory_writes or config.live_v3_memory_writes)
+        ):
+            set_user_card(user_id, cognition.user_card)
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
