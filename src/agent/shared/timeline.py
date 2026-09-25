@@ -195,6 +195,10 @@ def relative_day(day: date, today: date) -> str:
     if delta in named:
         return named[delta]
     size = abs(delta)
+    if size < 7:
+        # Within a week the weekday is how people say it: "this Friday", "on Sunday".
+        weekday = day.strftime("%A")
+        return f"this {weekday}, in {size} days" if delta > 0 else f"on {weekday}, {size} days ago"
     if size < 14:
         amount = f"{size} days"
     elif size < 60:

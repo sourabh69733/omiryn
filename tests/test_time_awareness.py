@@ -108,8 +108,9 @@ class RelativeDayTest(unittest.TestCase):
             date(2026, 9, 16): "today",
             date(2026, 9, 17): "tomorrow",
             date(2026, 9, 15): "yesterday",
-            date(2026, 9, 18): "in 2 days",
-            date(2026, 9, 13): "3 days ago",
+            date(2026, 9, 18): "this Friday, in 2 days",
+            date(2026, 9, 13): "on Sunday, 3 days ago",
+            date(2026, 9, 25): "in 9 days",
             date(2026, 10, 7): "in 3 weeks",
             date(2026, 6, 1): "3 months ago",
         }
