@@ -9,6 +9,7 @@ from agent.context_engine.conversation_engine.policy.replies import (
     MAX_REPLY_PARTS,
     REPLY_PART_SEPARATOR,
     REPLY_PART_WORD_LIMIT,
+    normalize_part_separators,
 )
 
 from .config import (
@@ -245,7 +246,7 @@ def _conversation_and_context_text(
     return f"{context_text}\n\nConversation:\n{conversation_text}"
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
-    cleaned = " ".join(content.strip().split())
+    cleaned = " ".join(normalize_part_separators(content).strip().split())
     if not cleaned:
         return cleaned
 

@@ -13,9 +13,20 @@ MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "7"))
 REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "35"))
 
 
+# Models sometimes write the separator as [next_message], </next_message> or <next message>.
+_SEPARATOR_VARIANTS = re.compile(r"[<\[]\s*/?\s*next[\s_-]*message\s*/?\s*[>\]]", re.IGNORECASE)
+
+
+def normalize_part_separators(text: str) -> str:
+    """Rewrite separator variants to the canonical <next_message> so none reach the user."""
+    return _SEPARATOR_VARIANTS.sub(REPLY_PART_SEPARATOR, text)
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = _soften_adult_safety_refusal(
-        " ".join(normalize_assistant_script(str(reply or "")).strip().split()),
+        " ".join(
+            normalize_part_separators(normalize_assistant_script(str(reply or ""))).strip().split()
+        ),
         user_text,
     )
     if not cleaned:
