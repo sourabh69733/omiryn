@@ -11,6 +11,7 @@ from agent.evals.behavior.core.models import (
     BehaviorEvalReport,
     BehaviorJudge,
     BehaviorScenario,
+    ObservedTurn,
     SampleResult,
     ScenarioDriver,
     ScenarioResult,
@@ -70,7 +71,31 @@ async def run_behavior_evals(
                 sample_number=sample_index + 1,
                 sample_count=sample_count,
             )
-            observed_turns = await driver.run_sample(scenario, sample_index)
+            observed_turns, run_error = await _run_sample_with_retry(
+                driver, scenario, sample_index, event_sink
+            )
+            if run_error is not None:
+                # A provider outage fails this conversation, not the whole suite.
+                sample_results.append(
+                    SampleResult(
+                        scenario_id=scenario.id,
+                        sample_index=sample_index,
+                        passed=False,
+                        turns=(),
+                        grades=(),
+                        error=run_error,
+                    )
+                )
+                emit_event(
+                    event_sink,
+                    "sample_completed",
+                    "Conversation sample could not run.",
+                    scenario_id=scenario.id,
+                    sample_index=sample_index,
+                    passed=False,
+                    error=run_error,
+                )
+                continue
             if len(observed_turns) != len(scenario.turns):
                 raise ValueError(
                     f"Driver returned {len(observed_turns)} turns for scenario '{scenario.id}', "
@@ -224,6 +249,7 @@ def report_payload(report: BehaviorEvalReport) -> dict[str, Any]:
                     {
                         "sample_index": sample.sample_index,
                         "passed": sample.passed,
+                        "error": sample.error,
                         "turns": [
                             {
                                 "turn_index": turn.turn_index,
@@ -323,3 +349,28 @@ def _persist_report(report: BehaviorEvalReport, config: BehaviorEvalConfig) -> s
         metadata=report.metadata,
     )
     return str(run["id"])
+
+
+async def _run_sample_with_retry(
+    driver: ScenarioDriver,
+    scenario: BehaviorScenario,
+    sample_index: int,
+    event_sink: EventSink | None,
+) -> tuple[tuple[ObservedTurn, ...], str | None]:
+    """Run one conversation, retrying once from the start if it crashes midway."""
+    error: Exception | None = None
+    for attempt in range(2):
+        try:
+            return await driver.run_sample(scenario, sample_index), None
+        except Exception as caught:  # provider outages, timeouts
+            error = caught
+            if attempt == 0:
+                emit_event(
+                    event_sink,
+                    "sample_retry",
+                    "Conversation sample crashed; running it again.",
+                    scenario_id=scenario.id,
+                    sample_index=sample_index,
+                    error=f"{type(caught).__name__}: {caught}",
+                )
+    return (), f"{type(error).__name__}: {error}"

@@ -177,6 +177,8 @@ class SampleResult:
     passed: bool
     turns: tuple[ObservedTurn, ...]
     grades: tuple[TurnGrade, ...]
+    # Set when the conversation could not run (e.g. a provider kept timing out).
+    error: str | None = None
 
 
 @dataclass(frozen=True)
