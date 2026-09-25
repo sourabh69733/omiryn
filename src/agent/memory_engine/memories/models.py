@@ -88,6 +88,7 @@ class MemoryRecord:
     evidence: tuple[MemoryEvidence, ...]
     created_at: datetime
     updated_at: datetime
+    statement: str | None = None
     allowed_uses: frozenset[MemoryUse] = frozenset({MemoryUse.REPLY_CONTEXT})
     status: MemoryStatus = MemoryStatus.ACTIVE
     sensitivity: MemorySensitivity = MemorySensitivity.STANDARD

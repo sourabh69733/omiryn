@@ -139,6 +139,8 @@ agent_memories = Table(
     Column("purposes_json", JSON, nullable=False),
     Column("key", String, nullable=False),
     Column("value_json", JSON, nullable=False),
+    # One plain sentence for prompts and search ("Has a job interview at a design studio.").
+    Column("statement", String, nullable=True),
     Column("allowed_uses_json", JSON, nullable=False),
     Column("status", String, nullable=False),
     Column("sensitivity", String, nullable=False),

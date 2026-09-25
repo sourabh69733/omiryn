@@ -52,6 +52,9 @@ def _create_agent_memory(connection, payload: dict[str, Any]) -> dict[str, Any]:
             purposes_json=sorted(purpose.value for purpose in record.purposes),
             key=record.key,
             value_json=maybe_encrypt_json(record.user_id, record.value),
+            statement=(
+                _protect_text(record.user_id, record.statement) if record.statement else None
+            ),
             allowed_uses_json=sorted(use.value for use in record.allowed_uses),
             status=record.status.value,
             sensitivity=record.sensitivity.value,
@@ -605,6 +608,7 @@ def _record_from_create_payload(payload: dict[str, Any]) -> MemoryRecord:
         evidence=evidence,
         created_at=now,
         updated_at=now,
+        statement=_optional_text(payload.get("statement")),
         allowed_uses=frozenset(
             MemoryUse(str(value))
             for value in payload.get("allowed_uses") or (MemoryUse.REPLY_CONTEXT.value,)
@@ -646,6 +650,9 @@ def _memory_from_row(connection, row) -> dict[str, Any]:
         "purposes": list(row["purposes_json"] or []),
         "key": row["key"],
         "value": decrypt_json(row["user_id"], row["value_json"]),
+        "statement": (
+            _unprotect_text(row["user_id"], row["statement"]) if row.get("statement") else None
+        ),
         "allowed_uses": list(row["allowed_uses_json"] or []),
         "status": row["status"],
         "sensitivity": row["sensitivity"],
