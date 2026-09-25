@@ -616,6 +616,24 @@ agent_user_cards = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# What the companion said itself (opinions, tastes, jokes, promises), so it stays consistent
+# and keeps promises. Written by background cognition; text is encrypted.
+agent_self_notes = Table(
+    "agent_self_notes",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("message_index", Integer, nullable=False),
+    Column("kind", String, nullable=False),
+    Column("text", String, nullable=False),
+    Column("due_at", DateTime(timezone=True), nullable=True),
+    Column("status", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+Index("ix_agent_self_notes_user_status", agent_self_notes.c.user_id, agent_self_notes.c.status)
+
 profile_facts = Table(
     "profile_facts",
     metadata,
