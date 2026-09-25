@@ -62,9 +62,22 @@ def test_memory_note_shows_first_and_latest_mention_in_user_timezone() -> None:
             {"observed_at": "2026-09-01T08:00:00+00:00"},
         ],
     }
-    note = _memory_time_note(memory, ZoneInfo("Asia/Kolkata"))
+    note = _memory_time_note(memory, ZoneInfo("Asia/Kolkata"), now=EXTRACTED)
 
-    assert note == " (told you 1 Sep 2026, again 23 Sep 2026; happened 21 Sep 2026)"
+    assert note == (
+        " (told you Tue 1 Sep 2026 (3 weeks ago), again Wed 23 Sep 2026 (today); "
+        "happened Mon 21 Sep 2026 (2 days ago))"
+    )
+
+
+def test_upcoming_event_says_happens_with_distance_from_today() -> None:
+    memory = {"occurred_at": "2026-09-25T12:00:00+05:30", "evidence": []}
+    note = _memory_time_note(memory, ZoneInfo("Asia/Kolkata"), now=EXTRACTED)
+    assert note == " (happens Fri 25 Sep 2026 (in 2 days))"
+
+
+def test_extraction_prompt_dates_scheduled_events() -> None:
+    assert "past or scheduled" in V3_MEMORY_OUTPUT_SHAPE
 
 
 def test_memory_note_is_empty_without_dates() -> None:

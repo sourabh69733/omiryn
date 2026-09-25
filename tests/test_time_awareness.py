@@ -1,6 +1,6 @@
 import os
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -15,6 +15,7 @@ from agent.shared.timeline import (
     day_part,
     day_notes,
     humanize_gap,
+    relative_day,
     valid_timezone_name,
 )
 from api.main import app, current_user
@@ -98,6 +99,23 @@ class TimelineTest(unittest.TestCase):
         messages = [_message("user", "brb", NOW - timedelta(hours=2))]
         with patch.dict(os.environ, {"AGENT_SESSION_GAP_HOURS": "1"}):
             self.assertTrue(conversation_time(messages, "UTC", NOW).new_session)
+
+
+class RelativeDayTest(unittest.TestCase):
+    def test_relative_day_wording(self) -> None:
+        today = date(2026, 9, 16)
+        cases = {
+            date(2026, 9, 16): "today",
+            date(2026, 9, 17): "tomorrow",
+            date(2026, 9, 15): "yesterday",
+            date(2026, 9, 18): "in 2 days",
+            date(2026, 9, 13): "3 days ago",
+            date(2026, 10, 7): "in 3 weeks",
+            date(2026, 6, 1): "3 months ago",
+        }
+        for day, expected in cases.items():
+            with self.subTest(day=day):
+                self.assertEqual(relative_day(day, today), expected)
 
 
 class DayNotesTest(unittest.TestCase):
