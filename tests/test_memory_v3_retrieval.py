@@ -130,8 +130,8 @@ def test_retrieval_is_kind_aware_and_ranks_relevant_memory_first() -> None:
     assert procedural["id"] in ids
 
 
-def test_retrieval_limits_each_kind_and_total_context() -> None:
-    for index in range(4):
+def test_retrieval_uses_one_total_budget_with_a_soft_cap_per_kind() -> None:
+    for index in range(7):
         _save_memory(
             key=f"profile.fact.{index}",
             value=f"fact {index}",
@@ -146,11 +146,33 @@ def test_retrieval_limits_each_kind_and_total_context() -> None:
             importance=1.0 - index / 10,
         )
 
-    selected = _retrieve("Tell me about my profile facts and events", limit=5)
+    selected = _retrieve("Tell me about my profile facts and events", limit=8)
 
-    assert len(selected) <= 5
-    assert sum(item["kind"] == "semantic" for item in selected) == 2
-    assert sum(item["kind"] == "episodic" for item in selected) == 1
+    assert len(selected) == 8
+    assert sum(item["kind"] == "semantic" for item in selected) == 5  # capped, not 2
+    assert sum(item["kind"] == "episodic" for item in selected) == 3  # all of them, not 1
+    assert len(_retrieve("Tell me about my profile facts and events", limit=4)) == 4
+
+
+def test_broad_recall_skips_the_relevance_floor() -> None:
+    dog = _save_memory(key="pets.dog", value="Bruno", statement="Has a beagle called Bruno.")
+    city = _save_memory(key="home.city", value="Pune", statement="Lives in Pune.")
+
+    assert _retrieve("what do you know about me") == []
+    package = importlib.import_module("agent.memory_engine.memories")
+    broad = package.retrieve_agent_memories_for_reply(
+        USER_ID, "what do you know about me", now=NOW, broad=True
+    )
+    assert {memory["id"] for memory in broad} == {dog["id"], city["id"]}
+
+
+def test_profile_recall_question_brings_the_whole_picture_into_context() -> None:
+    _save_memory(key="pets.dog", value="Bruno", statement="Has a beagle called Bruno.")
+    _save_memory(key="home.city", value="Pune", statement="Lives in Pune.")
+
+    content = _memory_context("what do you remember about me?")
+    assert "Has a beagle called Bruno." in content
+    assert "Lives in Pune." in content
 
 
 def test_context_uses_v3_memories_only_for_v3_pipeline() -> None:
