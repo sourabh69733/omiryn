@@ -4,9 +4,10 @@ import { Smile } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
+import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
-import { assetUrl, canShowUsage } from "../appUtils";
+import { canShowUsage } from "../appUtils";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
 import { cognitionResultLabel } from "../usagePresentation";
@@ -14,7 +15,7 @@ import { cognitionResultLabel } from "../usagePresentation";
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
 
-export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { initialConversationId?: string | null; userAvatar?: string | null, interestedIn?: string | null }) {
+export function ChatPage({ initialConversationId, userAvatar }: { initialConversationId?: string | null; userAvatar?: string | null }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -536,7 +537,6 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
   }
 
   const agentName = conversation?.agent_name || "Omiryn";
-  const avatar = assetUrl(agentAvatarPath(interestedIn));
   const usageSummary = usage?.summary || {};
   const usageEvents = usage?.events || [];
   const averageUsage = averageChatUsage(usageEvents, usageSummary);
@@ -600,7 +600,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
         </aside>
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
-            <div className="chat-title-lockup"><span className="terminal-mark"><img src={avatar} alt="" /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
               <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
               {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
@@ -626,7 +626,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
                   <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""}`} id={`message-${index}`} data-message-index={index}>
-                    {agent ? showAvatar ? <span className="chat-avatar agent"><img src={avatar} alt="" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
                     </div>
@@ -635,7 +635,7 @@ export function ChatPage({ initialConversationId, userAvatar, interestedIn }: { 
                 </Fragment>
               );
             })}
-            {sending || revealingBubbles ? <div className="message-row agent"><span className="chat-avatar agent"><img src={avatar} alt="" /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {sending || revealingBubbles ? <div className="message-row agent"><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
@@ -864,14 +864,6 @@ function usageRequestKindLabel(kind?: string) {
   };
   if (!kind) return "Agent call";
   return labels[kind] || titleize(String(kind).replaceAll("_", " "));
-}
-
-function agentAvatarPath(interestedIn?: string | null) {
-  if (interestedIn == "men") {
-    return "agent_avatar/jacket_male.png"
-  } else {
-    return "agent_avatar/suite_female.png";
-  }
 }
 
 function averageChatUsage(events: UsageEvent[], summary: UsageSummary = {}) {

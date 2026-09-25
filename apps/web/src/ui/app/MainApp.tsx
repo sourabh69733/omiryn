@@ -84,7 +84,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </header>
       <main>
-        {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} interestedIn={profile?.interested_in} /> : null}
+        {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} /> : null}
         {page === "style" ? <StylePage /> : null}
         {page === "matches" ? <MatchesPage /> : null}
         {page === "profile" ? <ProfilePage /> : null}
