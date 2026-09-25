@@ -292,8 +292,15 @@ def _direct_reply_reason(trace_steps: list[dict[str, Any]]) -> str | None:
     return None
 
 
+# Parallel samples share one process environment: the first sample in sets it, the last one
+# out restores it. All samples of a run use the same driver config, so the values agree.
+_environment_users = 0
+_environment_saved: dict[str, str | None] = {}
+
+
 @contextmanager
 def _runtime_environment(config: RuntimeDriverConfig) -> Iterator[None]:
+    global _environment_users, _environment_saved
     updates = {
         "AGENT_PROVIDER": config.provider,
         "AGENT_BEHAVIOR_VERSION": config.prompt_version,
@@ -302,13 +309,17 @@ def _runtime_environment(config: RuntimeDriverConfig) -> Iterator[None]:
     }
     if config.pipeline_version is not None:
         updates["AGENT_PIPELINE_VERSION"] = config.pipeline_version
-    previous = {name: os.environ.get(name) for name in updates}
-    try:
+    if _environment_users == 0:
+        _environment_saved = {name: os.environ.get(name) for name in updates}
         os.environ.update(updates)
+    _environment_users += 1
+    try:
         yield
     finally:
-        for name, value in previous.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        _environment_users -= 1
+        if _environment_users == 0:
+            for name, value in _environment_saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value

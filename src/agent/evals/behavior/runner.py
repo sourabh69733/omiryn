@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from agent.evals.behavior.core.events import EventSink, emit_event
+from agent.evals.behavior.core.events import EventSink, emit_event, sample_label
 from agent.evals.behavior.core.graders import combine_turn_grade
 from agent.evals.behavior.core.models import (
     BehaviorEvalReport,
@@ -31,12 +32,15 @@ class BehaviorEvalConfig:
     prompt_version: str = "v3"
     samples_override: int | None = None
     persist: bool = False
+    concurrency: int = 1
 
     def __post_init__(self) -> None:
         if not self.suite_name.strip():
             raise ValueError("suite_name is required.")
         if self.samples_override is not None and self.samples_override < 1:
             raise ValueError("samples_override must be at least 1.")
+        if self.concurrency < 1:
+            raise ValueError("concurrency must be at least 1.")
 
 
 async def run_behavior_evals(
@@ -49,8 +53,18 @@ async def run_behavior_evals(
 ) -> BehaviorEvalReport:
     run_config = config or BehaviorEvalConfig()
     _validate_scenario_suite(scenarios)
-    scenario_results: list[ScenarioResult] = []
-    for scenario in scenarios:
+    # Samples are independent conversations (own user and conversation IDs), so they can
+    # overlap; the semaphore caps how many talk to the providers at once.
+    slots = asyncio.Semaphore(run_config.concurrency)
+
+    async def run_sample(scenario: BehaviorScenario, sample_index: int, sample_count: int) -> SampleResult:
+        async with slots:
+            with sample_label(f"{scenario.id} #{sample_index + 1}"):
+                return await _run_and_grade_sample(
+                    scenario, sample_index, sample_count, driver, judge, event_sink
+                )
+
+    async def run_scenario(scenario: BehaviorScenario) -> ScenarioResult:
         sample_count = run_config.samples_override or scenario.samples
         emit_event(
             event_sink,
@@ -60,119 +74,9 @@ async def run_behavior_evals(
             description=scenario.description,
             sample_count=sample_count,
         )
-        sample_results: list[SampleResult] = []
-        for sample_index in range(sample_count):
-            emit_event(
-                event_sink,
-                "sample_started",
-                "Conversation sample started.",
-                scenario_id=scenario.id,
-                sample_index=sample_index,
-                sample_number=sample_index + 1,
-                sample_count=sample_count,
-            )
-            observed_turns, run_error = await _run_sample_with_retry(
-                driver, scenario, sample_index, event_sink
-            )
-            if run_error is not None:
-                # A provider outage fails this conversation, not the whole suite.
-                sample_results.append(
-                    SampleResult(
-                        scenario_id=scenario.id,
-                        sample_index=sample_index,
-                        passed=False,
-                        turns=(),
-                        grades=(),
-                        error=run_error,
-                    )
-                )
-                emit_event(
-                    event_sink,
-                    "sample_completed",
-                    "Conversation sample could not run.",
-                    scenario_id=scenario.id,
-                    sample_index=sample_index,
-                    passed=False,
-                    error=run_error,
-                )
-                continue
-            if len(observed_turns) != len(scenario.turns):
-                raise ValueError(
-                    f"Driver returned {len(observed_turns)} turns for scenario '{scenario.id}', "
-                    f"expected {len(scenario.turns)}."
-                )
-            grades = []
-            for turn_index, (scenario_turn, observed) in enumerate(
-                zip(scenario.turns, observed_turns, strict=True)
-            ):
-                judge_result = None
-                judge_error = None
-                if scenario_turn.expectation.rubric:
-                    emit_event(
-                        event_sink,
-                        "turn_grading_started",
-                        "Turn grading started.",
-                        scenario_id=scenario.id,
-                        sample_index=sample_index,
-                        turn_index=turn_index,
-                        turn_number=turn_index + 1,
-                    )
-                    if judge is None:
-                        judge_error = "No semantic judge configured."
-                    else:
-                        try:
-                            judge_result = await judge.judge(
-                                scenario=scenario,
-                                turn=scenario_turn,
-                                observed=observed,
-                                transcript=observed_turns[: turn_index + 1],
-                            )
-                        except Exception as error:
-                            judge_error = f"{type(error).__name__}: {error}"
-                grade = combine_turn_grade(
-                    scenario=scenario,
-                    turn=scenario_turn,
-                    observed=observed,
-                    prior_turns=observed_turns[:turn_index],
-                    judge_result=judge_result,
-                    judge_error=judge_error,
-                )
-                grades.append(grade)
-                emit_event(
-                    event_sink,
-                    "turn_graded",
-                    "Turn grading completed.",
-                    scenario_id=scenario.id,
-                    sample_index=sample_index,
-                    turn_index=turn_index,
-                    passed=grade.passed,
-                    weighted_score=grade.weighted_score,
-                    dimensions=[
-                        {
-                            "id": dimension.dimension_id,
-                            "score": dimension.score,
-                            "reason": dimension.reason,
-                        }
-                        for dimension in grade.dimension_grades
-                    ],
-                    findings=[finding.message for finding in grade.findings],
-                )
-            sample_result = SampleResult(
-                scenario_id=scenario.id,
-                sample_index=sample_index,
-                passed=all(grade.passed for grade in grades),
-                turns=observed_turns,
-                grades=tuple(grades),
-            )
-            sample_results.append(sample_result)
-            emit_event(
-                event_sink,
-                "sample_completed",
-                "Conversation sample completed.",
-                scenario_id=scenario.id,
-                sample_index=sample_index,
-                passed=sample_result.passed,
-            )
+        sample_results = await asyncio.gather(
+            *(run_sample(scenario, index, sample_count) for index in range(sample_count))
+        )
         passed_samples = sum(sample.passed for sample in sample_results)
         sample_pass_rate = passed_samples / len(sample_results)
         scenario_result = ScenarioResult(
@@ -182,7 +86,6 @@ async def run_behavior_evals(
             required_sample_pass_rate=scenario.minimum_sample_pass_rate,
             samples=tuple(sample_results),
         )
-        scenario_results.append(scenario_result)
         emit_event(
             event_sink,
             "scenario_completed",
@@ -192,6 +95,12 @@ async def run_behavior_evals(
             passed_samples=passed_samples,
             sample_count=len(sample_results),
         )
+        return scenario_result
+
+    if run_config.concurrency == 1:
+        scenario_results = [await run_scenario(scenario) for scenario in scenarios]
+    else:
+        scenario_results = list(await asyncio.gather(*(run_scenario(s) for s in scenarios)))
 
     passed_count = sum(result.passed for result in scenario_results)
     failed_count = len(scenario_results) - passed_count
@@ -349,6 +258,124 @@ def _persist_report(report: BehaviorEvalReport, config: BehaviorEvalConfig) -> s
         metadata=report.metadata,
     )
     return str(run["id"])
+
+
+async def _run_and_grade_sample(
+    scenario: BehaviorScenario,
+    sample_index: int,
+    sample_count: int,
+    driver: ScenarioDriver,
+    judge: BehaviorJudge | None,
+    event_sink: EventSink | None,
+) -> SampleResult:
+    emit_event(
+        event_sink,
+        "sample_started",
+        "Conversation sample started.",
+        scenario_id=scenario.id,
+        sample_index=sample_index,
+        sample_number=sample_index + 1,
+        sample_count=sample_count,
+    )
+    observed_turns, run_error = await _run_sample_with_retry(
+        driver, scenario, sample_index, event_sink
+    )
+    if run_error is not None:
+        # A provider outage fails this conversation, not the whole suite.
+        emit_event(
+            event_sink,
+            "sample_completed",
+            "Conversation sample could not run.",
+            scenario_id=scenario.id,
+            sample_index=sample_index,
+            passed=False,
+            error=run_error,
+        )
+        return SampleResult(
+            scenario_id=scenario.id,
+            sample_index=sample_index,
+            passed=False,
+            turns=(),
+            grades=(),
+            error=run_error,
+        )
+    if len(observed_turns) != len(scenario.turns):
+        raise ValueError(
+            f"Driver returned {len(observed_turns)} turns for scenario '{scenario.id}', "
+            f"expected {len(scenario.turns)}."
+        )
+    grades = []
+    for turn_index, (scenario_turn, observed) in enumerate(
+        zip(scenario.turns, observed_turns, strict=True)
+    ):
+        judge_result = None
+        judge_error = None
+        if scenario_turn.expectation.rubric:
+            emit_event(
+                event_sink,
+                "turn_grading_started",
+                "Turn grading started.",
+                scenario_id=scenario.id,
+                sample_index=sample_index,
+                turn_index=turn_index,
+                turn_number=turn_index + 1,
+            )
+            if judge is None:
+                judge_error = "No semantic judge configured."
+            else:
+                try:
+                    judge_result = await judge.judge(
+                        scenario=scenario,
+                        turn=scenario_turn,
+                        observed=observed,
+                        transcript=observed_turns[: turn_index + 1],
+                    )
+                except Exception as error:
+                    judge_error = f"{type(error).__name__}: {error}"
+        grade = combine_turn_grade(
+            scenario=scenario,
+            turn=scenario_turn,
+            observed=observed,
+            prior_turns=observed_turns[:turn_index],
+            judge_result=judge_result,
+            judge_error=judge_error,
+        )
+        grades.append(grade)
+        emit_event(
+            event_sink,
+            "turn_graded",
+            "Turn grading completed.",
+            scenario_id=scenario.id,
+            sample_index=sample_index,
+            turn_index=turn_index,
+            passed=grade.passed,
+            weighted_score=grade.weighted_score,
+            dimensions=[
+                {
+                    "id": dimension.dimension_id,
+                    "score": dimension.score,
+                    "reason": dimension.reason,
+                }
+                for dimension in grade.dimension_grades
+            ],
+            findings=[finding.message for finding in grade.findings],
+        )
+    sample_result = SampleResult(
+        scenario_id=scenario.id,
+        sample_index=sample_index,
+        passed=all(grade.passed for grade in grades),
+        turns=observed_turns,
+        grades=tuple(grades),
+    )
+    emit_event(
+        event_sink,
+        "sample_completed",
+        "Conversation sample completed.",
+        scenario_id=scenario.id,
+        sample_index=sample_index,
+        passed=sample_result.passed,
+    )
+    return sample_result
 
 
 async def _run_sample_with_retry(

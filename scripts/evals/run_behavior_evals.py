@@ -121,6 +121,12 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="Override samples per scenario. Release runs should use at least 3.",
     )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="How many conversations run at once. 3-4 is a good speed-up on DeepInfra.",
+    )
     parser.add_argument("--suite", default="companion_behavior_v1")
     parser.add_argument(
         "--scenario-set",
@@ -208,6 +214,7 @@ async def _run(args: argparse.Namespace, reporter: TerminalProgressReporter) -> 
             prompt_version=args.prompt_version,
             samples_override=args.samples,
             persist=args.persist,
+            concurrency=args.concurrency,
         ),
         event_sink=reporter,
     )
@@ -296,7 +303,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.no_save and args.output:
         parser.error("--no-save cannot be combined with --output.")
-    reporter = TerminalProgressReporter(enabled=not args.quiet)
+    reporter = TerminalProgressReporter(enabled=not args.quiet, tag_samples=args.concurrency > 1)
     try:
         payload = asyncio.run(_run(args, reporter))
     except ValueError as error:
