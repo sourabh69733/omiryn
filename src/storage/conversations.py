@@ -6,6 +6,8 @@ from sqlalchemy import func, select
 
 from .database import ENGINE
 from .schema import (
+    agent_memory_embeddings,
+    agent_memory_reviews,
     agent_self_notes,
     agent_context_snapshots,
     agent_jobs,
@@ -247,17 +249,33 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             )
         )
         if memory_ids:
-            connection.execute(
-                agent_memories.delete().where(
-                    agent_memories.c.user_id == owner_id,
-                    agent_memories.c.id.in_(memory_ids),
-                    ~agent_memories.c.id.in_(
-                        select(agent_memory_evidence.c.memory_id).where(
-                            agent_memory_evidence.c.user_id == owner_id
+            # Memories left without any evidence go, with their vectors and reviews.
+            orphan_ids = [
+                row[0]
+                for row in connection.execute(
+                    select(agent_memories.c.id).where(
+                        agent_memories.c.user_id == owner_id,
+                        agent_memories.c.id.in_(memory_ids),
+                        ~agent_memories.c.id.in_(
+                            select(agent_memory_evidence.c.memory_id).where(
+                                agent_memory_evidence.c.user_id == owner_id
+                            )
+                        ),
+                    )
+                ).all()
+            ]
+            if orphan_ids:
+                for table in (agent_memory_embeddings, agent_memory_reviews):
+                    connection.execute(
+                        table.delete().where(
+                            table.c.user_id == owner_id, table.c.memory_id.in_(orphan_ids)
                         )
-                    ),
+                    )
+                connection.execute(
+                    agent_memories.delete().where(
+                        agent_memories.c.user_id == owner_id, agent_memories.c.id.in_(orphan_ids)
+                    )
                 )
-            )
         connection.execute(
             memory_operation_applications.delete().where(
                 memory_operation_applications.c.conversation_id == conversation_id,
