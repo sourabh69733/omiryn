@@ -60,6 +60,15 @@ class NewExpectationTest(unittest.TestCase):
             "too_many_question_replies", _findings(expectation, _observed("fair enough"), prior)
         )
 
+    def test_question_streak(self) -> None:
+        expectation = TurnExpectation(maximum_question_streak=2)
+        asked = [_observed("which one?"), _observed("was it good?")]
+        self.assertIn("question_streak", _findings(expectation, _observed("why?"), asked))
+        self.assertNotIn("question_streak", _findings(expectation, _observed("fair"), asked))
+        self.assertNotIn(
+            "question_streak", _findings(expectation, _observed("why?"), [_observed("ok"), asked[0]])
+        )
+
     def test_invalid_values_are_rejected(self) -> None:
         with self.assertRaises(ValueError):
             TurnExpectation(minimum_bubbles=3, maximum_bubbles=2)
@@ -207,7 +216,13 @@ class CompanionV2CatalogueTest(unittest.TestCase):
             with self.subTest(scenario=scenario.id):
                 self.assertIn("companion_v2", scenario.tags)
                 self.assertIsNotNone(scenario.start_at)
-                self.assertTrue(any(turn.expectation.rubric for turn in scenario.turns))
+                for turn in scenario.turns:
+                    # Technical gate only: every reply keeps the question rules, no taste scores.
+                    self.assertEqual(turn.expectation.maximum_questions, 1)
+                    self.assertEqual(turn.expectation.maximum_question_streak, 2)
+                    self.assertNotIn(
+                        "naturalness", {dimension.id for dimension in turn.expectation.rubric}
+                    )
         start = datetime.fromisoformat(COMPANION_V2_SCENARIOS[0].start_at)
         self.assertEqual(start.strftime("%A"), "Monday")
 
@@ -224,9 +239,9 @@ class CompanionV2CatalogueTest(unittest.TestCase):
         selected = run_behavior_evals._selected_scenarios(None, scenario_set="companion_v2")
         self.assertEqual(selected, COMPANION_V2_SCENARIOS)
         one = run_behavior_evals._selected_scenarios(
-            ["style_story_in_bubbles"], scenario_set="companion_v2"
+            ["format_story_in_bubbles"], scenario_set="companion_v2"
         )
-        self.assertEqual([scenario.id for scenario in one], ["style_story_in_bubbles"])
+        self.assertEqual([scenario.id for scenario in one], ["format_story_in_bubbles"])
 
 
 if __name__ == "__main__":
