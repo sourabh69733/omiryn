@@ -87,7 +87,7 @@ COMPANION_V2_SCENARIOS = (
                 run_background_before=True,
                 # Asked on Wednesday 16 Sep: the interview is this Friday, not "next Friday".
                 expectation=_expect(
-                    required_substrings_any=("18",),
+                    required_substrings_any=("18", "this friday"),
                     forbidden_substrings=("next friday",),
                     rubric=(
                         _rubric(
