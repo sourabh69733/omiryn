@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
+from uuid import NAMESPACE_URL, uuid5
 from typing import Any
 
 from agent.config import agent_pipeline_config
@@ -25,12 +26,14 @@ from storage import (
     list_profile_facts,
 )
 from storage.profile_facts import save_data_point_extraction_debug
+from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
 from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories
 from agent.memory_engine.memories.models import MemoryStatus
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
+from agent.memory_engine.memories.self_notes import SelfNoteChanges
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
     MemoryProposalV3,
@@ -239,6 +242,7 @@ async def _run_claimed_background_cognition(
         " ".join(message.content for message in batch.new_messages if message.role == "user"),
     )
     user_card = (get_user_card(user_id) or "") if memory_version == 3 else None
+    self_notes = _self_note_context(user_id) if memory_version == 3 else None
     application_result = None
     thread_application_result = None
     live_attempted = (
@@ -252,6 +256,7 @@ async def _run_claimed_background_cognition(
                 thread_candidates,
                 get_user_timezone(user_id),
                 user_card,
+                self_notes,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -268,6 +273,7 @@ async def _run_claimed_background_cognition(
             },
             thread_candidates=thread_candidates,
             memory_version=memory_version,
+            active_self_note_ids={str(note["id"]) for note in self_notes or []},
         )
         analysis = cognition.memory
         if memory_version == 3 and not analysis.valid:
@@ -358,6 +364,12 @@ async def _run_claimed_background_cognition(
             and (config.live_memory_writes or config.live_v3_memory_writes)
         ):
             set_user_card(user_id, cognition.user_card)
+        if (
+            analysis.valid
+            and not cognition.self_notes.empty
+            and (config.live_memory_writes or config.live_v3_memory_writes)
+        ):
+            _apply_self_notes(batch, cognition.self_notes)
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
@@ -455,6 +467,32 @@ async def _run_claimed_background_cognition(
             ),
             "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
         }
+
+
+def _self_note_context(user_id: str) -> list[dict[str, Any]]:
+    return [
+        {key: note[key] for key in ("id", "kind", "text", "due_at")}
+        for note in list_active_self_notes(user_id, limit=30)
+    ]
+
+
+def _apply_self_notes(batch: MemoryBatch, changes: SelfNoteChanges) -> None:
+    # IDs derive from the batch, so a retried batch cannot add the same note twice.
+    add_self_notes(
+        batch.user_id,
+        batch.conversation_id,
+        [
+            {
+                "id": str(uuid5(NAMESPACE_URL, f"self-note:{batch.batch_key}:{position}")),
+                "kind": note.kind,
+                "text": note.text,
+                "message_index": note.message_index,
+                "due_at": note.due_at,
+            }
+            for position, note in enumerate(changes.adds)
+        ],
+    )
+    resolve_self_notes(batch.user_id, [(item.note_id, item.status) for item in changes.resolves])
 
 
 def _existing_memory_context(

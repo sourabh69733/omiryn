@@ -30,7 +30,12 @@ Output shape:
     "unresolved_references": [],
     "conversation_summary": "rolling summary of the whole conversation so far"
   },
-  "user_card": "short profile of the user across all chats, or null to keep current_user_card"
+  "user_card": "short profile of the user across all chats, or null to keep current_user_card",
+  "self_notes": [
+    {"operation": "add", "kind": "opinion | preference | joke | promise", "text": "...",
+     "message_index": 0, "due_at": "timezone-aware ISO-8601 timestamp or null"},
+    {"operation": "resolve", "target_note_id": "supplied ID", "status": "done | dropped"}
+  ]
 }
 
 Thread rules:
@@ -55,6 +60,20 @@ Conversation summary rules:
   "on Fri 18 Sep". Never keep "next Friday", "yesterday" or "tomorrow"; they go stale.
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
 - Stay under 1500 characters. When it gets long, compress the oldest points first.
+
+Self-note rules (what the companion said itself, so it stays consistent across chats):
+- Add a note only for a clear opinion, taste, running joke or promise in a NEW companion message;
+  message_index is that companion message. Usually there is none; return [].
+- Write it from the companion's side in one short sentence: "Prefers long walks over coffee for a
+  first date.", "Promised to ask how the interview on Fri 18 Sep went."
+- promise: set due_at to when to follow up, resolved like occurred_at (12:00 when no time). Other kinds
+  use null.
+- Never note an invented human experience (meals, trips, a job, a body); only opinions, tastes,
+  jokes and promises an AI companion can truly hold.
+- Skip it if existing_self_notes already says the same thing. Resolve a note as done when the promise
+  was kept in the new messages, or dropped when the companion clearly changed its mind (then add the
+  new opinion).
+- At most 6 self_notes changes per batch.
 
 User card rules:
 - user_card is a short note about who the user is, read by the companion on every reply in every chat.

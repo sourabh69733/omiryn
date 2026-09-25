@@ -72,12 +72,15 @@ def background_cognition_prompt(
     thread_candidates: list[dict[str, object]],
     timezone_name: str | None = None,
     user_card: str | None = None,
+    self_notes: list[dict[str, Any]] | None = None,
 ) -> str:
     """Serialize one shared batch for memory and thread analysis."""
     payload = json.loads(memory_batch_prompt(batch, existing_memories, timezone_name))
     payload["existing_threads"] = thread_candidates
     if user_card is not None:
         payload["current_user_card"] = user_card
+    if self_notes is not None:
+        payload["existing_self_notes"] = self_notes
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
