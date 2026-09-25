@@ -20,7 +20,7 @@ from .config import (
 )
 from agent.providers.companion.prompts import _context_sources_text, _truncate_for_context
 from agent.providers.companion.quality import _normalized_user_text
-from agent.shared.timeline import day_notes
+from agent.shared.timeline import current_session_start, day_notes
 from agent.shared.tokens import estimate_tokens
 
 
@@ -53,13 +53,17 @@ def reply_window(
 ) -> list[dict[str, Any]]:
     """Messages to send as chat history, each with a `day_note` in the user's timezone.
 
-    Drops messages the conversation summary already covers, but keeps at least the recent
-    window plus every message the summary has not reached yet; `_provider_messages` then
-    compacts only that unsummarized overflow.
+    Drops messages the conversation summary already covers: everything before the recent
+    window, and everything from earlier sessions (before the last long silence). Messages the
+    summary has not reached yet always stay; `_provider_messages` then compacts only that
+    unsummarized overflow.
     """
     start = 0
     if summarized_through is not None and summarized_through >= 0:
         start = min(max(0, len(messages) - RECENT_CHAT_MESSAGE_LIMIT), summarized_through + 1)
+        # Earlier sessions reach the model only through the dated summary, so it does not copy
+        # stale relative words ("next Friday" said days ago). Unsummarized messages always stay.
+        start = max(start, min(current_session_start(messages), summarized_through + 1))
     window = messages[start:]
     return [
         {**message, "day_note": note}

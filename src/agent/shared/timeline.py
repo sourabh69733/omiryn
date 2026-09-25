@@ -148,6 +148,20 @@ def conversation_time(
     )
 
 
+def current_session_start(messages: list[dict[str, Any]]) -> int:
+    """Index of the first message after the last silence of at least the session gap."""
+    start = 0
+    previous_sent: datetime | None = None
+    for index, message in enumerate(messages):
+        sent = message_time(message)
+        if sent is None:
+            continue
+        if previous_sent is not None and sent - previous_sent >= session_gap():
+            start = index
+        previous_sent = sent
+    return start
+
+
 def day_notes(
     messages: list[dict[str, Any]],
     timezone_name: str | None = None,
@@ -221,6 +235,7 @@ def _local_label(local: datetime, *, with_year: bool = False) -> str:
 __all__ = [
     "ConversationTime",
     "conversation_time",
+    "current_session_start",
     "date_label",
     "day_part",
     "default_timezone_name",
