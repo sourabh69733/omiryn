@@ -30,7 +30,11 @@ from storage.self_notes import add_self_notes, list_active_self_notes, resolve_s
 from storage.user_cards import set_user_card
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
-from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories
+from agent.memory_engine.memories.embeddings import (
+    embed_memory_query,
+    index_agent_memories,
+    refresh_user_memory_embeddings,
+)
 from agent.memory_engine.memories.models import MemoryStatus
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 from agent.memory_engine.memories.self_notes import SelfNoteChanges
@@ -316,6 +320,10 @@ async def _run_claimed_background_cognition(
                     await index_agent_memories(
                         application_result.memories,
                         conversation_id=conversation_id,
+                    )
+                    # Heals memories whose embedding failed in an earlier run.
+                    await refresh_user_memory_embeddings(
+                        user_id, conversation_id=conversation_id
                     )
             except Exception as error:
                 _save_cognition_debug_once(
