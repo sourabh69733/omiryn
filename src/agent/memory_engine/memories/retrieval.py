@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
@@ -18,17 +19,20 @@ from .ranking import (
 )
 
 
-DEFAULT_REPLY_MEMORY_LIMIT = 5
+DEFAULT_REPLY_MEMORY_LIMIT = int(os.getenv("AGENT_REPLY_MEMORY_LIMIT", "8"))
+# "What do you know about me?" wants the whole picture, not only what matches its words.
+BROAD_RECALL_MEMORY_LIMIT = int(os.getenv("AGENT_BROAD_RECALL_MEMORY_LIMIT", "12"))
 # Quality metadata may rank candidates, but only query relevance admits content memories.
 _LEXICAL_RELEVANCE_FLOOR = 0.05
 # Calibrated on bge-m3 (retrieval case eval, 2026-09-20): related memories scored 0.48-0.63,
 # unrelated ones up to 0.44. The margin is thin, so re-check when the model or fixtures change.
 _SEMANTIC_RELEVANCE_FLOOR = 0.45
+# One total budget; the per-kind cap only stops a single kind from filling every slot.
 _KIND_LIMITS = {
-    MemoryKind.SEMANTIC.value: 2,
-    MemoryKind.EPISODIC.value: 1,
-    MemoryKind.RELATIONSHIP.value: 1,
-    MemoryKind.PROCEDURAL.value: 1,
+    MemoryKind.SEMANTIC.value: 5,
+    MemoryKind.EPISODIC.value: 5,
+    MemoryKind.RELATIONSHIP.value: 4,
+    MemoryKind.PROCEDURAL.value: 3,
 }
 
 
@@ -39,8 +43,13 @@ def retrieve_agent_memories_for_reply(
     limit: int = DEFAULT_REPLY_MEMORY_LIMIT,
     now: datetime | None = None,
     query_embedding: dict[str, Any] | None = None,
+    broad: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return active reply-safe memories ranked without another model call."""
+    """Return active reply-safe memories ranked without another model call.
+
+    `broad` is for questions about the user as a whole: no relevance floor, so the most
+    important and confident memories come back even when they share no words with the query.
+    """
     if limit <= 0:
         return []
     # Local import avoids coupling storage initialization to retrieval policy.
@@ -91,7 +100,7 @@ def retrieve_agent_memories_for_reply(
     kind_counts: dict[str, int] = defaultdict(int)
     for memory, lexical_relevance, semantic_relevance in ranked:
         kind = str(memory.get("kind") or "")
-        if kind != MemoryKind.PROCEDURAL.value and not _meets_relevance_threshold(
+        if not broad and kind != MemoryKind.PROCEDURAL.value and not _meets_relevance_threshold(
             lexical_relevance,
             semantic_relevance,
         ):
