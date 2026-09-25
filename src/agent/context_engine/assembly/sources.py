@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from agent.config import agent_pipeline_config
@@ -28,7 +29,8 @@ from agent.memory_engine.data_points.retrieval.whatsapp import (
     retrieve_whatsapp_memory,
 )
 from agent.memory_engine.processing.service import get_processing_state
-from agent.shared.timeline import date_label, parse_time, user_zone
+from agent.shared.clock import utc_now
+from agent.shared.timeline import date_label, parse_time, relative_day, user_zone
 from storage import (
     get_user_timezone,
     list_context_sources,
@@ -349,8 +351,9 @@ def _agent_memory_v3_context_sources(
         "Relevant durable memories about the user.",
         "Use only when helpful; do not expose memory IDs, kinds, or internal keys.",
         "A relationship memory describes lived history, not a desired partner trait.",
-        "A date shows when something happened; do not present past events as current.",
-        "'told you' is when the user said it; use it to answer when they mentioned something.",
+        "Dates carry their distance from today in brackets; use that wording (e.g. 'this Friday, "
+        "in 2 days') rather than repeating the user's older relative words.",
+        "Do not present past events as current. 'told you' is when the user said it.",
     ]
     for memory in memories:
         value = json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True)
@@ -372,31 +375,34 @@ def _agent_memory_v3_context_sources(
     ]
 
 
-def _memory_time_note(memory: dict[str, Any], zone: Any) -> str:
-    """Give the model event, mention and expiry dates, in the user's timezone."""
+def _memory_time_note(memory: dict[str, Any], zone: Any, now: datetime | None = None) -> str:
+    """Give the model event, mention and expiry dates in the user's timezone, each with its
+    distance from today computed in code ("in 2 days"), so it never has to re-anchor
+    relative words like "next Friday" itself."""
+    today = (now or utc_now()).astimezone(zone).date()
 
-    def local_date(value: Any) -> str | None:
-        parsed = parse_time(value)
-        return date_label(parsed.astimezone(zone)) if parsed else None
+    def dated(moment: datetime) -> str:
+        local = moment.astimezone(zone)
+        return f"{date_label(local)} ({relative_day(local.date(), today)})"
 
     notes = []
-    mentioned = sorted(
+    mentions = sorted(
         {
-            (parsed, date_label(parsed.astimezone(zone)))
+            parsed.astimezone(zone)
             for evidence in memory.get("evidence") or []
             if (parsed := parse_time(evidence.get("observed_at")))
         }
     )
-    mention_days = list(dict.fromkeys(label for _, label in mentioned))
-    if mention_days:
-        told = f"told you {mention_days[0]}"
-        if len(mention_days) > 1:
-            told += f", again {mention_days[-1]}"
+    if mentions:
+        told = f"told you {dated(mentions[0])}"
+        if mentions[-1].date() != mentions[0].date():
+            told += f", again {dated(mentions[-1])}"
         notes.append(told)
-    if happened := local_date(memory.get("occurred_at")):
-        notes.append(f"happened {happened}")
-    if valid_until := local_date(memory.get("valid_until")):
-        notes.append(f"valid until {valid_until}")
+    if event := parse_time(memory.get("occurred_at")):
+        upcoming = event.astimezone(zone).date() > today
+        notes.append(f"{'happens' if upcoming else 'happened'} {dated(event)}")
+    if valid_until := parse_time(memory.get("valid_until")):
+        notes.append(f"valid until {dated(valid_until)}")
     return f" ({'; '.join(notes)})" if notes else ""
 
 
