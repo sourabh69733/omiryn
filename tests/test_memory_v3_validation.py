@@ -56,6 +56,22 @@ class MemoryV3ValidationTest(unittest.TestCase):
         self.assertIn("memory_kind", " ".join(result.errors))
         self.assertIn("duplicates", " ".join(result.errors))
 
+    def test_keeps_a_plain_statement(self) -> None:
+        result = validate_memory_analysis_v3(
+            self._analysis(statement="  Spoke with   Riya. "), batch=self.batch
+        )
+        self.assertTrue(result.valid, result.errors)
+        self.assertEqual(result.operations[0].statement, "Spoke with Riya.")
+
+    def test_bad_statement_is_dropped_but_the_memory_is_kept(self) -> None:
+        for statement in (42, "", "x" * 241):
+            with self.subTest(statement=statement):
+                result = validate_memory_analysis_v3(
+                    self._analysis(statement=statement), batch=self.batch
+                )
+                self.assertTrue(result.valid, result.errors)
+                self.assertIsNone(result.operations[0].statement)
+
     def _analysis(self, **changes: object) -> dict[str, object]:
         operation: dict[str, object] = {
             "operation": "add",

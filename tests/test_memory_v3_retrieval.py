@@ -208,6 +208,38 @@ def test_context_shows_event_and_expiry_dates_to_the_model() -> None:
     assert "not present past events as current" in content
 
 
+def _memory_context(user_text: str) -> str:
+    with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3"}, clear=False):
+        sources = build_reply_context_sources(CONVERSATION_ID, None, user_text, USER_ID)
+    return next(s for s in sources if s["source_type"] == "agent_memories_v3")["content"]
+
+
+def test_context_shows_the_memory_as_a_plain_sentence() -> None:
+    saved = _save_memory(
+        key="pets.dog",
+        value={"name": "Bruno", "breed": "beagle"},
+        statement="Has a beagle called Bruno.",
+    )
+
+    assert saved["statement"] == "Has a beagle called Bruno."
+    content = _memory_context("how is my dog Bruno")
+    assert "- Has a beagle called Bruno. (told you" in content
+    assert "semantic" not in content and "pets.dog" not in content
+
+
+def test_memory_without_a_statement_still_reads_as_text() -> None:
+    _save_memory(key="pets.dog", value={"name": "Bruno", "breed": "beagle", "age": None})
+
+    content = _memory_context("how is my dog Bruno")
+    assert "- Pets dog: name: Bruno; breed: beagle (told you" in content
+
+
+def test_statement_is_searchable() -> None:
+    saved = _save_memory(key="misc.item", value="x", statement="Plays the tabla on weekends.")
+
+    assert saved["id"] in {memory["id"] for memory in _retrieve("I practised tabla today")}
+
+
 def _retrieve(user_text: str, *, limit: int = 5) -> list[dict[str, object]]:
     package = importlib.import_module("agent.memory_engine.memories")
     function = getattr(package, "retrieve_agent_memories_for_reply", None)
@@ -229,6 +261,7 @@ def _save_memory(
     valid_from: datetime | None = None,
     valid_until: datetime | None = None,
     occurred_at: datetime | None = None,
+    statement: str | None = None,
 ) -> dict[str, object]:
     observed_at = (NOW - timedelta(days=1)).isoformat()
     return storage.create_agent_memory(
@@ -238,6 +271,7 @@ def _save_memory(
             "purposes": purposes or ["profile"],
             "key": key,
             "value": value,
+            "statement": statement,
             "allowed_uses": allowed_uses or ["reply_context"],
             "status": status,
             "sensitivity": sensitivity,
