@@ -72,6 +72,8 @@ V3 memory rules:
   in user_timezone. Write the resolved day as an ISO-8601 timestamp with that timezone's UTC offset,
   using 12:00 when no time of day is stated. Use null when the day cannot be pinned down, such as
   "recently", "a while ago" or "last year", or when the message has no sent_at.
+- Never put relative time words ("next Friday", "yesterday", "last week") in key or value; they go
+  stale. Put the time in occurred_at and write the value without it, or with the absolute date.
 - For plans and temporary states, set valid_until only when the evidence gives a clear end
   (for example "this week" ends at the end of that week); otherwise use null.
 - Before returning each operation, verify that the cited user evidence directly supports its kind,
