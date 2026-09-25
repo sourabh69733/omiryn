@@ -19,6 +19,8 @@ class BackgroundCognitionAnalysis:
     thread_operation: str
     valid: bool
     errors: tuple[str, ...] = ()
+    # Rewritten per-user card; None keeps the stored one.
+    user_card: str | None = None
 
 
 __all__ = ["BackgroundCognitionAnalysis"]

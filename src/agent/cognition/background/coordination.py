@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.context_engine.conversation_engine.state import evaluate_thread_operation_shadow
 from agent.memory_engine.processing.models import MemoryBatch
+from agent.memory_engine.memories.user_card import validate_user_card
 from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.validation import validate_memory_analysis
 from agent.shared.utils import unknown_fields
@@ -28,7 +29,7 @@ def interpret_background_cognition(
         errors.append("background cognition analysis must be an object")
     unsupported = unknown_fields(
         raw,
-        {"decision", "operations", "thread_operation", "handoff"},
+        {"decision", "operations", "thread_operation", "handoff", "user_card"},
     )
     if unsupported:
         errors.append(f"unsupported top-level fields: {', '.join(unsupported)}")
@@ -87,6 +88,7 @@ def interpret_background_cognition(
         thread_operation=operation_name,
         valid=not errors and memory.valid and bool(thread.get("valid")),
         errors=tuple(errors),
+        user_card=validate_user_card(raw.get("user_card")) if memory_version == 3 else None,
     )
 
 
