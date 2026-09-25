@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from .database import ENGINE
 from .schema import (
+    agent_self_notes,
     agent_context_snapshots,
     agent_jobs,
     agent_conversations,
@@ -222,6 +223,12 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_jobs.delete().where(
                 agent_jobs.c.conversation_id == conversation_id,
                 agent_jobs.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            agent_self_notes.delete().where(
+                agent_self_notes.c.conversation_id == conversation_id,
+                agent_self_notes.c.user_id == owner_id,
             )
         )
         memory_ids = [
