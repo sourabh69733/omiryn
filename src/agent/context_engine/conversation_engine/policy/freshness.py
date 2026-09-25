@@ -60,6 +60,16 @@ def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
     return None
 
 
+def question_rule_reason(reply: str, question_limit: int) -> str | None:
+    """Why the draft breaks this turn's question limit, or None when it keeps it."""
+    questions = len(re.findall(r"\?+", reply.replace(REPLY_PART_SEPARATOR, " ")))
+    if questions <= question_limit:
+        return None
+    if question_limit == 0:
+        return "it asks a question, but this reply must not ask any; react or share a thought instead"
+    return f"it asks {questions} questions; ask at most {question_limit}"
+
+
 def recent_assistant_replies(messages: list[dict[str, Any]]) -> list[str]:
     return [
         str(message.get("content") or "")
@@ -72,7 +82,7 @@ def rewrite_instruction(draft: str, reason: str) -> str:
     """Appended to the system prompt for the single rewrite attempt."""
     return (
         "\n\nRewrite needed: your draft reply was "
-        f'"{draft.strip()[:400]}". It sounds generic because {reason}. '
+        f'"{draft.strip()[:400]}". It needs a rewrite because {reason}. '
         "Write a different reply that responds specifically to the user's latest message, "
         "using what they actually said. Keep the same language, length and format rules."
     )
@@ -108,6 +118,7 @@ def _pairs(text: str) -> set[tuple[str, str]]:
 
 __all__ = [
     "STOCK_PHRASES",
+    "question_rule_reason",
     "recent_assistant_replies",
     "rewrite_instruction",
     "stale_reply_reason",

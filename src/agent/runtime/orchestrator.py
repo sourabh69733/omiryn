@@ -8,6 +8,7 @@ from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
 from agent.context_engine.conversation_engine.policy.freshness import (
+    question_rule_reason,
     recent_assistant_replies,
     rewrite_instruction,
     stale_reply_reason,
@@ -202,6 +203,8 @@ async def run_agent_turn(
         summarized_through(context_package.context_sources),
         (context_package.user_profile or {}).get("timezone"),
     )
+    # The last thing the model reads; it follows this more reliably than rules in the prompt.
+    reply_messages = reply_messages + _turn_notes(context_package.question_limit)
     provider_messages = _provider_messages(reply_messages)
     if context_snapshot:
         context_snapshot.setdefault("context", {})["prompt"] = {
@@ -265,6 +268,7 @@ async def run_agent_turn(
             previous_replies=recent_assistant_replies(messages),
             reply_messages=reply_messages,
             generation_arguments=generation_arguments,
+            question_limit=context_package.question_limit,
         )
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
@@ -358,14 +362,22 @@ async def _freshen_reply(
     previous_replies: list[str],
     reply_messages: list[dict[str, Any]],
     generation_arguments: dict[str, Any],
+    question_limit: int = 1,
 ) -> tuple[str, dict[str, Any] | None]:
-    """Ask for one rewrite when the draft is stock filler or repeats itself.
+    """Ask for one rewrite when the draft breaks the question limit, is stock filler, or
+    repeats itself.
 
     The rewrite is best effort: any failure keeps the original draft.
     """
     if not freshness_check_enabled():
         return reply, None
-    reason = stale_reply_reason(reply, previous_replies)
+
+    def problem(text: str) -> str | None:
+        return question_rule_reason(text, question_limit) or stale_reply_reason(
+            text, previous_replies
+        )
+
+    reason = problem(reply)
     if reason is None:
         return reply, None
     try:
@@ -385,8 +397,20 @@ async def _freshen_reply(
     return rewritten, {
         "reason": reason,
         "rewritten": True,
-        "still_stale": stale_reply_reason(rewritten, previous_replies) is not None,
+        "still_stale": problem(rewritten) is not None,
     }
+
+
+_NO_QUESTION_NOTE = (
+    "For this reply: react to what the user said or share a thought. Do not ask any question."
+)
+
+
+def _turn_notes(question_limit: int) -> list[dict[str, str]]:
+    """Per-turn rules placed after the user's message."""
+    if question_limit == 0:
+        return [{"role": "system", "content": _NO_QUESTION_NOTE}]
+    return []
 
 
 def freshness_check_enabled() -> bool:
