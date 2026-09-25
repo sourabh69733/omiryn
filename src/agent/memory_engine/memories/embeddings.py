@@ -33,6 +33,13 @@ def memory_embedding_target() -> tuple[str, str] | None:
     return provider.strip().casefold(), model.strip()
 
 
+def query_embedding_timeout_seconds() -> float:
+    try:
+        return max(1.0, float(os.getenv("MEMORY_EMBEDDING_QUERY_TIMEOUT_SECONDS", "8")))
+    except ValueError:
+        return 8.0
+
+
 # A message this short usually leans on the previous turns ("what about her?").
 _SHORT_QUERY_TOKEN_LIMIT = 8
 _QUERY_HISTORY_MESSAGES = 2
@@ -68,6 +75,8 @@ async def embed_memory_query(
             inputs=[text.strip()],
             conversation_id=conversation_id,
             request_kind="memory_embedding_query",
+            # A reply waits on this call; fall back to keyword recall rather than stall.
+            timeout_seconds=query_embedding_timeout_seconds(),
         )
         return _embedding(provider, model, vectors[0])
     except Exception as error:
