@@ -1,5 +1,7 @@
 """Deterministic checks for the companion_v2 eval additions (no real model calls)."""
 
+import asyncio
+import io
 import os
 import sys
 import unittest
@@ -16,6 +18,7 @@ from agent.evals.behavior.core.models import (
 )
 from agent.evals.behavior.core.scenarios_v2 import COMPANION_V2_SCENARIOS
 from agent.evals.behavior.judging.judge import build_judge_request
+from agent.evals.behavior.reporting.live import TerminalProgressReporter
 from agent.evals.behavior.reporting.writer import _scenario_markdown
 from agent.evals.behavior.runner import BehaviorEvalConfig, report_payload, run_behavior_evals
 from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig, RuntimeScenarioDriver
@@ -205,6 +208,67 @@ class CrashedSampleTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(fine.passed)
         markdown = "\n".join(_scenario_markdown(report_payload(report)["scenarios"][0]))
         self.assertIn("**Error:** the conversation could not run: TimeoutError", markdown)
+
+
+class _SlowDriver:
+    """Tracks how many samples run at the same time."""
+
+    def __init__(self) -> None:
+        self.running = 0
+        self.peak = 0
+
+    async def run_sample(self, scenario: BehaviorScenario, sample_index: int):
+        self.running += 1
+        self.peak = max(self.peak, self.running)
+        await asyncio.sleep(0.01)
+        self.running -= 1
+        return (_observed(f"{scenario.id} {sample_index}"),)
+
+
+class ConcurrencyTest(unittest.IsolatedAsyncioTestCase):
+    def _scenarios(self) -> tuple[BehaviorScenario, ...]:
+        return tuple(
+            BehaviorScenario(
+                id=f"s{index}",
+                description="d",
+                samples=3,
+                turns=(ScenarioTurn("hi", TurnExpectation(maximum_questions=None)),),
+            )
+            for index in range(3)
+        )
+
+    async def _run(self, concurrency: int, sink=None):
+        driver = _SlowDriver()
+        report = await run_behavior_evals(
+            scenarios=self._scenarios(),
+            driver=driver,
+            judge=None,
+            config=BehaviorEvalConfig(suite_name="t", concurrency=concurrency),
+            event_sink=sink,
+        )
+        return driver, report
+
+    async def test_samples_overlap_up_to_the_limit_and_results_keep_their_order(self) -> None:
+        driver, report = await self._run(4)
+        self.assertEqual(driver.peak, 4)
+        self.assertEqual([scenario.scenario_id for scenario in report.scenarios], ["s0", "s1", "s2"])
+        self.assertEqual(
+            [sample.turns[0].assistant_reply for sample in report.scenarios[1].samples],
+            ["s1 0", "s1 1", "s1 2"],
+        )
+
+    async def test_default_runs_one_at_a_time(self) -> None:
+        driver, _report = await self._run(1)
+        self.assertEqual(driver.peak, 1)
+
+    async def test_parallel_log_lines_name_their_conversation(self) -> None:
+        stream = io.StringIO()
+        await self._run(4, TerminalProgressReporter(stream, tag_samples=True))
+        self.assertIn("[s2 #3] Conversation result: PASS", stream.getvalue())
+
+    def test_concurrency_must_be_positive(self) -> None:
+        with self.assertRaises(ValueError):
+            BehaviorEvalConfig(concurrency=0)
 
 
 class CompanionV2CatalogueTest(unittest.TestCase):
