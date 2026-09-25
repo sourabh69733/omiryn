@@ -606,6 +606,16 @@ agent_user_settings = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# A short "who this user is" note across all chats, rewritten by background cognition
+# and shown to the companion on every reply. Encrypted like other user content.
+agent_user_cards = Table(
+    "agent_user_cards",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("card", String, nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 profile_facts = Table(
     "profile_facts",
     metadata,

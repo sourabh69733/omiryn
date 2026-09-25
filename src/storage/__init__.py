@@ -9,6 +9,7 @@ from .agent_behavior import *
 from .agent_runtime import *
 from .users import *
 from .user_settings import *
+from .user_cards import *
 from .agent_jobs import *
 from .context_sources import *
 from .public import *
