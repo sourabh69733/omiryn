@@ -10,8 +10,13 @@ from uuid import uuid4
 from sqlalchemy import func, select
 
 from .database import ENGINE
-from .schema import agent_memories, agent_memory_embeddings
+from .schema import agent_memories, agent_memory_embeddings, agent_memory_reviews
 from .utils import _require_user_id
+
+
+def embedding_content_hash(content: str) -> str:
+    """Fingerprint of the text an embedding was built from; unchanged text needs no new vector."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def save_agent_memory_embedding(
@@ -24,7 +29,7 @@ def save_agent_memory_embedding(
     """Upsert one embedding version after verifying memory ownership."""
     owner_id = _require_user_id(user_id, "agent memory embedding")
     provider, model, values = _validated_embedding(embedding)
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    content_hash = embedding_content_hash(content)
     with ENGINE.begin() as connection:
         owned = connection.execute(
             select(agent_memories.c.id).where(
@@ -93,6 +98,17 @@ def list_agent_memory_embeddings(
     with ENGINE.begin() as connection:
         rows = connection.execute(query).mappings().all()
     return [_embedding_from_row(row) for row in rows]
+
+
+def prune_orphan_memory_rows() -> dict[str, int]:
+    """Delete vectors and reviews whose memory no longer exists (left by older deletes)."""
+    existing = select(agent_memories.c.id)
+    deleted: dict[str, int] = {}
+    with ENGINE.begin() as connection:
+        for table in (agent_memory_embeddings, agent_memory_reviews):
+            result = connection.execute(table.delete().where(~table.c.memory_id.in_(existing)))
+            deleted[table.name] = int(result.rowcount or 0)
+    return deleted
 
 
 def _validated_embedding(embedding: dict[str, Any]) -> tuple[str, str, list[float]]:

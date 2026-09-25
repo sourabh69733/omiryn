@@ -7,12 +7,19 @@ import os
 from typing import Any
 
 from agent.providers.gateway.embeddings import provider_embeddings
-from storage.memory_embeddings import save_agent_memory_embedding
+from storage.memory_embeddings import (
+    embedding_content_hash,
+    list_agent_memory_embeddings,
+    save_agent_memory_embedding,
+)
 
 from .ranking import searchable_memory_text
 
 logger = logging.getLogger(__name__)
 
+
+# Memories embedded per background run while healing earlier failures; bounds cost per batch.
+EMBEDDING_REFRESH_LIMIT = 50
 
 # Multilingual, so Hindi and Hinglish memories share a vector space with English ones.
 DEFAULT_MEMORY_EMBEDDING_MODEL = "deepinfra:BAAI/bge-m3"
@@ -96,6 +103,9 @@ async def index_agent_memories(
         if target is None or not candidates:
             return 0
         provider, model = target
+        candidates = memories_needing_embeddings(candidates, provider, model)
+        if not candidates:
+            return 0
         texts = [searchable_memory_text(memory) for memory in candidates]
         vectors = await provider_embeddings(
             provider=provider,
@@ -120,6 +130,51 @@ async def index_agent_memories(
         return 0
 
 
+def memories_needing_embeddings(
+    memories: list[dict[str, Any]], provider: str, model: str
+) -> list[dict[str, Any]]:
+    """Memories with no vector for this model, or whose text changed since it was built."""
+    by_owner: dict[str, list[dict[str, Any]]] = {}
+    for memory in memories:
+        by_owner.setdefault(str(memory["user_id"]), []).append(memory)
+    needed: list[dict[str, Any]] = []
+    for owner, owned in by_owner.items():
+        hashes = {
+            str(item["memory_id"]): item["content_hash"]
+            for item in list_agent_memory_embeddings(owner, [str(m["id"]) for m in owned])
+            if item.get("provider") == provider and item.get("model") == model
+        }
+        needed.extend(
+            memory
+            for memory in owned
+            if hashes.get(str(memory["id"]))
+            != embedding_content_hash(searchable_memory_text(memory))
+        )
+    return needed
+
+
+async def refresh_user_memory_embeddings(
+    user_id: str,
+    *,
+    conversation_id: str | None = None,
+    limit: int = EMBEDDING_REFRESH_LIMIT,
+) -> int:
+    """Embed active memories an earlier run failed to embed, a few per call; never raises."""
+    try:
+        target = memory_embedding_target()
+        if target is None:
+            return 0
+        # Local import keeps storage initialization independent of this module.
+        from storage.memories import list_agent_memories
+
+        active = [m for m in list_agent_memories(user_id) if m.get("status") == "active"]
+        pending = memories_needing_embeddings(active, *target)[:limit]
+        return await index_agent_memories(pending, conversation_id=conversation_id)
+    except Exception as error:
+        logger.warning("agent.memory_embedding.refresh_failed error=%s", type(error).__name__)
+        return 0
+
+
 def _single_owner(memories: list[dict[str, Any]]) -> str | None:
     """Attribute usage to the owner when a batch has exactly one (backfills have no chat)."""
     owners = {str(memory["user_id"]) for memory in memories}
@@ -141,4 +196,6 @@ __all__ = [
     "index_agent_memories",
     "memory_embedding_target",
     "memory_query_text",
+    "memories_needing_embeddings",
+    "refresh_user_memory_embeddings",
 ]
