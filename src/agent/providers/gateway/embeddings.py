@@ -10,6 +10,7 @@ import httpx
 from agent.providers.shared.errors import AgentProviderError
 from agent.providers.shared.usage_events import _elapsed_ms, _record_usage_event
 
+from .retry import post_with_retry
 from .registry import (
     provider_api_key,
     provider_base_url,
@@ -26,6 +27,7 @@ async def provider_embeddings(
     conversation_id: str | None = None,
     request_kind: str = "memory_embedding",
     user_id: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> list[list[float]]:
     """Embed a non-empty text batch using an OpenAI-compatible provider."""
     normalized_provider = provider.strip().casefold()
@@ -48,9 +50,10 @@ async def provider_embeddings(
     started_at = perf_counter()
     try:
         async with httpx.AsyncClient(
-            timeout=float(provider_timeout_seconds(normalized_provider))
+            timeout=timeout_seconds or float(provider_timeout_seconds(normalized_provider))
         ) as client:
-            response = await client.post(
+            response = await post_with_retry(
+                client,
                 f"{base_url.rstrip('/')}/embeddings",
                 json=payload,
                 headers=headers,

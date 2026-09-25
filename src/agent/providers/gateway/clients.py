@@ -15,6 +15,7 @@ from agent.observability.usage import CHAT_REPLY
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
 from agent.providers.shared.messages import _compact_chat_reply, _provider_messages
 from agent.outputs.companion_response import textual_tool_arguments
+from .retry import post_with_retry
 from .registry import (
     provider_api_key,
     provider_base_url,
@@ -82,7 +83,9 @@ async def _openai_compatible_chat(
         )
         started_at = perf_counter()
         try:
-            response = await client.post(str(config["chat_url"]), json=payload, headers=headers)
+            response = await post_with_retry(
+                client, str(config["chat_url"]), json=payload, headers=headers
+            )
             response.raise_for_status()
             latency_ms = _elapsed_ms(started_at)
             logger.info("agent.%s.response status_code=%s", provider, response.status_code)
@@ -270,7 +273,8 @@ async def _groq_chat(
         )
         started_at = perf_counter()
         try:
-            response = await client.post(
+            response = await post_with_retry(
+                client,
                 "https://api.groq.com/openai/v1/chat/completions",
                 json=payload,
                 headers=headers,
