@@ -59,7 +59,13 @@ SIMPLE_ACKNOWLEDGEMENT_PREFIXES = {
 }
 ADULT_FLIRTY_TERMS = {"sexy", "hot", "adult", "intimate", "flirt", "flirty", "romantic"}
 STORY_TERMS = {"story", "scene", "continue", "example", "imagine", "roleplay"}
-PROFILE_RECALL_PHRASES = {"what do you know", "about me", "know me", "meri profile"}
+PROFILE_RECALL_PHRASES = {
+    "what do you know",
+    "what do you remember",
+    "about me",
+    "know me",
+    "meri profile",
+}
 BOREDOM_COMPLAINT_TERMS = {"boring", "bored", "bore", "same", "repeat", "repeated", "again"}
 BOREDOM_COMPLAINT_PHRASES = {
     "you are boring",

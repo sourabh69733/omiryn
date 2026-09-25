@@ -31,7 +31,8 @@ SOURCE_TYPE_PRIORITY = {
 SOURCE_TYPE_CHAR_LIMIT = {
     "conversation_summary": 1900,
     "conversation_threads": 1800,
-    "agent_memories_v3": 1400,
+    # Up to 12 one-line memories with their dates on a "what do you know about me" turn.
+    "agent_memories_v3": 2800,
     "agent_behavior_rules": 1400,
     "data_points": 1200,
     "friend_style": STYLE_CONTEXT_CHAR_LIMIT,

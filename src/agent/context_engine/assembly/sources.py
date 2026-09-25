@@ -18,7 +18,10 @@ from agent.context_engine.conversation_engine.understanding.rules.intent import 
 )
 from agent.context_engine.shared.text import memory_terms, normalized_memory_text, source_identity
 from agent.memory_engine.data_points import rank_data_points_for_context
-from agent.memory_engine.memories import retrieve_agent_memories_for_reply
+from agent.memory_engine.memories import (
+    BROAD_RECALL_MEMORY_LIMIT,
+    retrieve_agent_memories_for_reply,
+)
 from agent.memory_engine.behavior.retrieval import retrieve_agent_behavior_rules_for_context
 from agent.memory_engine.data_points.retrieval.profile_facts import (
     retrieve_profile_facts_for_context,
@@ -152,7 +155,10 @@ def build_reply_context_sources(
     )
     if pipeline.memory_contract_version == 3:
         durable_memory_sources = _agent_memory_v3_context_sources(
-            user_id, user_text, memory_query_embedding
+            user_id,
+            user_text,
+            memory_query_embedding,
+            broad="profile_recall" in query_intent.labels,
         )
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
@@ -337,11 +343,17 @@ def _agent_memory_v3_context_sources(
     user_id: str | None,
     user_text: str,
     query_embedding: dict[str, Any] | None = None,
+    *,
+    broad: bool = False,
 ) -> list[dict[str, Any]]:
     if not user_id:
         return []
     memories = retrieve_agent_memories_for_reply(
-        user_id, user_text, query_embedding=query_embedding
+        user_id,
+        user_text,
+        query_embedding=query_embedding,
+        broad=broad,
+        **({"limit": BROAD_RECALL_MEMORY_LIMIT} if broad else {}),
     )
     if not memories:
         return []
