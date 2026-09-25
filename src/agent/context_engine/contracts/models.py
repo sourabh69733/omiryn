@@ -150,3 +150,5 @@ class ModelContextPackage:
     matching_understanding: MatchingUnderstanding | None = None
     thread_guidance: ThreadGuidance = field(default_factory=ThreadGuidance)
     snapshot: dict[str, Any] | None = None
+    # Questions this reply may ask: 0 when the plan forbids one (cooldown, "no questions").
+    question_limit: int = 1

@@ -96,6 +96,7 @@ def build_model_context_package(
             listener_first=listener_first,
         )
         conversation_plan = apply_question_cooldown(conversation_plan, planning_messages[:-1])
+        question_limit = 0 if conversation_plan.question_purpose == "none" else 1
         system_prompt = build_companion_system_prompt_v2(
             context_sources=reply_context.context_sources,
             user_profile=reply_context.user_profile,
@@ -134,6 +135,7 @@ def build_model_context_package(
             matching_understanding=matching_understanding,
         )
     else:
+        question_limit = 1
         query_intent = context_query_intent(user_text)
         system_prompt = build_companion_system_prompt(
             context_sources=reply_context.context_sources,
@@ -164,6 +166,7 @@ def build_model_context_package(
         matching_understanding=matching_understanding,
         thread_guidance=reply_context.thread_guidance,
         snapshot=snapshot,
+        question_limit=question_limit,
     )
 
 
