@@ -244,6 +244,30 @@ COMPANION_V2_SCENARIOS = (
         ),
     ),
     BehaviorScenario(
+        id="format_story_continues_on_follow_up",
+        description="Short follow-ups mid-story keep the story going in several bubbles.",
+        tags=("companion_v2", "format", "bubbles"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=GREETING,
+        turns=(
+            _turn("tell me a story about a lighthouse keeper", minimum_bubbles=3, maximum_bubbles=7),
+            _turn("then?", minimum_bubbles=3, maximum_bubbles=7),
+            _turn(
+                "wow, aage kya hua",
+                minimum_bubbles=3,
+                maximum_bubbles=7,
+                rubric=(
+                    _rubric(
+                        "story_moves_on",
+                        "Continues the same lighthouse story with a new event. Restarting it, "
+                        "recapping only, or asking the user what should happen fails.",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
         id="format_small_talk_question_rules",
         description="Low-effort small talk keeps the question limits and avoids stock lines on every reply.",
         tags=("companion_v2", "format", "questions"),
