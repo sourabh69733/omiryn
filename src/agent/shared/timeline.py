@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -184,8 +184,25 @@ def day_notes(
 
 
 def date_label(local: datetime) -> str:
-    """Short date such as '12 Sep 2026'."""
-    return f"{local.day} {local.strftime('%b')} {local.year}"
+    """Date with weekday, such as 'Sat 12 Sep 2026'."""
+    return f"{local.strftime('%a')} {local.day} {local.strftime('%b')} {local.year}"
+
+
+def relative_day(day: date, today: date) -> str:
+    """How far a day is from today, as a person would say it: 'tomorrow', 'in 2 days', '3 weeks ago'."""
+    delta = (day - today).days
+    named = {0: "today", 1: "tomorrow", -1: "yesterday"}
+    if delta in named:
+        return named[delta]
+    size = abs(delta)
+    if size < 14:
+        amount = f"{size} days"
+    elif size < 60:
+        amount = f"{size // 7} weeks"
+    else:
+        months = size // 30
+        amount = f"{months} month{'' if months == 1 else 's'}"
+    return f"in {amount}" if delta > 0 else f"{amount} ago"
 
 
 def _local_label(local: datetime, *, with_year: bool = False) -> str:
@@ -207,6 +224,7 @@ __all__ = [
     "humanize_gap",
     "message_time",
     "parse_time",
+    "relative_day",
     "session_gap",
     "user_zone",
     "valid_timezone_name",
