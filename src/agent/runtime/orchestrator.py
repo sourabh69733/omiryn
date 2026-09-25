@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
+from agent.context_engine.conversation_engine.policy.replies import STORY_NOTE_PREFIX
 from agent.context_engine.conversation_engine.policy.freshness import (
     question_rule_reason,
     recent_assistant_replies,
@@ -317,8 +318,14 @@ async def run_agent_turn(
             },
         }
     )
+    story_turn = bool(
+        context_package.query_intent
+        and "story_or_long_reply" in context_package.query_intent.labels
+    )
     for index, reply_part in enumerate(reply_parts):
         assistant_message = {"role": "assistant", "content": reply_part}
+        if story_turn:
+            assistant_message["story"] = True  # lets "then?" next turn continue the story
         turn_state = assistant_turn_state(
             reply_part,
             conversation_move=(context_snapshot.get("summary") or {}).get("conversation_move"),
@@ -417,16 +424,24 @@ _NO_QUESTION_NOTE = (
 
 
 _STORY_NOTE = (
-    "For this reply: the user asked for a story. Tell it yourself now in 4-7 short bubbles "
+    f"{STORY_NOTE_PREFIX} the user asked for a story. Tell it yourself now in 4-7 short bubbles "
     "separated by <next_message>: a character, a setting and something that happens. End with "
     "an ending or a light 'want more?'. Do not ask the user what should happen."
+)
+_STORY_CONTINUE_NOTE = (
+    f"{STORY_NOTE_PREFIX} the user is following the story you are telling. If they react or ask "
+    "for more, react in a few words at most, then continue the story from where it stopped in 3-7 "
+    "short bubbles separated by <next_message>. Move the plot forward; do not restart or recap. "
+    "If they clearly changed the subject, reply to that instead and drop the story."
 )
 
 
 def _turn_notes(question_limit: int, intent_labels: tuple[str, ...] = ()) -> list[dict[str, str]]:
     """Per-turn rules placed after the user's message."""
     notes = []
-    if "story_or_long_reply" in intent_labels:
+    if "story_continuation" in intent_labels:
+        notes.append({"role": "system", "content": _STORY_CONTINUE_NOTE})
+    elif "story_or_long_reply" in intent_labels:
         notes.append({"role": "system", "content": _STORY_NOTE})
     elif question_limit == 0:
         notes.append({"role": "system", "content": _NO_QUESTION_NOTE})

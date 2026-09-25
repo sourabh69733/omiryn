@@ -9,6 +9,7 @@ from agent.context_engine.conversation_engine.policy.replies import (
     MAX_REPLY_PARTS,
     REPLY_PART_SEPARATOR,
     REPLY_PART_WORD_LIMIT,
+    STORY_NOTE_PREFIX,
     normalize_part_separators,
 )
 
@@ -283,7 +284,11 @@ def _chat_reply_word_limit(
     reply_text: str = "",
 ) -> int:
     latest_user_text = _latest_user_text(messages)
-    if REPLY_PART_SEPARATOR in reply_text or _wants_continuous_reply(latest_user_text):
+    if (
+        REPLY_PART_SEPARATOR in reply_text
+        or _wants_continuous_reply(latest_user_text)
+        or _is_story_turn(messages)
+    ):
         return MAX_REPLY_PARTS * REPLY_PART_WORD_LIMIT
     advice_markers = {
         "advice",
@@ -316,6 +321,17 @@ def _wants_continuous_reply(latest_user_text: str) -> bool:
         "what happened next",
     }
     return any(marker in latest_user_text for marker in continuous_markers)
+
+def _is_story_turn(messages: list[dict[str, str]]) -> bool:
+    """A story note follows the latest user message (set even for "then?" mid-story)."""
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            return False
+        if message.get("role") == "system" and str(message.get("content") or "").startswith(
+            STORY_NOTE_PREFIX
+        ):
+            return True
+    return False
 
 def _latest_user_text(messages: list[dict[str, str]]) -> str:
     latest = next(

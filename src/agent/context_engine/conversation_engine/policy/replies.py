@@ -11,6 +11,8 @@ REPLY_PART_SEPARATOR = "<next_message>"
 # Normal replies use 1-3 bubbles by prompt; 7 leaves room for a story or scene told in one go.
 MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "7"))
 REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "35"))
+# Starts every per-turn story note, so later steps know this reply is a story.
+STORY_NOTE_PREFIX = "Story turn:"
 
 
 # Models sometimes write the separator as [next_message], </next_message> or <next message>.
