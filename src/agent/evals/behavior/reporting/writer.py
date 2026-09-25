@@ -221,6 +221,8 @@ def _scenario_markdown(scenario: dict[str, Any]) -> list[str]:
                 "",
             ]
         )
+        if sample.get("error"):
+            lines.extend([f"**Error:** the conversation could not run: {sample['error']}", ""])
         grades = {grade["turn_index"]: grade for grade in sample.get("grades", [])}
         for turn in sample.get("turns", []):
             lines.extend(

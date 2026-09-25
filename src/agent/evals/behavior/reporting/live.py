@@ -249,7 +249,11 @@ def _render_event(event: EvalEvent) -> str | None:
         for finding in data.get("findings", []):
             lines.append(f"      Problem: {finding}")
         return "\n".join(lines)
+    if event.kind == "sample_retry":
+        return f"  Conversation crashed ({data['error']}); running it again..."
     if event.kind == "sample_completed":
+        if data.get("error"):
+            return f"  Conversation result: ERROR — {data['error']}"
         return f"  Conversation result: {'PASS' if data['passed'] else 'FAIL'}"
     if event.kind == "scenario_completed":
         return (
