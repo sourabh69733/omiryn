@@ -77,6 +77,7 @@ class SummaryValidationTest(unittest.TestCase):
         payload = json.loads(memory_batch_prompt(_batch(), []))
         self.assertEqual(payload["previous_handoff"]["conversation_summary"], PREVIOUS)
         self.assertIn("conversation_summary", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
+        self.assertIn("Never keep \"next Friday\"", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
 
 
 class ReplyWindowTest(unittest.TestCase):

@@ -50,6 +50,8 @@ Conversation summary rules:
 - Keep what a close friend would remember: events, plans, decisions, feelings, people by name, questions
   still open, and anything the companion promised, suggested, or gave an opinion on.
 - Date events with the day from sent_at, e.g. "On Tue 22 Sep the user said the interview went well".
+- Turn the user's relative words into absolute dates: "next Friday" said on Mon 14 Sep becomes
+  "on Fri 18 Sep". Never keep "next Friday", "yesterday" or "tomorrow"; they go stale.
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
 - Stay under 1500 characters. When it gets long, compress the oldest points first.
 
