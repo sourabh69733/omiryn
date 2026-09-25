@@ -16,6 +16,8 @@ from agent.evals.behavior.core.models import (
 )
 from agent.evals.behavior.core.scenarios_v2 import COMPANION_V2_SCENARIOS
 from agent.evals.behavior.judging.judge import build_judge_request
+from agent.evals.behavior.reporting.writer import _scenario_markdown
+from agent.evals.behavior.runner import BehaviorEvalConfig, report_payload, run_behavior_evals
 from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig, RuntimeScenarioDriver
 from storage import get_conversation, get_user_timezone, reset_db
 
@@ -147,6 +149,53 @@ class TimedRuntimeTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("once upon a time\\nthere was Raju", payload)
         self.assertIn("each line is a separate chat bubble", system)
+
+
+class _FlakyDriver:
+    """Fails the first `failures` sample runs, then returns one observed turn."""
+
+    def __init__(self, failures: int) -> None:
+        self.failures = failures
+        self.calls = 0
+
+    async def run_sample(self, scenario: BehaviorScenario, sample_index: int):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise TimeoutError("provider stalled")
+        return (_observed("fair enough"),)
+
+
+class CrashedSampleTest(unittest.IsolatedAsyncioTestCase):
+    def _scenario(self, scenario_id: str) -> BehaviorScenario:
+        return BehaviorScenario(
+            id=scenario_id,
+            description="d",
+            turns=(ScenarioTurn("hi", TurnExpectation(maximum_questions=None)),),
+        )
+
+    async def _run(self, driver: _FlakyDriver, *ids: str):
+        return await run_behavior_evals(
+            scenarios=tuple(self._scenario(item) for item in ids),
+            driver=driver,
+            judge=None,
+            config=BehaviorEvalConfig(suite_name="t"),
+        )
+
+    async def test_a_crash_is_retried_once(self) -> None:
+        driver = _FlakyDriver(failures=1)
+        report = await self._run(driver, "one")
+        self.assertEqual(driver.calls, 2)
+        self.assertTrue(report.scenarios[0].samples[0].passed)
+
+    async def test_a_repeated_crash_fails_that_sample_but_the_run_continues(self) -> None:
+        driver = _FlakyDriver(failures=2)
+        report = await self._run(driver, "broken", "fine")
+        broken, fine = report.scenarios
+        self.assertEqual(broken.samples[0].error, "TimeoutError: provider stalled")
+        self.assertFalse(broken.passed)
+        self.assertTrue(fine.passed)
+        markdown = "\n".join(_scenario_markdown(report_payload(report)["scenarios"][0]))
+        self.assertIn("**Error:** the conversation could not run: TimeoutError", markdown)
 
 
 class CompanionV2CatalogueTest(unittest.TestCase):
