@@ -49,6 +49,7 @@ def test_query_embedding_returns_provider_versioned_vector(monkeypatch) -> None:
         inputs=["मुझे शांत लोग पसंद हैं"],
         conversation_id=None,
         request_kind="memory_embedding_query",
+        timeout_seconds=8.0,
     )
 
 
