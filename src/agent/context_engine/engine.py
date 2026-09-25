@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from agent.context_engine.assembly.snapshot import build_context_snapshot, build_context_snapshot_v2
@@ -13,6 +14,7 @@ from agent.context_engine.conversation_engine.planning import (
 from agent.context_engine.conversation_engine.understanding import interpret_turn
 from agent.context_engine.conversation_engine.understanding.rules import (
     context_query_intent,
+    continues_story,
     detect_emotion_state,
 )
 from agent.context_engine.assembly.matching import build_matching_understanding
@@ -84,6 +86,14 @@ def build_model_context_package(
                 intent=query_intent,
             )
             conversational_stance = None
+        if "story_or_long_reply" not in query_intent.labels and continues_story(
+            user_text, planning_messages[:-1]
+        ):
+            # "then?" or "wow" mid-story keeps the story going instead of a one-line chat reply.
+            query_intent = replace(
+                query_intent,
+                labels=query_intent.labels + ("story_or_long_reply", "story_continuation"),
+            )
         topic_states = build_topic_state(planning_messages, user_text, query_intent)
         conversation_plan = build_conversation_plan(
             user_text=user_text,
