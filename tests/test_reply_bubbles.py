@@ -26,6 +26,12 @@ class ReplyBubbleTest(unittest.TestCase):
 
         self.assertEqual(parts, ["hmm", first, second])
 
+    def test_separator_variants_never_reach_the_user(self) -> None:
+        for variant in ("[next_message]", "</next_message>", "<next message>", "[ NEXT_MESSAGE ]", "<next_message/>"):
+            with self.subTest(variant=variant):
+                parts = split_assistant_reply(f"boring movies can be a drag {variant} want company?")
+                self.assertEqual(parts, ["boring movies can be a drag", "want company?"])
+
     def test_prompt_allows_short_splits_and_longer_stories(self) -> None:
         prompt = output_format_prompt()
         self.assertIn("2-3 bubbles", prompt)
