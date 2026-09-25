@@ -168,6 +168,24 @@ def hard_rule_findings(
                 )
             )
 
+    if expectation.maximum_question_streak is not None:
+        streak = 0
+        for item in reversed([prior.assistant_reply for prior in prior_turns] + [reply]):
+            if not any(mark in item for mark in QUESTION_MARKS):
+                break
+            streak += 1
+        if streak > expectation.maximum_question_streak:
+            findings.append(
+                GradeFinding(
+                    code="question_streak",
+                    message=(
+                        f"{streak} replies in a row asked a question; maximum is "
+                        f"{expectation.maximum_question_streak}."
+                    ),
+                    evidence=reply,
+                )
+            )
+
     if expectation.forbid_repeating_prior_reply and any(
         _canonical_exact(prior.assistant_reply) == canonical_exact_reply
         for prior in prior_turns

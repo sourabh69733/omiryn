@@ -46,6 +46,8 @@ class TurnExpectation:
     forbid_stock_phrases: bool = False
     # Share of replies so far (this turn included) that contain a question.
     maximum_question_reply_ratio: float | None = None
+    # Longest allowed run of consecutive replies with a question, ending at this turn.
+    maximum_question_streak: int | None = None
 
     def __post_init__(self) -> None:
         if self.minimum_words < 0:
@@ -62,6 +64,8 @@ class TurnExpectation:
             raise ValueError("maximum_bubbles cannot be lower than minimum_bubbles.")
         if self.maximum_question_reply_ratio is not None and not 0 <= self.maximum_question_reply_ratio <= 1:
             raise ValueError("maximum_question_reply_ratio must be 0-1.")
+        if self.maximum_question_streak is not None and self.maximum_question_streak < 1:
+            raise ValueError("maximum_question_streak must be at least 1.")
         rubric_ids = [dimension.id for dimension in self.rubric]
         if len(rubric_ids) != len(set(rubric_ids)):
             raise ValueError("Rubric dimension ids must be unique within a turn.")
