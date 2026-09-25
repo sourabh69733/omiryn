@@ -12,6 +12,7 @@ from typing import Any
 def searchable_memory_text(memory: dict[str, Any]) -> str:
     return " ".join(
         (
+            str(memory.get("statement") or ""),
             str(memory.get("key") or ""),
             json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True),
             " ".join(str(value) for value in memory.get("purposes") or []),

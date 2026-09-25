@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any
 
@@ -349,18 +348,14 @@ def _agent_memory_v3_context_sources(
     zone = user_zone(get_user_timezone(user_id))
     lines = [
         "Relevant durable memories about the user.",
-        "Use only when helpful; do not expose memory IDs, kinds, or internal keys.",
-        "A relationship memory describes lived history, not a desired partner trait.",
+        "Use only when helpful; do not quote them as a list or say you have stored notes.",
+        "Memories about relationships describe lived history, not a desired partner trait.",
         "Dates carry their distance from today in brackets; use that wording (e.g. 'this Friday, "
         "in 2 days') rather than repeating the user's older relative words.",
         "Do not present past events as current. 'told you' is when the user said it.",
     ]
     for memory in memories:
-        value = json.dumps(memory.get("value"), ensure_ascii=False, sort_keys=True)
-        lines.append(
-            f"- {memory.get('kind')}: {memory.get('key')} = {value}"
-            f"{_memory_time_note(memory, zone)}"
-        )
+        lines.append(f"- {memory_sentence(memory)}{_memory_time_note(memory, zone)}")
     return [
         {
             "source_type": AGENT_MEMORIES_V3_SOURCE_TYPE,
@@ -373,6 +368,33 @@ def _agent_memory_v3_context_sources(
             },
         }
     ]
+
+
+def memory_sentence(memory: dict[str, Any]) -> str:
+    """The memory as plain text: its stored sentence, else a readable key and value."""
+    statement = str(memory.get("statement") or "").strip()
+    if statement:
+        return statement
+    key = _readable_key(memory.get("key"))
+    value = _readable_value(memory.get("value"))
+    return f"{key}: {value}" if key else value
+
+
+def _readable_key(key: Any) -> str:
+    text = " ".join(str(key or "").replace("_", " ").replace(".", " ").split())
+    return text[:1].upper() + text[1:]
+
+
+def _readable_value(value: Any) -> str:
+    if isinstance(value, dict):
+        return "; ".join(
+            f"{_readable_key(name).lower()}: {_readable_value(item)}"
+            for name, item in value.items()
+            if item not in (None, "", [], {})
+        )
+    if isinstance(value, list):
+        return ", ".join(_readable_value(item) for item in value)
+    return str(value)
 
 
 def _memory_time_note(memory: dict[str, Any], zone: Any, now: datetime | None = None) -> str:
