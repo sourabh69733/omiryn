@@ -34,6 +34,7 @@ from agent.memory_engine.processing.service import get_processing_state
 from agent.shared.clock import utc_now
 from agent.shared.timeline import date_label, parse_time, relative_day, user_zone
 from storage import (
+    get_user_card,
     get_user_timezone,
     list_context_sources,
     list_user_context_sources,
@@ -48,6 +49,7 @@ WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
 AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
+USER_CARD_SOURCE_TYPE = "user_card"
 AGENT_BEHAVIOR_RULES_SOURCE_TYPE = "agent_behavior_rules"
 WHATSAPP_STRUCTURED_SOURCE_TYPE = "whatsapp_structured_context"
 MEMORY_TRIGGER_TERMS = {
@@ -170,8 +172,8 @@ def build_reply_context_sources(
         user_id,
         query_intent,
     )
-    continuity_sources = _conversation_summary_sources(
-        conversation_id, user_id
+    continuity_sources = (
+        _user_card_sources(user_id) + _conversation_summary_sources(conversation_id, user_id)
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
@@ -311,6 +313,26 @@ def _data_point_context_sources(user_id: str | None, user_text: str) -> list[dic
                 "point_count": len(ranked_points),
                 "point_ids": [point.get("id") for point in ranked_points],
             },
+        }
+    ]
+
+
+def _user_card_sources(user_id: str | None) -> list[dict[str, Any]]:
+    """The short note on who the user is, kept across all chats by background cognition."""
+    if not user_id or agent_pipeline_config().memory_contract_version != 3:
+        return []
+    card = get_user_card(user_id)
+    if not card:
+        return []
+    return [
+        {
+            "source_type": USER_CARD_SOURCE_TYPE,
+            "title": "About the user",
+            "content": (
+                "What you know about the user from all your chats. Use it naturally; do not "
+                "recite it or say you keep notes.\n" + card
+            ),
+            "metadata": {"card_chars": len(card)},
         }
     ]
 
