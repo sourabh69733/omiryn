@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.memory_engine.memories.operations import MemoryAnalysisV3
+from agent.memory_engine.memories.self_notes import SelfNoteChanges
 from agent.memory_engine.processing.validation import MemoryAnalysis
 
 
@@ -21,6 +22,7 @@ class BackgroundCognitionAnalysis:
     errors: tuple[str, ...] = ()
     # Rewritten per-user card; None keeps the stored one.
     user_card: str | None = None
+    self_notes: SelfNoteChanges = SelfNoteChanges()
 
 
 __all__ = ["BackgroundCognitionAnalysis"]
