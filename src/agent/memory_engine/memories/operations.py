@@ -26,6 +26,7 @@ class MemoryAddProposal:
     occurred_at: datetime | None = None
     valid_from: datetime | None = None
     valid_until: datetime | None = None
+    statement: str | None = None
 
 
 @dataclass(frozen=True)

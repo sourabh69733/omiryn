@@ -11,6 +11,7 @@ add creates a new memory:
   "purposes": ["profile | matching | personalization"],
   "key": "short stable semantic key",
   "value": "specific scalar, array, or object",
+  "statement": "one short plain sentence about the user, e.g. Has a job interview at a design studio.",
   "sensitivity": "standard | sensitive | highly_sensitive",
   "confidence": 0.0,
   "importance": 0.0,
@@ -74,6 +75,9 @@ V3 memory rules:
   "recently", "a while ago" or "last year", or when the message has no sent_at.
 - Never put relative time words ("next Friday", "yesterday", "last week") in key or value; they go
   stale. Put the time in occurred_at and write the value without it, or with the absolute date.
+- statement restates the memory as one short, plain third-person sentence without the user's
+  name ("Has a beagle called Bruno.", "Moved from Mumbai to Pune."). Same rules as value: no
+  relative time words, no guessing beyond the evidence. At most 240 characters.
 - For plans and temporary states, set valid_until only when the evidence gives a clear end
   (for example "this week" ends at the end of that week); otherwise use null.
 - Before returning each operation, verify that the cited user evidence directly supports its kind,

@@ -147,6 +147,7 @@ def _memory_payload(
         "purposes": sorted(purpose.value for purpose in proposal.purposes),
         "key": proposal.key,
         "value": proposal.value,
+        "statement": proposal.statement,
         # A model may describe utility, but it cannot grant matching permission.
         "allowed_uses": ["reply_context"],
         "sensitivity": proposal.sensitivity.value,

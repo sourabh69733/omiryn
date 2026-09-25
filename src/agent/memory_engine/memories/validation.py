@@ -27,6 +27,7 @@ _ADD_FIELDS = {
     "purposes",
     "key",
     "value",
+    "statement",
     "sensitivity",
     "confidence",
     "importance",
@@ -222,6 +223,7 @@ def _validate_add(
     if value is None or isinstance(value, bool):
         errors.append("value must contain useful data")
 
+    statement = _statement(raw.get("statement"))
     confidence = _score(raw.get("confidence"), "confidence", errors)
     importance = _score(raw.get("importance"), "importance", errors)
     occurred_at = _optional_datetime(raw.get("occurred_at"), "occurred_at", errors)
@@ -249,7 +251,19 @@ def _validate_add(
         occurred_at=occurred_at,
         valid_from=valid_from,
         valid_until=valid_until,
+        statement=statement,
     ), []
+
+
+MAX_STATEMENT_CHARS = 240
+
+
+def _statement(value: Any) -> str | None:
+    """Optional readable sentence; a bad one is dropped, never a reason to lose the memory."""
+    if not is_non_empty_string(value):
+        return None
+    text = " ".join(str(value).split())
+    return text if len(text) <= MAX_STATEMENT_CHARS else None
 
 
 def _unsupported_errors(raw: dict[str, Any], allowed_fields: set[str]) -> list[str]:
