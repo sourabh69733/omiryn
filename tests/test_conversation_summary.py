@@ -99,6 +99,28 @@ class ReplyWindowTest(unittest.TestCase):
         window = reply_window(self.messages, 5)
         self.assertEqual(window[0]["content"], "m6")
 
+    def test_earlier_sessions_are_left_to_the_summary(self) -> None:
+        monday = "2026-09-14T14:30:00+00:00"
+        wednesday = "2026-09-16T14:30:00+00:00"
+        messages = [
+            {"role": "user", "content": "interview next Friday", "created_at": monday},
+            {"role": "assistant", "content": "good luck!", "created_at": monday},
+            {"role": "user", "content": "when is it again?", "created_at": wednesday},
+        ]
+        window = reply_window(messages, summarized_through=1)
+        self.assertEqual([m["content"] for m in window], ["when is it again?"])
+
+    def test_unsummarized_earlier_session_messages_stay(self) -> None:
+        monday = "2026-09-14T14:30:00+00:00"
+        wednesday = "2026-09-16T14:30:00+00:00"
+        messages = [
+            {"role": "user", "content": "interview next Friday", "created_at": monday},
+            {"role": "assistant", "content": "good luck!", "created_at": monday},
+            {"role": "user", "content": "when is it again?", "created_at": wednesday},
+        ]
+        window = reply_window(messages, summarized_through=0)
+        self.assertEqual(window[0]["content"], "good luck!")
+
     def test_summarized_through_reads_the_summary_source(self) -> None:
         sources = [
             {"source_type": "agent_memories_v3", "metadata": {}},
