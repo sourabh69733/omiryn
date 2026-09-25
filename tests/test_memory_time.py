@@ -78,6 +78,7 @@ def test_upcoming_event_says_happens_with_distance_from_today() -> None:
 
 def test_extraction_prompt_dates_scheduled_events() -> None:
     assert "past or scheduled" in V3_MEMORY_OUTPUT_SHAPE
+    assert "Never put relative time words" in V3_MEMORY_OUTPUT_SHAPE
 
 
 def test_memory_note_is_empty_without_dates() -> None:

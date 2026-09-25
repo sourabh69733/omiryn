@@ -7,8 +7,9 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     recent_assistant_replies,
     rewrite_instruction,
     stale_reply_reason,
+    trim_questions,
 )
-from agent.runtime.orchestrator import _freshen_reply
+from agent.runtime.orchestrator import _freshen_reply, _turn_notes
 
 
 class StaleReplyTest(unittest.TestCase):
@@ -43,6 +44,23 @@ class StaleReplyTest(unittest.TestCase):
         self.assertIn("2 questions", question_rule_reason("best part?<next_message>new trail?", 1))
         self.assertIn("must not ask any", question_rule_reason("which one?", 0))
         self.assertIsNone(question_rule_reason("fair enough", 0))
+
+    def test_trim_questions_drops_extra_questions_but_never_empties(self) -> None:
+        separator = "<next_message>"
+        self.assertEqual(trim_questions(f"which one?{separator}was it any good?", 1), "which one?")
+        self.assertEqual(
+            trim_questions(f"boring movies can be a drag.{separator}what did you expect?", 0),
+            "boring movies can be a drag.",
+        )
+        self.assertEqual(trim_questions(f"which one?{separator}was it good?", 0), "which one?")
+        self.assertEqual(trim_questions("Raju made chai. Want more?", 1), "Raju made chai. Want more?")
+
+    def test_turn_notes(self) -> None:
+        self.assertEqual(_turn_notes(1), [])
+        self.assertIn("Do not ask any question", _turn_notes(0)[0]["content"])
+        story = _turn_notes(0, ("story_or_long_reply",))
+        self.assertEqual(len(story), 1)
+        self.assertIn("Tell it yourself now in 4-7 short bubbles", story[0]["content"])
 
     def test_recent_replies_and_rewrite_instruction(self) -> None:
         messages = [
@@ -101,6 +119,20 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(reply, "a week of launches, you've earned a quiet night")
         self.assertIn("must not ask any", freshness["reason"])
+        self.assertFalse(freshness["still_stale"])
+
+    async def test_rewrite_that_still_asks_is_trimmed(self) -> None:
+        generate = AsyncMock(return_value="which one?<next_message>was it any good?")
+        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
+            reply, freshness = await _freshen_reply(
+                "which one?<next_message>was it any good?",
+                previous_replies=[],
+                reply_messages=[{"role": "user", "content": "watched a movie"}],
+                generation_arguments={"system_prompt": "SYSTEM"},
+                question_limit=1,
+            )
+        self.assertEqual(reply, "which one?")
+        self.assertTrue(freshness["questions_trimmed"])
         self.assertFalse(freshness["still_stale"])
 
     async def test_check_can_be_switched_off(self) -> None:

@@ -73,6 +73,25 @@ class QuestionPolicyPromptTest(unittest.TestCase):
         self.assertIn("A question is optional", prompt)
         self.assertNotIn("ask at most one natural question", prompt)
 
+    def test_story_turn_always_allows_the_check_in_question(self) -> None:
+        save_conversation(
+            {"id": "c", "status": "active", "messages": _chat("which one?", "why though?")}, "u"
+        )
+        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
+            package = build_model_context_package(
+                conversation_id="c",
+                user_text="tell me a story about a chai stall owner in Mumbai",
+                user_id="u",
+                user_profile={},
+                model=None,
+                agent_tone="auto",
+                agent_name=None,
+                style_source_id=None,
+                user_message_index=4,
+                assistant_message_index=5,
+            )
+        self.assertEqual(package.question_limit, 1)
+
     def test_story_request_is_not_steered_to_the_users_childhood(self) -> None:
         prompt = self._prompt([], "tell me a story about a chai stall owner in Mumbai")
         self.assertNotIn("Personal stories: childhood", prompt)
