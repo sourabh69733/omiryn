@@ -81,17 +81,21 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 
 ### Phase 3: Memory quality
 
-1. Plain-sentence memory formatting with dates.
-2. Flexible selection instead of fixed per-kind caps; review relevance floors.
-3. User card: a short always-visible summary, rewritten in the background.
-4. Agent self-notes: opinions, jokes, promises, with the same lifecycle rules as memories.
-5. Maintenance: embedding retry, skip unchanged content, remove orphan embeddings and reviews on conversation deletion.
+1. Plain-sentence memories: done. Background cognition writes a `statement` per memory ("Has a beagle called Bruno."); older memories fall back to a readable key and value. Kinds and keys no longer reach the prompt.
+2. Flexible selection: done. One budget of 8 memories (`AGENT_REPLY_MEMORY_LIMIT`), each kind capped at 3-5. "What do you know about me" turns skip the relevance floor and get up to 12. Relevance floors unchanged.
+3. User card: done. A short per-user note (`agent_user_cards`), rewritten by the existing background call and shown on every reply.
+4. Agent self-notes: done. Opinions, tastes, jokes and promises from companion messages (`agent_self_notes`), added, marked done or dropped by the background call. Open promises always show with due dates; opinions show when the message touches them.
+5. Maintenance: done. Unchanged text is not re-embedded; each background batch heals up to 50 missing vectors; conversation delete removes the vectors and reviews of its memories; the backfill script can prune old orphans.
 
 ### Phase 4: Initiative
 
 1. Return greetings after a long gap, using the clock and the user's context.
 2. Promise follow-ups scheduled at the right time.
 3. Story mode: parts every 30 to 90 seconds, check-ins every few parts, pause when the user goes quiet, stop on request.
+
+### Phase 5: New-user onboarding (agent side)
+
+Plan in [agent-onboarding-plan.md](agent-onboarding-plan.md): a real first message, a getting-to-know-you stage in the prompt, an admin tracker per user and an early drop-off nudge. Two product decisions are open (user-facing progress, goal of the first chat).
 
 ## Evaluation per phase
 
@@ -101,6 +105,7 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 | 2 | Annie and Kabir stay in character across 30 turns. No banned phrases. Fewer questions per turn than today. |
 | 3 | Recall of relevant memories without unrelated ones. Promises and opinions remembered across sessions. |
 | 4 | Follow-ups arrive on time. Story mode continues, checks in and stops correctly. |
+| 5 | First message is personal and honest. New users are not interviewed: at most one basics question per reply. |
 
 ## Sources
 
