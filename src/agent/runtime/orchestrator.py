@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
-from agent.context_engine.conversation_engine.policy.replies import STORY_NOTE_PREFIX
+from agent.context_engine.conversation_engine.policy.replies import (
+    STORY_END_MARKER,
+    STORY_NOTE_PREFIX,
+    strip_story_end,
+)
+from agent.runtime.story_mode import (
+    schedule_story_part,
+    story_autoplay_enabled,
+    story_part_block_reason,
+)
 from agent.context_engine.conversation_engine.policy.freshness import (
     question_rule_reason,
     recent_assistant_replies,
@@ -275,6 +284,7 @@ async def run_agent_turn(
             generation_arguments=generation_arguments,
             question_limit=context_package.question_limit,
         )
+        reply, story_ended = strip_story_end(reply)
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -333,7 +343,17 @@ async def run_agent_turn(
         )
         if turn_state and index == len(reply_parts) - 1:
             assistant_message["turn_state"] = turn_state
+        if story_turn and story_ended and index == len(reply_parts) - 1:
+            assistant_message["story_end"] = True
         updated_messages.append(assistant_message)
+    if (
+        story_turn
+        and user_id
+        and story_autoplay_enabled()
+        and story_part_block_reason(updated_messages) is None
+    ):
+        # The user is listening; the next part follows on its own unless they write first.
+        schedule_story_part(user_id, conversation_id)
     if context_snapshot:
         context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = (
             reply
@@ -425,8 +445,8 @@ _NO_QUESTION_NOTE = (
 
 _STORY_NOTE = (
     f"{STORY_NOTE_PREFIX} the user asked for a story. Tell it yourself now in 4-7 short bubbles "
-    "separated by <next_message>: a character, a setting and something that happens. End with "
-    "an ending or a light 'want more?'. Do not ask the user what should happen."
+    "separated by <next_message>: a character, a setting and something that happens. Do not ask "
+    "the user what should happen."
 )
 _STORY_CONTINUE_NOTE = (
     f"{STORY_NOTE_PREFIX} the user is following the story you are telling. If they react or ask "
@@ -434,15 +454,22 @@ _STORY_CONTINUE_NOTE = (
     "short bubbles separated by <next_message>. Move the plot forward; do not restart or recap. "
     "If they clearly changed the subject, reply to that instead and drop the story."
 )
+_STORY_ENDING = " End with an ending or a light 'want more?'."
+# With autoplay the story goes on by itself, so a part stops at a pause instead of asking.
+_STORY_AUTOPLAY_ENDING = (
+    " Stop this part at a natural pause without asking whether to go on; you will continue on "
+    f"your own in a moment. When the whole story is finished, add {STORY_END_MARKER} at the very end."
+)
 
 
 def _turn_notes(question_limit: int, intent_labels: tuple[str, ...] = ()) -> list[dict[str, str]]:
     """Per-turn rules placed after the user's message."""
     notes = []
+    ending = _STORY_AUTOPLAY_ENDING if story_autoplay_enabled() else _STORY_ENDING
     if "story_continuation" in intent_labels:
-        notes.append({"role": "system", "content": _STORY_CONTINUE_NOTE})
+        notes.append({"role": "system", "content": _STORY_CONTINUE_NOTE + ending})
     elif "story_or_long_reply" in intent_labels:
-        notes.append({"role": "system", "content": _STORY_NOTE})
+        notes.append({"role": "system", "content": _STORY_NOTE + ending})
     elif question_limit == 0:
         notes.append({"role": "system", "content": _NO_QUESTION_NOTE})
     return notes
