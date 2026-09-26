@@ -407,6 +407,9 @@ async def _run_claimed_background_cognition(
                 "operations": [_operation_dict(operation) for operation in analysis.operations],
                 "thread_operation": raw.get("thread_operation"),
                 "handoff": _handoff_dict(analysis.handoff),
+                # Raw, so a missing card or note shows whether the model wrote it at all.
+                "user_card": raw.get("user_card"),
+                "self_notes": raw.get("self_notes"),
             },
             review={
                 "valid": analysis.valid,
@@ -685,6 +688,10 @@ def _handoff_dict(handoff: MemoryHandoff) -> dict[str, Any]:
         "active_topics": list(handoff.active_topics),
         "unresolved_references": list(handoff.unresolved_references),
         "conversation_summary": handoff.conversation_summary,
+        "session_log": [
+            {"started_at": e.started_at, "gist": e.gist, "unfinished": e.unfinished}
+            for e in handoff.session_log
+        ],
     }
 
 
