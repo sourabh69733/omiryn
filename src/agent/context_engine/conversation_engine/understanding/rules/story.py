@@ -4,58 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.shared.text import normalized_memory_text
-
-# Short replies ("then?", "wow", "aage kya hua") while a story is running mean "keep going".
-_SHORT_REPLY_WORDS = 8
-_CONTINUE_PHRASES = (
-    "continue",
-    "go on",
-    "keep going",
-    "what happened",
-    "what next",
-    "then",
-    "next",
-    "more",
-    "after that",
-    "aage",
-    "phir",
-    "fir",
-    "uske baad",
-    "sunao",
-)
-_STOP_PHRASES = (
-    "stop",
-    "enough",
-    "bas",
-    "the end",
-    "never mind",
-    "nevermind",
-    "change the topic",
-    "change topic",
-    "something else",
-    "good night",
-    "bye",
-)
-
 
 def continues_story(user_text: str, history: list[dict[str, Any]]) -> bool:
-    """True when the last reply was a story and the user is following it, not moving on."""
+    """True while a story the companion is telling has not ended.
+
+    Whether the user's message follows the story or moves on is left to the model: the story
+    turn note tells it to reply to a change of subject and mark the story ended. Keyword lists
+    for "then?" or "stop" missed too much wording, Hinglish included.
+    """
     last_reply = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
-    if not last_reply or not last_reply.get("story") or last_reply.get("story_end"):
-        return False
-    normalized = normalized_memory_text(user_text)
-    if not normalized:
-        return True  # an emoji or a bare reaction
-    if any(_has_phrase(normalized, phrase) for phrase in _STOP_PHRASES):
-        return False
-    if len(normalized.split()) <= _SHORT_REPLY_WORDS:
-        return True
-    return any(_has_phrase(normalized, phrase) for phrase in _CONTINUE_PHRASES)
-
-
-def _has_phrase(text: str, phrase: str) -> bool:
-    return f" {phrase} " in f" {text} "
+    return bool(last_reply and last_reply.get("story") and not last_reply.get("story_end"))
 
 
 __all__ = ["continues_story"]

@@ -452,7 +452,8 @@ _STORY_CONTINUE_NOTE = (
     f"{STORY_NOTE_PREFIX} the user is following the story you are telling. If they react or ask "
     "for more, react in a few words at most, then continue the story from where it stopped in 3-7 "
     "short bubbles separated by <next_message>. Move the plot forward; do not restart or recap. "
-    "If they clearly changed the subject, reply to that instead and drop the story."
+    "If they want to stop or have moved on to something else, reply to that instead and add "
+    f"{STORY_END_MARKER} at the very end."
 )
 _STORY_ENDING = " End with an ending or a light 'want more?'."
 # With autoplay the story goes on by itself, so a part stops at a pause instead of asking.
