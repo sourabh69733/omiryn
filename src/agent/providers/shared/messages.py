@@ -17,6 +17,7 @@ from .config import (
     CHAT_ADVICE_REPLY_WORD_LIMIT,
     CHAT_REPLY_WORD_LIMIT,
     HISTORY_TOKEN_BUDGET,
+    PREVIOUS_SESSION_TAIL,
     RECENT_CHAT_MESSAGE_LIMIT,
 )
 from agent.providers.companion.prompts import _context_sources_text, _truncate_for_context
@@ -55,16 +56,19 @@ def reply_window(
     """Messages to send as chat history, each with a `day_note` in the user's timezone.
 
     Drops messages the conversation summary already covers: everything before the recent
-    window, and everything from earlier sessions (before the last long silence). Messages the
-    summary has not reached yet always stay; `_provider_messages` then compacts only that
-    unsummarized overflow.
+    window, and earlier sessions except the last few messages before the latest break.
+    Messages the summary has not reached yet always stay; `_provider_messages` then compacts
+    only that unsummarized overflow.
     """
     start = 0
     if summarized_through is not None and summarized_through >= 0:
         start = min(max(0, len(messages) - RECENT_CHAT_MESSAGE_LIMIT), summarized_through + 1)
-        # Earlier sessions reach the model only through the dated summary, so it does not copy
-        # stale relative words ("next Friday" said days ago). Unsummarized messages always stay.
-        start = max(start, min(current_session_start(messages), summarized_through + 1))
+        # Older sessions reach the model through the dated summary, so it does not copy stale
+        # relative words. The tail of the previous session stays: it is what "last time" means.
+        session_start = current_session_start(messages)
+        previous_start = current_session_start(messages[:session_start])
+        keep_from = max(previous_start, session_start - PREVIOUS_SESSION_TAIL)
+        start = max(start, min(keep_from, summarized_through + 1))
     window = messages[start:]
     return [
         {**message, "day_note": note}

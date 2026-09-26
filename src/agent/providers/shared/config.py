@@ -18,6 +18,9 @@ from agent.providers.gateway.registry import (
 RECENT_CHAT_MESSAGE_LIMIT = int(os.getenv("AGENT_RECENT_MESSAGE_LIMIT", "24"))
 # Estimated tokens for the chat history sent with each reply (system prompt excluded).
 HISTORY_TOKEN_BUDGET = int(os.getenv("AGENT_HISTORY_TOKEN_BUDGET", "4000"))
+# Messages from the end of the previous session kept word for word after a break, so the
+# companion knows what it was just talking about.
+PREVIOUS_SESSION_TAIL = int(os.getenv("AGENT_PREVIOUS_SESSION_TAIL", "6"))
 CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "5"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
