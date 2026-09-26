@@ -188,3 +188,91 @@ def test_pass_does_not_talk_over_a_message_sent_while_generating() -> None:
 
     assert asyncio.run(scenario()) == 0
     assert len(storage.get_conversation(CONVERSATION_ID, USER_ID)["messages"]) == 3
+
+
+# Return greetings: a user who opens the chat after a long gap gets one short hello.
+
+from agent.proactive import greet_on_return, return_greeting_block_reason  # noqa: E402
+from agent.proactive import service as proactive_service  # noqa: E402
+
+HOUR = 60
+
+
+def test_return_greeting_needs_a_long_gap() -> None:
+    assert return_greeting_block_reason([_msg("user", 5 * HOUR)], NOW) == "no_long_gap"
+    assert return_greeting_block_reason([_msg("user", 7 * HOUR)], NOW) is None
+    assert return_greeting_block_reason([_msg("assistant", 7 * HOUR)], NOW) == "no_user_message"
+
+
+def test_one_greeting_per_return() -> None:
+    greeted = [_msg("user", 30 * HOUR), _msg("assistant", 7 * HOUR, proactive=True)]
+    assert return_greeting_block_reason(greeted, NOW) == "last_nudge_unanswered"
+
+
+def _greet(socket: _Socket, reply: str = "Morning! Big day, the interview is today.") -> tuple[bool, AsyncMock]:
+    generate = AsyncMock(return_value=reply)
+
+    async def scenario() -> bool:
+        await _connect(socket)
+        with patch("agent.proactive.service._generate", generate):
+            return await greet_on_return(USER_ID, CONVERSATION_ID, NOW)
+
+    return asyncio.run(scenario()), generate
+
+
+def test_greeting_is_saved_pushed_and_tells_the_model_the_gap_and_hour() -> None:
+    socket = _seed([_msg("user", 2 * 24 * HOUR + 1), _msg("assistant", 2 * 24 * HOUR)])
+    storage.set_user_timezone(USER_ID, "Asia/Kolkata")
+
+    sent, generate = _greet(socket)
+
+    assert sent
+    stored = storage.get_conversation(CONVERSATION_ID, USER_ID)["messages"][-1]
+    assert stored["proactive"] is True and stored["proactive_kind"] == "return_greeting"
+    assert socket.sent[-1]["type"] == "message.created"
+    instructions = generate.await_args.kwargs["instructions"]
+    assert "after 2 days away" in instructions
+    assert "It is evening for them" in instructions  # 12:00 UTC is 5:30 pm in India
+
+
+def test_no_greeting_when_the_user_was_here_recently_or_is_opted_out() -> None:
+    socket = _seed([_msg("user", 60), _msg("assistant", 59)])
+    assert _greet(socket)[0] is False
+    socket = _seed([_msg("user", 2 * 24 * HOUR)])
+    storage.set_proactive_enabled(USER_ID, False)
+    assert _greet(socket)[0] is False
+
+
+def test_periodic_pass_greets_a_returning_user_instead_of_a_topic_nudge() -> None:
+    socket = _seed([_msg("user", 2 * 24 * HOUR), _msg("assistant", 2 * 24 * HOUR - 1)])
+    generate = AsyncMock(return_value="Hey, welcome back!")
+
+    async def scenario() -> int:
+        await _connect(socket)
+        with patch("agent.proactive.service.list_threads", return_value=[_thread()]), patch(
+            "agent.proactive.service._generate", generate
+        ):
+            return await run_proactive_pass(now=NOW)
+
+    assert asyncio.run(scenario()) == 1
+    assert generate.await_args.kwargs["cue"] == proactive_service._RETURN_CUE
+
+
+def test_scheduled_greeting_waits_and_skips_when_the_user_left(monkeypatch) -> None:
+    monkeypatch.setenv("PROACTIVE_RETURN_GREETING_DELAY_SECONDS", "0")
+    _seed([_msg("user", 2 * 24 * HOUR)])
+    greet = AsyncMock(return_value=True)
+
+    async def scenario(watching: bool) -> None:
+        await realtime_hub.reset()
+        if watching:
+            await _connect(_Socket())
+        with patch("agent.proactive.service.greet_on_return", greet):
+            proactive_service.schedule_return_greeting(USER_ID, CONVERSATION_ID)
+            proactive_service.schedule_return_greeting(USER_ID, CONVERSATION_ID)  # deduped
+            await asyncio.gather(*proactive_service._greeting_tasks)
+
+    asyncio.run(scenario(watching=False))
+    assert greet.await_count == 0
+    asyncio.run(scenario(watching=True))
+    assert greet.await_count == 1
