@@ -99,16 +99,33 @@ class ReplyWindowTest(unittest.TestCase):
         window = reply_window(self.messages, 5)
         self.assertEqual(window[0]["content"], "m6")
 
-    def test_earlier_sessions_are_left_to_the_summary(self) -> None:
+    def test_only_the_previous_session_tail_stays_after_a_break(self) -> None:
         monday = "2026-09-14T14:30:00+00:00"
         wednesday = "2026-09-16T14:30:00+00:00"
+        friday = "2026-09-18T14:30:00+00:00"
         messages = [
             {"role": "user", "content": "interview next Friday", "created_at": monday},
             {"role": "assistant", "content": "good luck!", "created_at": monday},
-            {"role": "user", "content": "when is it again?", "created_at": wednesday},
+            {"role": "user", "content": "tell me a story", "created_at": wednesday},
+            {"role": "assistant", "content": "Once, a lighthouse keeper...", "created_at": wednesday},
+            {"role": "user", "content": "what were we doing last time?", "created_at": friday},
         ]
-        window = reply_window(messages, summarized_through=1)
-        self.assertEqual([m["content"] for m in window], ["when is it again?"])
+        window = reply_window(messages, summarized_through=3)
+        self.assertEqual(
+            [m["content"] for m in window],
+            ["tell me a story", "Once, a lighthouse keeper...", "what were we doing last time?"],
+        )
+
+    def test_previous_session_tail_is_capped(self) -> None:
+        monday = "2026-09-14T14:30:00+00:00"
+        wednesday = "2026-09-16T14:30:00+00:00"
+        messages = [
+            *({"role": "user", "content": f"m{i}", "created_at": monday} for i in range(10)),
+            {"role": "user", "content": "back", "created_at": wednesday},
+        ]
+        with patch("agent.providers.shared.messages.PREVIOUS_SESSION_TAIL", 3):
+            window = reply_window(messages, summarized_through=9)
+        self.assertEqual([m["content"] for m in window], ["m7", "m8", "m9", "back"])
 
     def test_unsummarized_earlier_session_messages_stay(self) -> None:
         monday = "2026-09-14T14:30:00+00:00"
@@ -119,7 +136,7 @@ class ReplyWindowTest(unittest.TestCase):
             {"role": "user", "content": "when is it again?", "created_at": wednesday},
         ]
         window = reply_window(messages, summarized_through=0)
-        self.assertEqual(window[0]["content"], "good luck!")
+        self.assertEqual(window[0]["content"], "interview next Friday")
 
     def test_summarized_through_reads_the_summary_source(self) -> None:
         sources = [

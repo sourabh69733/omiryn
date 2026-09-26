@@ -188,6 +188,36 @@ COMPANION_V2_SCENARIOS = (
         ),
     ),
     BehaviorScenario(
+        id="memory_last_topic_after_gap",
+        description="After a story and an 18-hour break, the user asks what they were doing last time.",
+        tags=("companion_v2", "memory", "time"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=(
+            {"role": "user", "content": "I'm from Jaipur, love long drives"},
+            {"role": "assistant", "content": "Jaipur and long drives, that's a good combo."},
+        ),
+        turns=(
+            _turn("tell me a short crime story", after_minutes=DAY),
+            _turn("then?"),
+            ScenarioTurn(
+                user_message="hey, what were we doing last time?",
+                after_minutes=18 * 60,
+                run_background_before=True,
+                expectation=_expect(
+                    required_substrings_any=("story", "kahani", "crime", "detective"),
+                    rubric=(
+                        _rubric(
+                            "names_last_topic",
+                            "Says they were in the middle of a crime story (last time). Naming an "
+                            "older topic such as Jaipur or long drives as the last thing fails.",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
         id="memory_correction_wins",
         description="The user corrects where they live; later the companion must use the corrected city.",
         tags=("companion_v2", "memory"),
