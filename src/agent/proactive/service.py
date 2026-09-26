@@ -23,10 +23,12 @@ from storage import (
     get_proactive_enabled,
     get_user_profile,
     get_user_timezone,
+    list_active_self_notes,
+    resolve_self_notes,
     save_conversation,
 )
 
-from .policy import nudge_block_reason, pick_thread, return_greeting_block_reason
+from .policy import due_promise, nudge_block_reason, pick_thread, return_greeting_block_reason
 
 logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL_SECONDS = 300.0
@@ -57,6 +59,16 @@ enough. No "how was your day" or "what's on your mind", no guilt about the absen
 mention timers, memory or being automated.
 """
 _RETURN_CUE = "(The user just came back and has not written yet. Greet them now.)"
+_PROMISE_IN_GREETING = """Earlier you promised: "{promise}". It is due now, so bring it up in the greeting.
+"""
+
+_PROMISE_INSTRUCTIONS = """
+
+PROMISE FOLLOW-UP
+Earlier you promised the user: "{promise}". It is due now. Write ONE short message (one or two
+sentences) that follows up on it naturally, the way a friend who remembered would. No pressure,
+and do not mention reminders, timers, notes or being automated.
+"""
 # Lets the user type first; the greeting only goes out if they are still quiet.
 DEFAULT_RETURN_GREETING_DELAY_SECONDS = 8.0
 _pending_greetings: set[tuple[str, str]] = set()
@@ -119,29 +131,47 @@ async def greet_on_return(user_id: str, conversation_id: str, now: datetime) -> 
         return False
     last_sent = parse_time(messages[-1].get("created_at"))
     local_now = now.astimezone(user_zone(get_user_timezone(user_id)))
+    promise = due_promise(list_active_self_notes(user_id), now)
+    instructions = _RETURN_INSTRUCTIONS.format(
+        gap=humanize_gap(now - last_sent), day_part=day_part(local_now)
+    )
+    if promise:
+        instructions += _PROMISE_IN_GREETING.format(promise=promise["text"])
     reply = await _generate(
         conversation,
         user_id,
-        user_text=_last_user_text(messages),
-        instructions=_RETURN_INSTRUCTIONS.format(
-            gap=humanize_gap(now - last_sent), day_part=day_part(local_now)
-        ),
+        user_text=promise["text"] if promise else _last_user_text(messages),
+        instructions=instructions,
         cue=_RETURN_CUE,
     )
     if not reply:
         return False
-    return await _deliver(
-        user_id,
-        conversation_id,
-        expected_count=len(messages),
-        message={
-            "role": "assistant",
-            "content": reply,
-            "proactive": True,
-            "proactive_kind": "return_greeting",
-            "created_at": now.isoformat(),
-        },
+    message = {
+        "role": "assistant",
+        "content": reply,
+        "proactive": True,
+        "proactive_kind": "return_greeting",
+        "created_at": now.isoformat(),
+    }
+    return await _deliver_keeping_promise(user_id, conversation_id, len(messages), message, promise)
+
+
+async def _deliver_keeping_promise(
+    user_id: str,
+    conversation_id: str,
+    expected_count: int,
+    message: dict[str, Any],
+    promise: dict[str, Any] | None,
+) -> bool:
+    """Deliver; a promise raised in the message is marked done so it is never raised twice."""
+    if promise:
+        message["promise_note_id"] = promise["id"]
+    delivered = await _deliver(
+        user_id, conversation_id, expected_count=expected_count, message=message
     )
+    if delivered and promise:
+        resolve_self_notes(user_id, [(promise["id"], "done")])
+    return delivered
 
 
 def _open_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | None:
@@ -169,6 +199,9 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
         return await greet_on_return(user_id, conversation_id, now)
     if nudge_block_reason(messages, now):
         return False
+    promise = due_promise(list_active_self_notes(user_id), now)
+    if promise:
+        return await _follow_up_promise(user_id, conversation, promise, now)
     already_nudged = {m.get("thread_id") for m in messages if m.get("proactive")}
     thread = pick_thread(
         list_threads(user_id, statuses=("open",)), exclude_ids=already_nudged
@@ -199,6 +232,30 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
             "thread_id": thread.id,
             "created_at": now.isoformat(),
         },
+    )
+
+
+async def _follow_up_promise(
+    user_id: str, conversation: dict[str, Any], promise: dict[str, Any], now: datetime
+) -> bool:
+    reply = await _generate(
+        conversation,
+        user_id,
+        user_text=promise["text"],
+        instructions=_PROMISE_INSTRUCTIONS.format(promise=promise["text"]),
+        cue=_CUE,
+    )
+    if not reply:
+        return False
+    message = {
+        "role": "assistant",
+        "content": reply,
+        "proactive": True,
+        "proactive_kind": "promise_follow_up",
+        "created_at": now.isoformat(),
+    }
+    return await _deliver_keeping_promise(
+        user_id, conversation["id"], len(conversation["messages"]), message, promise
     )
 
 

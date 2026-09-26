@@ -95,6 +95,23 @@ def return_greeting_block_reason(
     return None
 
 
+# A promise this late is stale; raising it would feel odd rather than caring.
+PROMISE_FOLLOW_UP_MAX_AGE = timedelta(days=14)
+
+
+def due_promise(notes: list[dict[str, Any]], now: datetime) -> dict[str, Any] | None:
+    """The oldest active promise whose follow-up time has come, if any."""
+    due = [
+        (due_at, note)
+        for note in notes
+        if note.get("kind") == "promise"
+        and (due_at := _parse_time(note.get("due_at")))
+        and due_at <= now
+        and now - due_at <= PROMISE_FOLLOW_UP_MAX_AGE
+    ]
+    return min(due, key=lambda item: item[0])[1] if due else None
+
+
 def pick_thread(
     threads: list[ConversationThread],
     exclude_ids: set[str | None] | frozenset[str | None] = frozenset(),
