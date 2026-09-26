@@ -15,8 +15,8 @@ STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500
 SOURCE_TYPE_PRIORITY = {
     # Who the user is; small and always relevant.
     "user_card": 130,
-    # Where the previous session stopped; small, and what "last time" questions need.
-    "last_session": 128,
+    # One dated line per recent session; what "last time" and "on Monday" questions need.
+    "recent_sessions": 128,
     # Older parts of this chat; without it the companion forgets beyond the recent window.
     "conversation_summary": 125,
     # The current inline thread contract requires candidate IDs to be present.
@@ -35,7 +35,7 @@ SOURCE_TYPE_PRIORITY = {
 }
 SOURCE_TYPE_CHAR_LIMIT = {
     "user_card": 1000,
-    "last_session": 1000,
+    "recent_sessions": 1200,
     "conversation_summary": 1900,
     "conversation_threads": 1800,
     # Up to 12 one-line memories with their dates on a "what do you know about me" turn.

@@ -37,14 +37,12 @@ from agent.shared.timeline import (
     date_label,
     humanize_gap,
     local_label,
-    message_time,
     parse_time,
-    previous_session,
     relative_day,
+    session_gap,
     user_zone,
 )
 from storage import (
-    get_conversation,
     get_user_card,
     list_active_self_notes,
     get_user_timezone,
@@ -62,10 +60,8 @@ DATA_POINT_SOURCE_TYPE = "data_points"
 AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 USER_CARD_SOURCE_TYPE = "user_card"
-LAST_SESSION_SOURCE_TYPE = "last_session"
-_LAST_SESSION_QUOTE_CHARS = 220
-_LAST_SESSION_MESSAGES = 8
-_LAST_SESSION_TURNS = 4
+RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
+RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
 # Open promises always show; opinions, tastes and jokes only when the message touches them.
 SELF_NOTE_PROMISE_LIMIT = 4
@@ -195,7 +191,7 @@ def build_reply_context_sources(
     )
     continuity_sources = (
         _user_card_sources(user_id)
-        + _last_session_sources(conversation_id, user_id)
+        + _recent_sessions_sources(conversation_id, user_id)
         + _conversation_summary_sources(conversation_id, user_id)
         + _self_note_sources(user_id, user_text)
     ) + conversation_thread_context_sources(
@@ -361,70 +357,39 @@ def _user_card_sources(user_id: str | None) -> list[dict[str, Any]]:
     ]
 
 
-def _last_session_sources(conversation_id: str, user_id: str | None) -> list[dict[str, Any]]:
-    """Where the previous session stopped, stated plainly, so "what were we doing last time?"
-    gets the last topic rather than whatever the summary dwells on."""
-    if not user_id:
+def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[dict[str, Any]]:
+    """The last few chat sessions, one dated line each, from the background session log."""
+    if not user_id or agent_pipeline_config().memory_contract_version != 3:
         return []
-    conversation = get_conversation(conversation_id, user_id)
+    state = get_processing_state(conversation_id, user_id)
+    entries = state.handoff.session_log[-RECENT_SESSION_LIMIT:] if state else ()
+    if not entries:
+        return []
     now = utc_now()
-    previous = previous_session((conversation or {}).get("messages") or [], now)
-    # Messages we sent first that were never answered were not the topic; name them apart.
-    unanswered: list[dict[str, Any]] = []
-    while previous and previous[-1].get("proactive"):
-        unanswered.insert(0, previous.pop())
-    if not any(message.get("role") == "user" for message in previous):
-        return []
-    ended = message_time(previous[-1])
     zone = user_zone(get_user_timezone(user_id))
-    when = (
-        f"{local_label(ended.astimezone(zone))} ({humanize_gap(now - ended)} ago)"
-        if ended
-        else "before this session"
-    )
-    lines = [
-        f"Where you left off: the previous session ended {when}. If the user asks what you "
-        "were doing or talking about last time, this is it. Its last exchanges:",
-        *(f'- {speaker}: "{_quote(text)}"' for speaker, text in _last_turns(previous)),
-    ]
-    replies = [m for m in previous[-_LAST_SESSION_MESSAGES:] if m.get("role") == "assistant"]
-    if any(m.get("story") for m in replies) and not any(m.get("story_end") for m in replies):
-        lines.append("- You were in the middle of telling a story; it was not finished.")
-    if unanswered:
-        lines.append(
-            f'- Later you messaged them first ("{_quote(unanswered[-1].get("content"))}"); they '
-            "have not answered it, so it was not the topic."
+    lines = ["Your recent chat sessions with the user, oldest first:"]
+    for entry in entries:
+        started, ended = parse_time(entry.started_at), parse_time(entry.ended_at)
+        if started is None:
+            continue
+        current = ended is not None and now - ended < session_gap()
+        when = (
+            "this session so far"
+            if current
+            else f"{humanize_gap(now - (ended or started))} ago"
         )
+        line = f"- {local_label(started.astimezone(zone))} ({when}): {entry.gist}"
+        if entry.unfinished:
+            line += f" Left open: {entry.unfinished}"
+        lines.append(line)
     return [
         {
-            "source_type": LAST_SESSION_SOURCE_TYPE,
-            "title": "Where you left off",
+            "source_type": RECENT_SESSIONS_SOURCE_TYPE,
+            "title": "Recent sessions",
             "content": "\n".join(lines),
-            "metadata": {"previous_session_messages": len(previous) + len(unanswered)},
+            "metadata": {"session_count": len(lines) - 1},
         }
     ]
-
-
-def _last_turns(messages: list[dict[str, Any]]) -> list[tuple[str, str]]:
-    """The last few turns; one reply's bubbles joined into one line."""
-    turns: list[tuple[str, str]] = []
-    for message in messages[-_LAST_SESSION_MESSAGES:]:
-        speaker = {"user": "them", "assistant": "you"}.get(str(message.get("role")))
-        if speaker is None:
-            continue
-        text = str(message.get("content") or "")
-        if turns and turns[-1][0] == speaker:
-            turns[-1] = (speaker, f"{turns[-1][1]} {text}")
-        else:
-            turns.append((speaker, text))
-    return turns[-_LAST_SESSION_TURNS:]
-
-
-def _quote(text: Any) -> str:
-    cleaned = " ".join(str(text or "").split()).replace('"', "'")
-    if len(cleaned) <= _LAST_SESSION_QUOTE_CHARS:
-        return cleaned
-    return cleaned[: _LAST_SESSION_QUOTE_CHARS].rsplit(" ", 1)[0] + "..."
 
 
 def _self_note_sources(user_id: str | None, user_text: str) -> list[dict[str, Any]]:

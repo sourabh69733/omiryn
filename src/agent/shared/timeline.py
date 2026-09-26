@@ -162,16 +162,6 @@ def current_session_start(messages: list[dict[str, Any]]) -> int:
     return start
 
 
-def previous_session(messages: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
-    """Messages of the session before the current one, where a message sent `now` belongs to
-    the current one. Empty when there is no earlier session."""
-    probe = [*messages, {"created_at": now.isoformat()}]
-    session_start = current_session_start(probe)
-    if session_start <= 0:
-        return []
-    return messages[current_session_start(messages[:session_start]) : session_start]
-
-
 def local_label(local: datetime) -> str:
     """'Friday 25 Sep, 5:29 pm'."""
     return _local_label(local)
@@ -250,7 +240,6 @@ def _local_label(local: datetime, *, with_year: bool = False) -> str:
 __all__ = [
     "ConversationTime",
     "local_label",
-    "previous_session",
     "conversation_time",
     "current_session_start",
     "date_label",
