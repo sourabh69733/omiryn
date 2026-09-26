@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import split_assistant_reply
-from agent.context_engine.conversation_engine.state.models import ConversationThread
 from agent.context_engine.conversation_engine.state.service import list_threads
 from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
@@ -17,15 +16,17 @@ from agent.providers import _provider_messages, generate_agent_reply
 from agent.providers.shared.messages import reply_window, summarized_through
 from agent.runtime.orchestrator import _visible_companion_reply
 from agent.shared.clock import utc_now
+from agent.shared.timeline import day_part, humanize_gap, parse_time, user_zone
 from realtime import conversation_event, realtime_hub
 from storage import (
     get_conversation,
     get_proactive_enabled,
     get_user_profile,
+    get_user_timezone,
     save_conversation,
 )
 
-from .policy import nudge_block_reason, pick_thread
+from .policy import nudge_block_reason, pick_thread, return_greeting_block_reason
 
 logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL_SECONDS = 300.0
@@ -45,6 +46,22 @@ Topic: {title}. What was said: {summary}. Suggested angle: {angle}.
 """
 _CUE = "(The user has said nothing new. Send your own short opening message now.)"
 
+_RETURN_INSTRUCTIONS = """
+
+RETURN GREETING
+The user just opened this chat after {gap} away. It is {day_part} for them. They have not
+written yet. Write ONE short greeting (one or two sentences) that fits the time of day and the
+gap. If one concrete thing is worth bringing up now (a promise of yours that is due, a plan they
+had around this time, or where you left off), mention it; otherwise a warm, specific hello is
+enough. No "how was your day" or "what's on your mind", no guilt about the absence, and do not
+mention timers, memory or being automated.
+"""
+_RETURN_CUE = "(The user just came back and has not written yet. Greet them now.)"
+# Lets the user type first; the greeting only goes out if they are still quiet.
+DEFAULT_RETURN_GREETING_DELAY_SECONDS = 8.0
+_pending_greetings: set[tuple[str, str]] = set()
+_greeting_tasks: set[asyncio.Task[None]] = set()
+
 
 def proactive_messaging_enabled() -> bool:
     """Deployment-level kill switch; each user also has their own off switch."""
@@ -63,13 +80,93 @@ async def run_proactive_pass(*, now: datetime | None = None) -> int:
     return sent
 
 
-async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
-    if not get_proactive_enabled(user_id):
-        return False
-    conversation = get_conversation(conversation_id, user_id)
-    if not conversation or conversation.get("status") != "active":
+def schedule_return_greeting(user_id: str, conversation_id: str) -> None:
+    """Called when a user opens a chat: greet them shortly if they come back after a long gap."""
+    key = (user_id, conversation_id)
+    if not proactive_messaging_enabled() or key in _pending_greetings:
+        return
+    _pending_greetings.add(key)
+    task = asyncio.create_task(_greet_after_delay(user_id, conversation_id))
+    _greeting_tasks.add(task)
+    task.add_done_callback(_greeting_tasks.discard)
+
+
+def _return_greeting_delay() -> float:
+    try:
+        return max(0.0, float(os.getenv("PROACTIVE_RETURN_GREETING_DELAY_SECONDS", "8")))
+    except ValueError:
+        return DEFAULT_RETURN_GREETING_DELAY_SECONDS
+
+
+async def _greet_after_delay(user_id: str, conversation_id: str) -> None:
+    try:
+        await asyncio.sleep(_return_greeting_delay())
+        if (user_id, conversation_id) in await realtime_hub.live_conversations():
+            await greet_on_return(user_id, conversation_id, utc_now())
+    except Exception:
+        logger.exception("agent.proactive.return_greeting_failed conversation_id=%s", conversation_id)
+    finally:
+        _pending_greetings.discard((user_id, conversation_id))
+
+
+async def greet_on_return(user_id: str, conversation_id: str, now: datetime) -> bool:
+    """Send one greeting to a user who opened the chat after a long silence."""
+    conversation = _open_conversation(user_id, conversation_id)
+    if conversation is None:
         return False
     messages = conversation["messages"]
+    if return_greeting_block_reason(messages, now):
+        return False
+    last_sent = parse_time(messages[-1].get("created_at"))
+    local_now = now.astimezone(user_zone(get_user_timezone(user_id)))
+    reply = await _generate(
+        conversation,
+        user_id,
+        user_text=_last_user_text(messages),
+        instructions=_RETURN_INSTRUCTIONS.format(
+            gap=humanize_gap(now - last_sent), day_part=day_part(local_now)
+        ),
+        cue=_RETURN_CUE,
+    )
+    if not reply:
+        return False
+    return await _deliver(
+        user_id,
+        conversation_id,
+        expected_count=len(messages),
+        message={
+            "role": "assistant",
+            "content": reply,
+            "proactive": True,
+            "proactive_kind": "return_greeting",
+            "created_at": now.isoformat(),
+        },
+    )
+
+
+def _open_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | None:
+    if not proactive_messaging_enabled() or not get_proactive_enabled(user_id):
+        return None
+    conversation = get_conversation(conversation_id, user_id)
+    if not conversation or conversation.get("status") != "active":
+        return None
+    return conversation
+
+
+def _last_user_text(messages: list[dict[str, Any]]) -> str:
+    return next(
+        (str(m.get("content") or "") for m in reversed(messages) if m.get("role") == "user"), ""
+    )
+
+
+async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
+    conversation = _open_conversation(user_id, conversation_id)
+    if conversation is None:
+        return False
+    messages = conversation["messages"]
+    if return_greeting_block_reason(messages, now) is None:
+        # A user back after a long gap gets a greeting, not a topic nudge.
+        return await greet_on_return(user_id, conversation_id, now)
     if nudge_block_reason(messages, now):
         return False
     already_nudged = {m.get("thread_id") for m in messages if m.get("proactive")}
@@ -79,21 +176,40 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
     if thread is None:
         return False
 
-    reply = await _generate(conversation, thread, user_id)
+    reply = await _generate(
+        conversation,
+        user_id,
+        user_text=thread.next_angle or thread.title,
+        instructions=_PROACTIVE_INSTRUCTIONS.format(
+            title=thread.title, summary=thread.summary, angle=thread.next_angle
+        ),
+        cue=_CUE,
+    )
     if not reply:
         return False
+    return await _deliver(
+        user_id,
+        conversation_id,
+        expected_count=len(messages),
+        message={
+            "role": "assistant",
+            "content": reply,
+            "proactive": True,
+            "proactive_kind": "topic_nudge",
+            "thread_id": thread.id,
+            "created_at": now.isoformat(),
+        },
+    )
 
+
+async def _deliver(
+    user_id: str, conversation_id: str, *, expected_count: int, message: dict[str, Any]
+) -> bool:
     # The user may have written while the model was thinking; re-read and never talk over them.
     latest = get_conversation(conversation_id, user_id)
-    if not latest or len(latest["messages"]) != len(messages):
+    if not latest or len(latest["messages"]) != expected_count:
         return False
-    message = {
-        "role": "assistant",
-        "content": reply,
-        "proactive": True,
-        "thread_id": thread.id,
-        "created_at": now.isoformat(),
-    }
+    reply = message["content"]
     latest["messages"] = [*latest["messages"], message]
     save_conversation(latest, user_id)
     index = len(latest["messages"]) - 1
@@ -118,13 +234,18 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
 
 
 async def _generate(
-    conversation: dict[str, Any], thread: ConversationThread, user_id: str
+    conversation: dict[str, Any],
+    user_id: str,
+    *,
+    user_text: str,
+    instructions: str,
+    cue: str,
 ) -> str | None:
     messages = conversation["messages"]
     package = await asyncio.to_thread(
         build_model_context_package,
         conversation_id=conversation["id"],
-        user_text=thread.next_angle or thread.title,
+        user_text=user_text,
         user_id=user_id,
         user_profile=get_user_profile(user_id),
         model=conversation.get("agent_model"),
@@ -134,9 +255,7 @@ async def _generate(
         user_message_index=len(messages),
         assistant_message_index=len(messages),
     )
-    system_prompt = package.system_prompt + _PROACTIVE_INSTRUCTIONS.format(
-        title=thread.title, summary=thread.summary, angle=thread.next_angle
-    )
+    system_prompt = package.system_prompt + instructions
     raw = await generate_agent_reply(
         [
             *_provider_messages(
@@ -146,7 +265,7 @@ async def _generate(
                     (package.user_profile or {}).get("timezone"),
                 )
             ),
-            {"role": "user", "content": _CUE},
+            {"role": "user", "content": cue},
         ],
         conversation_id=conversation["id"],
         model=conversation.get("agent_model"),

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from agent.context_engine.conversation_engine.state.models import ConversationThread
+from agent.shared.timeline import session_gap
 
 
 def _default_min_silence() -> timedelta:
@@ -55,6 +56,39 @@ def nudge_block_reason(
         message
         for _, message in nudges
         if (sent := _parse_time(message.get("created_at"))) and now - sent < limits.window
+    ]
+    if len(recent) >= limits.max_per_window:
+        return "daily_limit"
+    return None
+
+
+def return_greeting_block_reason(
+    messages: list[dict[str, Any]],
+    now: datetime,
+    limits: ProactiveLimits | None = None,
+) -> str | None:
+    """Why the agent must not greet a returning user now, or None when it may.
+
+    A return is a new session (silence of at least AGENT_SESSION_GAP_HOURS). One greeting per
+    return: if the last message is already ours, the user has not answered it yet.
+    """
+    limits = limits or ProactiveLimits()
+    if not any(message.get("role") == "user" for message in messages):
+        return "no_user_message"
+    last_sent = _parse_time(messages[-1].get("created_at"))
+    if last_sent is None:
+        return "unknown_last_message_time"
+    if now - last_sent < session_gap():
+        return "no_long_gap"
+    if messages[-1].get("proactive"):
+        return "last_nudge_unanswered"
+    recent = [
+        message
+        for message in messages
+        if message.get("proactive")
+        and message.get("role") == "assistant"
+        and (sent := _parse_time(message.get("created_at")))
+        and now - sent < limits.window
     ]
     if len(recent) >= limits.max_per_window:
         return "daily_limit"
