@@ -34,6 +34,7 @@ from agent.memory_engine.processing.service import get_processing_state
 from agent.memory_engine.memories.ranking import text_relevance
 from agent.shared.clock import utc_now
 from agent.shared.timeline import (
+    clock_label,
     date_label,
     humanize_gap,
     local_label,
@@ -367,18 +368,15 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
         return []
     now = utc_now()
     zone = user_zone(get_user_timezone(user_id))
-    lines = ["Your recent chat sessions with the user, oldest first:"]
+    lines = ["Your recent chat sessions with the user, oldest first (start to end time):"]
     for entry in entries:
         started, ended = parse_time(entry.started_at), parse_time(entry.ended_at)
         if started is None:
             continue
         current = ended is not None and now - ended < session_gap()
-        when = (
-            "this session so far"
-            if current
-            else f"{humanize_gap(now - (ended or started))} ago"
-        )
-        line = f"- {local_label(started.astimezone(zone))} ({when}): {entry.gist}"
+        span = _session_span(started, ended, zone)
+        when = "this session so far" if current else f"ended {humanize_gap(now - (ended or started))} ago"
+        line = f"- {span} ({when}): {entry.gist}"
         if entry.unfinished:
             line += f" Left open: {entry.unfinished}"
         lines.append(line)
@@ -390,6 +388,16 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
             "metadata": {"session_count": len(lines) - 1},
         }
     ]
+
+
+def _session_span(started: datetime, ended: datetime | None, zone: Any) -> str:
+    """'Saturday 26 Sep, 5:11 pm to 10:18 pm': a session is a stretch of time, not a moment."""
+    start = started.astimezone(zone)
+    if ended is None or ended <= started:
+        return local_label(start)
+    end = ended.astimezone(zone)
+    end_text = clock_label(end) if end.date() == start.date() else local_label(end)
+    return f"{local_label(start)} to {end_text}"
 
 
 def _self_note_sources(user_id: str | None, user_text: str) -> list[dict[str, Any]]:

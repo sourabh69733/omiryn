@@ -165,10 +165,15 @@ def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
     else:
         lines.append("This is the user's first message in this chat.")
     lines.append(
-        "Notes like (Mon 14 Sep) or (Wed 16 Sep, 2 days later) at the start of a user message "
-        "give the day it was sent; messages after it are from that day until the next note. "
-        "Never write such notes yourself. Use these days, memory dates and the conversation "
-        "summary for questions about when something happened or was said; if no date is "
-        "shown, say you are not sure instead of guessing."
+        "Notes like (Mon 14 Sep, 8:05 pm) or (9:30 pm, 1 hour later) at the start of a user "
+        "message give when it was sent; messages after it are from about that time until the "
+        "next note. Never write such notes yourself. A recent-sessions line gives when a whole "
+        "session started and ended, not when each thing inside it was said."
+    )
+    lines.append(
+        "Answer when-questions and questions about past details only from these notes, the "
+        "sessions, memories and summaries. If the exact day, time or detail is not there, say "
+        "what you do know (for example 'yesterday evening') and that you don't remember the "
+        "exact time or detail. Never guess a time, a date or a fact and state it as known."
     )
     return "\n".join(lines)

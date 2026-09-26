@@ -122,9 +122,10 @@ class SessionLogFlowTest(unittest.TestCase):
         ):
             sources = build_reply_context_sources(CONVERSATION_ID, None, "what were we doing last time?", USER_ID)
         block = next(s["content"] for s in sources if s["source_type"] == "recent_sessions")
-        self.assertIn("- Wednesday 23 Sep, 3:30 pm (2 days ago): Talked about a Goa trip in December.", block)
+        self.assertIn("- Wednesday 23 Sep, 3:30 pm (ended 2 days ago): Talked about a Goa trip", block)
         self.assertIn(
-            "- Friday 25 Sep, 5:28 pm (14 hours ago): Started a 20 questions game. Left open: the game;",
+            "- Friday 25 Sep, 5:28 pm to 9:16 pm (ended 14 hours ago): Started a 20 questions game. "
+            "Left open: the game;",
             block,
         )
 
