@@ -89,9 +89,11 @@ persona card -> behavior rules -> clock -> user card -> previous session summary
 
 ### Phase 4: Initiative
 
-1. Return greetings after a long gap, using the clock and the user's context.
-2. Promise follow-ups scheduled at the right time.
-3. Story mode: parts every 30 to 90 seconds, check-ins every few parts, pause when the user goes quiet, stop on request.
+Agent-initiated messages only reach a user who has the chat open (no push notifications). All share the proactive limits: two unprompted messages per 24 hours, none while the last one is unanswered, and the user's off switch.
+
+1. Return greetings: done. Opening a chat after the session gap (6h) and staying quiet for `PROACTIVE_RETURN_GREETING_DELAY_SECONDS` (8) brings one greeting sized to the gap and the user's hour. The 5-minute proactive pass greets a returning user instead of sending a topic nudge.
+2. Promise follow-ups: done. A self-note promise whose due time has passed (up to 14 days late) is named in the return greeting, or sent as its own message to an online user before any topic nudge. Once delivered it is marked done.
+3. Story mode: done (`AGENT_STORY_AUTOPLAY`). A story turn schedules a `story_part` job; the next part follows after 30-90s while the user watches. Every 3rd automatic part ends with a check-in and waits. It pauses when the user is away, stops when they write anything but a continue, and ends at `<story_end>`.
 
 ### Phase 5: New-user onboarding (agent side)
 
