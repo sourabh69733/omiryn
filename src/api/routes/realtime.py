@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
+from agent.proactive import schedule_return_greeting
 from realtime import RealtimeTicketError, issue_realtime_ticket, realtime_hub
 from realtime.tickets import verify_realtime_ticket
 from security.auth import CurrentUser, production_runtime_enabled, require_user
@@ -71,6 +72,8 @@ async def _handle_command(websocket: WebSocket, connection, command: object) -> 
         return
     if command_type == "subscribe":
         await realtime_hub.subscribe(connection, scope, scope_id)
+        # Opening a chat after a long gap may earn a short greeting if the user stays quiet.
+        schedule_return_greeting(connection.user_id, scope_id)
     else:
         await realtime_hub.unsubscribe(connection, scope, scope_id)
     await websocket.send_json(
