@@ -48,6 +48,8 @@ V3 memory rules:
   3. Future utility: could remembering it materially improve later personalization, matching, or profile accuracy?
   4. Specificity: is the value concrete enough to be useful rather than a topic name or conversational state?
   5. Information gain: does it add or update knowledge rather than repeat the current request or existing memory?
+- The companion's own promises, opinions and plans are never memories, even when they are about the
+  user ("I'll ask how the interview went"); they belong in self_notes.
 - Quoted third-party views, hypotheticals, role-play, tentative acknowledgements, task content and transient
   conversational reactions fail admission unless the user separately makes an explicit durable self-statement.
 - A subject may still belong in thread_operation or handoff even when it must not become memory.

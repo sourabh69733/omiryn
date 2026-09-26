@@ -58,8 +58,14 @@ Conversation summary rules:
 - Date events with the day from sent_at, e.g. "On Tue 22 Sep the user said the interview went well".
 - Turn the user's relative words into absolute dates: "next Friday" said on Mon 14 Sep becomes
   "on Fri 18 Sep". Never keep "next Friday", "yesterday" or "tomorrow"; they go stale.
+- For a story, game or role-play, keep its gist (who, what happened, where it stopped), not just
+  "the companion told a story".
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
+- End with one line starting "Last:" that says where the conversation stopped, e.g. "Last: the
+  companion was telling a crime story about detective Siya; not finished."
 - Stay under 1500 characters. When it gets long, compress the oldest points first.
+- Before returning, check the summary has no relative day words ("next", "last", "yesterday",
+  "tomorrow", "tonight", "this Friday"); replace each with the date.
 
 Self-note rules (what the companion said itself, so it stays consistent across chats):
 - Add a note only for a clear opinion, taste, running joke or promise in a NEW companion message;
@@ -77,13 +83,15 @@ Self-note rules (what the companion said itself, so it stays consistent across c
 
 User card rules:
 - user_card is a short note about who the user is, read by the companion on every reply in every chat.
-- Start from current_user_card (empty for a new user) and update it with the new user messages.
-  Return null when nothing durable changed.
+- Start from current_user_card and update it with the new user messages. Return null when
+  nothing durable changed. If current_user_card is empty, write it now from existing_memories and
+  the messages.
 - One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, work or
   study, key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.
 - Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
   financial details, no relative time words. Replace a line when the user corrects it.
+- Leave out what is unknown; never write lines like "Name: not given".
 
 """ + V3_MEMORY_OUTPUT_SHAPE
 
