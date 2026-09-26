@@ -135,7 +135,15 @@ class DayNotesTest(unittest.TestCase):
 
         self.assertEqual(
             notes,
-            [None, "(Mon 14 Sep)", None, "(Tue 15 Sep)", None, "(Wed 16 Sep, 1 day later)", None],
+            [
+                None,
+                "(Mon 14 Sep, 8:00 pm)",
+                None,
+                "(Tue 15 Sep, 12:00 am)",
+                None,
+                "(Wed 16 Sep, 8:00 pm, 1 day later)",
+                None,
+            ],
         )
 
     def test_provider_messages_prefix_user_turns_but_never_assistant_turns(self) -> None:
@@ -147,15 +155,27 @@ class DayNotesTest(unittest.TestCase):
         ]
         provider = _provider_messages(messages)
 
-        self.assertTrue(provider[0]["content"].startswith("(Fri 18 Sep)"))
-        self.assertEqual(provider[-1]["content"], "(Tue 22 Sep, 1 day later) I'm back")
+        self.assertTrue(provider[0]["content"].startswith("(Fri 18 Sep, "))
+        self.assertRegex(provider[-1]["content"], r"^\(Tue 22 Sep, [0-9:]+ [ap]m, 1 day later\) I'm back$")
         self.assertTrue(all(m["content"][0] != "(" for m in provider if m["role"] == "assistant"))
         self.assertEqual(messages[-1]["content"], "I'm back")
 
     def test_reply_window_notes_use_the_user_timezone(self) -> None:
         late_utc = datetime(2026, 9, 21, 20, 0, tzinfo=UTC)  # Tue 22 Sep, 1:30 am in IST
         window = reply_window([_message("user", "can't sleep", late_utc)], None, "Asia/Kolkata")
-        self.assertEqual(_provider_messages(window)[0]["content"], "(Tue 22 Sep) can't sleep")
+        self.assertEqual(_provider_messages(window)[0]["content"], "(Tue 22 Sep, 1:30 am) can't sleep")
+
+    def test_an_hour_long_pause_inside_a_session_gets_a_time_note(self) -> None:
+        start = datetime(2026, 9, 26, 11, 43, tzinfo=UTC)  # 5:13 pm IST
+        messages = [
+            _message("user", "tell me a story", start),
+            _message("user", "why so long", start + timedelta(minutes=50)),
+            _message("user", "hi, what is next now?", start + timedelta(hours=2, minutes=21)),
+        ]
+        self.assertEqual(
+            day_notes(messages, "Asia/Kolkata"),
+            ["(Sat 26 Sep, 5:13 pm)", None, "(7:34 pm, 1 hour later)"],
+        )
 
 
 class TimeAwarenessPromptTest(unittest.TestCase):

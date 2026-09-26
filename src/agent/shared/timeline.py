@@ -162,6 +162,20 @@ def current_session_start(messages: list[dict[str, Any]]) -> int:
     return start
 
 
+def time_note_gap() -> timedelta:
+    """A pause this long inside a session gets its own time note (AGENT_TIME_NOTE_GAP_MINUTES)."""
+    try:
+        minutes = float(os.getenv("AGENT_TIME_NOTE_GAP_MINUTES", "60"))
+    except ValueError:
+        minutes = 60.0
+    return timedelta(minutes=max(1.0, minutes))
+
+
+def clock_label(local: datetime) -> str:
+    """'7:34 pm', independent of the server locale."""
+    return local.strftime("%I:%M %p").lstrip("0").lower()
+
+
 def local_label(local: datetime) -> str:
     """'Friday 25 Sep, 5:29 pm'."""
     return _local_label(local)
@@ -171,14 +185,16 @@ def day_notes(
     messages: list[dict[str, Any]],
     timezone_name: str | None = None,
 ) -> list[str | None]:
-    """One note per message: a day anchor on selected user messages, otherwise None.
+    """One note per message: a time anchor on selected user messages, otherwise None.
 
-    The first dated user message gets its day, e.g. "(Mon 14 Sep)", so older lines are not
-    read as today. Later user messages get one only when the day changes, or after a long
-    silence, e.g. "(Wed 16 Sep, 2 days later)". Assistant messages never carry notes, so the
-    model does not learn to write them.
+    The first dated user message gets its day and time, e.g. "(Mon 14 Sep, 8:00 pm)", so
+    older lines are not read as today. Later user messages get one when the day changes,
+    after a long silence ("(Wed 16 Sep, 8:00 pm, 2 days later)"), or after a pause of an hour
+    or more ("(9:30 pm, 1 hour later)"). Messages between notes are from about that time.
+    Assistant messages never carry notes, so the model does not learn to write them.
     """
     zone = user_zone(timezone_name)
+    pause = time_note_gap()
     notes: list[str | None] = []
     anchored = False
     previous_sent: datetime | None = None
@@ -187,7 +203,7 @@ def day_notes(
         note = None
         if message.get("role") == "user" and sent is not None:
             local = sent.astimezone(zone)
-            label = f"{local.strftime('%a')} {local.day} {local.strftime('%b')}"
+            label = f"{local.strftime('%a')} {local.day} {local.strftime('%b')}, {clock_label(local)}"
             gap = sent - previous_sent if previous_sent else None
             if gap is not None and gap >= session_gap():
                 note = f"({label}, {humanize_gap(gap)} later)"
@@ -195,6 +211,8 @@ def day_notes(
                 previous_sent is not None and previous_sent.astimezone(zone).date() != local.date()
             ):
                 note = f"({label})"
+            elif gap is not None and gap >= pause:
+                note = f"({clock_label(local)}, {humanize_gap(gap)} later)"
             anchored = True
         notes.append(note)
         if sent is not None:
@@ -239,6 +257,8 @@ def _local_label(local: datetime, *, with_year: bool = False) -> str:
 
 __all__ = [
     "ConversationTime",
+    "clock_label",
+    "time_note_gap",
     "local_label",
     "conversation_time",
     "current_session_start",
