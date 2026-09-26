@@ -7,14 +7,16 @@ from dataclasses import dataclass
 from typing import Any
 
 # Room for the user card and conversation summary on top of the five earlier source slots.
-CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "8"))
-CONTEXT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_CONTEXT_TOTAL_CHAR_BUDGET", "9500"))
+CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "9"))
+CONTEXT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_CONTEXT_TOTAL_CHAR_BUDGET", "10500"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
 
 SOURCE_TYPE_PRIORITY = {
     # Who the user is; small and always relevant.
     "user_card": 130,
+    # Where the previous session stopped; small, and what "last time" questions need.
+    "last_session": 128,
     # Older parts of this chat; without it the companion forgets beyond the recent window.
     "conversation_summary": 125,
     # The current inline thread contract requires candidate IDs to be present.
@@ -33,6 +35,7 @@ SOURCE_TYPE_PRIORITY = {
 }
 SOURCE_TYPE_CHAR_LIMIT = {
     "user_card": 1000,
+    "last_session": 1000,
     "conversation_summary": 1900,
     "conversation_threads": 1800,
     # Up to 12 one-line memories with their dates on a "what do you know about me" turn.
