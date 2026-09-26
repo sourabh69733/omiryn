@@ -292,6 +292,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     };
   }, [emojiPickerOpen]);
 
+
   useEffect(() => {
     if (!composerLimit?.until) return;
     if (composerPauseTimerRef.current !== null) window.clearInterval(composerPauseTimerRef.current);
@@ -544,6 +545,22 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const usageInrCost = usageSummary.estimated_cost_inr ? ` / Rs ${usageSummary.estimated_cost_inr.toFixed(4)}` : "";
   const pauseRemainingSeconds = composerLimit?.until ? Math.max(0, Math.ceil((composerLimit.until - pauseNow) / 1000)) : 0;
   const composerBlocked = Boolean(composerLimit && (!composerLimit.until || pauseRemainingSeconds > 0));
+
+  useEffect(() => {
+    if (!conversation || composerBlocked) return;
+    const focusComposerOnType = (event: KeyboardEvent) => {
+      // A plain, unmodified printable character typed anywhere on the page
+      // should land in the composer instead of doing nothing.
+      if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return;
+      const active = document.activeElement;
+      const alreadyTyping = active instanceof HTMLElement
+        && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT" || active.isContentEditable);
+      if (alreadyTyping) return;
+      inputRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("keydown", focusComposerOnType);
+    return () => window.removeEventListener("keydown", focusComposerOnType);
+  }, [conversation, composerBlocked]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
