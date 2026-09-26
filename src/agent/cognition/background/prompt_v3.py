@@ -28,7 +28,8 @@ Output shape:
     "active_people": [],
     "active_topics": [],
     "unresolved_references": [],
-    "conversation_summary": "rolling summary of the whole conversation so far"
+    "conversation_summary": "rolling summary of the whole conversation so far",
+    "session_log": [{"session": "s1", "gist": "...", "unfinished": "... or null"}]
   },
   "user_card": "short profile of the user across all chats, or null to keep current_user_card",
   "self_notes": [
@@ -61,8 +62,6 @@ Conversation summary rules:
 - For a story, game or role-play, keep its gist (who, what happened, where it stopped), not just
   "the companion told a story".
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
-- End with one line starting "Last:" that says where the conversation stopped, e.g. "Last: the
-  companion was telling a crime story about detective Siya; not finished."
 - Stay under 1500 characters. When it gets long, compress the oldest points first.
 - Before returning, check the summary has no relative day words ("next", "last", "yesterday",
   "tomorrow", "tonight", "this Friday"); replace each with the date.
@@ -80,6 +79,16 @@ Self-note rules (what the companion said itself, so it stays consistent across c
   was kept in the new messages, or dropped when the companion clearly changed its mind (then add the
   new opinion).
 - At most 6 self_notes changes per batch.
+
+Session log rules:
+- sessions lists the chat sessions in this batch; code splits them at long silences and each
+  message carries its session.
+- For every session with has_new_messages=true, return one session_log entry. gist: one or two
+  plain sentences on what the session was about, with names and specifics. unfinished: what was
+  left open when it stopped (anything half done or awaiting an answer), or null.
+- When previous_handoff.session_log has an entry for the same session, extend it.
+- A message with initiated_by_companion=true was sent first by the companion. If the user did not
+  answer it, it was not what the session was about.
 
 User card rules:
 - user_card is a short note about who the user is, read by the companion on every reply in every chat.

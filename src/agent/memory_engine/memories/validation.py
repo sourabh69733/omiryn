@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff
+from agent.memory_engine.processing.sessions import merge_session_log
 from agent.shared.utils import is_non_empty_string, is_number, unknown_fields
 
 from .models import MemoryKind, MemoryPurpose, MemorySensitivity
@@ -90,7 +91,7 @@ def validate_memory_analysis_v3(
     if decision == "propose" and not raw_operations:
         errors.append("propose requires at least one operation")
 
-    handoff, handoff_errors = _validate_handoff(raw.get("handoff"), batch.previous_handoff)
+    handoff, handoff_errors = _validate_handoff(raw.get("handoff"), batch.previous_handoff, batch)
     errors.extend(f"handoff: {error}" for error in handoff_errors)
     if errors:
         return MemoryAnalysisV3(
@@ -357,6 +358,7 @@ def _evidence_indexes(
 def _validate_handoff(
     raw: Any,
     previous: MemoryHandoff | None = None,
+    batch: MemoryBatch | None = None,
 ) -> tuple[MemoryHandoff, list[str]]:
     if not isinstance(raw, dict):
         return MemoryHandoff(), ["must be an object"]
@@ -369,6 +371,7 @@ def _validate_handoff(
             "active_topics",
             "unresolved_references",
             "conversation_summary",
+            "session_log",
         },
     )
     if unsupported:
@@ -395,6 +398,11 @@ def _validate_handoff(
         conversation_summary=_conversation_summary(
             raw.get("conversation_summary"),
             previous.conversation_summary if previous else "",
+        ),
+        session_log=(
+            merge_session_log(raw.get("session_log"), batch=batch, previous=previous.session_log)
+            if batch is not None and previous is not None
+            else (previous.session_log if previous else ())
         ),
     ), errors
 

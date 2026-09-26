@@ -8,6 +8,7 @@ from typing import Any
 from agent.shared.timeline import parse_time, user_zone
 
 from .models import MemoryBatch, MemoryMessage
+from .sessions import batch_sessions
 
 
 MEMORY_OPERATION_RULES = """Rules:
@@ -72,6 +73,7 @@ def memory_batch_prompt(
 ) -> str:
     """Serialize trusted batch metadata separately from model-generated operations."""
     zone = user_zone(timezone_name)
+    labels, sessions = batch_sessions(batch, batch.previous_handoff.session_log)
     payload = {
         "conversation_id": batch.conversation_id,
         "batch_key": batch.batch_key,
@@ -84,8 +86,18 @@ def memory_batch_prompt(
                 "scope": message.scope,
                 "evidence_eligible": message.evidence_eligible,
                 **_sent_fields(message, zone),
+                **({"session": labels[message.message_index]} if message.message_index in labels else {}),
+                **({"initiated_by_companion": True} if message.initiated_by_companion else {}),
             }
             for message in batch.messages
+        ],
+        "sessions": [
+            {
+                "session": session.id,
+                "started_at": _local_iso(session.started_at, zone),
+                "has_new_messages": session.has_new_messages,
+            }
+            for session in sessions
         ],
         "previous_handoff": {
             "summary": batch.previous_handoff.summary,
@@ -93,10 +105,29 @@ def memory_batch_prompt(
             "active_topics": list(batch.previous_handoff.active_topics),
             "unresolved_references": list(batch.previous_handoff.unresolved_references),
             "conversation_summary": batch.previous_handoff.conversation_summary,
+            "session_log": [
+                {
+                    "session": _label_for(entry.started_at, sessions),
+                    "started_at": _local_iso(entry.started_at, zone),
+                    "gist": entry.gist,
+                    "unfinished": entry.unfinished or None,
+                }
+                for entry in batch.previous_handoff.session_log[-3:]
+            ],
         },
         "existing_memories": existing_memories,
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _local_iso(value: str, zone: Any) -> str:
+    parsed = parse_time(value)
+    return parsed.astimezone(zone).isoformat(timespec="minutes") if parsed else value
+
+
+def _label_for(started_at: str, sessions: list[Any]) -> str:
+    """The batch label when this logged session continues in the batch, else 'earlier'."""
+    return next((s.id for s in sessions if s.started_at == started_at), "earlier")
 
 
 def _sent_fields(message: MemoryMessage, zone: Any) -> dict[str, str]:
