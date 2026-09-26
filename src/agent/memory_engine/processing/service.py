@@ -14,6 +14,7 @@ from storage.memory_processing import (
 )
 
 from .models import MemoryHandoff, MemoryProcessingState
+from .sessions import session_log_from_raw
 
 
 def claim_processing_batch(
@@ -63,6 +64,7 @@ def _state_from_row(row: dict[str, Any]) -> MemoryProcessingState:
             str(value) for value in raw_handoff.get("unresolved_references") or ()
         ),
         conversation_summary=str(raw_handoff.get("conversation_summary") or ""),
+        session_log=session_log_from_raw(raw_handoff.get("session_log")),
     )
     return MemoryProcessingState(
         conversation_id=str(row["conversation_id"]),

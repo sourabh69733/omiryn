@@ -19,6 +19,18 @@ class MemoryMessage:
     scope: MemoryScope
     evidence_eligible: bool
     sent_at: str | None = None
+    # Sent first by the companion (a nudge or greeting), not in answer to the user.
+    initiated_by_companion: bool = False
+
+
+@dataclass(frozen=True)
+class SessionLogEntry:
+    """What one chat session was about; keyed by its start time (UTC ISO)."""
+
+    started_at: str
+    ended_at: str
+    gist: str
+    unfinished: str = ""
 
 
 @dataclass(frozen=True)
@@ -31,6 +43,8 @@ class MemoryHandoff:
     unresolved_references: tuple[str, ...] = ()
     # Rolling summary of the whole conversation so far, read by the companion (V3).
     conversation_summary: str = ""
+    # One dated entry per session, newest last (V3).
+    session_log: tuple[SessionLogEntry, ...] = ()
 
 
 @dataclass(frozen=True)

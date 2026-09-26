@@ -114,6 +114,7 @@ def _memory_message(message: dict[str, object], *, scope: MemoryScope) -> Memory
         scope=scope,
         evidence_eligible=scope == "new" and role == "user" and bool(content.strip()),
         sent_at=message.get("created_at") if isinstance(message.get("created_at"), str) else None,
+        initiated_by_companion=role == "assistant" and bool(message.get("proactive")),
     )
 
 
