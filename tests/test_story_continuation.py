@@ -17,26 +17,25 @@ STORY = [
 
 
 class ContinuesStoryTest(unittest.TestCase):
-    def test_short_reactions_keep_the_story_going(self) -> None:
-        for text in ("then?", "wow", "aage kya hua", "haha and then what", "", "ok"):
+    def test_any_message_while_a_story_runs_gets_the_story_note(self) -> None:
+        # The model decides whether the user follows or moves on; no keyword lists.
+        for text in ("then?", "aage kya hua", "ok enough, bye", "btw my manager was annoying today"):
             with self.subTest(text=text):
                 self.assertTrue(continues_story(text, STORY))
 
-    def test_long_message_with_a_continue_phrase_keeps_it_going(self) -> None:
-        self.assertTrue(
-            continues_story("this is so good, I really want to know what happened to the bag", STORY)
-        )
-
-    def test_stop_words_and_new_long_topics_end_it(self) -> None:
-        self.assertFalse(continues_story("ok enough, bye", STORY))
-        self.assertFalse(
-            continues_story("btw I had a really long day at work and my manager was annoying", STORY)
-        )
+    def test_an_ended_story_is_not_continued(self) -> None:
+        ended = [*STORY[:-1], {**STORY[-1], "story_end": True}]
+        self.assertFalse(continues_story("then?", ended))
 
     def test_no_story_running(self) -> None:
         chat = [{"role": "assistant", "content": "hey, how's it going?"}]
         self.assertFalse(continues_story("then?", chat))
         self.assertFalse(continues_story("then?", []))
+
+    def test_continue_note_lets_the_model_end_the_story(self) -> None:
+        [note] = _turn_notes(1, ("story_or_long_reply", "story_continuation"))
+        self.assertIn("If they want to stop or have moved on", note["content"])
+        self.assertIn("<story_end>", note["content"])
 
 
 class StoryContinuationContextTest(unittest.TestCase):

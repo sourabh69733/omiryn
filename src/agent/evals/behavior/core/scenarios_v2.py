@@ -188,36 +188,6 @@ COMPANION_V2_SCENARIOS = (
         ),
     ),
     BehaviorScenario(
-        id="memory_last_topic_after_gap",
-        description="After a story and an 18-hour break, the user asks what they were doing last time.",
-        tags=("companion_v2", "memory", "time"),
-        start_at=START,
-        timezone=TIMEZONE,
-        initial_messages=(
-            {"role": "user", "content": "I'm from Jaipur, love long drives"},
-            {"role": "assistant", "content": "Jaipur and long drives, that's a good combo."},
-        ),
-        turns=(
-            _turn("tell me a short crime story", after_minutes=DAY),
-            _turn("then?"),
-            ScenarioTurn(
-                user_message="hey, what were we doing last time?",
-                after_minutes=18 * 60,
-                run_background_before=True,
-                expectation=_expect(
-                    required_substrings_any=("story", "kahani", "crime", "detective"),
-                    rubric=(
-                        _rubric(
-                            "names_last_topic",
-                            "Says they were in the middle of a crime story (last time). Naming an "
-                            "older topic such as Jaipur or long drives as the last thing fails.",
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    ),
-    BehaviorScenario(
         id="memory_correction_wins",
         description="The user corrects where they live; later the companion must use the corrected city.",
         tags=("companion_v2", "memory"),
@@ -361,4 +331,80 @@ COMPANION_V2_SCENARIOS = (
 )
 
 
-__all__ = ["COMPANION_V2_SCENARIOS"]
+
+def _last_topic_scenario(
+    scenario_id: str,
+    *,
+    older: str,
+    topic_turns: tuple[str, ...],
+    gap_hours: float,
+    question: str,
+    topic: str,
+    mentions: tuple[str, ...],
+) -> BehaviorScenario:
+    """An older topic, then a different one, a break, and a question about last time."""
+    return BehaviorScenario(
+        id=scenario_id,
+        description=f"After {gap_hours:g} hours away the user asks about last time; it was {topic}.",
+        tags=("companion_v2", "memory", "time"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=(
+            {"role": "user", "content": older},
+            {"role": "assistant", "content": "Oh nice, tell me more sometime."},
+        ),
+        turns=(
+            *(_turn(text, after_minutes=DAY if index == 0 else 2.0) for index, text in enumerate(topic_turns)),
+            ScenarioTurn(
+                user_message=question,
+                after_minutes=gap_hours * 60,
+                run_background_before=True,
+                expectation=_expect(
+                    required_substrings_any=mentions,
+                    rubric=(
+                        _rubric(
+                            "names_last_topic",
+                            f"Says the last session was about {topic}. Naming the older topic "
+                            f"({older!r}) as the last thing, or not knowing, fails.",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+# Varied on purpose: different activities, gaps, languages and ways of asking.
+LAST_TOPIC_SCENARIOS = (
+    _last_topic_scenario(
+        "memory_last_topic_story",
+        older="I work at a bakery in Indore",
+        topic_turns=("tell me a short story about a lighthouse keeper",),
+        gap_hours=20,
+        question="hey, what were we doing last time?",
+        topic="a story about a lighthouse keeper",
+        mentions=("story", "lighthouse", "kahani"),
+    ),
+    _last_topic_scenario(
+        "memory_last_topic_game_hinglish",
+        older="mujhe cricket dekhna pasand hai",
+        topic_turns=("chal 20 questions khelte hain, tu guess kar", "haan, it's a living thing"),
+        gap_hours=18,
+        question="pichli baar hum kya kar rahe the?",
+        topic="a 20 questions game",
+        mentions=("20", "question", "game", "khel"),
+    ),
+    _last_topic_scenario(
+        "memory_last_topic_trip_plan",
+        older="my sister just got married last month",
+        topic_turns=("help me plan a weekend in Rishikesh", "budget is around 5k"),
+        gap_hours=3 * 24,
+        question="where did we stop last time?",
+        topic="planning a weekend trip to Rishikesh",
+        mentions=("rishikesh", "trip", "plan"),
+    ),
+)
+COMPANION_V2_SCENARIOS = COMPANION_V2_SCENARIOS + LAST_TOPIC_SCENARIOS
+
+
+__all__ = ["COMPANION_V2_SCENARIOS", "LAST_TOPIC_SCENARIOS"]
