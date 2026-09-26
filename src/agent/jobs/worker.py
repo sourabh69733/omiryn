@@ -31,8 +31,10 @@ RETRY_BASE_SECONDS = 60.0
 def _job_handlers() -> dict[str, JobHandler]:
     # Imported here so storage and the worker load without pulling in cognition code.
     from agent.cognition.background.idle import MEMORY_FLUSH_JOB, run_memory_flush_job
+    from agent.proactive.story import run_story_part_job
+    from agent.runtime.story_mode import STORY_PART_JOB
 
-    return {MEMORY_FLUSH_JOB: run_memory_flush_job}
+    return {MEMORY_FLUSH_JOB: run_memory_flush_job, STORY_PART_JOB: run_story_part_job}
 
 
 def jobs_enabled() -> bool:

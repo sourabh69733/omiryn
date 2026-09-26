@@ -262,31 +262,43 @@ async def _follow_up_promise(
 async def _deliver(
     user_id: str, conversation_id: str, *, expected_count: int, message: dict[str, Any]
 ) -> bool:
+    return await deliver_messages(
+        user_id, conversation_id, expected_count=expected_count, new_messages=[message]
+    )
+
+
+async def deliver_messages(
+    user_id: str,
+    conversation_id: str,
+    *,
+    expected_count: int,
+    new_messages: list[dict[str, Any]],
+) -> bool:
+    """Append agent-initiated bubbles and push them live, unless the chat moved on meanwhile."""
     # The user may have written while the model was thinking; re-read and never talk over them.
     latest = get_conversation(conversation_id, user_id)
-    if not latest or len(latest["messages"]) != expected_count:
+    if not latest or len(latest["messages"]) != expected_count or not new_messages:
         return False
-    reply = message["content"]
-    latest["messages"] = [*latest["messages"], message]
+    latest["messages"] = [*latest["messages"], *new_messages]
     save_conversation(latest, user_id)
-    index = len(latest["messages"]) - 1
-    await realtime_hub.publish(
-        conversation_event(
-            "message.created",
-            conversation_id,
-            sequence=index,
-            payload={
-                "conversation_id": conversation_id,
-                "message_index": index,
-                "message": {
-                    "role": "assistant",
-                    "content": reply,
-                    "created_at": message["created_at"],
-                    "delivery_status": None,
+    for index, message in enumerate(new_messages, start=expected_count):
+        await realtime_hub.publish(
+            conversation_event(
+                "message.created",
+                conversation_id,
+                sequence=index,
+                payload={
+                    "conversation_id": conversation_id,
+                    "message_index": index,
+                    "message": {
+                        "role": "assistant",
+                        "content": message["content"],
+                        "created_at": message["created_at"],
+                        "delivery_status": None,
+                    },
                 },
-            },
+            )
         )
-    )
     return True
 
 
@@ -298,6 +310,24 @@ async def _generate(
     instructions: str,
     cue: str,
 ) -> str | None:
+    """One short bubble for a nudge or greeting; None when the model declines."""
+    text = await generate_initiative_text(
+        conversation, user_id, user_text=user_text, instructions=instructions, cue=cue
+    )
+    parts = split_assistant_reply(text, user_text="") if text else []
+    return parts[0].strip() if parts else None
+
+
+async def generate_initiative_text(
+    conversation: dict[str, Any],
+    user_id: str,
+    *,
+    user_text: str,
+    instructions: str,
+    cue: str,
+    max_tokens: int = 300,
+) -> str | None:
+    """The full visible reply for an agent-initiated message; None on SKIP."""
     messages = conversation["messages"]
     package = await asyncio.to_thread(
         build_model_context_package,
@@ -332,13 +362,10 @@ async def _generate(
         context_sources=package.context_sources,
         user_profile=package.user_profile,
         system_prompt=system_prompt,
-        max_tokens=300,
+        max_tokens=max_tokens,
     )
     text = _visible_companion_reply(raw, structured_companion_reply(raw))
-    if _is_skip(text):
-        return None
-    parts = split_assistant_reply(text, user_text="")
-    return parts[0].strip() if parts else None
+    return None if _is_skip(text) else text
 
 
 def _is_skip(text: str) -> bool:
