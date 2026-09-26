@@ -24,6 +24,17 @@ def normalize_part_separators(text: str) -> str:
     return _SEPARATOR_VARIANTS.sub(REPLY_PART_SEPARATOR, text)
 
 
+# Written by the model after the last part of a story; never shown to the user.
+STORY_END_MARKER = "<story_end>"
+_STORY_END_VARIANTS = re.compile(r"[<\[]\s*/?\s*story[\s_-]*end\s*/?\s*[>\]]", re.IGNORECASE)
+
+
+def strip_story_end(text: str) -> tuple[str, bool]:
+    """Remove the story-end marker (and its variants); report whether it was there."""
+    cleaned, count = _STORY_END_VARIANTS.subn("", text)
+    return cleaned.strip(), count > 0
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = _soften_adult_safety_refusal(
         " ".join(

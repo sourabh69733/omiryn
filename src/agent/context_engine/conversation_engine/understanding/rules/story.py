@@ -42,7 +42,7 @@ _STOP_PHRASES = (
 def continues_story(user_text: str, history: list[dict[str, Any]]) -> bool:
     """True when the last reply was a story and the user is following it, not moving on."""
     last_reply = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
-    if not last_reply or not last_reply.get("story"):
+    if not last_reply or not last_reply.get("story") or last_reply.get("story_end"):
         return False
     normalized = normalized_memory_text(user_text)
     if not normalized:
