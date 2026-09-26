@@ -276,3 +276,85 @@ def test_scheduled_greeting_waits_and_skips_when_the_user_left(monkeypatch) -> N
     assert greet.await_count == 0
     asyncio.run(scenario(watching=True))
     assert greet.await_count == 1
+
+
+# Promise follow-ups: a due promise is raised once, then marked done.
+
+from agent.proactive.policy import due_promise  # noqa: E402
+
+
+def _promise(note_id: str, due_minutes_ago: float | None) -> dict:
+    due = None if due_minutes_ago is None else (NOW - timedelta(minutes=due_minutes_ago)).isoformat()
+    return {"id": note_id, "kind": "promise", "text": f"Ask about {note_id}.", "due_at": due}
+
+
+def test_due_promise_picks_the_oldest_due_and_skips_future_and_stale() -> None:
+    notes = [
+        _promise("future", -60),
+        _promise("recent", 30),
+        _promise("older", 3 * 24 * HOUR),
+        _promise("stale", 15 * 24 * HOUR),
+        _promise("undated", None),
+        {"id": "opinion", "kind": "opinion", "text": "x", "due_at": None},
+    ]
+    assert due_promise(notes, NOW)["id"] == "older"
+    assert due_promise(notes[:1], NOW) is None
+
+
+def _save_promise(due_minutes_ago: float) -> None:
+    storage.add_self_notes(
+        USER_ID,
+        CONVERSATION_ID,
+        [
+            {
+                "id": "interview",
+                "kind": "promise",
+                "text": "Ask how the interview went.",
+                "message_index": 1,
+                "due_at": NOW - timedelta(minutes=due_minutes_ago),
+            }
+        ],
+    )
+
+
+def test_online_user_gets_a_promise_follow_up_before_any_topic_nudge() -> None:
+    socket = _seed([_msg("user", 90), _msg("assistant", 89)])
+    _save_promise(10)
+    generate = AsyncMock(return_value="So, how did the interview go?")
+
+    async def scenario() -> int:
+        await _connect(socket)
+        with patch("agent.proactive.service.list_threads", return_value=[_thread()]), patch(
+            "agent.proactive.service._generate", generate
+        ):
+            first = await run_proactive_pass(now=NOW)
+            second = await run_proactive_pass(now=NOW)  # last message unanswered: quiet
+            return first + second
+
+    assert asyncio.run(scenario()) == 1
+    assert "Ask how the interview went." in generate.await_args.kwargs["instructions"]
+    stored = storage.get_conversation(CONVERSATION_ID, USER_ID)["messages"][-1]
+    assert stored["proactive_kind"] == "promise_follow_up"
+    assert stored["promise_note_id"] == "interview"
+    assert storage.list_active_self_notes(USER_ID) == []
+
+
+def test_return_greeting_brings_up_the_due_promise_and_keeps_it() -> None:
+    socket = _seed([_msg("user", 2 * 24 * HOUR + 1), _msg("assistant", 2 * 24 * HOUR)])
+    _save_promise(60)
+
+    sent, generate = _greet(socket)
+
+    assert sent
+    assert "Ask how the interview went." in generate.await_args.kwargs["instructions"]
+    assert storage.list_active_self_notes(USER_ID) == []
+
+
+def test_promise_stays_open_when_the_message_was_not_delivered() -> None:
+    socket = _seed([_msg("user", 2 * 24 * HOUR + 1), _msg("assistant", 2 * 24 * HOUR)])
+    _save_promise(60)
+
+    sent, _generate = _greet(socket, reply="")
+
+    assert not sent
+    assert [note["id"] for note in storage.list_active_self_notes(USER_ID)] == ["interview"]
