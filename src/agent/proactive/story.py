@@ -9,6 +9,7 @@ from agent.context_engine.conversation_engine.policy import split_assistant_repl
 from agent.context_engine.conversation_engine.policy.replies import (
     STORY_END_MARKER,
     strip_story_end,
+    strip_story_marker,
 )
 from agent.runtime.story_mode import (
     STORY_CHECK_IN_EVERY,
@@ -65,6 +66,7 @@ async def run_story_part_job(job: dict[str, Any]) -> bool:
         max_tokens=600,
     )
     text, ended = strip_story_end(text or "")
+    text, _ = strip_story_marker(text)
     bubbles = [bubble for bubble in split_assistant_reply(text, user_text="") if bubble.strip()]
     if not bubbles:
         return False

@@ -9,8 +9,10 @@ from typing import Any
 from agent.context_engine.conversation_engine.policy import direct_turn_reply, split_assistant_reply
 from agent.context_engine.conversation_engine.policy.replies import (
     STORY_END_MARKER,
+    STORY_MARKER,
     STORY_NOTE_PREFIX,
     strip_story_end,
+    strip_story_marker,
 )
 from agent.runtime.story_mode import (
     schedule_story_part,
@@ -285,6 +287,7 @@ async def run_agent_turn(
             question_limit=context_package.question_limit,
         )
         reply, story_ended = strip_story_end(reply)
+        reply, story_marked = strip_story_marker(reply)
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -328,10 +331,8 @@ async def run_agent_turn(
             },
         }
     )
-    story_turn = bool(
-        context_package.query_intent
-        and "story_or_long_reply" in context_package.query_intent.labels
-    )
+    # The model's own marker decides; a keyword in the user's message is only a hint for the note.
+    story_turn = story_marked or story_ended
     for index, reply_part in enumerate(reply_parts):
         assistant_message = {"role": "assistant", "content": reply_part}
         if story_turn:
@@ -444,13 +445,13 @@ _NO_QUESTION_NOTE = (
 
 
 _STORY_NOTE = (
-    f"{STORY_NOTE_PREFIX} the user asked for a story. Tell it yourself now in 4-7 short bubbles "
+    f"{STORY_NOTE_PREFIX} the user asked for a story. Start with {STORY_MARKER} and tell it yourself now in 4-7 short bubbles "
     "separated by <next_message>: a character, a setting and something that happens. Do not ask "
     "the user what should happen."
 )
 _STORY_CONTINUE_NOTE = (
     f"{STORY_NOTE_PREFIX} the user is following the story you are telling. If they react or ask "
-    "for more, react in a few words at most, then continue the story from where it stopped in 3-7 "
+    f"for more, start with {STORY_MARKER}, react in a few words at most, then continue the story from where it stopped in 3-7 "
     "short bubbles separated by <next_message>. Move the plot forward; do not restart or recap. "
     "If they want to stop or have moved on to something else, reply to that instead and add "
     f"{STORY_END_MARKER} at the very end."
