@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import sys
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
@@ -17,7 +19,8 @@ from agent.cognition.background.service import (
     should_schedule_idle_background_cognition,
 )
 from agent.runtime.orchestrator import run_agent_turn
-from agent.shared.clock import utc_now_iso
+from agent.shared.clock import utc_now, utc_now_iso
+from agent.shared.timeline import parse_time
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
@@ -61,6 +64,26 @@ from ..models import (
 from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
 
 router = APIRouter()
+
+
+logger = logging.getLogger(__name__)
+# A user message whose reply failed; it stays in the chat with a Retry.
+REPLY_FAILED = "failed"
+REPLY_FAILED_CODE = "reply_failed"
+
+
+# A reply still "sending" after this long was lost (a crash or restart); treat it as failed.
+_STALE_SENDING_SECONDS = 120
+
+
+def _reply_failed(message: dict[str, Any]) -> bool:
+    status = message.get("delivery_status")
+    if status == REPLY_FAILED:
+        return True
+    sent = parse_time(message.get("created_at"))
+    return status == "sending" and sent is not None and (
+        utc_now() - sent
+    ).total_seconds() > _STALE_SENDING_SECONDS
 
 
 def _stamp_new_messages(messages: list[dict[str, object]], start_index: int = 0) -> None:
@@ -260,14 +283,66 @@ async def send_agent_message(
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     _remember_user_timezone(user, timezone_header)
+    # A new message answers for any earlier one whose reply failed: the reply covers both.
+    for message in conversation.messages:
+        if message.get("role") == "user" and _reply_failed(message):
+            message["delivery_status"] = "read"
+    prior_messages = list(conversation.messages)
+    pending = {
+        "role": "user",
+        "content": payload.message,
+        "created_at": utc_now_iso(),
+        "delivery_status": "sending",
+    }
+    # Saved before the model runs, so a failed reply never loses what the user wrote.
+    conversation.messages = [*prior_messages, pending]
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    return await _reply_to_pending(conversation, user, prior_messages, pending, background_tasks)
+
+
+@router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/retry")
+async def retry_agent_message(
+    conversation_id: str,
+    message_index: int,
+    background_tasks: BackgroundTasks,
+    user: CurrentUser = Depends(require_user),
+    timezone_header: str | None = Header(default=None, alias="X-Timezone"),
+) -> AgentConversation:
+    """Reply again to the last message, whose earlier reply failed."""
+    conversation = _get_existing_conversation(conversation_id, user)
+    if conversation.status != "active":
+        raise HTTPException(status_code=409, detail="Conversation already extracted.")
+    messages = conversation.messages
+    if (
+        message_index != len(messages) - 1
+        or messages[message_index].get("role") != "user"
+        or not _reply_failed(messages[message_index])
+    ):
+        raise HTTPException(status_code=409, detail="This message has nothing to retry.")
+    enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+    _remember_user_timezone(user, timezone_header)
+    pending = messages[message_index]
+    pending["delivery_status"] = "sending"
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    return await _reply_to_pending(
+        conversation, user, messages[:message_index], pending, background_tasks
+    )
+
+
+async def _reply_to_pending(
+    conversation: AgentConversation,
+    user: CurrentUser,
+    prior_messages: list[dict[str, Any]],
+    pending: dict[str, Any],
+    background_tasks: BackgroundTasks,
+) -> AgentConversation:
     runtime = agent_runtime_status()
     _sync_conversation_runtime(conversation, runtime)
-
     try:
         turn = await _run_agent_turn_callable()(
             conversation_id=conversation.id,
-            messages=conversation.messages,
-            user_text=payload.message,
+            messages=prior_messages,
+            user_text=str(pending["content"]),
             user_id=_user_id(user),
             user_profile=_agent_user_context(user),
             model=conversation.agent_model,
@@ -277,10 +352,26 @@ async def send_agent_message(
             style_source_id=conversation.agent_style_source_id,
         )
     except (AgentProviderError, Exception) as error:
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        logger.warning(
+            "agent.reply.failed conversation_id=%s error=%s", conversation.id, type(error).__name__
+        )
+        pending["delivery_status"] = REPLY_FAILED
+        save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": REPLY_FAILED_CODE,
+                "message": "Couldn't reply right now. Your message is saved; tap Retry.",
+                "message_index": len(prior_messages),
+            },
+        ) from error
 
-    previous_message_count = len(conversation.messages)
+    previous_message_count = len(prior_messages)
     conversation.messages = turn.messages
+    user_message = conversation.messages[previous_message_count]
+    # Keep when the user actually wrote it, even when this reply came from a retry.
+    user_message["created_at"] = pending["created_at"]
+    user_message["delivery_status"] = "read"
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     await _publish_new_messages(conversation, previous_message_count)
