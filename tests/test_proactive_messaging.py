@@ -358,3 +358,36 @@ def test_promise_stays_open_when_the_message_was_not_delivered() -> None:
 
     assert not sent
     assert [note["id"] for note in storage.list_active_self_notes(USER_ID)] == ["interview"]
+
+
+# Typing: the chat shows dots while the companion writes a message of its own.
+
+
+def _event_types(socket: _Socket) -> list[tuple[str, object]]:
+    return [(event["type"], event["payload"].get("active")) for event in socket.sent]
+
+
+def test_greeting_is_announced_with_typing_dots() -> None:
+    socket = _seed([_msg("user", 2 * 24 * HOUR + 1), _msg("assistant", 2 * 24 * HOUR)])
+
+    async def scenario() -> bool:
+        await _connect(socket)
+        with patch("agent.proactive.service._initiative_text", AsyncMock(return_value="Hey, welcome back!")):
+            return await greet_on_return(USER_ID, CONVERSATION_ID, NOW)
+
+    assert asyncio.run(scenario())
+    assert _event_types(socket) == [("agent.typing", True), ("agent.typing", False), ("message.created", None)]
+
+
+def test_topic_nudges_that_may_be_skipped_show_no_typing() -> None:
+    socket = _seed([_msg("user", 90), _msg("assistant", 89)])
+
+    async def scenario() -> int:
+        await _connect(socket)
+        with patch("agent.proactive.service.list_threads", return_value=[_thread()]), patch(
+            "agent.proactive.service._initiative_text", AsyncMock(return_value="SKIP")
+        ):
+            return await run_proactive_pass(now=NOW)
+
+    assert asyncio.run(scenario()) == 0
+    assert socket.sent == []

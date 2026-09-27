@@ -217,6 +217,7 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
             title=thread.title, summary=thread.summary, angle=thread.next_angle
         ),
         cue=_CUE,
+        show_typing=False,
     )
     if not reply:
         return False
@@ -309,10 +310,16 @@ async def _generate(
     user_text: str,
     instructions: str,
     cue: str,
+    show_typing: bool = True,
 ) -> str | None:
     """One short bubble for a nudge or greeting; None when the model declines."""
     text = await generate_initiative_text(
-        conversation, user_id, user_text=user_text, instructions=instructions, cue=cue
+        conversation,
+        user_id,
+        user_text=user_text,
+        instructions=instructions,
+        cue=cue,
+        show_typing=show_typing,
     )
     parts = split_assistant_reply(text, user_text="") if text else []
     return parts[0].strip() if parts else None
@@ -326,8 +333,49 @@ async def generate_initiative_text(
     instructions: str,
     cue: str,
     max_tokens: int = 300,
+    show_typing: bool = True,
 ) -> str | None:
-    """The full visible reply for an agent-initiated message; None on SKIP."""
+    """The full visible reply for an agent-initiated message; None on SKIP.
+
+    With show_typing the chat shows typing dots while the model writes, as it does for replies.
+    Messages the model may decline (topic nudges) skip it: dots that end in nothing feel odd.
+    """
+    if show_typing:
+        await _publish_typing(conversation["id"], True)
+    try:
+        text = await _initiative_text(
+            conversation,
+            user_id,
+            user_text=user_text,
+            instructions=instructions,
+            cue=cue,
+            max_tokens=max_tokens,
+        )
+        return None if _is_skip(text) else text
+    finally:
+        if show_typing:
+            await _publish_typing(conversation["id"], False)
+
+
+async def _publish_typing(conversation_id: str, active: bool) -> None:
+    await realtime_hub.publish(
+        conversation_event(
+            "agent.typing",
+            conversation_id,
+            payload={"conversation_id": conversation_id, "active": active},
+        )
+    )
+
+
+async def _initiative_text(
+    conversation: dict[str, Any],
+    user_id: str,
+    *,
+    user_text: str,
+    instructions: str,
+    cue: str,
+    max_tokens: int,
+) -> str:
     messages = conversation["messages"]
     package = await asyncio.to_thread(
         build_model_context_package,
@@ -364,8 +412,7 @@ async def generate_initiative_text(
         system_prompt=system_prompt,
         max_tokens=max_tokens,
     )
-    text = _visible_companion_reply(raw, structured_companion_reply(raw))
-    return None if _is_skip(text) else text
+    return _visible_companion_reply(raw, structured_companion_reply(raw))
 
 
 def _is_skip(text: str) -> bool:
