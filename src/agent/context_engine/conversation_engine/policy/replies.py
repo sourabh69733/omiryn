@@ -35,6 +35,22 @@ def strip_story_end(text: str) -> tuple[str, bool]:
     return cleaned.strip(), count > 0
 
 
+# Written by the model at the start of a reply that tells or continues a story; never shown.
+# The model decides, so a story is recognised in any language ("ek kahani sunao" included).
+STORY_MARKER = "<story>"
+_STORY_MARKER_VARIANTS = re.compile(r"[<\[]\s*story\s*[>\]]", re.IGNORECASE)
+
+
+def has_story_marker(text: str) -> bool:
+    return bool(_STORY_MARKER_VARIANTS.search(text))
+
+
+def strip_story_marker(text: str) -> tuple[str, bool]:
+    """Remove the story marker; report whether the model marked the reply as a story."""
+    cleaned, count = _STORY_MARKER_VARIANTS.subn("", text)
+    return cleaned.strip(), count > 0
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = _soften_adult_safety_refusal(
         " ".join(

@@ -10,6 +10,7 @@ from agent.context_engine.conversation_engine.policy.replies import (
     REPLY_PART_SEPARATOR,
     REPLY_PART_WORD_LIMIT,
     STORY_NOTE_PREFIX,
+    has_story_marker,
     normalize_part_separators,
 )
 
@@ -292,6 +293,7 @@ def _chat_reply_word_limit(
         REPLY_PART_SEPARATOR in reply_text
         or _wants_continuous_reply(latest_user_text)
         or _is_story_turn(messages)
+        or has_story_marker(reply_text)
     ):
         return MAX_REPLY_PARTS * REPLY_PART_WORD_LIMIT
     advice_markers = {

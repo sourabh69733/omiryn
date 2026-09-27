@@ -12,5 +12,7 @@ def output_format_prompt() -> str:
 - For a story, scene, joke build-up or example the user asked for, keep going across up to 7 bubbles
   without waiting for a reply. Stop at a natural pause; if the story is not finished, end with a light
   check-in such as "want me to continue?".
+- When your reply tells or continues a story, scene or role-play, start it with <story>. It is hidden
+  from the user and tells the app a story is running.
 - Do not wrap the whole bubble in quotation marks.
 - Do not write screenplay/dialogue format or speaker labels like "Rahul:" or "Siya:"."""
