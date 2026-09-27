@@ -99,13 +99,30 @@ export async function signOut() {
   window.dispatchEvent(new Event("omiryn:auth-required"));
 }
 
-export async function apiErrorMessage(response: Response, fallback: string) {
+export type ApiErrorDetail = { message: string; code?: string; messageIndex?: number };
+
+// `detail` is a string, or {code, message, message_index} for errors the UI handles inline.
+export async function apiErrorDetail(response: Response, fallback: string): Promise<ApiErrorDetail> {
   try {
-    const body = (await response.json()) as { detail?: string };
-    return body.detail || fallback;
+    const body = (await response.json()) as { detail?: unknown };
+    const detail = body.detail;
+    if (typeof detail === "string") return { message: detail || fallback };
+    if (detail && typeof detail === "object") {
+      const record = detail as { message?: unknown; code?: unknown; message_index?: unknown };
+      return {
+        message: typeof record.message === "string" ? record.message : fallback,
+        code: typeof record.code === "string" ? record.code : undefined,
+        messageIndex: typeof record.message_index === "number" ? record.message_index : undefined
+      };
+    }
+    return { message: fallback };
   } catch {
-    return fallback;
+    return { message: fallback };
   }
+}
+
+export async function apiErrorMessage(response: Response, fallback: string) {
+  return (await apiErrorDetail(response, fallback)).message;
 }
 
 // IANA name such as "Asia/Kolkata"; the agent uses it to know the user's local time.

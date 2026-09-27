@@ -1,12 +1,13 @@
 import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Smile } from "lucide-react";
-import { apiErrorMessage, apiFetch } from "../../../lib/api";
+import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
+import { isFailedMessage } from "../messageDelivery";
 import { canShowUsage } from "../appUtils";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
@@ -23,6 +24,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [sending, setSending] = useState(false);
   // How many messages are on screen; later bubbles of one reply are revealed one by one.
   const [shownCount, setShownCount] = useState(0);
+  // Set after a reply has been pending a while, to say so under the typing dots.
+  const [slowReply, setSlowReply] = useState(false);
   const shownConversationIdRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
@@ -245,6 +248,13 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     return () => window.clearTimeout(timer);
   }, [conversation, shownCount]);
 
+  useEffect(() => {
+    setSlowReply(false);
+    if (!sending) return;
+    const timer = window.setTimeout(() => setSlowReply(true), SLOW_REPLY_MS);
+    return () => window.clearTimeout(timer);
+  }, [sending]);
+
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
 
@@ -417,58 +427,93 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const message = draft.trim();
     if (!message || !conversation || sending || composerLimit) return;
     closeEmojiShortcodeSuggestions();
+    setDraft("");
+    await sendText(message);
+  }
+
+  async function sendText(message: string) {
+    if (!conversation) return;
     shouldStickToBottomRef.current = true;
     const previousConversation = conversation;
-    setDraft("");
     setSending(true);
     setError("");
     setComposerLimit(null);
-    setConversation({ ...conversation, messages: [...conversation.messages, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sent" }] });
-    let handledInlineError = false;
+    // A new message also answers for an earlier failed one; the server clears it the same way.
+    const earlier = conversation.messages.map((item) => (isFailedMessage(item) ? { ...item, delivery_status: "read" } : item));
+    setConversation({ ...conversation, messages: [...earlier, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending" }] });
+    await postReply(`/api/agent/conversations/${conversation.id}/messages`, { message }, previousConversation, message);
+  }
+
+  async function retryMessage(index: number) {
+    if (!conversation || sending) return;
+    const text = conversation.messages[index]?.content || "";
+    shouldStickToBottomRef.current = true;
+    setSending(true);
+    setError("");
+    setConversation({ ...conversation, messages: conversation.messages.map((item, position) => (position === index ? { ...item, delivery_status: "sending" } : item)) });
+    const outcome = await postReply(`/api/agent/conversations/${conversation.id}/messages/${index}/retry`, null, conversation, text);
+    if (outcome === "not_retryable") {
+      // The server never saved it (the connection dropped first): send it as a new message.
+      setConversation((current) => (current ? { ...current, messages: current.messages.filter((_, position) => position !== index) } : current));
+      await sendText(text);
+    }
+  }
+
+  // Sends the request and settles the pending bubble: replied, failed (with Retry), or rolled back.
+  async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string): Promise<"ok" | "failed" | "not_retryable"> {
     try {
-      const response = await apiFetch(`/api/agent/conversations/${conversation.id}/messages`, {
+      const response = await apiFetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
+        body: body === null ? undefined : JSON.stringify(body)
       });
       if (!response.ok) {
-        const detail = await apiErrorMessage(response, "Omiryn could not reply.");
-        setConversation(previousConversation);
+        const detail = await apiErrorDetail(response, "Omiryn could not reply.");
         if (response.status === 429) {
-          const friendly = friendlyQuotaMessage(detail);
+          setConversation(previousConversation);
+          setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
+          const friendly = friendlyQuotaMessage(detail.message);
           const retryAfterSeconds = retryAfterFromResponse(response);
-          if (detail.toLowerCase().includes("short time")) {
-            const pausedAt = Date.now();
-            setPauseNow(pausedAt);
+          const pausedAt = Date.now();
+          setPauseNow(pausedAt);
+          if (detail.message.toLowerCase().includes("short time")) {
             setComposerLimit({ until: pausedAt + (retryAfterSeconds || 60) * 1000, message: friendly, kind: "burst" });
-            setError("");
-            handledInlineError = true;
           } else {
-            const pausedAt = Date.now();
-            setPauseNow(pausedAt);
-            setComposerLimit({
-              until: retryAfterSeconds ? pausedAt + retryAfterSeconds * 1000 : undefined,
-              message: friendly,
-              kind: "monthly"
-            });
-            setError("");
-            handledInlineError = true;
+            setComposerLimit({ until: retryAfterSeconds ? pausedAt + retryAfterSeconds * 1000 : undefined, message: friendly, kind: "monthly" });
           }
-          throw new Error(friendly);
+          return "failed";
         }
-        throw new Error(detail);
+        if (response.status === 409 && body === null) return "not_retryable";
+        if (detail.code === "reply_failed" || response.status >= 500) {
+          markLastUserMessageFailed();
+          return "failed";
+        }
+        // Rejected before it was saved (for example a finished conversation): nothing to retry.
+        setConversation(previousConversation);
+        setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
+        setError(detail.message);
+        return "failed";
       }
       const nextConversation = (await response.json()) as Conversation;
-      setSending(false);
       setConversation(nextConversation);
       await fetchSummaries();
       void loadConversationUsage(nextConversation.id);
-    } catch (caught) {
-      setDraft((currentDraft) => currentDraft.trim() ? currentDraft : message);
-      if (!handledInlineError) setError(caught instanceof Error ? caught.message : "Omiryn could not reply.");
+      return "ok";
+    } catch {
+      // No answer at all (offline, server down): keep the bubble with a Retry.
+      markLastUserMessageFailed();
+      return "failed";
     } finally {
       setSending(false);
     }
+  }
+
+  function markLastUserMessageFailed() {
+    setConversation((current) => {
+      if (!current) return current;
+      const index = current.messages.map((item) => item.role).lastIndexOf("user");
+      return { ...current, messages: current.messages.map((item, position) => (position === index ? { ...item, delivery_status: "failed" } : item)) };
+    });
   }
 
   async function updateModel(model: string) {
@@ -649,10 +694,12 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                     </div>
                     {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
+                  {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span>Not delivered</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)}>Retry</button></div> : null}
                 </Fragment>
               );
             })}
             {sending || revealingBubbles ? <div className="message-row agent"><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
@@ -767,6 +814,8 @@ function friendlyQuotaMessage(detail: string) {
   }
   return detail;
 }
+
+const SLOW_REPLY_MS = 20000;
 
 function retryAfterFromResponse(response: Response) {
   const raw = response.headers.get("X-RateLimit-Reset-Seconds") || response.headers.get("Retry-After");
