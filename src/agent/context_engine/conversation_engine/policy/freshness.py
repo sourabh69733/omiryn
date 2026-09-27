@@ -10,23 +10,9 @@ import re
 from typing import Any
 
 from .replies import REPLY_PART_SEPARATOR
+# Lines that fit any message: a seed plus lines learned from real chats. Matched after normalizing.
+from .stock_phrases import STOCK_PHRASES
 
-# Lines that fit any message, so they say nothing about this one. Matched after normalizing.
-STOCK_PHRASES = (
-    "what's on your mind",
-    "whats on your mind",
-    "sometimes just relaxing is nice",
-    "that sounds like fun",
-    "that sounds amazing",
-    "that sounds interesting",
-    "i'm here for you",
-    "im here for you",
-    "how can i help you",
-    "tell me more about it",
-    "that's great to hear",
-    "thats great to hear",
-    "i'm glad to hear that",
-)
 # Replies this short ("haha", "ok sure") are normal to repeat.
 _MIN_WORDS_FOR_REPEAT_CHECK = 4
 _RECENT_REPLIES = 20
