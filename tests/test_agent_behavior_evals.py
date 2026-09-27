@@ -1422,6 +1422,10 @@ class RuntimeBehaviorDriverTest(unittest.IsolatedAsyncioTestCase):
                     direct_turn_reply(text, [*messages, {"role": "user", "content": text}])
                 )
 
+    @unittest.skip(
+        "Direct acknowledgement replies are disabled in turn_policy.direct_turn_reply while "
+        "their quality is redesigned; re-enable with that policy."
+    )
     def test_known_acknowledgements_still_use_the_fast_path(self) -> None:
         messages = [{"role": "assistant", "content": "Got it."}]
         for text in ("okay", "sure", "haan okay", "sahi hai", "acha baba"):

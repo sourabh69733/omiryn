@@ -250,6 +250,10 @@ class AgentArchitectureTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.messages[-1]["content"], "Location is no longer a priority for you")
         self.assertNotIn("<function", result.messages[-1]["content"])
 
+    @unittest.skip(
+        "Direct acknowledgement replies are disabled in turn_policy.direct_turn_reply while "
+        "their quality is redesigned; re-enable with that policy."
+    )
     async def test_orchestrator_skips_model_for_simple_acceptance_acknowledgement(self) -> None:
         with (
             patch("agent.runtime.orchestrator.capture_profile_facts_from_user_message"),

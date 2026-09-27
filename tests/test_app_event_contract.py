@@ -9,7 +9,7 @@ from api.routes.profile import _APP_EVENT_METADATA_ALLOWLIST
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_LOGGER = PROJECT_ROOT / "frontend" / "src" / "lib" / "appLogger.ts"
+FRONTEND_LOGGER = PROJECT_ROOT / "apps" / "web" / "src" / "lib" / "appLogger.ts"
 
 
 def test_frontend_and_backend_app_event_names_match() -> None:
