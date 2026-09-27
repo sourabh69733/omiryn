@@ -198,10 +198,11 @@ class TimeAwarenessPromptTest(unittest.TestCase):
 
 class TimeAwarenessApiTest(unittest.TestCase):
     def setUp(self) -> None:
-        os.environ["AUTH_REQUIRED"] = "false"
-        os.environ["AGENT_PROVIDER"] = "mock"
-        os.environ["AGENT_PIPELINE_VERSION"] = "v1"
-        os.environ["AGENT_ROLLOUT"] = "off"
+        self.env = patch.dict(
+            os.environ,
+            {"AUTH_REQUIRED": "false", "AGENT_PROVIDER": "mock", "AGENT_PIPELINE_VERSION": "v1", "AGENT_ROLLOUT": "off"},
+        )
+        self.env.start()
         app.dependency_overrides.clear()
 
         async def signed_in_user() -> CurrentUser:
@@ -213,8 +214,7 @@ class TimeAwarenessApiTest(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
-        os.environ.pop("AGENT_PIPELINE_VERSION", None)
-        os.environ.pop("AGENT_ROLLOUT", None)
+        self.env.stop()
         app.dependency_overrides.clear()
 
     def test_browser_timezone_is_stored_and_invalid_values_are_ignored(self) -> None:

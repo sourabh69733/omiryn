@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -15,9 +16,11 @@ from storage import reset_db
 
 class RealtimeGatewayTest(unittest.TestCase):
     def setUp(self) -> None:
-        os.environ["AUTH_REQUIRED"] = "false"
-        os.environ["AGENT_PROVIDER"] = "mock"
-        os.environ["REALTIME_TICKET_SECRET"] = "test-realtime-secret"
+        self.env = patch.dict(
+            os.environ,
+            {"AUTH_REQUIRED": "false", "AGENT_PROVIDER": "mock", "REALTIME_TICKET_SECRET": "test-realtime-secret"},
+        )
+        self.env.start()
         app.dependency_overrides.clear()
 
         async def signed_in_user() -> CurrentUser:
@@ -28,6 +31,7 @@ class RealtimeGatewayTest(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        self.env.stop()
         app.dependency_overrides.clear()
         os.environ.pop("REALTIME_TICKET_SECRET", None)
 

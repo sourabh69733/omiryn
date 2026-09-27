@@ -86,11 +86,17 @@ from storage import (
 
 class AgentSubmissionApiTest(unittest.TestCase):
     def setUp(self) -> None:
-        os.environ["AUTH_REQUIRED"] = "false"
-        os.environ["AGENT_PROVIDER"] = "mock"
-        os.environ["DATA_POINT_EXTRACTOR"] = "rules"
-        os.environ["AGENT_PIPELINE_VERSION"] = "v1"
-        os.environ["AGENT_ROLLOUT"] = "off"
+        self.env = patch.dict(
+            os.environ,
+            {
+                "AUTH_REQUIRED": "false",
+                "AGENT_PROVIDER": "mock",
+                "DATA_POINT_EXTRACTOR": "rules",
+                "AGENT_PIPELINE_VERSION": "v1",
+                "AGENT_ROLLOUT": "off",
+            },
+        )
+        self.env.start()
         self.photo_storage_patch = patch("api.main.PROFILE_PHOTO_GCS_BUCKET", "")
         self.photo_storage_patch.start()
         app.dependency_overrides.clear()
@@ -105,8 +111,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.photo_storage_patch.stop()
-        os.environ.pop("AGENT_PIPELINE_VERSION", None)
-        os.environ.pop("AGENT_ROLLOUT", None)
+        self.env.stop()
         app.dependency_overrides.clear()
 
     def test_agent_submission_creates_reviewable_draft(self) -> None:
