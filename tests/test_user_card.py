@@ -51,7 +51,8 @@ class ValidateUserCardTest(unittest.TestCase):
 
     def test_prompt_explains_the_card(self) -> None:
         self.assertIn("current_user_card", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
-        self.assertIn("If current_user_card is empty, write it now", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
+        self.assertIn("If current_user_card is empty, write", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
+        self.assertIn("never a copy of the current card", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
         self.assertIn('never write lines like "Name: not given"', BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
 
 
