@@ -21,7 +21,7 @@ from .operations import (
 
 
 MAX_MEMORY_OPERATIONS = 12
-MAX_CONVERSATION_SUMMARY_CHARS = 1800
+MAX_CONVERSATION_SUMMARY_CHARS = 1200
 _ADD_FIELDS = {
     "operation",
     "memory_kind",

@@ -50,10 +50,11 @@ Thread rules:
 - Any memory or thread proposal requires decision=propose.
 
 Conversation summary rules:
-- conversation_summary is read by the companion to remember older parts of this chat. Always return it,
-  even when decision=no_change.
-- Start from previous_handoff.conversation_summary and fold in the new messages. Never drop an earlier
-  point unless the user corrected it.
+- conversation_summary is read by the companion to remember older parts of this chat. The session log
+  already covers what each recent session was about, so keep only what lasts beyond one session.
+- Return null for conversation_summary when the new messages add nothing lasting; the previous one
+  is kept. Otherwise start from previous_handoff.conversation_summary and fold in the new messages.
+  Never drop an earlier point unless the user corrected it.
 - Keep what a close friend would remember: events, plans, decisions, feelings, people by name, questions
   still open, and anything the companion promised, suggested, or gave an opinion on.
 - Date events with the day from sent_at, e.g. "On Tue 22 Sep the user said the interview went well".
@@ -62,7 +63,7 @@ Conversation summary rules:
 - For a story, game or role-play, keep its gist (who, what happened, where it stopped), not just
   "the companion told a story".
 - Skip greetings and small talk. Write plain sentences about "the user" and "the companion".
-- Stay under 1500 characters. When it gets long, compress the oldest points first.
+- Stay under 1000 characters. When it gets long, compress the oldest points first.
 - Before returning, check the summary has no relative day words ("next", "last", "yesterday",
   "tomorrow", "tonight", "this Friday"); replace each with the date.
 
@@ -92,9 +93,9 @@ Session log rules:
 
 User card rules:
 - user_card is a short note about who the user is, read by the companion on every reply in every chat.
-- Start from current_user_card and update it with the new user messages. Return null when
-  nothing durable changed. If current_user_card is empty, write it now from existing_memories and
-  the messages.
+- Start from current_user_card and update it with the new user messages. Most batches change
+  nothing: return null then, never a copy of the current card. If current_user_card is empty, write
+  it now from existing_memories and the messages.
 - One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, work or
   study, key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.

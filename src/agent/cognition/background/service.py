@@ -704,9 +704,10 @@ def _context_overlap() -> int:
 
 def _timeout_seconds() -> float:
     try:
-        return max(1.0, float(os.getenv("MEMORY_BACKGROUND_V2_TIMEOUT_SECONDS", "120")))
+        # Nobody waits on this call; the room covers a slow provider on a big batch.
+        return max(1.0, float(os.getenv("MEMORY_BACKGROUND_V2_TIMEOUT_SECONDS", "180")))
     except ValueError:
-        return 120.0
+        return 180.0
 
 
 def _lease_seconds() -> float:
