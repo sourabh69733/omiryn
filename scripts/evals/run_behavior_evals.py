@@ -21,6 +21,7 @@ if str(SRC_DIR) not in sys.path:
 os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_behavior_eval.db"
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
+from agent.evals.shared.offline import keep_mock_runs_offline  # noqa: E402
 from agent.evals.behavior.judging.calibration import (  # noqa: E402
     calibration_report_payload,
     run_judge_calibration,
@@ -301,6 +302,7 @@ def _resolved_output_dir(path: Path) -> Path:
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
+    keep_mock_runs_offline(args.provider)
     if args.no_save and args.output:
         parser.error("--no-save cannot be combined with --output.")
     reporter = TerminalProgressReporter(enabled=not args.quiet, tag_samples=args.concurrency > 1)

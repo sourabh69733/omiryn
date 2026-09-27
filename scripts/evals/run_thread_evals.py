@@ -25,6 +25,7 @@ os.environ["DATABASE_URL"] = (
 )
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
+from agent.evals.shared.offline import keep_mock_runs_offline  # noqa: E402
 from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig  # noqa: E402
 from agent.evals.behavior.reporting.live import TerminalProgressReporter  # noqa: E402
 from agent.evals.behavior.reporting.writer import (  # noqa: E402
@@ -179,6 +180,7 @@ def _print_scenarios(*, tags: tuple[str, ...]) -> None:
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
+    keep_mock_runs_offline(args.provider)
     if args.list_scenarios:
         _print_scenarios(tags=tuple(args.scenario_tags or ()))
         return 0
