@@ -8,6 +8,7 @@ import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { isFailedMessage } from "../messageDelivery";
+import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { canShowUsage } from "../appUtils";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
@@ -26,6 +27,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [shownCount, setShownCount] = useState(0);
   // Set after a reply has been pending a while, to say so under the typing dots.
   const [slowReply, setSlowReply] = useState(false);
+  // Conversation where the companion is writing a message of its own (from realtime).
+  const [typingConversationId, setTypingConversationId] = useState<string | null>(null);
   const shownConversationIdRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
@@ -59,7 +62,10 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
 
   useEffect(() => {
     const realtime = new RealtimeClient(
-      (event) => applyRealtimeEvent(event, setConversation),
+      (event) => {
+        setTypingConversationId((current) => typingAfterEvent(event, current));
+        applyRealtimeEvent(event, setConversation);
+      },
       (conversationId, afterSequence) => recoverConversation(conversationId, afterSequence),
     );
     realtimeClientRef.current = realtime;
@@ -247,6 +253,12 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const timer = window.setTimeout(() => setShownCount((count) => count + 1), delay);
     return () => window.clearTimeout(timer);
   }, [conversation, shownCount]);
+
+  useEffect(() => {
+    if (!typingConversationId) return;
+    const timer = window.setTimeout(() => setTypingConversationId(null), AGENT_TYPING_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [typingConversationId]);
 
   useEffect(() => {
     setSlowReply(false);
@@ -698,7 +710,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                 </Fragment>
               );
             })}
-            {sending || revealingBubbles ? <div className="message-row agent"><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {sending || revealingBubbles || (conversation && typingConversationId === conversation.id) ? <div className="message-row agent"><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
