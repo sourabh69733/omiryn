@@ -32,6 +32,13 @@ def _auto(part: int, content: str = "The boat came closer.") -> dict:
 
 
 class StoryPolicyTest(unittest.TestCase):
+    def test_story_marker_is_found_and_removed(self) -> None:
+        from agent.context_engine.conversation_engine.policy.replies import strip_story_marker
+
+        self.assertEqual(strip_story_marker("<story>Once upon a time"), ("Once upon a time", True))
+        self.assertEqual(strip_story_marker("[STORY] Once"), ("Once", True))
+        self.assertEqual(strip_story_marker("The end. <story_end>"), ("The end. <story_end>", False))
+
     def test_marker_is_removed_in_any_spelling(self) -> None:
         for text in ("The end. <story_end>", "The end. [story_end]", "The end.</story end>"):
             with self.subTest(text=text):
@@ -104,7 +111,7 @@ class StoryJobTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_story_turn_schedules_the_next_part(self) -> None:
         self._save(STORY_START[1:2])
-        story = "Mira kept the lighthouse.<next_message>A light blinked back at her."
+        story = "<story>Mira kept the lighthouse.<next_message>A light blinked back at her."
         with patch("agent.runtime.orchestrator.generate_agent_reply", AsyncMock(return_value=story)):
             result = await run_agent_turn(
                 conversation_id=CONVERSATION_ID,
@@ -118,7 +125,34 @@ class StoryJobTest(unittest.IsolatedAsyncioTestCase):
                 style_source_id=None,
             )
         self.assertTrue(all(m.get("story") for m in result.messages[-2:]))
+        self.assertEqual(result.messages[-2]["content"], "Mira kept the lighthouse.")
         self.assertIsNotNone(storage.get_agent_job(JOB_KEY))
+
+    async def _turn(self, user_text: str, reply: str):
+        self._save(STORY_START[1:2])
+        with patch("agent.runtime.orchestrator.generate_agent_reply", AsyncMock(return_value=reply)):
+            return await run_agent_turn(
+                conversation_id=CONVERSATION_ID,
+                messages=STORY_START[1:2],
+                user_text=user_text,
+                user_id=USER_ID,
+                user_profile={},
+                model=None,
+                agent_mode="know_me",
+                agent_tone="auto",
+                style_source_id=None,
+            )
+
+    async def test_the_model_marks_stories_in_any_language(self) -> None:
+        # No English story keyword in the request; the model's own marker decides.
+        result = await self._turn("ek kahani sunao", "<story>Ek gaon mein Raju rehta tha.<next_message>Ek din...")
+        self.assertTrue(all(m.get("story") for m in result.messages[-2:]))
+        self.assertIsNotNone(storage.get_agent_job(JOB_KEY))
+
+    async def test_no_marker_means_no_story(self) -> None:
+        result = await self._turn("tell me a story", "Sure, what kind of story do you like?")
+        self.assertFalse(result.messages[-1].get("story"))
+        self.assertIsNone(storage.get_agent_job(JOB_KEY))
 
     async def test_part_is_sent_while_the_user_watches_and_schedules_the_next(self) -> None:
         self._save(STORY_START)

@@ -76,6 +76,11 @@ class StoryNoteTest(unittest.TestCase):
         [note] = _turn_notes(1, ("story_or_long_reply",))
         self.assertIn("the user asked for a story", note["content"])
 
+    def test_story_marker_lifts_the_one_bubble_word_cap(self) -> None:
+        messages = [{"role": "user", "content": "ek kahani sunao"}]
+        long_story = "<story>" + " ".join(["word"] * 60)
+        self.assertGreater(_chat_reply_word_limit(messages, long_story), CHAT_REPLY_WORD_LIMIT)
+
     def test_story_note_lifts_the_one_bubble_word_cap(self) -> None:
         [note] = _turn_notes(1, ("story_or_long_reply", "story_continuation"))
         messages = [{"role": "user", "content": "then?"}, note]

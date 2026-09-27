@@ -60,7 +60,7 @@ class StaleReplyTest(unittest.TestCase):
         self.assertIn("Do not ask any question", _turn_notes(0)[0]["content"])
         story = _turn_notes(0, ("story_or_long_reply",))
         self.assertEqual(len(story), 1)
-        self.assertIn("Tell it yourself now in 4-7 short bubbles", story[0]["content"])
+        self.assertIn("tell it yourself now in 4-7 short bubbles", story[0]["content"])
 
     def test_recent_replies_and_rewrite_instruction(self) -> None:
         messages = [

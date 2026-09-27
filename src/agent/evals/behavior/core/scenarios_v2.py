@@ -297,6 +297,29 @@ COMPANION_V2_SCENARIOS = (
         ),
     ),
     BehaviorScenario(
+        id="format_story_hinglish_without_keywords",
+        description="A story asked for in Hinglish (no English story words) continues on 'phir?'.",
+        tags=("companion_v2", "format", "bubbles"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=GREETING,
+        turns=(
+            _turn("ek chhoti si kahani sunao, kisi chaiwale ki", minimum_bubbles=3, maximum_bubbles=7),
+            _turn(
+                "phir?",
+                minimum_bubbles=3,
+                maximum_bubbles=7,
+                rubric=(
+                    _rubric(
+                        "story_moves_on",
+                        "Continues the same story with a new event. Restarting, only recapping, or "
+                        "asking the user what should happen fails.",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
         id="format_small_talk_question_rules",
         description="Low-effort small talk keeps the question limits and avoids stock lines on every reply.",
         tags=("companion_v2", "format", "questions"),
