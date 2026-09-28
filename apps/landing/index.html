@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Omiryn | Find Your People</title>
-  <meta name="description" content="Talk to Omiryn. It gets your vibe and finds friends you'd actually get along with. Starting with tech college students, one campus at a time.">
+  <meta name="description" content="Talk to Omiryn. It gets your vibe and finds friends you'd actually get along with.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#0e0c15">
+  <meta name="theme-color" content="#0a0a0c">
   <meta name="color-scheme" content="dark">
   <meta name="application-name" content="Omiryn">
   <meta name="apple-mobile-web-app-title" content="Omiryn">
@@ -32,9 +32,9 @@
   <link rel="preload" href="/static/assets/omiryn-logo-neon-light.png" as="image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260928-friends">
-  <link rel="stylesheet" href="/static/landing-home.css?v=20260928-friends">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20260928-redesign">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body class="home">
@@ -52,7 +52,7 @@
     </a>
     <div class="nav-links">
       <a href="#how">How it works</a>
-      <a href="#campus">Campus</a>
+      <a href="#vibe">Vibe</a>
       <a href="/about">About</a>
       <a href="https://app.omiryn.com/" data-app-link data-track="nav_start_talking" class="nav-cta">Start talking</a>
     </div>
@@ -60,218 +60,239 @@
 
   <main>
     <!-- ═══════════ HERO ═══════════ -->
-    <section class="h-hero" id="hero">
-      <div class="h-hero-copy">
-        <p class="h-pill reveal"><span class="h-pill-dot"></span>Friends first · Built for college</p>
-        <h1 class="reveal reveal-delay-1">Find your<br><span class="gradient-text">people.</span></h1>
-        <p class="h-lead reveal reveal-delay-2">Talk to an AI that gets your vibe.<br>It finds friends you'd actually get along with.</p>
-        <div class="h-actions reveal reveal-delay-3">
-          <a href="#" data-app-link data-track="hero_start_talking" class="btn-primary">
-            Start talking
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </a>
-          <a href="#how" class="btn-secondary" data-track="hero_how">See how</a>
+    <section class="o-section o-hero" id="hero">
+      <div class="o-container o-split">
+        <div class="o-hero-copy">
+          <p class="o-badge reveal"><span class="o-dot"></span>Friends first. Not dating.</p>
+          <h1 class="o-h1 reveal reveal-delay-1">Find your <em>people.</em></h1>
+          <p class="o-lead reveal reveal-delay-2">Talk to an AI that gets your vibe. It finds friends you'd actually get along with.</p>
+          <div class="o-actions reveal reveal-delay-3">
+            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary">
+              Start talking
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a href="#how" class="o-btn o-btn-ghost" data-track="hero_how">See how it works</a>
+          </div>
+          <ul class="o-meta reveal reveal-delay-3">
+            <li>Free to start</li>
+            <li>Private by default</li>
+            <li>18+ only</li>
+          </ul>
         </div>
-      </div>
 
-      <!-- Orbit: you in the middle, people around, one lights up as a match -->
-      <div class="h-orbit reveal reveal-delay-2" aria-hidden="true">
-        <svg class="h-orbit-lines" viewBox="0 0 400 400">
-          <circle cx="200" cy="200" r="150" class="ring"/>
-          <circle cx="200" cy="200" r="96" class="ring ring-inner"/>
-          <line class="link" data-link="0" x1="200" y1="200" x2="200" y2="50"/>
-          <line class="link" data-link="1" x1="200" y1="200" x2="343" y2="154"/>
-          <line class="link" data-link="2" x1="200" y1="200" x2="288" y2="321"/>
-          <line class="link" data-link="3" x1="200" y1="200" x2="112" y2="321"/>
-          <line class="link" data-link="4" x1="200" y1="200" x2="57" y2="154"/>
-        </svg>
-        <div class="h-you"><span>You</span></div>
-        <div class="h-person p0" data-person="0">A</div>
-        <div class="h-person p1" data-person="1">R</div>
-        <div class="h-person p2" data-person="2">K</div>
-        <div class="h-person p3" data-person="3">S</div>
-        <div class="h-person p4" data-person="4">M</div>
-        <div class="h-reason" id="h-reason">
-          <small>Matched because</small>
-          <strong id="h-reason-text">same chaotic humor</strong>
+        <!-- Orbit: you in the middle, people around, one lights up as a match -->
+        <div class="o-orbit reveal reveal-delay-2" aria-hidden="true">
+          <svg class="o-orbit-lines" viewBox="0 0 400 400">
+            <circle cx="200" cy="200" r="150" class="ring"/>
+            <circle cx="200" cy="200" r="96" class="ring ring-inner"/>
+            <line class="link" data-link="0" x1="200" y1="200" x2="200" y2="50"/>
+            <line class="link" data-link="1" x1="200" y1="200" x2="343" y2="154"/>
+            <line class="link" data-link="2" x1="200" y1="200" x2="288" y2="321"/>
+            <line class="link" data-link="3" x1="200" y1="200" x2="112" y2="321"/>
+            <line class="link" data-link="4" x1="200" y1="200" x2="57" y2="154"/>
+          </svg>
+          <div class="o-you">You</div>
+          <div class="o-person p0" data-person="0">A</div>
+          <div class="o-person p1" data-person="1">R</div>
+          <div class="o-person p2" data-person="2">K</div>
+          <div class="o-person p3" data-person="3">S</div>
+          <div class="o-person p4" data-person="4">M</div>
+          <div class="o-reason" id="o-reason">
+            <small>Matched because</small>
+            <strong id="o-reason-text">same chaotic humor</strong>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- ═══════════ HOW ═══════════ -->
-    <section class="h-section" id="how">
-      <p class="section-label reveal">How it works</p>
-      <h2 class="h-title reveal reveal-delay-1">Talk. It gets you.<br>Meet your people.</h2>
+    <section class="o-section" id="how">
+      <div class="o-container">
+        <header class="o-head">
+          <p class="o-eyebrow reveal">How it works</p>
+          <h2 class="o-h2 reveal reveal-delay-1">Talk. It gets you. <em>Meet your people.</em></h2>
+        </header>
 
-      <div class="h-steps">
-        <article class="h-step reveal">
-          <div class="h-step-visual">
-            <div class="mini-chat">
-              <span class="b bot">Worst lab you've survived?</span>
-              <span class="b me">DBMS at 8am. Never again 😭</span>
-              <span class="b bot">Haha fair. Night owl then?</span>
+        <div class="o-steps">
+          <article class="o-step reveal">
+            <div class="o-step-visual">
+              <div class="mini-chat">
+                <span class="b bot">What's something you'll defend forever?</span>
+                <span class="b me">Chai beats coffee. Always.</span>
+                <span class="b bot">Bold. Tell me more 👀</span>
+              </div>
             </div>
-          </div>
-          <span class="h-step-num">01</span>
-          <h3>Just talk</h3>
-          <p>No forms. No bio. Chat like you would with a friend.</p>
-        </article>
+            <span class="o-step-num">01</span>
+            <h3>Just talk</h3>
+            <p>No forms, no bio. Chat like you would with a friend.</p>
+          </article>
 
-        <article class="h-step reveal reveal-delay-1">
-          <div class="h-step-visual">
-            <div class="vibe-tags">
-              <span class="t t1">Humor</span>
-              <span class="t t2">Beliefs</span>
-              <span class="t t3">Stories</span>
-              <span class="t t4">Work style</span>
-              <span class="t t5">What you can accept</span>
+          <article class="o-step reveal reveal-delay-1">
+            <div class="o-step-visual">
+              <div class="vibe-tags">
+                <span class="t">Humor</span>
+                <span class="t">Beliefs</span>
+                <span class="t">Stories</span>
+                <span class="t">Work style</span>
+                <span class="t t-key">What you can accept</span>
+              </div>
             </div>
-          </div>
-          <span class="h-step-num">02</span>
-          <h3>It learns your vibe</h3>
-          <p>What makes you laugh, what you believe, what you can live with.</p>
-        </article>
+            <span class="o-step-num">02</span>
+            <h3>It learns your vibe</h3>
+            <p>What makes you laugh, what you believe, what you can live with.</p>
+          </article>
 
-        <article class="h-step reveal reveal-delay-2">
-          <div class="h-step-visual">
-            <div class="mini-match">
-              <div class="mm-faces"><span>Y</span><span>R</span></div>
-              <div class="mm-score"><i style="--w: 86%"></i></div>
-              <small>You + Riya · same humor, same 2am thoughts</small>
+          <article class="o-step reveal reveal-delay-2">
+            <div class="o-step-visual">
+              <div class="mini-match">
+                <div class="o-faces"><span>Y</span><span>R</span></div>
+                <div class="o-meter"><i style="--w: 86%"></i></div>
+                <small>Same humor, same 2am thoughts</small>
+              </div>
             </div>
-          </div>
-          <span class="h-step-num">03</span>
-          <h3>Meet your people</h3>
-          <p>A few real introductions, each with a reason. Say hi if it clicks.</p>
-        </article>
+            <span class="o-step-num">03</span>
+            <h3>Meet your people</h3>
+            <p>A few real introductions, each with a reason. Say hi if it clicks.</p>
+          </article>
+        </div>
       </div>
     </section>
 
     <!-- ═══════════ VIBE ═══════════ -->
-    <section class="h-section h-vibe" id="vibe">
-      <div class="h-vibe-copy">
-        <p class="section-label reveal">What we mean by vibe</p>
-        <h2 class="h-title reveal reveal-delay-1">Not people like you.<br><span class="gradient-text">People you'd let in.</span></h2>
-        <p class="h-sub reveal reveal-delay-2">Good friends aren't copies of each other. They share a few things that matter, and they're fine with the rest.</p>
-      </div>
+    <section class="o-section" id="vibe">
+      <div class="o-container o-split">
+        <header class="o-head">
+          <p class="o-eyebrow reveal">What we mean by vibe</p>
+          <h2 class="o-h2 reveal reveal-delay-1">Not people like you. <em>People you'd let in.</em></h2>
+          <p class="o-sub reveal reveal-delay-2">Good friends aren't copies of each other. They share a few things that matter, and they're fine with the rest.</p>
+        </header>
 
-      <div class="venn reveal reveal-delay-2" aria-label="Example: two friends share humor and values, and accept their differences">
-        <div class="venn-c venn-a">
-          <b>You</b>
-          <span>Cricket</span>
-          <span>Believer</span>
-        </div>
-        <div class="venn-c venn-b">
-          <b>Them</b>
-          <span>Football</span>
-          <span>Not so sure</span>
-        </div>
-        <div class="venn-mid">
-          <span>Same humor</span>
-          <span>Honest</span>
-          <span>Chai &gt; coffee</span>
-        </div>
-        <p class="venn-note">Different, and okay with it.</p>
-      </div>
-    </section>
-
-    <!-- ═══════════ MATCH CARD ═══════════ -->
-    <section class="h-section h-match" id="match">
-      <div class="match-card reveal">
-        <div class="match-top">
-          <div class="mm-faces big"><span>Y</span><span>R</span></div>
-          <div>
-            <small>New match</small>
-            <strong>You &amp; Riya</strong>
+        <div class="venn reveal reveal-delay-2" role="img" aria-label="Two people share humor and honesty, and accept their differences">
+          <div class="venn-c venn-a">
+            <b>You</b>
+            <span>Cricket</span>
+            <span>Believer</span>
           </div>
-        </div>
-        <p class="match-label">You matched because</p>
-        <ul class="match-reasons">
-          <li>You both laugh at terrible puns</li>
-          <li>Both think side projects &gt; grades</li>
-          <li>You disagree on pineapple pizza, and both find it funny</li>
-        </ul>
-        <p class="match-label">Start with</p>
-        <div class="match-starters">
-          <span>Worst hackathon idea ever?</span>
-          <span>Your 2am rabbit hole</span>
-        </div>
-        <div class="match-cta" aria-hidden="true">Say hi</div>
-      </div>
-      <div class="h-match-copy">
-        <p class="section-label reveal">No awkward "hi"</p>
-        <h2 class="h-title reveal reveal-delay-1">Every match comes<br>with a reason.</h2>
-        <p class="h-sub reveal reveal-delay-2">You see why you matched and get something real to talk about. The first message writes itself.</p>
-        <p class="h-example reveal reveal-delay-3">Example match. Names are made up.</p>
-      </div>
-    </section>
-
-    <!-- ═══════════ CAMPUS ═══════════ -->
-    <section class="h-section h-campus" id="campus">
-      <div class="campus-box reveal">
-        <div class="campus-copy">
-          <p class="section-label">Starting on campus</p>
-          <h2 class="h-title">Friends first.<br>One campus at a time.</h2>
-          <div class="campus-chips">
-            <span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>
-              Tech college students
-            </span>
-            <span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              Private, you control it
-            </span>
-            <span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
-              18+ only
-            </span>
+          <div class="venn-c venn-b">
+            <b>Them</b>
+            <span>Football</span>
+            <span>Not sure</span>
           </div>
+          <div class="venn-mid">
+            <span>Same humor</span>
+            <span>Honest</span>
+            <span>Night owls</span>
+          </div>
+          <p class="venn-note">Different, and okay with it.</p>
         </div>
-
-        <form class="lead-form campus-form" id="landing-lead-form" data-form="lead">
-          <h3>Want Omiryn at your college?</h3>
-          <label>
-            <span>Email</span>
-            <input name="contact" type="email" autocomplete="email" required placeholder="you@college.edu">
-          </label>
-          <label>
-            <span>College name</span>
-            <textarea name="message" rows="2" required minlength="10" placeholder="e.g. IIT Bombay, 2nd year CSE"></textarea>
-          </label>
-          <input type="hidden" name="channel" value="email">
-          <input type="hidden" name="intent" value="feedback">
-          <button class="btn-primary" type="submit" data-track="campus_request">Bring it to my campus</button>
-          <small class="form-helper">We only use your email to reply.</small>
-          <p class="form-status" role="status" aria-live="polite"></p>
-        </form>
       </div>
     </section>
 
-    <!-- ═══════════ CTA ═══════════ -->
-    <section class="h-section h-final" id="cta">
-      <h2 class="h-title reveal">Your people are<br><span class="gradient-text">already out there.</span></h2>
-      <div class="reveal reveal-delay-1">
-        <a href="#" data-app-link class="btn-primary btn-primary-large" id="btn-join" data-track="final_start_talking">
-          Start talking
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
+    <!-- ═══════════ MATCH ═══════════ -->
+    <section class="o-section" id="match">
+      <div class="o-container o-split o-split-rev">
+        <header class="o-head">
+          <p class="o-eyebrow reveal">No awkward "hi"</p>
+          <h2 class="o-h2 reveal reveal-delay-1">Every match comes <em>with a reason.</em></h2>
+          <p class="o-sub reveal reveal-delay-2">See why you matched and get something real to talk about. The first message writes itself.</p>
+          <p class="o-note reveal reveal-delay-3">Example match. Names are made up.</p>
+        </header>
+
+        <div class="match-card reveal">
+          <div class="match-top">
+            <div class="o-faces"><span>Y</span><span>R</span></div>
+            <div>
+              <small>New match</small>
+              <strong>You &amp; Riya</strong>
+            </div>
+          </div>
+          <p class="match-label">You matched because</p>
+          <ul class="match-reasons">
+            <li>You both laugh at terrible puns</li>
+            <li>Both think weekends are for side quests</li>
+            <li>You disagree on pineapple pizza, and both find it funny</li>
+          </ul>
+          <p class="match-label">Start with</p>
+          <div class="match-starters">
+            <span>Best bad movie ever?</span>
+            <span>Your 2am rabbit hole</span>
+          </div>
+          <div class="match-cta" aria-hidden="true">Say hi</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ EARLY ACCESS ═══════════ -->
+    <section class="o-section" id="early">
+      <div class="o-container">
+        <div class="o-panel o-split reveal">
+          <header class="o-head">
+            <p class="o-eyebrow">Early access</p>
+            <h2 class="o-h2">Matches roll out <em>in waves.</em></h2>
+            <p class="o-sub">Leave your email and we'll let you know when yours are ready.</p>
+            <ul class="o-chips">
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                Private, you control it
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c2.8 0 5 2.2 5 5"/></svg>
+                Friends, not dating
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6l7-3z"/></svg>
+                18+ only
+              </li>
+            </ul>
+          </header>
+
+          <form class="o-form" id="landing-lead-form" data-form="lead">
+            <label>
+              <span>Email</span>
+              <input name="contact" type="email" autocomplete="email" required placeholder="you@example.com">
+            </label>
+            <label>
+              <span>What kind of friends are you looking for?</span>
+              <textarea name="message" rows="3" required minlength="10" placeholder="People to build things with, talk late at night, explore the city..."></textarea>
+            </label>
+            <input type="hidden" name="channel" value="email">
+            <input type="hidden" name="intent" value="feedback">
+            <button class="o-btn o-btn-primary" type="submit" data-track="early_access">Get early access</button>
+            <small class="o-helper">We only use your email to reach you about Omiryn.</small>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ FINAL CTA ═══════════ -->
+    <section class="o-section o-final" id="cta">
+      <div class="o-container">
+        <h2 class="o-h2 reveal">Your people are <em>already out there.</em></h2>
+        <div class="reveal reveal-delay-1">
+          <a href="#" data-app-link class="o-btn o-btn-primary o-btn-lg" id="btn-join" data-track="final_start_talking">
+            Start talking
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
       </div>
     </section>
   </main>
 
   <!-- ═══════════ FOOTER ═══════════ -->
   <footer class="footer">
-    <div class="footer-left">
+    <div class="o-container o-footer">
       <img class="footer-logo" src="/static/assets/omiryn-logo-neon-light.png" alt="Omiryn">
-    </div>
-    <span class="footer-copy">© 2026 Omiryn. Find your people.</span>
-    <div class="footer-links">
-      <a href="/about">About</a>
-      <a href="/safety">Safety</a>
-      <a href="/ai-disclosure">AI Disclosure</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
-      <a href="/contact">Contact</a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/about">About</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/safety">Safety</a>
+        <a href="/ai-disclosure">AI Disclosure</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <span class="footer-copy">© 2026 Omiryn</span>
     </div>
   </footer>
 
@@ -285,7 +306,7 @@
         if (entry.isIntersecting) entry.target.classList.add('visible');
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal, .h-step').forEach(el => observer.observe(el));
+    document.querySelectorAll('.reveal, .o-step').forEach(el => observer.observe(el));
 
     // ── Smooth scroll for anchor links ──
     document.querySelectorAll('a[href^="#"]').forEach(link => {
@@ -300,22 +321,22 @@
       });
     });
 
-    // ── Nav blur on scroll ──
+    // ── Nav background on scroll ──
     const nav = document.getElementById('nav-main');
     window.addEventListener('scroll', () => {
-      nav.classList.toggle('is-scrolled', window.scrollY > 50);
+      nav.classList.toggle('is-scrolled', window.scrollY > 24);
     }, { passive: true });
 
     // ── Orbit: cycle which person is the match and why ──
     const reasons = [
       'same chaotic humor',
-      'both build at 2am',
+      'both overthink at 2am',
       'different views, zero drama',
       'same taste in bad movies',
       'both hate small talk'
     ];
-    const reasonText = document.getElementById('h-reason-text');
-    const reasonBox = document.getElementById('h-reason');
+    const reasonText = document.getElementById('o-reason-text');
+    const reasonBox = document.getElementById('o-reason');
     let active = 0;
     function lightUp(index) {
       document.querySelectorAll('[data-person]').forEach(el => el.classList.toggle('is-match', +el.dataset.person === index));
@@ -337,7 +358,7 @@
 
     // ── Boot loader ──
     const bootLoaderStartedAt = Date.now();
-    const bootLoaderMinimumMs = 900;
+    const bootLoaderMinimumMs = 700;
     const hideBootLoader = () => {
       const remainingMs = Math.max(0, bootLoaderMinimumMs - (Date.now() - bootLoaderStartedAt));
       window.setTimeout(() => {
