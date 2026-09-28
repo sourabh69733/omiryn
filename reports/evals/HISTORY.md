@@ -115,3 +115,41 @@ Synthetic evaluation scores are grouped by day for comparison.
 | Time (IST) | Result | Stage | Companion | Score | Passed |
 | --- | --- | --- | --- | --- | --- |
 | 20:33:17 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 4.0/4 | 5/6 scenarios |
+
+## 2026-09-24
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 17:38:49 | FAIL | Execution error | meta-llama/Llama-3.3-70B-Instruct-Turbo | — | 0/0 judge checks |
+| 17:39:01 | FAIL | Judge calibration | meta-llama/Llama-3.3-70B-Instruct-Turbo | — | 1/6 judge checks |
+| 22:24:32 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 2.2/4 | 0/1 scenarios |
+| 22:26:20 | FAIL | Execution error | meta-llama/Llama-3.3-70B-Instruct-Turbo | — | 0/0 judge checks |
+| 22:27:34 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 2.8/4 | 0/1 scenarios |
+
+## 2026-09-25
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 02:36:03 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.3/4 | 5/10 scenarios |
+| 02:49:15 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.0/4 | 5/10 scenarios |
+| 11:56:32 | FAIL | Execution error | meta-llama/Llama-3.3-70B-Instruct-Turbo | — | 0/0 judge checks |
+| 12:15:11 | FAIL | Execution error | meta-llama/Llama-3.3-70B-Instruct-Turbo | — | 0/0 judge checks |
+| 15:34:06 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.3/4 | 6/10 scenarios |
+| 18:51:01 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.0/4 | 1/4 scenarios |
+| 19:17:33 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.2/4 | 3/4 scenarios |
+| 19:23:22 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.0/4 | 0/1 scenarios |
+| 19:32:24 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.3/4 | 0/1 scenarios |
+| 19:55:55 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 4.0/4 | 3/4 scenarios |
+| 23:08:47 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.6/4 | 9/11 scenarios |
+
+## 2026-09-26
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 10:36:37 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 3.5/4 | 9/11 scenarios |
+
+## 2026-09-27
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 05:37:03 | FAIL | Behavior evaluation | meta-llama/Llama-3.3-70B-Instruct-Turbo | 4.0/4 | 4/5 scenarios |
