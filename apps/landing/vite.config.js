@@ -41,6 +41,10 @@ export default defineConfig({
   root: landingRoot,
   publicDir: "public",
   plugins: [landingRoutesPlugin()],
+  // Pre-bundle GSAP up front so the dev server never serves a stale copy.
+  optimizeDeps: {
+    include: ["gsap", "gsap/ScrollTrigger"]
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
