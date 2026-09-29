@@ -225,7 +225,7 @@ function playDemo() {
       const dots = typing();
       tl.call(() => { feed.appendChild(dots); scrollFeed(); });
       tl.fromTo(dots, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.25 });
-      tl.to({}, { duration: 0.7 });
+      tl.to({}, { duration: 0.45 });
       tl.call(() => dots.remove());
     }
     const msg = bubble(step);
@@ -244,16 +244,16 @@ function playDemo() {
         const to = tag.getBoundingClientRect();
         gsap.fromTo(tag,
           { x: from.left - to.left, y: from.top - to.top, scale: 0.6, autoAlpha: 0 },
-          { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: 0.8, ease: "expo.out", delay: 0.35 });
+          { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: 0.6, ease: "expo.out", delay: 0.25 });
       });
-      tl.to({}, { duration: 1.1 });
+      tl.to({}, { duration: 0.7 });
     } else {
-      tl.to({}, { duration: 0.5 });
+      tl.to({}, { duration: 0.3 });
     }
   });
 
   tl.call(() => $(".o-phone").classList.add("is-thinking"));
-  tl.to({}, { duration: 0.6 });
+  tl.to({}, { duration: 0.3 });
   tl.fromTo(matchPop, { autoAlpha: 0, y: 40, scale: 0.8, rotation: -6 }, {
     autoAlpha: 1, y: 0, scale: 1, rotation: -3, duration: 0.8, ease: "elastic.out(1, 0.6)",
   });
@@ -291,9 +291,9 @@ if (reduce) {
 if (!reduce) {
   // Intro: headline words rise from a mask, the rest follows.
   gsap.timeline({ defaults: { ease: "expo.out" } })
-    .from(".o-h1 .w > span", { yPercent: 110, duration: 1.1, stagger: 0.08 })
+    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.8, stagger: 0.06 })
     .from("[data-intro]", { y: 24, autoAlpha: 0, duration: 0.9, stagger: 0.08 }, "-=0.8")
-    .from(".o-phone", { y: 60, autoAlpha: 0, rotation: 4, duration: 1.2 }, 0.2)
+    .from(".o-phone", { y: 60, autoAlpha: 0, rotation: 4, duration: 0.9 }, 0.1)
     .from(".o-sticker", { scale: 0, rotation: -30, stagger: 0.12, duration: 0.8, ease: "back.out(2.5)" }, 0.8);
 
   // Stickers bob gently.
@@ -306,7 +306,6 @@ if (!reduce) {
     gsap.to(blob, {
       x: () => gsap.utils.random(-120, 120),
       y: () => gsap.utils.random(-80, 80),
-      scale: () => gsap.utils.random(0.85, 1.2),
       duration: 9 + i * 2,
       repeat: -1,
       yoyo: true,
@@ -379,7 +378,7 @@ if (!reduce) {
         const r = card.getBoundingClientRect();
         const px = (e.clientX - r.left) / r.width - 0.5;
         const py = (e.clientY - r.top) / r.height - 0.5;
-        gsap.to(card, { rotationY: px * 10, rotationX: -py * 10, transformPerspective: 800, duration: 0.4, ease: "power2.out" });
+        gsap.to(card, { rotationY: px * 10, rotationX: -py * 10, transformPerspective: 800, duration: 0.4, ease: "power2.out", overwrite: "auto" });
       });
       card.addEventListener("pointerleave", () => gsap.to(card, { rotationY: 0, rotationX: 0, duration: 0.6, ease: "elastic.out(1, 0.5)" }));
     });
@@ -390,7 +389,7 @@ if (!reduce) {
       const r = stage.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
-      gsap.to(".o-phone", { rotationY: px * 8, rotationX: -py * 8, transformPerspective: 1000, duration: 0.6 });
+      gsap.to(".o-phone", { rotationY: px * 8, rotationX: -py * 8, transformPerspective: 1000, duration: 0.6, overwrite: "auto" });
     });
     stage.addEventListener("pointerleave", () => gsap.to(".o-phone", { rotationY: 0, rotationX: 0, duration: 0.8 }));
   }
