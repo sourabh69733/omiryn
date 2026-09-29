@@ -359,8 +359,12 @@
 /* ─────────── HOW IT WORKS: pinned story ─────────── */
 .o-story { position: relative; min-height: 100svh; display: flex; align-items: center; padding: 96px 0; }
 .o-story-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; align-items: center; gap: 48px; }
-.o-story-steps { position: relative; min-height: 260px; }
-.st { position: absolute; inset: 0 0 auto; }
+.o-story-steps { position: relative; }
+.o-story.is-live .o-story-steps { min-height: 260px; }
+/* Steps stack normally; they only overlap once the scroll story is running. */
+.o-story-steps { display: grid; gap: 28px; }
+.o-story.is-live .o-story-steps { display: block; }
+.o-story.is-live .st { position: absolute; inset: 0 0 auto; }
 .st-num { display: block; margin-bottom: 14px; color: var(--accent); font-family: var(--font-mono); font-size: 13px; }
 .o-story-bar { width: 160px; height: 4px; margin-top: 28px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .o-story-bar i { display: block; height: 100%; background: var(--brand-gradient); transform-origin: 0 50%; transform: scaleX(0); }
@@ -389,8 +393,6 @@
 .o-story .o-matchpop { left: 50%; right: auto; bottom: 10px; translate: -50% 0; transform: none; }
 
 /* Reduced motion: everything shown, no pinning */
-.o-story.is-static .o-story-steps { min-height: 0; display: grid; gap: 28px; }
-.o-story.is-static .st { position: static; }
 .o-story.is-static .o-story-bar { display: none; }
 .o-story.is-static .o-phone { opacity: 0.35; }
 .o-story.is-static .s-you { left: 45%; top: 38%; }

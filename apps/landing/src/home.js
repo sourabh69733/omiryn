@@ -334,6 +334,7 @@ function storyStatic() {
 }
 
 function buildStory() {
+  story.classList.add("is-live");
   gsap.set(bubbles, { autoAlpha: 0, y: 16 });
   gsap.set(steps, { autoAlpha: 0, y: 30 });
   gsap.set(steps[0], { autoAlpha: 1, y: 0 });
