@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260929-alive">
-  <link rel="stylesheet" href="/static/landing-home.css?v=20260929-people">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20260930-vibe">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body class="home">
@@ -63,73 +63,103 @@
   <main>
     <!-- ═══════════ 1. HERO: one message, one animation ═══════════ -->
     <section class="o-hero" id="hero">
-      <div class="o-container o-hero-copy">
-        <h1 class="o-h1" aria-label="Meet people who get you.">
-          <span class="w"><span>Meet</span></span>
-          <span class="w"><span>people</span></span>
-          <span class="w"><span>who</span></span>
-          <span class="w"><span><em>get you.</em></span></span>
-        </h1>
-        <p class="o-lead" data-intro>An AI that learns your vibe and introduces you to people you'll click with.</p>
-        <div data-intro>
-          <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary o-btn-lg magnetic">
-            <span>Start talking</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </a>
+      <div class="o-container o-hero-grid">
+        <div class="o-hero-copy">
+          <h1 class="o-h1" aria-label="Meet people who get you.">
+            <span class="w"><span>Meet</span></span>
+            <span class="w"><span>people</span></span>
+            <span class="w"><span>who</span></span>
+            <span class="w"><span><em>get you.</em></span></span>
+          </h1>
+          <p class="o-lead" data-intro>An AI that learns your vibe and introduces you to people you'll click with.</p>
+          <div data-intro>
+            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary o-btn-lg magnetic">
+              <span>Start talking</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
         </div>
-      </div>
 
-      <!-- People float around the headline; pairs connect with a reason -->
-      <div class="o-float" id="o-float" aria-hidden="true">
-        <svg class="o-float-lines" id="o-float-lines">
-          <defs>
-            <linearGradient id="o-link-grad" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stop-color="#7c3aed"/>
-              <stop offset="1" stop-color="#db2777"/>
-            </linearGradient>
-          </defs>
-          <path id="o-float-path" fill="none" stroke="url(#o-link-grad)" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-        <span class="o-float-chip" id="o-float-chip"></span>
+        <!-- Vibe fingerprints: two living shapes drift together and blend where they overlap -->
+        <div class="vs" id="vs" aria-hidden="true">
+          <div class="vs-glow" id="vs-glow"><span>✦</span></div>
+          <div class="blob" id="blob-you" data-c1="#ddd6fe" data-c2="#8b5cf6">
+            <img class="blob-face" src="/static/assets/people/p1.webp" alt="">
+            <span class="blob-chip" style="left: 20%; top: 8%">Chai &gt; coffee</span>
+            <span class="blob-chip" style="left: 2%; top: 52%">Cricket</span>
+            <span class="blob-chip is-shared" style="left: 86%; top: 6%"></span>
+          </div>
+          <div class="blob" id="blob-them" data-c1="#fbcfe8" data-c2="#f472b6">
+            <img class="blob-face" src="/static/assets/people/p4.webp" alt="">
+            <span class="blob-chip" style="left: 80%; top: 8%"></span>
+            <span class="blob-chip" style="left: 98%; top: 52%"></span>
+            <span class="blob-chip is-shared" style="left: 14%; top: 6%"></span>
+          </div>
+          <span class="vs-reason" id="vs-reason"></span>
+        </div>
       </div>
     </section>
 
-    <!-- ═══════════ 2. CHAT DEMO ═══════════ -->
-    <section class="o-section o-center" id="how">
-      <div class="o-container">
-        <header class="o-head" data-rv>
+    <!-- ═══════════ 2. HOW IT WORKS: pinned scroll story ═══════════ -->
+    <section class="o-story" id="how">
+      <div class="o-container o-story-grid">
+        <div class="o-story-text">
           <p class="o-eyebrow">How it works</p>
-          <h2 class="o-h2">Just talk. <em>It learns you.</em></h2>
-        </header>
-
-        <div class="o-demo" data-rv>
-          <div class="o-phone">
-            <div class="o-phone-head">
-              <span class="o-phone-logo"><span class="o-mark"></span></span>
-              <div>
-                <strong>Omiryn</strong>
-                <small><span class="o-live"></span>getting to know you</small>
-              </div>
-            </div>
-            <div class="o-feed" id="o-feed"></div>
-            <div class="o-vibe">
-              <small>Your vibe</small>
-              <div class="o-vibe-slots" id="o-vibe-slots"></div>
-            </div>
+          <div class="o-story-steps">
+            <article class="st" data-st="0">
+              <span class="st-num">01</span>
+              <h2 class="o-h2">Just <em>talk.</em></h2>
+              <p class="o-sub">No forms, no bio. Chat like you would with a friend.</p>
+            </article>
+            <article class="st" data-st="1">
+              <span class="st-num">02</span>
+              <h2 class="o-h2">It learns <em>your vibe.</em></h2>
+              <p class="o-sub">What makes you laugh, what you believe, what you can live with.</p>
+            </article>
+            <article class="st" data-st="2">
+              <span class="st-num">03</span>
+              <h2 class="o-h2">Meet people <em>who click.</em></h2>
+              <p class="o-sub">A few real introductions, each with a reason. Say hi if it clicks.</p>
+            </article>
           </div>
-
-          <div class="o-matchpop" id="o-matchpop">
-            <div class="o-matchpop-faces"><span data-avatar="0"></span><span class="o-heart">✦</span><span data-avatar="3"></span></div>
-            <strong>You &amp; Riya would click</strong>
-            <p>Same goofy humor. Both night owls. No small talk.</p>
-          </div>
+          <div class="o-story-bar"><i id="o-story-bar"></i></div>
         </div>
 
-        <ol class="o-progress" id="o-progress" aria-label="Steps">
-          <li data-step="0">Chat</li>
-          <li data-step="1">Vibe</li>
-          <li data-step="2">Match</li>
-        </ol>
+        <div class="o-story-view">
+          <div class="o-story-stage" id="o-story-stage">
+            <div class="o-phone">
+              <div class="o-phone-head">
+                <span class="o-phone-logo"><span class="o-mark"></span></span>
+                <div>
+                  <strong>Omiryn</strong>
+                  <small><span class="o-live"></span>getting to know you</small>
+                </div>
+              </div>
+              <div class="o-feed">
+                <div class="o-msg bot">Hey! What's something you'll defend forever?</div>
+                <div class="o-msg me">Chai beats coffee. <mark data-tag="Chai loyalist">Always.</mark></div>
+                <div class="o-msg bot">Respect. What made you laugh this week?</div>
+                <div class="o-msg me">My friend's <mark data-tag="Night owl">2am voice notes</mark> 😂</div>
+                <div class="o-msg bot">And what can you not stand?</div>
+                <div class="o-msg me"><mark data-tag="No small talk">Small talk.</mark> Say the real thing.</div>
+              </div>
+            </div>
+
+            <div class="blob s-you" id="s-you" data-c1="#ddd6fe" data-c2="#8b5cf6">
+              <img class="blob-face" src="/static/assets/people/p1.webp" alt="">
+            </div>
+            <div class="blob s-them" id="s-them" data-c1="#fbcfe8" data-c2="#f472b6">
+              <img class="blob-face" src="/static/assets/people/p4.webp" alt="">
+            </div>
+            <div class="s-tags" id="s-tags"></div>
+
+            <div class="o-matchpop" id="o-matchpop">
+              <div class="o-matchpop-faces"><span data-avatar="0"></span><span class="o-heart">✦</span><span data-avatar="3"></span></div>
+              <strong>You &amp; Riya would click</strong>
+              <p>Same goofy humor. Both night owls. No small talk.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

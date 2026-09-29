@@ -1,5 +1,5 @@
 // Home page motion. One main animation per section:
-// hero floating people, chat demo, venn, reasons marquee, card stack.
+// hero vibe fingerprints, pinned how-it-works story, venn, reasons marquee, card stack.
 // Everything renders in a readable final state when the user prefers reduced motion.
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -145,280 +145,263 @@ const endDrag = (event) => {
 stack.addEventListener("pointerup", endDrag);
 stack.addEventListener("pointercancel", endDrag);
 
-/* ─────────── Hero: floating people ─────────── */
-// Portraits float around the headline. Every few seconds two of them light up,
-// a curved line draws between them under the text, and a short reason appears.
-const FLOAT_REASONS = [
-  "both hate small talk",
-  "same chaotic humor",
-  "both overthink at 2am",
-  "different views, zero drama",
-  "same taste in bad movies",
-  "chai loyalists",
-  "both love long walks",
-];
-// Side layout: x is 0..1 across the free space beside the text (0 = page edge),
-// y is 0..1 down the hero. Size in px. Faces never enter the text box.
-const SIDE_SPOTS = [
-  [0.6, 0.12, 112], [0.95, 0.42, 80], [0.45, 0.68, 98], [0.9, 0.92, 64],
-];
-const DESKTOP_PAIRS = [[0, 5], [1, 6], [2, 4], [3, 7], [1, 4], [2, 5], [0, 6], [3, 5]];
-// Narrow screens: a row of faces under the button.
-const ROW_SPOTS = [[0.12, 0.3, 62], [0.37, 0.7, 70], [0.63, 0.3, 74], [0.88, 0.7, 60]];
-const ROW_PAIRS = [[0, 2], [1, 3], [0, 3], [1, 2]];
+/* ─────────── Vibe fingerprints ─────────── */
+// Each .blob gets an SVG shape that slowly wobbles like a lava lamp. Shapes are
+// drawn on one shared ticker; overlapping blobs blend through mix-blend-mode.
+const blobs = [];
+let blobId = 0;
 
-const hero = $("#hero");
-const floatLayer = $("#o-float");
-const floatPath = $("#o-float-path");
-const floatChip = $("#o-float-chip");
-let floaters = [];
-let pairs = DESKTOP_PAIRS;
-let textBox = null;
-
-// Union of the headline, subtext and button, relative to the float layer.
-function measureText() {
-  const box = floatLayer.getBoundingClientRect();
-  const rects = [".o-h1", ".o-lead", ".o-hero .o-btn"].map((sel) => $(sel).getBoundingClientRect());
-  return {
-    left: Math.min(...rects.map((r) => r.left)) - box.left,
-    right: Math.max(...rects.map((r) => r.right)) - box.left,
-    top: Math.min(...rects.map((r) => r.top)) - box.top,
-    bottom: Math.max(...rects.map((r) => r.bottom)) - box.top,
-  };
+function makeBlob(el, seed) {
+  const id = `bg${(blobId += 1)}`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 200 200");
+  svg.setAttribute("class", "blob-shape");
+  svg.innerHTML = `
+    <defs>
+      <radialGradient id="${id}" cx="40%" cy="35%" r="75%">
+        <stop class="c1" offset="0" stop-color="${el.dataset.c1}"/>
+        <stop class="c2" offset="1" stop-color="${el.dataset.c2}"/>
+      </radialGradient>
+    </defs>
+    <path fill="url(#${id})"/>`;
+  el.prepend(svg);
+  const blob = { el, path: svg.querySelector("path"), stops: svg.querySelectorAll("stop"), seed, energy: 1, visible: true };
+  blobs.push(blob);
+  return blob;
 }
 
-function place(x, y, size, i) {
-  const el = document.createElement("span");
-  el.className = "o-floater";
-  el.style.left = `${x}px`;
-  el.style.top = `${y}px`;
-  el.style.setProperty("--s", `${size}px`);
-  el.innerHTML = `<img src="${photo(i)}" alt="" decoding="async">`;
-  floatLayer.appendChild(el);
-  return el;
+function setBlobColors(blob, c1, c2) {
+  blob.stops[0].setAttribute("stop-color", c1);
+  blob.stops[1].setAttribute("stop-color", c2);
 }
 
-function buildFloat() {
-  $$(".o-floater", floatLayer).forEach((el) => el.remove());
-  gsap.set(floatLayer, { x: 0, y: 0 });
-  const w = floatLayer.offsetWidth;
-  const h = floatLayer.offsetHeight;
-  textBox = measureText();
-  const gap = 32;
-  const sideWidth = textBox.left - gap;
-  floaters = [];
-
-  if (sideWidth >= 150) {
-    // Two side columns, mirrored.
-    pairs = DESKTOP_PAIRS;
-    [0, 1].forEach((side) => {
-      SIDE_SPOTS.forEach(([fx, fy, size], k) => {
-        const s = Math.min(size, sideWidth * 0.7);
-        const minX = s / 2 + 12;
-        const maxX = sideWidth - s / 2;
-        const x = minX + (maxX - minX) * fx;
-        const y = Math.max(textBox.top - 40, 90) + (h - Math.max(textBox.top - 40, 90) - s / 2 - 24) * fy;
-        floaters.push(place(side ? w - x : x, y, s, side * 4 + k + (side ? 1 : 0)));
-      });
-    });
-  } else {
-    // Not enough room beside the text: one row below the button.
-    pairs = ROW_PAIRS;
-    const top = textBox.bottom + 48;
-    const band = Math.max(h - top - 40, 80);
-    ROW_SPOTS.forEach(([fx, fy, size], k) => {
-      floaters.push(place(w * fx, top + band * fy, size, k * 2));
-    });
+// Smooth closed shape through points on a wobbling circle (Catmull-Rom to Bezier).
+function blobPath(t, seed, energy) {
+  const n = 9;
+  const pts = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2;
+    const wobble =
+      0.07 * Math.sin(3 * a + t * 0.9 + seed) +
+      0.05 * Math.sin(5 * a - t * 1.2 + seed * 2.1) +
+      0.04 * Math.sin(2 * a + t * 0.55 + seed * 0.7);
+    const r = 84 * (1 + wobble * energy);
+    pts.push([100 + Math.cos(a) * r, 100 + Math.sin(a) * r]);
   }
-  $("#o-float-lines").setAttribute("viewBox", `0 0 ${w} ${h}`);
-}
-buildFloat();
-
-function centerOf(el) {
-  const box = floatLayer.getBoundingClientRect();
-  const r = el.getBoundingClientRect();
-  return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top };
-}
-
-let pairIndex = 0;
-function connectPair() {
-  const [ia, ib] = pairs[pairIndex % pairs.length];
-  pairIndex += 1;
-  const a = floaters[ia];
-  const b = floaters[ib];
-  if (!a || !b) return;
-  const p1 = centerOf(a);
-  const p2 = centerOf(b);
-  // Curve dips below both people so it passes under the headline and button.
-  // The chip sits at the curve's midpoint, always below the button.
-  const h = floatLayer.offsetHeight;
-  const cx = (p1.x + p2.x) / 2;
-  const midY = Math.min(Math.max(textBox.bottom + 56, (p1.y + p2.y) / 2), h - 28);
-  const cy = 2 * midY - (p1.y + p2.y) / 2;
-  floatPath.setAttribute("d", `M${p1.x},${p1.y} Q${cx},${cy} ${p2.x},${p2.y}`);
-  const len = floatPath.getTotalLength();
-  const mid = floatPath.getPointAtLength(len / 2);
-  floatChip.textContent = FLOAT_REASONS[pairIndex % FLOAT_REASONS.length];
-  floatChip.style.left = `${mid.x}px`;
-  floatChip.style.top = `${mid.y}px`;
-
-  gsap.timeline()
-    .call(() => { a.classList.add("is-match"); b.classList.add("is-match"); })
-    .fromTo(floatPath, { strokeDasharray: len, strokeDashoffset: len, autoAlpha: 1 }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" })
-    .fromTo(floatChip, { autoAlpha: 0, scale: 0.7, y: 10 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.45, ease: "back.out(2.2)" }, "-=0.3")
-    .to({}, { duration: 1.6 })
-    .to([floatPath, floatChip], { autoAlpha: 0, duration: 0.4 })
-    .call(() => { a.classList.remove("is-match"); b.classList.remove("is-match"); });
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < n; i += 1) {
+    const p0 = pts[(i - 1 + n) % n];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % n];
+    const p3 = pts[(i + 2) % n];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return `${d}Z`;
 }
 
-function floatIdle() {
-  floaters.forEach((el, i) => {
-    gsap.to(el, {
-      y: gsap.utils.random(-14, 14),
-      x: gsap.utils.random(-8, 8),
-      rotation: gsap.utils.random(-4, 4),
-      duration: gsap.utils.random(3, 5),
-      delay: i * 0.1,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-    });
+function drawBlobs(time = 0) {
+  blobs.forEach((b) => {
+    if (b.visible) b.path.setAttribute("d", blobPath(time, b.seed, b.energy));
   });
 }
 
-const progress = $$("#o-progress li");
-function setStep(index) {
-  progress.forEach((li, i) => {
-    li.classList.toggle("is-on", i <= index);
-    li.classList.toggle("is-now", i === index);
-  });
-}
+$$(".blob").forEach((el, i) => makeBlob(el, i * 1.7));
+drawBlobs(0);
 
-const SCRIPT = [
-  { who: "bot", text: "Hey! What's something you'll defend forever?" },
-  { who: "me", text: "Chai beats coffee. [Always.]", tag: "Chai loyalist" },
-  { who: "bot", text: "Respect. What made you laugh this week?" },
-  { who: "me", text: "My friend's [2am voice notes] 😂", tag: "Night owl" },
-  { who: "bot", text: "Haha. And what can you not stand?" },
-  { who: "me", text: "[Small talk.] Just say the real thing.", tag: "No small talk" },
+// Only animate shapes that are on screen.
+const blobObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    const b = blobs.find((x) => x.el === entry.target);
+    if (b) b.visible = entry.isIntersecting;
+  });
+});
+blobs.forEach((b) => blobObserver.observe(b.el));
+
+/* ─────────── Hero: you meet someone new, again and again ─────────── */
+const PARTNERS = [
+  { face: 4, c: ["#fbcfe8", "#f472b6"], traits: ["Football", "Gym at 6am"], shared: "Bad puns", reason: "both laugh at bad puns" },
+  { face: 2, c: ["#fde68a", "#f59e0b"], traits: ["Coffee person", "Early bird"], shared: "No small talk", reason: "both hate small talk" },
+  { face: 5, c: ["#a7f3d0", "#10b981"], traits: ["Not so sure about god", "Books"], shared: "2am thinker", reason: "same 2am overthinking" },
+  { face: 8, c: ["#bae6fd", "#0ea5e9"], traits: ["Football", "Hills > beaches"], shared: "Side quests", reason: "both live for side quests" },
 ];
-const feed = $("#o-feed");
-const slots = $("#o-vibe-slots");
+const vs = $("#vs");
+const you = blobs.find((b) => b.el.id === "blob-you");
+const them = blobs.find((b) => b.el.id === "blob-them");
+const vsGlow = $("#vs-glow");
+const vsReason = $("#vs-reason");
+let partnerIndex = 0;
+
+function loadPartner(partner) {
+  $(".blob-face", them.el).src = photo(partner.face - 1);
+  setBlobColors(them, partner.c[0], partner.c[1]);
+  const [t1, t2, shared] = $$(".blob-chip", them.el);
+  t1.textContent = partner.traits[0];
+  t2.textContent = partner.traits[1];
+  shared.textContent = partner.shared;
+  $(".blob-chip.is-shared", you.el).textContent = partner.shared;
+  vsReason.textContent = `✦ ${partner.reason}`;
+}
+
+function showMerged() {
+  // Final, readable state: both people overlapping with the shared reason.
+  loadPartner(PARTNERS[0]);
+  gsap.set(you.el, { left: "41.5%" });
+  gsap.set(them.el, { left: "58.5%", autoAlpha: 1 });
+  gsap.set([vsGlow, vsReason], { autoAlpha: 1, scale: 1 });
+}
+
+function meetCycle() {
+  const partner = PARTNERS[partnerIndex % PARTNERS.length];
+  partnerIndex += 1;
+  const theirChips = $$(".blob-chip", them.el);
+  const sharedChips = [$(".blob-chip.is-shared", you.el), $(".blob-chip.is-shared", them.el)];
+
+  return gsap.timeline({ onComplete: meetCycle })
+    .call(() => loadPartner(partner))
+    .set(them.el, { left: "112%", autoAlpha: 0, scale: 0.6 })
+    .set([vsGlow, vsReason], { autoAlpha: 0, scale: 0.6 })
+    .set(sharedChips, { autoAlpha: 0, scale: 0.6 })
+    // Someone new arrives.
+    .to(them.el, { left: "70%", autoAlpha: 1, scale: 1, duration: 1.1, ease: "expo.out" })
+    .fromTo(theirChips.slice(0, 2), { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, stagger: 0.1, duration: 0.4, ease: "back.out(2)" }, "-=0.5")
+    .to(sharedChips, { autoAlpha: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, "-=0.2")
+    .to({}, { duration: 0.5 })
+    // They drift together; the overlap lights up.
+    .to(you.el, { left: "41.5%", duration: 1.3, ease: "power3.inOut" }, "meet")
+    .to(them.el, { left: "58.5%", duration: 1.3, ease: "power3.inOut" }, "meet")
+    .to(sharedChips, { autoAlpha: 0, scale: 0.4, duration: 0.4 }, "meet+=0.8")
+    .to(vsGlow, { autoAlpha: 1, scale: 1, duration: 0.7, ease: "back.out(1.6)" }, "meet+=0.9")
+    .to(vsReason, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2.2)" }, "meet+=1.1")
+    .to([you, them], { energy: 1.8, duration: 0.6, yoyo: true, repeat: 1, ease: "sine.inOut" }, "meet+=0.9")
+    .to({}, { duration: 2.2 })
+    // They part ways; someone else is next.
+    .to([vsGlow, vsReason], { autoAlpha: 0, scale: 0.8, duration: 0.35 })
+    .to(theirChips.slice(0, 2), { autoAlpha: 0, duration: 0.25 }, "<")
+    .to(them.el, { left: "112%", autoAlpha: 0, scale: 0.7, duration: 0.8, ease: "power2.in" }, "part")
+    .to(you.el, { left: "30%", duration: 1, ease: "power3.inOut" }, "part");
+}
+
+/* ─────────── How it works: pinned scroll story ─────────── */
+const story = $("#how");
+const stage = $("#o-story-stage");
+const sYou = blobs.find((b) => b.el.id === "s-you");
+const sThem = blobs.find((b) => b.el.id === "s-them");
+const bubbles = $$(".o-story .o-msg");
+const marks = $$(".o-story mark");
+const steps = $$(".o-story .st");
 const matchPop = $("#o-matchpop");
+const tagLayer = $("#s-tags");
 
-function bubble(step) {
-  const el = document.createElement("div");
-  el.className = `o-msg ${step.who}`;
-  el.innerHTML = step.text.replace(/\[(.+?)\]/g, "<mark>$1</mark>");
-  return el;
-}
-function typing() {
-  const el = document.createElement("div");
-  el.className = "o-msg bot o-typing";
-  el.innerHTML = "<i></i><i></i><i></i>";
-  return el;
-}
-function addTag(text) {
+// One flying tag per highlighted phrase.
+const flyTags = marks.map((mark, i) => {
   const tag = document.createElement("span");
-  tag.className = `o-vtag c${slots.children.length + 1}`;
-  tag.textContent = text;
-  slots.appendChild(tag);
+  tag.className = `s-tag c${i + 1}`;
+  tag.textContent = mark.dataset.tag;
+  tagLayer.appendChild(tag);
   return tag;
+});
+
+// Positions inside the (possibly scaled) stage, in unscaled stage pixels.
+function stagePoint(el) {
+  const box = stage.getBoundingClientRect();
+  const k = box.width / stage.offsetWidth || 1;
+  const r = el.getBoundingClientRect();
+  return { x: (r.left + r.width / 2 - box.left) / k, y: (r.top + r.height / 2 - box.top) / k };
 }
 
-function renderStaticDemo() {
-  SCRIPT.forEach((step) => {
-    feed.appendChild(bubble(step));
-    if (step.tag) addTag(step.tag);
-  });
-  matchPop.classList.add("is-static");
+// On stacked layouts the stage sits under the text, so shrink it to fit the screen.
+function fitStage() {
+  const view = $(".o-story-view");
+  if (window.innerWidth > 1024) {
+    view.style.removeProperty("--k");
+    return;
+  }
+  const textHeight = $(".o-story-text").offsetHeight;
+  const room = window.innerHeight - textHeight - 110;
+  const k = Math.max(0.42, Math.min(window.innerWidth / 600, room / 560, 0.85));
+  view.style.setProperty("--k", k.toFixed(3));
+}
+fitStage();
+window.addEventListener("resize", fitStage);
+
+function storyStatic() {
+  story.classList.add("is-static");
+  gsap.set(marks, { backgroundSize: "100% 100%" });
 }
 
-function playDemo() {
-  const tl = gsap.timeline({ onComplete: () => gsap.delayedCall(0.2, resetDemo) });
+function buildStory() {
+  gsap.set(bubbles, { autoAlpha: 0, y: 16 });
+  gsap.set(steps, { autoAlpha: 0, y: 30 });
+  gsap.set(steps[0], { autoAlpha: 1, y: 0 });
+  gsap.set(sYou.el, { scale: 0.55, autoAlpha: 0.5 });
+  gsap.set(sThem.el, { xPercent: 140, autoAlpha: 0 });
+  gsap.set(matchPop, { autoAlpha: 0, y: 40, scale: 0.9 });
+  gsap.set(flyTags, { autoAlpha: 0 });
 
-  tl.call(() => setStep(0));
-  SCRIPT.forEach((step) => {
-    if (step.who === "bot") {
-      const dots = typing();
-      tl.call(() => { feed.appendChild(dots); scrollFeed(); });
-      tl.fromTo(dots, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.25 });
-      tl.to({}, { duration: 0.45 });
-      tl.call(() => dots.remove());
-    }
-    const msg = bubble(step);
-    tl.call(() => { feed.appendChild(msg); scrollFeed(); });
-    tl.fromTo(msg, { autoAlpha: 0, y: 14, scale: 0.94 }, {
-      autoAlpha: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.8)",
-      transformOrigin: step.who === "me" ? "100% 100%" : "0% 100%",
-    });
-    if (step.tag) {
-      // The highlighted words glow, then a tag flies from them into "Your vibe".
-      tl.call(() => {
-        setStep(1);
-        const mark = $("mark", msg);
-        mark.classList.add("is-on");
-        const tag = addTag(step.tag);
-        const from = mark.getBoundingClientRect();
-        const to = tag.getBoundingClientRect();
-        gsap.fromTo(tag,
-          { x: from.left - to.left, y: from.top - to.top, scale: 0.6, autoAlpha: 0 },
-          { x: 0, y: 0, scale: 1, autoAlpha: 1, duration: 0.6, ease: "expo.out", delay: 0.25 });
-      });
-      tl.to({}, { duration: 0.7 });
-    } else {
-      tl.to({}, { duration: 0.3 });
-    }
+  const tl = gsap.timeline({
+    defaults: { ease: "power2.out" },
+    scrollTrigger: {
+      trigger: story,
+      start: "top top",
+      end: "+=260%",
+      pin: true,
+      scrub: 0.7,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => gsap.set("#o-story-bar", { scaleX: self.progress }),
+    },
   });
 
-  tl.call(() => { $(".o-phone").classList.add("is-thinking"); setStep(2); });
-  tl.to({}, { duration: 0.3 });
-  tl.fromTo(matchPop, { autoAlpha: 0, y: 40, scale: 0.8, rotation: -6 }, {
-    autoAlpha: 1, y: 0, scale: 1, rotation: -4, duration: 0.8, ease: "elastic.out(1, 0.6)",
+  // 1. The chat types in.
+  tl.to(bubbles, { autoAlpha: 1, y: 0, stagger: 0.16, duration: 0.2 }, 0);
+
+  // 2. Highlighted words lift off and get absorbed into your vibe.
+  tl.to(steps[0], { autoAlpha: 0, y: -30, duration: 0.15 }, 1)
+    .to(steps[1], { autoAlpha: 1, y: 0, duration: 0.15 }, 1.05);
+  marks.forEach((mark, i) => {
+    const at = 1.05 + i * 0.22;
+    const tag = flyTags[i];
+    tl.to(mark, { backgroundSize: "100% 100%", duration: 0.12 }, at)
+      .fromTo(tag,
+        { x: () => stagePoint(mark).x, y: () => stagePoint(mark).y, autoAlpha: 0, scale: 0.8 },
+        { autoAlpha: 1, scale: 1, duration: 0.08 }, at + 0.05)
+      .to(tag, { x: () => stagePoint(sYou.el).x, y: () => stagePoint(sYou.el).y, scale: 0.3, duration: 0.18, ease: "power2.in" }, at + 0.1)
+      .to(tag, { autoAlpha: 0, duration: 0.04 }, at + 0.26)
+      .to(sYou.el, { scale: 0.55 + (i + 1) * 0.15, autoAlpha: 0.6 + (i + 1) * 0.13, duration: 0.1, ease: "back.out(2)" }, at + 0.27);
   });
-  tl.from($$(".o-matchpop-faces > span", matchPop), { scale: 0, stagger: 0.08, duration: 0.4, ease: "back.out(3)" }, "<0.2");
-  tl.to({}, { duration: 3.2 });
-  tl.to([feed, slots, matchPop], { autoAlpha: 0, duration: 0.4 });
+
+  // 3. Someone who fits arrives, you overlap, the match lands.
+  tl.to(steps[1], { autoAlpha: 0, y: -30, duration: 0.15 }, 2)
+    .to(steps[2], { autoAlpha: 1, y: 0, duration: 0.15 }, 2.05)
+    .to(".o-story .o-phone", { autoAlpha: 0.18, scale: 0.92, duration: 0.3 }, 2)
+    .to(sYou.el, { left: "45%", top: "38%", duration: 0.35, ease: "power2.inOut" }, 2.05)
+    .to(sThem.el, { xPercent: 0, autoAlpha: 1, duration: 0.35, ease: "power2.inOut" }, 2.1)
+    .fromTo(matchPop, { autoAlpha: 0, y: 40, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.25, ease: "back.out(1.8)" }, 2.5)
+    .to({}, { duration: 0.25 });
   return tl;
-}
-function scrollFeed() {
-  gsap.to(feed, { scrollTop: feed.scrollHeight, duration: 0.4, ease: "power2.out" });
-}
-function resetDemo() {
-  setStep(-1);
-  feed.innerHTML = "";
-  slots.innerHTML = "";
-  $(".o-phone").classList.remove("is-thinking");
-  gsap.set([feed, slots], { autoAlpha: 1 });
-  gsap.set(matchPop, { autoAlpha: 0 });
-  demo = playDemo();
 }
 
 /* ─────────── Start ─────────── */
-let demo = null;
-const demoStage = $(".o-demo");
 if (reduce) {
-  renderStaticDemo();
-  setStep(2);
+  showMerged();
+  storyStatic();
 } else {
-  gsap.set(matchPop, { autoAlpha: 0 });
-  // The chat starts when its section is on screen, then loops.
-  ScrollTrigger.create({ trigger: demoStage, start: "top 75%", once: true, onEnter: () => { demo = playDemo(); } });
-  document.addEventListener("visibilitychange", () => {
-    if (!demo) return;
-    document.hidden ? demo.pause() : demo.resume();
-  });
+  buildStory();
 }
 
 if (!reduce) {
-  // Hero intro: words rise, then subtext and button, then the people pop in.
+  // Hero intro: words rise, then subtext and button, then your vibe appears.
   gsap.timeline({ defaults: { ease: "expo.out" } })
     .from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.07 })
     .from("[data-intro]", { y: 20, autoAlpha: 0, duration: 0.8, stagger: 0.1 }, "-=0.6")
-    .from(".o-floater", { scale: 0, autoAlpha: 0, duration: 0.8, stagger: { each: 0.06, from: "random" }, ease: "back.out(1.8)" }, 0.3);
-  floatIdle();
-  gsap.delayedCall(2, connectPair);
-  setInterval(() => { if (!document.hidden) connectPair(); }, 3400);
+    .from(you.el, { scale: 0, autoAlpha: 0, duration: 1.2, ease: "elastic.out(1, 0.6)" }, 0.3)
+    .add(meetCycle, 1);
+
+  // Shapes wobble on the shared ticker.
+  gsap.ticker.add((time) => drawBlobs(time));
 
   // Background blobs drift.
   $$(".o-blob").forEach((blob, i) => {
@@ -477,30 +460,13 @@ if (!reduce) {
       btn.addEventListener("pointerleave", () => { mx(0); my(0); });
     });
 
-    // Portraits drift with the cursor; bigger (closer) faces move more.
-    const layerX = gsap.quickTo(floatLayer, "x", { duration: 1.2, ease: "power3" });
-    const layerY = gsap.quickTo(floatLayer, "y", { duration: 1.2, ease: "power3" });
-    hero.addEventListener("pointermove", (e) => {
-      const r = hero.getBoundingClientRect();
-      layerX(((e.clientX - r.left) / r.width - 0.5) * -24);
-      layerY(((e.clientY - r.top) / r.height - 0.5) * -16);
+    // The fingerprints lean toward the cursor a little.
+    const vx = gsap.quickTo(vs, "x", { duration: 1.2, ease: "power3" });
+    const vy = gsap.quickTo(vs, "y", { duration: 1.2, ease: "power3" });
+    $("#hero").addEventListener("pointermove", (e) => {
+      vx((e.clientX / window.innerWidth - 0.5) * 24);
+      vy((e.clientY / window.innerHeight - 0.5) * 16);
     });
   }
 }
 
-function rebuildFloat() {
-  gsap.killTweensOf(floaters);
-  buildFloat();
-  if (!reduce) floatIdle();
-}
-// Web fonts change the headline size, so measure again once they load.
-document.fonts?.ready.then(() => {
-  const now = measureText();
-  if (Math.abs(now.left - textBox.left) > 8 || Math.abs(now.bottom - textBox.bottom) > 8) rebuildFloat();
-});
-
-let resizeTimer = null;
-window.addEventListener("resize", () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(rebuildFloat, 250);
-});
