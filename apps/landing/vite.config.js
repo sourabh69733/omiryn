@@ -41,6 +41,9 @@ export default defineConfig({
   root: landingRoot,
   publicDir: "public",
   plugins: [landingRoutesPlugin()],
+  // Own dep cache: the web app's dev server shares node_modules/.vite and would
+  // otherwise invalidate our pre-bundled GSAP ("504 Outdated Optimize Dep").
+  cacheDir: path.resolve("node_modules/.vite-landing"),
   // Pre-bundle GSAP up front so the dev server never serves a stale copy.
   optimizeDeps: {
     include: ["gsap", "gsap/ScrollTrigger"]
