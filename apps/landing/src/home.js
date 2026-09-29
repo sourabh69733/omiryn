@@ -1,4 +1,5 @@
-// Home page motion: hero chat demo, marquee, scroll reveals, venn, card stack.
+// Home page motion. One main animation per section:
+// hero orbit, chat demo, venn, reasons marquee, card stack.
 // Everything renders in a readable final state when the user prefers reduced motion.
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -176,7 +177,102 @@ const endDrag = (event) => {
 stack.addEventListener("pointerup", endDrag);
 stack.addEventListener("pointercancel", endDrag);
 
-/* ─────────── Hero chat demo ─────────── */
+/* ─────────── Hero orbit ─────────── */
+// Rings of people rotate around you. Every few seconds one lights up,
+// a line draws from you to them, and a short reason appears.
+const ORBIT_REASONS = [
+  "same chaotic humor",
+  "both overthink at 2am",
+  "different views, zero drama",
+  "same taste in bad movies",
+  "both hate small talk",
+  "chai loyalists",
+];
+const RINGS = [
+  { r: 0.2, count: 4, size: 64, speed: 60, dir: 1 },
+  { r: 0.34, count: 6, size: 56, speed: 90, dir: -1 },
+  { r: 0.48, count: 8, size: 46, speed: 120, dir: 1 },
+];
+const orbit = $("#o-orbit");
+const orbitPeople = [];
+
+function buildOrbit() {
+  $$(".o-ring", orbit).forEach((el) => el.remove());
+  orbitPeople.length = 0;
+  const size = orbit.offsetWidth;
+  let avatarIndex = 1;
+  RINGS.forEach((ring, ringIndex) => {
+    const el = document.createElement("div");
+    el.className = `o-ring ring-${ringIndex}`;
+    const radius = ring.r * size;
+    el.style.setProperty("--d", `${radius * 2}px`);
+    for (let i = 0; i < ring.count; i += 1) {
+      const angle = (360 / ring.count) * i + ringIndex * 17;
+      const line = document.createElement("span");
+      line.className = "o-link";
+      line.style.width = `${radius}px`;
+      line.style.transform = `rotate(${angle}deg)`;
+      const person = document.createElement("div");
+      person.className = "o-person";
+      person.style.setProperty("--s", `${ring.size}px`);
+      const rad = (angle * Math.PI) / 180;
+      person.style.left = `calc(50% + ${Math.cos(rad) * radius}px)`;
+      person.style.top = `calc(50% + ${Math.sin(rad) * radius}px)`;
+      person.innerHTML = `<span class="o-face" data-avatar="${avatarIndex % 8 || 1}"></span><span class="o-tip"></span>`;
+      avatarIndex += 1;
+      el.append(line, person);
+      orbitPeople.push({ person, line, ring: el });
+    }
+    orbit.appendChild(el);
+    el.dataset.speed = ring.speed;
+    el.dataset.dir = ring.dir;
+  });
+  paintAvatars(orbit);
+}
+buildOrbit();
+
+let orbitTimer = null;
+function spinOrbit() {
+  $$(".o-ring", orbit).forEach((ring) => {
+    const dir = Number(ring.dataset.dir);
+    const faces = $$(".o-person", ring);
+    gsap.to(ring, { rotation: 360 * dir, duration: Number(ring.dataset.speed), repeat: -1, ease: "none" });
+    // Keep faces upright while the ring turns.
+    gsap.to(faces, { rotation: -360 * dir, duration: Number(ring.dataset.speed), repeat: -1, ease: "none" });
+  });
+}
+let lastPick = -1;
+function pickMatch() {
+  // Pick someone clearly inside the visible spotlight.
+  const box = $(".o-orbit-wrap").getBoundingClientRect();
+  const visible = orbitPeople
+    .map((p, i) => ({ ...p, i, rect: p.person.getBoundingClientRect() }))
+    .filter(({ rect, i }) => {
+      const x = (rect.left + rect.width / 2 - box.left) / box.width;
+      const y = (rect.top + rect.height / 2 - box.top) / box.height;
+      return i !== lastPick && x > 0.25 && x < 0.75 && y > 0.18 && y < 0.62;
+    });
+  if (!visible.length) return;
+  const pick = visible[Math.floor(Math.random() * visible.length)];
+  lastPick = pick.i;
+  const tip = $(".o-tip", pick.person);
+  tip.textContent = ORBIT_REASONS[Math.floor(Math.random() * ORBIT_REASONS.length)];
+  pick.person.classList.add("is-match");
+  gsap.timeline({ onComplete: () => pick.person.classList.remove("is-match") })
+    .fromTo(pick.line, { scaleX: 0, autoAlpha: 1 }, { scaleX: 1, duration: 0.6, ease: "power2.out" })
+    .fromTo(tip, { autoAlpha: 0, y: 8, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(2)" }, 0.3)
+    .fromTo(".o-you", { scale: 1 }, { scale: 1.08, duration: 0.25, yoyo: true, repeat: 1, ease: "power2.out" }, 0.5)
+    .to([pick.line, tip], { autoAlpha: 0, duration: 0.4 }, 2.4);
+}
+
+const progress = $$("#o-progress li");
+function setStep(index) {
+  progress.forEach((li, i) => {
+    li.classList.toggle("is-on", i <= index);
+    li.classList.toggle("is-now", i === index);
+  });
+}
+
 const SCRIPT = [
   { who: "bot", text: "Hey! What's something you'll defend forever?" },
   { who: "me", text: "Chai beats coffee. [Always.]", tag: "Chai loyalist" },
@@ -220,6 +316,7 @@ function renderStaticDemo() {
 function playDemo() {
   const tl = gsap.timeline({ onComplete: () => gsap.delayedCall(0.2, resetDemo) });
 
+  tl.call(() => setStep(0));
   SCRIPT.forEach((step) => {
     if (step.who === "bot") {
       const dots = typing();
@@ -237,6 +334,7 @@ function playDemo() {
     if (step.tag) {
       // The highlighted words glow, then a tag flies from them into "Your vibe".
       tl.call(() => {
+        setStep(1);
         const mark = $("mark", msg);
         mark.classList.add("is-on");
         const tag = addTag(step.tag);
@@ -252,10 +350,10 @@ function playDemo() {
     }
   });
 
-  tl.call(() => $(".o-phone").classList.add("is-thinking"));
+  tl.call(() => { $(".o-phone").classList.add("is-thinking"); setStep(2); });
   tl.to({}, { duration: 0.3 });
   tl.fromTo(matchPop, { autoAlpha: 0, y: 40, scale: 0.8, rotation: -6 }, {
-    autoAlpha: 1, y: 0, scale: 1, rotation: -3, duration: 0.8, ease: "elastic.out(1, 0.6)",
+    autoAlpha: 1, y: 0, scale: 1, rotation: -4, duration: 0.8, ease: "elastic.out(1, 0.6)",
   });
   tl.from($$(".o-matchpop-faces > span", matchPop), { scale: 0, stagger: 0.08, duration: 0.4, ease: "back.out(3)" }, "<0.2");
   tl.to({}, { duration: 3.2 });
@@ -266,6 +364,7 @@ function scrollFeed() {
   gsap.to(feed, { scrollTop: feed.scrollHeight, duration: 0.4, ease: "power2.out" });
 }
 function resetDemo() {
+  setStep(-1);
   feed.innerHTML = "";
   slots.innerHTML = "";
   $(".o-phone").classList.remove("is-thinking");
@@ -274,32 +373,32 @@ function resetDemo() {
   demo = playDemo();
 }
 
+/* ─────────── Start ─────────── */
 let demo = null;
+const demoStage = $(".o-demo");
 if (reduce) {
   renderStaticDemo();
-  $(".v-match .count").textContent = "86";
+  setStep(2);
 } else {
   gsap.set(matchPop, { autoAlpha: 0 });
-  demo = playDemo();
+  // The chat starts when its section is on screen, then loops.
+  ScrollTrigger.create({ trigger: demoStage, start: "top 75%", once: true, onEnter: () => { demo = playDemo(); } });
   document.addEventListener("visibilitychange", () => {
     if (!demo) return;
     document.hidden ? demo.pause() : demo.resume();
   });
 }
 
-/* ─────────── Everything below is motion only ─────────── */
 if (!reduce) {
-  // Intro: headline words rise from a mask, the rest follows.
+  // Hero intro: words rise, then subtext and button, then the orbit fades in.
   gsap.timeline({ defaults: { ease: "expo.out" } })
-    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.8, stagger: 0.06 })
-    .from("[data-intro]", { y: 24, autoAlpha: 0, duration: 0.9, stagger: 0.08 }, "-=0.8")
-    .from(".o-phone", { y: 60, autoAlpha: 0, rotation: 4, duration: 0.9 }, 0.1)
-    .from(".o-sticker", { scale: 0, rotation: -30, stagger: 0.12, duration: 0.8, ease: "back.out(2.5)" }, 0.8);
-
-  // Stickers bob gently.
-  $$(".o-sticker").forEach((el, i) => {
-    gsap.to(el, { y: i % 2 ? 10 : -10, rotation: `+=${i % 2 ? 4 : -4}`, duration: 2.6 + i * 0.4, repeat: -1, yoyo: true, ease: "sine.inOut" });
-  });
+    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.07 })
+    .from("[data-intro]", { y: 20, autoAlpha: 0, duration: 0.8, stagger: 0.1 }, "-=0.6")
+    .from(".o-you", { scale: 0, duration: 0.9, ease: "back.out(2)" }, 0.3)
+    .from(".o-person", { scale: 0, autoAlpha: 0, duration: 0.6, stagger: { each: 0.03, from: "random" }, ease: "back.out(2)" }, 0.5);
+  spinOrbit();
+  gsap.delayedCall(1.8, pickMatch);
+  orbitTimer = setInterval(() => { if (!document.hidden) pickMatch(); }, 2800);
 
   // Background blobs drift.
   $$(".o-blob").forEach((blob, i) => {
@@ -322,24 +421,10 @@ if (!reduce) {
     onEnter: (batch) => gsap.to(batch, { y: 0, autoAlpha: 1, duration: 1, stagger: 0.12, ease: "expo.out" }),
   });
 
-  // Step visuals play when their card appears.
-  ScrollTrigger.create({
-    trigger: ".o-steps",
-    start: "top 75%",
-    once: true,
-    onEnter: () => {
-      gsap.from(".v-chat .b", { y: 12, autoAlpha: 0, scale: 0.9, stagger: 0.45, duration: 0.5, ease: "back.out(2)", delay: 0.3 });
-      gsap.from(".v-tags .t", { scale: 0, rotation: () => gsap.utils.random(-20, 20), stagger: 0.12, duration: 0.6, ease: "back.out(2.5)", delay: 0.4 });
-      gsap.fromTo(".v-match .meter i", { width: "0%" }, { width: "86%", duration: 1.6, ease: "power3.out", delay: 0.6 });
-      const counter = { v: 0 };
-      gsap.to(counter, { v: 86, duration: 1.6, ease: "power3.out", delay: 0.6, onUpdate: () => { $(".v-match .count").textContent = Math.round(counter.v); } });
-    },
-  });
-
   // Venn: circles slide together as you scroll, shared traits pop in the middle.
   gsap.timeline({ scrollTrigger: { trigger: ".venn", start: "top 85%", end: "center 55%", scrub: 0.8 } })
-    .fromTo(".venn-a", { xPercent: -30, rotation: -8 }, { xPercent: 0, rotation: 0 }, 0)
-    .fromTo(".venn-b", { xPercent: 30, rotation: 8 }, { xPercent: 0, rotation: 0 }, 0)
+    .fromTo(".venn-a", { xPercent: -35, rotation: -8 }, { xPercent: 0, rotation: 0 }, 0)
+    .fromTo(".venn-b", { xPercent: 35, rotation: 8 }, { xPercent: 0, rotation: 0 }, 0)
     .fromTo(".venn-mid span", { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, stagger: 0.1 }, 0.4)
     .fromTo(".venn-note", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0 }, 0.7);
 
@@ -372,25 +457,24 @@ if (!reduce) {
       btn.addEventListener("pointerleave", () => { mx(0); my(0); });
     });
 
-    // 3D tilt on step cards.
-    $$(".tilt").forEach((card) => {
-      card.addEventListener("pointermove", (e) => {
-        const r = card.getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width - 0.5;
-        const py = (e.clientY - r.top) / r.height - 0.5;
-        gsap.to(card, { rotationY: px * 10, rotationX: -py * 10, transformPerspective: 800, duration: 0.4, ease: "power2.out", overwrite: "auto" });
-      });
-      card.addEventListener("pointerleave", () => gsap.to(card, { rotationY: 0, rotationX: 0, duration: 0.6, ease: "elastic.out(1, 0.5)" }));
+    // The orbit leans toward the cursor a little.
+    const wrap = $(".o-orbit-wrap");
+    const ox = gsap.quickTo(orbit, "x", { duration: 1, ease: "power3" });
+    const oy = gsap.quickTo(orbit, "y", { duration: 1, ease: "power3" });
+    $("#hero").addEventListener("pointermove", (e) => {
+      const r = wrap.getBoundingClientRect();
+      ox(((e.clientX - r.left) / r.width - 0.5) * 30);
+      oy(((e.clientY - r.top) / r.height - 0.5) * 16);
     });
-
-    // The phone leans toward the cursor a little.
-    const stage = $(".o-stage");
-    stage.addEventListener("pointermove", (e) => {
-      const r = stage.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      gsap.to(".o-phone", { rotationY: px * 8, rotationX: -py * 8, transformPerspective: 1000, duration: 0.6, overwrite: "auto" });
-    });
-    stage.addEventListener("pointerleave", () => gsap.to(".o-phone", { rotationY: 0, rotationX: 0, duration: 0.8 }));
   }
 }
+
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    gsap.killTweensOf($$(".o-ring, .o-person", orbit));
+    buildOrbit();
+    if (!reduce) spinOrbit();
+  }, 250);
+});

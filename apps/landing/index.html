@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260929-alive">
-  <link rel="stylesheet" href="/static/landing-home.css?v=20260929-alive">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20260929-calm">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body class="home">
@@ -54,45 +54,48 @@
     <div class="nav-links">
       <a href="#how">How it works</a>
       <a href="#vibe">Vibe</a>
+      <a href="#match">Matches</a>
       <a href="/about">About</a>
       <a href="https://app.omiryn.com/" data-app-link data-track="nav_start_talking" class="nav-cta">Start talking</a>
     </div>
   </nav>
 
   <main>
-    <!-- ═══════════ HERO ═══════════ -->
+    <!-- ═══════════ 1. HERO: one message, one animation ═══════════ -->
     <section class="o-hero" id="hero">
-      <div class="o-container o-hero-grid">
-        <div class="o-hero-copy">
-          <p class="o-badge" data-intro><span class="o-dot"></span>AI-powered introductions</p>
-          <h1 class="o-h1" aria-label="Meet people who get you.">
-            <span class="w"><span>Meet</span></span>
-            <span class="w"><span>people</span></span>
-            <span class="w"><span>who</span></span>
-            <span class="w"><span><em>get you.</em></span></span>
-          </h1>
-          <p class="o-lead" data-intro>Chat with Omiryn. It learns your vibe and introduces you to people you'll actually click with.</p>
-          <div class="o-actions" data-intro>
-            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary magnetic">
-              <span>Start talking</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </a>
-            <a href="#how" class="o-btn o-btn-ghost" data-track="hero_how">See how it works</a>
-          </div>
-          <div class="o-proof" data-intro>
-            <div class="o-proof-faces">
-              <span data-avatar="1"></span><span data-avatar="2"></span><span data-avatar="4"></span><span data-avatar="5"></span>
-            </div>
-            <p>Free to start · Private by default · 18+</p>
-          </div>
+      <div class="o-container o-hero-copy">
+        <h1 class="o-h1" aria-label="Meet people who get you.">
+          <span class="w"><span>Meet</span></span>
+          <span class="w"><span>people</span></span>
+          <span class="w"><span>who</span></span>
+          <span class="w"><span><em>get you.</em></span></span>
+        </h1>
+        <p class="o-lead" data-intro>An AI that learns your vibe and introduces you to people you'll click with.</p>
+        <div data-intro>
+          <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary o-btn-lg magnetic">
+            <span>Start talking</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
         </div>
+      </div>
 
-        <!-- Living demo: chat → vibe tags → match -->
-        <div class="o-stage" aria-label="Demo: a chat with Omiryn turns into a match" role="img">
-          <span class="o-sticker s1">✦ 2am thinker</span>
-          <span class="o-sticker s2">chai &gt; coffee</span>
-          <span class="o-sticker s3">bad pun enjoyer</span>
+      <!-- You in the middle, people orbiting, one lights up and connects -->
+      <div class="o-orbit-wrap" aria-hidden="true">
+        <div class="o-orbit" id="o-orbit">
+          <div class="o-you"><span data-avatar="0"></span></div>
+        </div>
+      </div>
+    </section>
 
+    <!-- ═══════════ 2. CHAT DEMO ═══════════ -->
+    <section class="o-section o-center" id="how">
+      <div class="o-container">
+        <header class="o-head" data-rv>
+          <p class="o-eyebrow">How it works</p>
+          <h2 class="o-h2">Just talk. <em>It learns you.</em></h2>
+        </header>
+
+        <div class="o-demo" data-rv>
           <div class="o-phone">
             <div class="o-phone-head">
               <span class="o-phone-logo"><span class="o-mark"></span></span>
@@ -111,72 +114,24 @@
           <div class="o-matchpop" id="o-matchpop">
             <div class="o-matchpop-faces"><span data-avatar="0"></span><span class="o-heart">✦</span><span data-avatar="3"></span></div>
             <strong>You &amp; Riya would click</strong>
-            <p>Same goofy humor. Both night owls. Chai loyalists.</p>
+            <p>Same goofy humor. Both night owls. No small talk.</p>
           </div>
         </div>
+
+        <ol class="o-progress" id="o-progress" aria-label="Steps">
+          <li data-step="0">Chat</li>
+          <li data-step="1">Vibe</li>
+          <li data-step="2">Match</li>
+        </ol>
       </div>
     </section>
 
-    <!-- ═══════════ MARQUEE ═══════════ -->
-    <section class="o-marquee" aria-label="Reasons people matched">
-      <div class="o-marquee-row" data-dir="left"></div>
-      <div class="o-marquee-row" data-dir="right"></div>
-    </section>
-
-    <!-- ═══════════ HOW ═══════════ -->
-    <section class="o-section" id="how">
+    <!-- ═══════════ 3. VIBE ═══════════ -->
+    <section class="o-section o-center" id="vibe">
       <div class="o-container">
-        <header class="o-head" data-rv>
-          <p class="o-eyebrow">How it works</p>
-          <h2 class="o-h2">Chat. It learns you. <em>You meet people.</em></h2>
-        </header>
-
-        <div class="o-steps">
-          <article class="o-step tilt" data-rv>
-            <div class="o-step-visual v-chat">
-              <span class="b bot">What's something you'll defend forever?</span>
-              <span class="b me">Chai beats coffee. Always.</span>
-              <span class="b bot">Bold. Tell me more 👀</span>
-            </div>
-            <span class="o-step-num">01</span>
-            <h3>Just talk</h3>
-            <p>No forms, no bio. Chat like you would with a friend.</p>
-          </article>
-
-          <article class="o-step tilt" data-rv>
-            <div class="o-step-visual v-tags">
-              <span class="t c1">Humor</span>
-              <span class="t c2">Beliefs</span>
-              <span class="t c3">Stories</span>
-              <span class="t c4">Work style</span>
-              <span class="t c5">What you can accept</span>
-            </div>
-            <span class="o-step-num">02</span>
-            <h3>It learns your vibe</h3>
-            <p>What makes you laugh, what you believe, what you can live with.</p>
-          </article>
-
-          <article class="o-step tilt" data-rv>
-            <div class="o-step-visual v-match">
-              <div class="pair"><span data-avatar="0"></span><span data-avatar="3"></span></div>
-              <div class="meter"><i></i></div>
-              <small><b class="count">0</b>% vibe match</small>
-            </div>
-            <span class="o-step-num">03</span>
-            <h3>Meet people who click</h3>
-            <p>A few real introductions, each with a reason. Say hi if it clicks.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══════════ VIBE ═══════════ -->
-    <section class="o-section" id="vibe">
-      <div class="o-container o-split">
         <header class="o-head" data-rv>
           <p class="o-eyebrow">What we mean by vibe</p>
           <h2 class="o-h2">Not people like you. <em>People you'd let in.</em></h2>
-          <p class="o-sub">The best connections aren't copies. You share what matters and accept the rest.</p>
         </header>
 
         <div class="venn" role="img" aria-label="Two people share humor and honesty, and accept their differences">
@@ -202,20 +157,32 @@
       </div>
     </section>
 
-    <!-- ═══════════ CARD STACK ═══════════ -->
-    <section class="o-section" id="match">
-      <div class="o-container o-split o-split-rev">
+    <!-- ═══════════ 4. REASONS MARQUEE ═══════════ -->
+    <section class="o-section o-center o-reasons" aria-label="Reasons people matched">
+      <div class="o-container">
+        <header class="o-head" data-rv>
+          <p class="o-eyebrow">Matched because</p>
+          <h2 class="o-h2">Real reasons, <em>not swipes.</em></h2>
+        </header>
+      </div>
+      <div class="o-marquee">
+        <div class="o-marquee-row" data-dir="left"></div>
+        <div class="o-marquee-row" data-dir="right"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 5. CARD STACK ═══════════ -->
+    <section class="o-section o-center" id="match">
+      <div class="o-container">
         <header class="o-head" data-rv>
           <p class="o-eyebrow">No awkward "hi"</p>
           <h2 class="o-h2">Every match comes <em>with a reason.</em></h2>
-          <p class="o-sub">See why you matched and get something real to talk about. The first message writes itself.</p>
-          <p class="o-note">Example matches. Names are made up.</p>
         </header>
 
         <div class="o-stack-wrap">
           <div class="o-stack" id="o-stack" aria-live="polite"></div>
           <div class="o-stack-ctrl">
-            <span class="o-stack-hint">Drag the card</span>
+            <span class="o-stack-hint">Drag the card · Example matches</span>
             <button class="o-round" type="button" id="o-stack-next" aria-label="Show next example match">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </button>
@@ -224,7 +191,7 @@
       </div>
     </section>
 
-    <!-- ═══════════ EARLY ACCESS ═══════════ -->
+    <!-- ═══════════ 6. EARLY ACCESS ═══════════ -->
     <section class="o-section" id="early">
       <div class="o-container">
         <div class="o-panel o-split" data-rv>
@@ -232,11 +199,6 @@
             <p class="o-eyebrow">Early access</p>
             <h2 class="o-h2">Matches roll out <em>in waves.</em></h2>
             <p class="o-sub">Leave your email and we'll let you know when yours are ready.</p>
-            <ul class="o-chips">
-              <li class="c1">Private, you control it</li>
-              <li class="c3">Real people, real talk</li>
-              <li class="c4">18+ only</li>
-            </ul>
           </header>
 
           <form class="o-form" id="landing-lead-form" data-form="lead">
@@ -250,15 +212,15 @@
             </label>
             <input type="hidden" name="channel" value="email">
             <input type="hidden" name="intent" value="feedback">
-            <button class="o-btn o-btn-primary" type="submit" data-track="early_access">Get early access</button>
-            <small class="o-helper">We only use your email to reach you about Omiryn.</small>
+            <button class="o-btn o-btn-primary" type="submit" data-track="early_access"><span>Get early access</span></button>
+            <small class="o-helper">Private by default · 18+ only · We only email you about Omiryn.</small>
             <p class="form-status" role="status" aria-live="polite"></p>
           </form>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════ FINAL CTA ═══════════ -->
+    <!-- ═══════════ 7. FINAL CTA ═══════════ -->
     <section class="o-section o-final" id="cta">
       <div class="o-container">
         <h2 class="o-h2 o-final-title" data-rv>Someone out there <em>gets you.</em></h2>
