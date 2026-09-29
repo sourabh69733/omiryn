@@ -157,15 +157,15 @@ const FLOAT_REASONS = [
   "chai loyalists",
   "both love long walks",
 ];
-// x, y in % of the hero; size in px. Desktop keeps the centre clear for text.
-const DESKTOP_SPOTS = [
-  [11, 26, 116], [21, 54, 82], [9, 78, 100], [27, 86, 64],
-  [89, 26, 108], [79, 54, 86], [91, 78, 96], [73, 86, 68],
-  [33, 13, 54], [67, 13, 54],
+// Side layout: x is 0..1 across the free space beside the text (0 = page edge),
+// y is 0..1 down the hero. Size in px. Faces never enter the text box.
+const SIDE_SPOTS = [
+  [0.6, 0.12, 112], [0.95, 0.42, 80], [0.45, 0.68, 98], [0.9, 0.92, 64],
 ];
 const DESKTOP_PAIRS = [[0, 5], [1, 6], [2, 4], [3, 7], [1, 4], [2, 5], [0, 6], [3, 5]];
-const MOBILE_SPOTS = [[14, 79, 64], [38, 91, 70], [62, 79, 76], [86, 91, 62]];
-const MOBILE_PAIRS = [[0, 2], [1, 3], [0, 3], [1, 2]];
+// Narrow screens: a row of faces under the button.
+const ROW_SPOTS = [[0.12, 0.3, 62], [0.37, 0.7, 70], [0.63, 0.3, 74], [0.88, 0.7, 60]];
+const ROW_PAIRS = [[0, 2], [1, 3], [0, 3], [1, 2]];
 
 const hero = $("#hero");
 const floatLayer = $("#o-float");
@@ -173,25 +173,64 @@ const floatPath = $("#o-float-path");
 const floatChip = $("#o-float-chip");
 let floaters = [];
 let pairs = DESKTOP_PAIRS;
+let textBox = null;
+
+// Union of the headline, subtext and button, relative to the float layer.
+function measureText() {
+  const box = floatLayer.getBoundingClientRect();
+  const rects = [".o-h1", ".o-lead", ".o-hero .o-btn"].map((sel) => $(sel).getBoundingClientRect());
+  return {
+    left: Math.min(...rects.map((r) => r.left)) - box.left,
+    right: Math.max(...rects.map((r) => r.right)) - box.left,
+    top: Math.min(...rects.map((r) => r.top)) - box.top,
+    bottom: Math.max(...rects.map((r) => r.bottom)) - box.top,
+  };
+}
+
+function place(x, y, size, i) {
+  const el = document.createElement("span");
+  el.className = "o-floater";
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.setProperty("--s", `${size}px`);
+  el.innerHTML = `<img src="${photo(i)}" alt="" decoding="async">`;
+  floatLayer.appendChild(el);
+  return el;
+}
 
 function buildFloat() {
   $$(".o-floater", floatLayer).forEach((el) => el.remove());
-  const mobile = window.matchMedia("(max-width: 760px)").matches;
-  const spots = mobile ? MOBILE_SPOTS : DESKTOP_SPOTS;
-  pairs = mobile ? MOBILE_PAIRS : DESKTOP_PAIRS;
-  floaters = spots.map(([x, y, size], i) => {
-    const el = document.createElement("span");
-    el.className = "o-floater";
-    el.style.left = `${x}%`;
-    el.style.top = `${y}%`;
-    el.style.setProperty("--s", `${size}px`);
-    el.dataset.depth = (size / 120).toFixed(2);
-    el.innerHTML = `<img src="${photo(i)}" alt="" decoding="async">`;
-    floatLayer.appendChild(el);
-    return el;
-  });
-  const svg = $("#o-float-lines");
-  svg.setAttribute("viewBox", `0 0 ${floatLayer.offsetWidth} ${floatLayer.offsetHeight}`);
+  gsap.set(floatLayer, { x: 0, y: 0 });
+  const w = floatLayer.offsetWidth;
+  const h = floatLayer.offsetHeight;
+  textBox = measureText();
+  const gap = 32;
+  const sideWidth = textBox.left - gap;
+  floaters = [];
+
+  if (sideWidth >= 150) {
+    // Two side columns, mirrored.
+    pairs = DESKTOP_PAIRS;
+    [0, 1].forEach((side) => {
+      SIDE_SPOTS.forEach(([fx, fy, size], k) => {
+        const s = Math.min(size, sideWidth * 0.7);
+        const minX = s / 2 + 12;
+        const maxX = sideWidth - s / 2;
+        const x = minX + (maxX - minX) * fx;
+        const y = Math.max(textBox.top - 40, 90) + (h - Math.max(textBox.top - 40, 90) - s / 2 - 24) * fy;
+        floaters.push(place(side ? w - x : x, y, s, side * 4 + k + (side ? 1 : 0)));
+      });
+    });
+  } else {
+    // Not enough room beside the text: one row below the button.
+    pairs = ROW_PAIRS;
+    const top = textBox.bottom + 48;
+    const band = Math.max(h - top - 40, 80);
+    ROW_SPOTS.forEach(([fx, fy, size], k) => {
+      floaters.push(place(w * fx, top + band * fy, size, k * 2));
+    });
+  }
+  $("#o-float-lines").setAttribute("viewBox", `0 0 ${w} ${h}`);
 }
 buildFloat();
 
@@ -211,9 +250,11 @@ function connectPair() {
   const p1 = centerOf(a);
   const p2 = centerOf(b);
   // Curve dips below both people so it passes under the headline and button.
-  const cx = (p1.x + p2.x) / 2;
+  // The chip sits at the curve's midpoint, always below the button.
   const h = floatLayer.offsetHeight;
-  const cy = Math.min(Math.max(p1.y, p2.y) + h * 0.16, h * 0.9);
+  const cx = (p1.x + p2.x) / 2;
+  const midY = Math.min(Math.max(textBox.bottom + 56, (p1.y + p2.y) / 2), h - 28);
+  const cy = 2 * midY - (p1.y + p2.y) / 2;
   floatPath.setAttribute("d", `M${p1.x},${p1.y} Q${cx},${cy} ${p2.x},${p2.y}`);
   const len = floatPath.getTotalLength();
   const mid = floatPath.getPointAtLength(len / 2);
@@ -447,12 +488,19 @@ if (!reduce) {
   }
 }
 
+function rebuildFloat() {
+  gsap.killTweensOf(floaters);
+  buildFloat();
+  if (!reduce) floatIdle();
+}
+// Web fonts change the headline size, so measure again once they load.
+document.fonts?.ready.then(() => {
+  const now = measureText();
+  if (Math.abs(now.left - textBox.left) > 8 || Math.abs(now.bottom - textBox.bottom) > 8) rebuildFloat();
+});
+
 let resizeTimer = null;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    gsap.killTweensOf(floaters);
-    buildFloat();
-    if (!reduce) floatIdle();
-  }, 250);
+  resizeTimer = setTimeout(rebuildFloat, 250);
 });
