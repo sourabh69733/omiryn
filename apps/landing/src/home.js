@@ -1,5 +1,5 @@
 // Home page motion. One main animation per section:
-// hero orbit, chat demo, venn, reasons marquee, card stack.
+// hero floating people, chat demo, venn, reasons marquee, card stack.
 // Everything renders in a readable final state when the user prefers reduced motion.
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -11,45 +11,13 @@ const finePointer = window.matchMedia("(pointer: fine)").matches;
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-/* ─────────── Avatars: small drawn faces, no stock photos ─────────── */
-const AVATARS = [
-  { bg: "#ede9fe", skin: "#f2c9a5", hair: "#2b1b12", shirt: "#7c3aed", style: 0 },
-  { bg: "#fef3c7", skin: "#c68a5e", hair: "#111827", shirt: "#f59e0b", style: 3 },
-  { bg: "#d1fae5", skin: "#e0ac80", hair: "#5b3a21", shirt: "#10b981", style: 1 },
-  { bg: "#fce7f3", skin: "#e8b48f", hair: "#1f1410", shirt: "#db2777", style: 1 },
-  { bg: "#e0f2fe", skin: "#8d5a3b", hair: "#0f0f10", shirt: "#0ea5e9", style: 2 },
-  { bg: "#ffe4e6", skin: "#f6d5bd", hair: "#a0522d", shirt: "#f43f5e", style: 0 },
-  { bg: "#ecfccb", skin: "#d49a6a", hair: "#2b1b12", shirt: "#65a30d", style: 2 },
-  { bg: "#f3e8ff", skin: "#b9784f", hair: "#1a1a1a", shirt: "#9333ea", style: 3 },
-];
-
-function avatarSvg(i) {
-  const a = AVATARS[i % AVATARS.length];
-  const back = a.style === 1
-    ? `<path d="M17 36c0-11 6-18 15-18s15 7 15 18v14c-3-2-4-5-4-9H21c0 4-1 7-4 9z" fill="${a.hair}"/>`
-    : "";
-  const top = [
-    `<path d="M18 35c0-10 6-17 14-17s14 7 14 17c-3-5-8-8-14-8s-11 3-14 8z" fill="${a.hair}"/>`,
-    `<path d="M18 34c1-10 7-16 14-16s13 6 14 16c-5-4-9-6-14-6-6 0-10 2-14 6z" fill="${a.hair}"/>`,
-    `<circle cx="32" cy="15" r="6" fill="${a.hair}"/><path d="M18 35c0-10 6-16 14-16s14 6 14 16c-4-6-9-8-14-8s-10 2-14 8z" fill="${a.hair}"/>`,
-    `<g fill="${a.hair}"><circle cx="22" cy="26" r="6"/><circle cx="29" cy="21" r="6.5"/><circle cx="37" cy="21" r="6.5"/><circle cx="43" cy="27" r="6"/><circle cx="20" cy="33" r="4.5"/><circle cx="45" cy="34" r="4.5"/></g>`,
-  ][a.style];
-  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect width="64" height="64" fill="${a.bg}"/>
-    ${back}
-    <path d="M12 66c2-11 10-17 20-17s18 6 20 17z" fill="${a.shirt}"/>
-    <rect x="28" y="44" width="8" height="7" rx="3" fill="${a.skin}"/>
-    <circle cx="32" cy="36" r="13.5" fill="${a.skin}"/>
-    ${top}
-    <circle cx="27" cy="37" r="1.6" fill="#1f2937"/><circle cx="37" cy="37" r="1.6" fill="#1f2937"/>
-    <path d="M27.5 42.5q4.5 3.5 9 0" stroke="#1f2937" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-    <circle cx="24" cy="41" r="2" fill="#f472b6" opacity=".35"/><circle cx="40" cy="41" r="2" fill="#f472b6" opacity=".35"/>
-  </svg>`;
-}
+/* ─────────── People: portrait photos (illustrative, not real users) ─────────── */
+const PEOPLE = 10;
+const photo = (i) => `/static/assets/people/p${(i % PEOPLE) + 1}.webp`;
 
 function paintAvatars(root = document) {
   $$("[data-avatar]", root).forEach((el) => {
-    el.innerHTML = avatarSvg(Number(el.dataset.avatar));
+    el.innerHTML = `<img src="${photo(Number(el.dataset.avatar))}" alt="" loading="lazy" decoding="async">`;
   });
 }
 paintAvatars();
@@ -177,92 +145,104 @@ const endDrag = (event) => {
 stack.addEventListener("pointerup", endDrag);
 stack.addEventListener("pointercancel", endDrag);
 
-/* ─────────── Hero orbit ─────────── */
-// Rings of people rotate around you. Every few seconds one lights up,
-// a line draws from you to them, and a short reason appears.
-const ORBIT_REASONS = [
+/* ─────────── Hero: floating people ─────────── */
+// Portraits float around the headline. Every few seconds two of them light up,
+// a curved line draws between them under the text, and a short reason appears.
+const FLOAT_REASONS = [
+  "both hate small talk",
   "same chaotic humor",
   "both overthink at 2am",
   "different views, zero drama",
   "same taste in bad movies",
-  "both hate small talk",
   "chai loyalists",
+  "both love long walks",
 ];
-const RINGS = [
-  { r: 0.2, count: 4, size: 64, speed: 60, dir: 1 },
-  { r: 0.34, count: 6, size: 56, speed: 90, dir: -1 },
-  { r: 0.48, count: 8, size: 46, speed: 120, dir: 1 },
+// x, y in % of the hero; size in px. Desktop keeps the centre clear for text.
+const DESKTOP_SPOTS = [
+  [11, 26, 116], [21, 54, 82], [9, 78, 100], [27, 86, 64],
+  [89, 26, 108], [79, 54, 86], [91, 78, 96], [73, 86, 68],
+  [33, 13, 54], [67, 13, 54],
 ];
-const orbit = $("#o-orbit");
-const orbitPeople = [];
+const DESKTOP_PAIRS = [[0, 5], [1, 6], [2, 4], [3, 7], [1, 4], [2, 5], [0, 6], [3, 5]];
+const MOBILE_SPOTS = [[14, 79, 64], [38, 91, 70], [62, 79, 76], [86, 91, 62]];
+const MOBILE_PAIRS = [[0, 2], [1, 3], [0, 3], [1, 2]];
 
-function buildOrbit() {
-  $$(".o-ring", orbit).forEach((el) => el.remove());
-  orbitPeople.length = 0;
-  const size = orbit.offsetWidth;
-  let avatarIndex = 1;
-  RINGS.forEach((ring, ringIndex) => {
-    const el = document.createElement("div");
-    el.className = `o-ring ring-${ringIndex}`;
-    const radius = ring.r * size;
-    el.style.setProperty("--d", `${radius * 2}px`);
-    for (let i = 0; i < ring.count; i += 1) {
-      const angle = (360 / ring.count) * i + ringIndex * 17;
-      const line = document.createElement("span");
-      line.className = "o-link";
-      line.style.width = `${radius}px`;
-      line.style.transform = `rotate(${angle}deg)`;
-      const person = document.createElement("div");
-      person.className = "o-person";
-      person.style.setProperty("--s", `${ring.size}px`);
-      const rad = (angle * Math.PI) / 180;
-      person.style.left = `calc(50% + ${Math.cos(rad) * radius}px)`;
-      person.style.top = `calc(50% + ${Math.sin(rad) * radius}px)`;
-      person.innerHTML = `<span class="o-face" data-avatar="${avatarIndex % 8 || 1}"></span><span class="o-tip"></span>`;
-      avatarIndex += 1;
-      el.append(line, person);
-      orbitPeople.push({ person, line, ring: el });
-    }
-    orbit.appendChild(el);
-    el.dataset.speed = ring.speed;
-    el.dataset.dir = ring.dir;
-  });
-  paintAvatars(orbit);
-}
-buildOrbit();
+const hero = $("#hero");
+const floatLayer = $("#o-float");
+const floatPath = $("#o-float-path");
+const floatChip = $("#o-float-chip");
+let floaters = [];
+let pairs = DESKTOP_PAIRS;
 
-let orbitTimer = null;
-function spinOrbit() {
-  $$(".o-ring", orbit).forEach((ring) => {
-    const dir = Number(ring.dataset.dir);
-    const faces = $$(".o-person", ring);
-    gsap.to(ring, { rotation: 360 * dir, duration: Number(ring.dataset.speed), repeat: -1, ease: "none" });
-    // Keep faces upright while the ring turns.
-    gsap.to(faces, { rotation: -360 * dir, duration: Number(ring.dataset.speed), repeat: -1, ease: "none" });
+function buildFloat() {
+  $$(".o-floater", floatLayer).forEach((el) => el.remove());
+  const mobile = window.matchMedia("(max-width: 760px)").matches;
+  const spots = mobile ? MOBILE_SPOTS : DESKTOP_SPOTS;
+  pairs = mobile ? MOBILE_PAIRS : DESKTOP_PAIRS;
+  floaters = spots.map(([x, y, size], i) => {
+    const el = document.createElement("span");
+    el.className = "o-floater";
+    el.style.left = `${x}%`;
+    el.style.top = `${y}%`;
+    el.style.setProperty("--s", `${size}px`);
+    el.dataset.depth = (size / 120).toFixed(2);
+    el.innerHTML = `<img src="${photo(i)}" alt="" decoding="async">`;
+    floatLayer.appendChild(el);
+    return el;
   });
+  const svg = $("#o-float-lines");
+  svg.setAttribute("viewBox", `0 0 ${floatLayer.offsetWidth} ${floatLayer.offsetHeight}`);
 }
-let lastPick = -1;
-function pickMatch() {
-  // Pick someone clearly inside the visible spotlight.
-  const box = $(".o-orbit-wrap").getBoundingClientRect();
-  const visible = orbitPeople
-    .map((p, i) => ({ ...p, i, rect: p.person.getBoundingClientRect() }))
-    .filter(({ rect, i }) => {
-      const x = (rect.left + rect.width / 2 - box.left) / box.width;
-      const y = (rect.top + rect.height / 2 - box.top) / box.height;
-      return i !== lastPick && x > 0.25 && x < 0.75 && y > 0.18 && y < 0.62;
+buildFloat();
+
+function centerOf(el) {
+  const box = floatLayer.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top };
+}
+
+let pairIndex = 0;
+function connectPair() {
+  const [ia, ib] = pairs[pairIndex % pairs.length];
+  pairIndex += 1;
+  const a = floaters[ia];
+  const b = floaters[ib];
+  if (!a || !b) return;
+  const p1 = centerOf(a);
+  const p2 = centerOf(b);
+  // Curve dips below both people so it passes under the headline and button.
+  const cx = (p1.x + p2.x) / 2;
+  const h = floatLayer.offsetHeight;
+  const cy = Math.min(Math.max(p1.y, p2.y) + h * 0.16, h * 0.9);
+  floatPath.setAttribute("d", `M${p1.x},${p1.y} Q${cx},${cy} ${p2.x},${p2.y}`);
+  const len = floatPath.getTotalLength();
+  const mid = floatPath.getPointAtLength(len / 2);
+  floatChip.textContent = FLOAT_REASONS[pairIndex % FLOAT_REASONS.length];
+  floatChip.style.left = `${mid.x}px`;
+  floatChip.style.top = `${mid.y}px`;
+
+  gsap.timeline()
+    .call(() => { a.classList.add("is-match"); b.classList.add("is-match"); })
+    .fromTo(floatPath, { strokeDasharray: len, strokeDashoffset: len, autoAlpha: 1 }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" })
+    .fromTo(floatChip, { autoAlpha: 0, scale: 0.7, y: 10 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.45, ease: "back.out(2.2)" }, "-=0.3")
+    .to({}, { duration: 1.6 })
+    .to([floatPath, floatChip], { autoAlpha: 0, duration: 0.4 })
+    .call(() => { a.classList.remove("is-match"); b.classList.remove("is-match"); });
+}
+
+function floatIdle() {
+  floaters.forEach((el, i) => {
+    gsap.to(el, {
+      y: gsap.utils.random(-14, 14),
+      x: gsap.utils.random(-8, 8),
+      rotation: gsap.utils.random(-4, 4),
+      duration: gsap.utils.random(3, 5),
+      delay: i * 0.1,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
     });
-  if (!visible.length) return;
-  const pick = visible[Math.floor(Math.random() * visible.length)];
-  lastPick = pick.i;
-  const tip = $(".o-tip", pick.person);
-  tip.textContent = ORBIT_REASONS[Math.floor(Math.random() * ORBIT_REASONS.length)];
-  pick.person.classList.add("is-match");
-  gsap.timeline({ onComplete: () => pick.person.classList.remove("is-match") })
-    .fromTo(pick.line, { scaleX: 0, autoAlpha: 1 }, { scaleX: 1, duration: 0.6, ease: "power2.out" })
-    .fromTo(tip, { autoAlpha: 0, y: 8, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(2)" }, 0.3)
-    .fromTo(".o-you", { scale: 1 }, { scale: 1.08, duration: 0.25, yoyo: true, repeat: 1, ease: "power2.out" }, 0.5)
-    .to([pick.line, tip], { autoAlpha: 0, duration: 0.4 }, 2.4);
+  });
 }
 
 const progress = $$("#o-progress li");
@@ -390,15 +370,14 @@ if (reduce) {
 }
 
 if (!reduce) {
-  // Hero intro: words rise, then subtext and button, then the orbit fades in.
+  // Hero intro: words rise, then subtext and button, then the people pop in.
   gsap.timeline({ defaults: { ease: "expo.out" } })
     .from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.07 })
     .from("[data-intro]", { y: 20, autoAlpha: 0, duration: 0.8, stagger: 0.1 }, "-=0.6")
-    .from(".o-you", { scale: 0, duration: 0.9, ease: "back.out(2)" }, 0.3)
-    .from(".o-person", { scale: 0, autoAlpha: 0, duration: 0.6, stagger: { each: 0.03, from: "random" }, ease: "back.out(2)" }, 0.5);
-  spinOrbit();
-  gsap.delayedCall(1.8, pickMatch);
-  orbitTimer = setInterval(() => { if (!document.hidden) pickMatch(); }, 2800);
+    .from(".o-floater", { scale: 0, autoAlpha: 0, duration: 0.8, stagger: { each: 0.06, from: "random" }, ease: "back.out(1.8)" }, 0.3);
+  floatIdle();
+  gsap.delayedCall(2, connectPair);
+  setInterval(() => { if (!document.hidden) connectPair(); }, 3400);
 
   // Background blobs drift.
   $$(".o-blob").forEach((blob, i) => {
@@ -457,14 +436,13 @@ if (!reduce) {
       btn.addEventListener("pointerleave", () => { mx(0); my(0); });
     });
 
-    // The orbit leans toward the cursor a little.
-    const wrap = $(".o-orbit-wrap");
-    const ox = gsap.quickTo(orbit, "x", { duration: 1, ease: "power3" });
-    const oy = gsap.quickTo(orbit, "y", { duration: 1, ease: "power3" });
-    $("#hero").addEventListener("pointermove", (e) => {
-      const r = wrap.getBoundingClientRect();
-      ox(((e.clientX - r.left) / r.width - 0.5) * 30);
-      oy(((e.clientY - r.top) / r.height - 0.5) * 16);
+    // Portraits drift with the cursor; bigger (closer) faces move more.
+    const layerX = gsap.quickTo(floatLayer, "x", { duration: 1.2, ease: "power3" });
+    const layerY = gsap.quickTo(floatLayer, "y", { duration: 1.2, ease: "power3" });
+    hero.addEventListener("pointermove", (e) => {
+      const r = hero.getBoundingClientRect();
+      layerX(((e.clientX - r.left) / r.width - 0.5) * -24);
+      layerY(((e.clientY - r.top) / r.height - 0.5) * -16);
     });
   }
 }
@@ -473,8 +451,8 @@ let resizeTimer = null;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    gsap.killTweensOf($$(".o-ring, .o-person", orbit));
-    buildOrbit();
-    if (!reduce) spinOrbit();
+    gsap.killTweensOf(floaters);
+    buildFloat();
+    if (!reduce) floatIdle();
   }, 250);
 });

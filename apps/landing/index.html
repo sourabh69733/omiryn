@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260929-alive">
-  <link rel="stylesheet" href="/static/landing-home.css?v=20260929-calm">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20260929-people">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body class="home">
@@ -79,11 +79,18 @@
         </div>
       </div>
 
-      <!-- You in the middle, people orbiting, one lights up and connects -->
-      <div class="o-orbit-wrap" aria-hidden="true">
-        <div class="o-orbit" id="o-orbit">
-          <div class="o-you"><span data-avatar="0"></span></div>
-        </div>
+      <!-- People float around the headline; pairs connect with a reason -->
+      <div class="o-float" id="o-float" aria-hidden="true">
+        <svg class="o-float-lines" id="o-float-lines">
+          <defs>
+            <linearGradient id="o-link-grad" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#7c3aed"/>
+              <stop offset="1" stop-color="#db2777"/>
+            </linearGradient>
+          </defs>
+          <path id="o-float-path" fill="none" stroke="url(#o-link-grad)" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span class="o-float-chip" id="o-float-chip"></span>
       </div>
     </section>
 
