@@ -268,8 +268,6 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }, [sending]);
 
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
-  // Only the newest Omiryn avatar animates; older ones stay still.
-  const lastAgentIndex = visibleMessages.reduce((last, message, index) => (message.role === "assistant" ? index : last), -1);
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
 
   useLayoutEffect(() => {
@@ -707,7 +705,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
                   <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""}`} id={`message-${index}`} data-message-index={index}>
-                    {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb still={index !== lastAgentIndex} /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
                     </div>

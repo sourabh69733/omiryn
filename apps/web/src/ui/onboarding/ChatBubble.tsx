@@ -11,7 +11,7 @@ type ChatBubbleProps = {
 export function ChatBubble({ role, children, hint, timestamp, typing = false }: ChatBubbleProps) {
   return (
     <div className={`chat-row ${role} ${typing ? "is-typing" : ""}`}>
-      {role === "agent" ? <AgentAvatar /> : null}
+      {role === "agent" ? <AgentAvatar mood={typing ? "thinking" : "happy"} /> : null}
       <div className="chat-bubble">
         {typing ? (
           <span className="typing-dots" aria-label="Omiryn is typing">
