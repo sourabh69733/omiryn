@@ -1,16 +1,20 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { OmirynLogo } from "../brand/OmirynLogo";
 
 type AuthUser = { display_name?: string | null };
+type LocationEstimate = { city?: string; region?: string; country?: string };
 
 // Signup asks only what the app cannot work without: a name and the 18+ confirmation.
-// Location is estimated from the connection and confirmed later in chat; everything else
-// is learned in conversation or set on the profile page.
+// Location is estimated from the connection and shown so the user can correct it; everything
+// else is learned in conversation or set on the profile page.
 export function QuickSetup() {
   const [displayName, setDisplayName] = useState("");
   const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [estimate, setEstimate] = useState<LocationEstimate | null>(null);
+  const [editingCity, setEditingCity] = useState(false);
+  const [city, setCity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,10 +27,19 @@ export function QuickSetup() {
         if (name && !cancelled) setDisplayName((current) => current.trim() || name);
       })
       .catch(() => undefined);
+    apiFetch("/api/me/location-estimate")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { estimate?: LocationEstimate | null } | null) => {
+        if (!cancelled && data?.estimate?.city) setEstimate(data.estimate);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const placeLabel = estimate ? [estimate.city, estimate.region].filter(Boolean).join(", ") : "";
+  const showCityInput = editingCity || !estimate;
 
   async function start(event: FormEvent) {
     event.preventDefault();
@@ -45,7 +58,12 @@ export function QuickSetup() {
       const basics = await apiFetch("/api/me/basics", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName.trim(), adult_confirmed: true })
+        body: JSON.stringify({
+          display_name: displayName.trim(),
+          adult_confirmed: true,
+          // Sent only when the user typed it; otherwise the estimate stays marked approximate.
+          city: showCityInput && city.trim() ? city.trim() : null
+        })
       });
       if (!basics.ok) throw new Error(await apiErrorMessage(basics, "Could not save your details."));
       const created = await apiFetch("/api/agent/conversations", {
@@ -65,45 +83,65 @@ export function QuickSetup() {
   }
 
   return (
-    <main className="setup-page quick-setup">
-      <header className="setup-header">
+    <main className="quick-setup">
+      <header className="quick-setup-header">
         <OmirynLogo />
       </header>
-      <section className="setup-content">
-        <form className="setup-card" onSubmit={start}>
-          <div className="card-heading">
-            <h2>Welcome to Omiryn</h2>
-            <p>Talk with Omi, and it finds friends you'd actually get along with.</p>
-          </div>
-          <div className="form-section">
-            <label className="field-label" htmlFor="display-name">What should we call you?</label>
-            <input
-              id="display-name"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="Your name"
-              autoComplete="name"
-              maxLength={120}
-              autoFocus
-            />
-            <label className="adult-check">
+      <form className="quick-setup-card" onSubmit={start} noValidate>
+        <h1>Welcome to Omiryn</h1>
+        <p className="quick-setup-intro">Talk with Omi, and it finds friends you'd actually get along with.</p>
+
+        <label className="quick-setup-label" htmlFor="display-name">What should we call you?</label>
+        <input
+          id="display-name"
+          className="quick-setup-input"
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          placeholder="Your name"
+          autoComplete="name"
+          maxLength={120}
+        />
+
+        <div className="quick-setup-location">
+          {showCityInput ? (
+            <>
+              <label className="quick-setup-label" htmlFor="city">
+                Where are you? <span className="quick-setup-optional">Optional</span>
+              </label>
               <input
-                type="checkbox"
-                checked={adultConfirmed}
-                onChange={(event) => setAdultConfirmed(event.target.checked)}
+                id="city"
+                className="quick-setup-input"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                placeholder={placeLabel || "Your city"}
+                autoComplete="address-level2"
+                maxLength={120}
               />
-              <span>I'm 18 or older</span>
-            </label>
-          </div>
-          <footer className="form-actions">
-            <span />
-            <button className="primary-button" type="submit" disabled={submitting}>
-              {submitting ? "Opening chat..." : "Start chatting"} <ArrowRight />
-            </button>
-          </footer>
-          {error ? <p className="submit-error" role="alert">{error}</p> : null}
-        </form>
-      </section>
+              <p className="quick-setup-hint">Helps us find friends near you. You can change it anytime.</p>
+            </>
+          ) : (
+            <p className="quick-setup-place">
+              <MapPin aria-hidden="true" />
+              <span>Around <strong>{placeLabel}</strong></span>
+              <button type="button" onClick={() => { setEditingCity(true); setCity(estimate?.city || ""); }}>
+                Change
+              </button>
+            </p>
+          )}
+        </div>
+
+        <label className="quick-setup-check">
+          <input type="checkbox" checked={adultConfirmed} onChange={(event) => setAdultConfirmed(event.target.checked)} />
+          <span>I'm 18 or older</span>
+        </label>
+
+        {error ? <p className="quick-setup-error" role="alert">{error}</p> : null}
+
+        <button className="quick-setup-submit" type="submit" disabled={submitting}>
+          {submitting ? "Opening chat..." : "Start chatting"}
+          {submitting ? null : <ArrowRight aria-hidden="true" />}
+        </button>
+      </form>
     </main>
   );
 }
