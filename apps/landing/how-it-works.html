@@ -3,26 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>How Omiryn Works | Find your people</title>
+  <title>How Omiryn Works | Meet people who get you</title>
   <meta name="description" content="See how Omiryn learns your vibe through conversation and introduces you to friends you'd get along with.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#fbfaf8">
+  <meta name="color-scheme" content="light">
   <link rel="canonical" href="https://omiryn.com/how-it-works">
   <link rel="icon" href="/static/assets/omiryn-app-icon-light.png" type="image/png">
-  <link rel="stylesheet" href="/static/landing.css?v=20260726-trust-layer">
+  <link rel="stylesheet" href="/static/landing.css?v=20260930-pages">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20260930-pages">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="home page">
+  <div class="o-bg" aria-hidden="true">
+    <span class="o-blob b1"></span>
+    <span class="o-blob b2"></span>
+    <span class="o-blob b3"></span>
+    <span class="o-grain"></span>
+  </div>
+
   <nav class="nav" id="nav-main">
-    <a href="/" class="nav-logo" aria-label="Omiryn home"><img src="/static/assets/omiryn-logo-neon-light.png" alt="Omiryn"></a>
-    <div class="nav-links"><a href="/about">About</a><a href="/how-it-works">How it works</a><a href="/privacy">Privacy</a><a href="/contact">Contact</a><a href="https://app.omiryn.com/" data-app-link data-track="how_start_talking" class="nav-cta">Start talking</a></div>
+    <a href="/" class="nav-logo" aria-label="Omiryn home">
+      <span class="o-mark" aria-hidden="true"></span><span class="o-word">Omiryn</span>
+    </a>
+    <div class="nav-links">
+      <a href="/#how">How it works</a>
+      <a href="/about">About</a>
+      <a href="/safety">Safety</a>
+      <a href="/contact">Contact</a>
+      <a href="https://app.omiryn.com/" data-app-link data-track="how_start_talking" class="nav-cta">Start talking</a>
+    </div>
   </nav>
   <main class="page-shell">
     <section class="page-hero" id="how-it-works">
       <p class="section-label">How it works</p>
-      <h1>Talk. It gets you. Meet your people.</h1>
+      <h1>Just talk. It learns your vibe. You meet people.</h1>
       <p>Chat with Omiryn like you would with a friend. It learns your vibe and introduces you to people you'd actually get along with.</p>
     </section>
     <section class="content-band" id="process">
@@ -39,7 +56,7 @@
         </article>
         <article class="step-card">
           <div class="step-number">3</div>
-          <h3>Meet your people</h3>
+          <h3>Meet people who click</h3>
           <p>A few friend introductions, each with a reason you matched and something to talk about.</p>
         </article>
       </div>
@@ -59,7 +76,21 @@
       </div>
     </section>
   </main>
-  <footer class="footer"><div class="footer-left"><img class="footer-logo" src="/static/assets/omiryn-logo-neon-light.png" alt="Omiryn"></div><span class="footer-copy">© 2026 Omiryn.</span><div class="footer-links"><a href="/about">About</a><a href="/safety">Safety</a><a href="/ai-disclosure">AI Disclosure</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></div></footer>
-  <script src="/static/landing.js?v=20260726-trust-layer"></script>
+  <footer class="footer">
+    <div class="o-container o-footer">
+      <a href="/" class="nav-logo" aria-label="Omiryn home"><span class="o-mark" aria-hidden="true"></span><span class="o-word">Omiryn</span></a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/about">About</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/safety">Safety</a>
+        <a href="/ai-disclosure">AI Disclosure</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <span class="footer-copy">© 2026 Omiryn</span>
+    </div>
+  </footer>
+  <script src="/static/landing.js?v=20260930-pages"></script>
 </body>
 </html>
