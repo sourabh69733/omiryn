@@ -115,3 +115,15 @@ class VoiceApiTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IdentityPromptTest(unittest.TestCase):
+    def test_live_prompt_says_matches_are_friends(self) -> None:
+        reset_db()
+        save_conversation({"id": "c", "status": "active", "messages": []}, USER_ID)
+        with patch.dict(os.environ, {"AGENT_BEHAVIOR_VERSION": "v3-1"}):
+            prompt = _prompt()
+        self.assertIn("find friends they would actually get along with", prompt)
+        self.assertIn("Matches are friends", prompt)
+        self.assertNotIn("dating companion", prompt)
+        self.assertNotIn("Dating focus", prompt)
