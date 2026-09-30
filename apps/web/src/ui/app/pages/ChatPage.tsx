@@ -30,6 +30,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   // Conversation where the companion is writing a message of its own (from realtime).
   const [typingConversationId, setTypingConversationId] = useState<string | null>(null);
   const shownConversationIdRef = useRef<string | null>(null);
+  // Messages from this index on arrived while the chat was open, so they fade in; history does not.
+  const newFromIndexRef = useRef(0);
   const [error, setError] = useState("");
   const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
   const [pauseNow, setPauseNow] = useState(() => Date.now());
@@ -240,6 +242,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const messages = conversation?.messages ?? [];
     // A newly opened conversation, or a rolled-back one, shows everything at once.
     if (shownConversationIdRef.current !== (conversation?.id ?? null) || messages.length < shownCount) {
+      if (shownConversationIdRef.current !== (conversation?.id ?? null)) newFromIndexRef.current = messages.length;
       shownConversationIdRef.current = conversation?.id ?? null;
       setShownCount(messages.length);
       return;
@@ -510,6 +513,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       }
       const nextConversation = (await response.json()) as Conversation;
       setConversation(nextConversation);
+      // Drop the typing row in the same render the reply lands, not after the history refresh.
+      setSending(false);
       await fetchSummaries();
       void loadConversationUsage(nextConversation.id);
       return "ok";
@@ -708,7 +713,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
               return (
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
-                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""}`} id={`message-${index}`} data-message-index={index}>
+                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""}`} id={`message-${index}`} data-message-index={index}>
                     {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
@@ -719,7 +724,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                 </Fragment>
               );
             })}
-            {typingVisible ? <div className={`message-row agent ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
