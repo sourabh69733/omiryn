@@ -593,7 +593,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(reupload_response.status_code, 200)
         self.assertEqual(len(reupload_response.json()["profile_photo_urls"]), 1)
 
-    def test_agent_initial_persona_uses_interested_gender(self) -> None:
+    def test_agent_initial_persona_is_neutral_whoever_they_want_to_meet(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
 
@@ -612,9 +612,11 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.post("/api/agent/conversations")
 
         self.assertEqual(response.status_code, 201)
-        self.assertIn("Annie", response.json()["messages"][0]["content"])
+        # One neutral companion for everyone, whoever they are interested in.
+        self.assertIn("Omi", response.json()["messages"][0]["content"])
+        self.assertEqual(response.json()["agent_voice"], "neutral")
 
-    def test_agent_initial_persona_uses_male_companion_for_men_interest(self) -> None:
+    def test_agent_initial_persona_is_neutral_for_men_interest_too(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
 
@@ -633,7 +635,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.post("/api/agent/conversations")
 
         self.assertEqual(response.status_code, 201)
-        self.assertIn("Kabir", response.json()["messages"][0]["content"])
+        self.assertIn("Omi", response.json()["messages"][0]["content"])
 
     def test_agent_initial_message_uses_display_name_when_available(self) -> None:
         async def signed_in_user() -> CurrentUser:
@@ -653,7 +655,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         response = self.client.post("/api/agent/conversations")
 
         self.assertEqual(response.status_code, 201)
-        self.assertIn("Hey Sourabh, I'm Annie", response.json()["messages"][0]["content"])
+        self.assertIn("Hey Sourabh, I'm Omi", response.json()["messages"][0]["content"])
 
     def test_agent_messages_include_chat_timestamps(self) -> None:
         conversation_response = self.client.post("/api/agent/conversations")

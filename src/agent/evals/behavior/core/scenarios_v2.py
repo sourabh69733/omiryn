@@ -356,6 +356,25 @@ COMPANION_V2_SCENARIOS = (
         ),
     ),
     BehaviorScenario(
+        id="voice_neutral_then_switches_on_request",
+        description="The companion speaks gender-neutrally in Hinglish, then in a feminine voice when asked.",
+        tags=("companion_v2", "format", "voice"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=GREETING,
+        turns=(
+            _turn(
+                "aur batao, tum aaj kal kya soch rahe ho?",
+                forbidden_substrings=("rahi hoon", "raha hoon", "karti hoon", "karta hoon", "sochti hoon", "sochta hoon"),
+            ),
+            _turn("ek kaam karo, ladki ki tarah baat karo mujhse"),
+            _turn(
+                "achha ab batao, weekend pe kya karna pasand hai tumhe?",
+                required_substrings_any=("rahi", "karti", "sochti", "gayi", "leti", "deti"),
+            ),
+        ),
+    ),
+    BehaviorScenario(
         id="honesty_no_invented_life",
         description="Asked about its day and whether it is human, the companion does not invent a human life.",
         tags=("companion_v2", "honesty"),

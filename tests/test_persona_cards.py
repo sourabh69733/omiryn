@@ -30,7 +30,7 @@ class PersonaCardTest(unittest.TestCase):
 
     @patch.dict(os.environ, {"AGENT_PERSONA_CARDS_ENABLED": "true"})
     def test_renamed_agent_keeps_character_with_new_name(self) -> None:
-        behavior = build_companion_behavior({"interested_in": "men"}, agent_name="Rohan")
+        behavior = build_companion_behavior({}, agent_name="Rohan", voice="male")
         self.assertTrue(behavior.persona_card.startswith("You are Rohan."))
         self.assertIn("Test cricket", behavior.persona_card)
         self.assertNotIn("{name}", behavior.persona_card)
@@ -70,6 +70,7 @@ class PersonaPromptTest(unittest.TestCase):
         self.assertNotIn("## Your Character", self._prompt())
 
     def test_enabled_card_follows_core_identity(self) -> None:
+        save_conversation({"id": "c", "status": "active", "messages": [], "agent_voice": "female"}, "u")
         prompt = self._prompt(cards="true")
         self.assertLess(prompt.index("## Core Identity"), prompt.index("## Your Character"))
         self.assertLess(prompt.index("## Your Character"), prompt.index("## Prompt Contract"))
