@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { apiFetch, ensureAuthenticatedSession, signInWithGoogle } from "../lib/api";
 import { MainApp } from "./app/MainApp";
 import { OmirynLogo } from "./brand/OmirynLogo";
-import { ProfileSetupWizard } from "./onboarding/ProfileSetupWizard";
+import { QuickSetup } from "./onboarding/QuickSetup";
 
 type AuthState = "checking" | "signed_in" | "signed_out";
 type ProfileState = "checking" | "complete" | "incomplete";
@@ -56,7 +56,7 @@ export function App() {
   useEffect(() => {
     if (authState !== "signed_in") return;
     let cancelled = false;
-    apiFetch("/api/me/dating-basics")
+    apiFetch("/api/me/basics")
       .then(async (response) => response.ok ? response.json() : { complete: false })
       .then((data) => {
         if (!cancelled) setProfileState(data.complete ? "complete" : "incomplete");
@@ -87,6 +87,6 @@ export function App() {
     return <main className="auth-screen-page"><section className="auth-card"><OmirynLogo /><h1>Welcome to Omiryn</h1><p className="auth-copy">Sign in to meet Omiryn and start talking.</p><button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}><span className="google-mark">G</span>{isSigningIn ? "Opening Google..." : "Continue with Google"}</button>{authError ? <p className="auth-error">{authError}</p> : null}<small>By continuing, you agree to Omiryn's <a href="https://omiryn.com/terms">Terms</a> and <a href="https://omiryn.com/privacy">Privacy Policy</a>.</small></section></main>;
   }
 
-  if (profileState === "incomplete") return <ProfileSetupWizard />;
+  if (profileState === "incomplete") return <QuickSetup />;
   return <MainApp initialConversationId={conversationIdFromUrl()} />;
 }
