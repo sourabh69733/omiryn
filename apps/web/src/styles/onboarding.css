@@ -1336,6 +1336,8 @@
 .agent-avatar {
   width: 42px;
   height: 42px;
+  background: transparent;
+  box-shadow: none;
 }
 
 .agent-avatar svg,
