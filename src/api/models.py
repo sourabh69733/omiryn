@@ -42,6 +42,8 @@ ContextSourceType = Literal[
 WhatsappStyleKind = Literal["user_style", "friend_style"]
 Gender = Literal["man", "woman", "non_binary", "prefer_not_to_say"]
 InterestedIn = Literal["men", "women", "everyone"]
+# How the companion speaks about itself; it is an AI either way.
+AgentVoice = Literal["neutral", "female", "male"]
 MemoryAllowedUse = Literal["reply_context", "matching"]
 
 
@@ -165,6 +167,7 @@ class AgentConversation(BaseModel):
     agent_mode: AgentMode = "know_me"
     agent_tone: AgentTone = "auto"
     agent_name: str | None = Field(default=None, max_length=40)
+    agent_voice: AgentVoice = "neutral"
     agent_style_source_id: str | None = None
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -182,6 +185,7 @@ class AgentConversationSettings(BaseModel):
     agent_mode: AgentMode | None = None
     agent_tone: AgentTone | None = None
     agent_name: str | None = Field(default=None, max_length=40)
+    agent_voice: AgentVoice | None = None
     agent_style_source_id: str | None = None
 
 

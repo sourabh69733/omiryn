@@ -257,6 +257,8 @@ def update_agent_conversation_settings(
         conversation.agent_mode = payload.agent_mode
     if payload.agent_tone is not None:
         conversation.agent_tone = payload.agent_tone
+    if payload.agent_voice is not None:
+        conversation.agent_voice = payload.agent_voice
     if "agent_name" in payload.model_fields_set:
         conversation.agent_name = _normalize_agent_name(
             payload.agent_name,
@@ -368,6 +370,8 @@ async def _reply_to_pending(
 
     previous_message_count = len(prior_messages)
     conversation.messages = turn.messages
+    if getattr(turn, "agent_voice", None):
+        conversation.agent_voice = turn.agent_voice
     user_message = conversation.messages[previous_message_count]
     # Keep when the user actually wrote it, even when this reply came from a retry.
     user_message["created_at"] = pending["created_at"]

@@ -543,12 +543,8 @@ def _dedupe_context_sources(sources: list[dict[str, object]]) -> list[dict[str, 
 
 
 def _agent_persona_for_profile(profile: dict[str, object] | None) -> dict[str, str]:
-    interested_in = str((profile or {}).get("interested_in") or "")
-    if interested_in == "women":
-        return {"name": "Annie", "presentation": "girl"}
-    if interested_in == "men":
-        return {"name": "Kabir", "presentation": "boy"}
-    return {"name": "Mira", "presentation": "companion"}
+    # One neutral companion for everyone; the user can rename it or change its voice.
+    return {"name": "Omi", "presentation": "companion"}
 
 
 def _normalize_agent_name(name: str | None, persona: dict[str, str]) -> str:
