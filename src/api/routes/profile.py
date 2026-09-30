@@ -6,6 +6,8 @@ from agent.context_engine.assembly import STYLE_CONTEXT_SOURCE_TYPES
 from agent.memory_engine.data_points.feedback import normalize_data_point_feedback
 from security.auth import CurrentUser, require_user
 from storage import (
+    save_setup_basics,
+    set_estimated_location,
     delete_profile_fact,
     delete_user_private_data,
     get_profile_fact,
@@ -43,6 +45,7 @@ from ..helpers import (
     logger,
 )
 from ..models import (
+    SetupBasics,
     AppEventsBatchCreate,
     CommunityInviteRequestCreate,
     DataPointFeedbackCreate,
@@ -52,6 +55,7 @@ from ..models import (
     ProfileFactPatch,
     UserProfilePatch,
 )
+from ..ip_location import client_ip, locate_ip
 from ..photo_processing import sanitize_profile_photo
 router = APIRouter()
 
@@ -69,7 +73,8 @@ _APP_EVENT_METADATA_ALLOWLIST = {
 }
 
 
-@router.get("/api/me/dating-basics")
+@router.get("/api/me/basics")
+@router.get("/api/me/dating-basics")  # older web builds; remove after a release
 async def get_dating_basics(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, object]:
@@ -80,6 +85,33 @@ async def get_dating_basics(
         "complete": _basic_profile_complete(profile),
         "profile": profile,
     }
+
+
+@router.put("/api/me/basics")
+async def put_setup_basics(
+    payload: SetupBasics,
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Signup asks only for a name and the 18+ confirmation; the rest is learned or edited later."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    if not payload.adult_confirmed:
+        raise HTTPException(status_code=422, detail="Omiryn is for people aged 18 and above.")
+    existing_profile = get_user_profile(user.id) or {}
+    display_name = _clean_optional_text(
+        payload.display_name or existing_profile.get("display_name") or user.display_name
+    )
+    if not display_name:
+        raise HTTPException(status_code=422, detail="Name is required.")
+    save_setup_basics(user.id, display_name)
+    place = locate_ip(
+        client_ip(request.headers.get("x-forwarded-for"), request.client.host if request.client else None)
+    )
+    if place:
+        set_estimated_location(user.id, place)
+    profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
+    return {"complete": _basic_profile_complete(profile), "profile": profile}
 
 
 @router.put("/api/me/dating-basics")

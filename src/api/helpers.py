@@ -333,13 +333,11 @@ def _delete_local_profile_photo(file_name: str) -> bool:
 
 
 def _basic_profile_complete(profile: dict[str, object] | None) -> bool:
+    """A name and the 18+ confirmation (older profiles confirmed it with an age)."""
     return bool(
         profile
         and profile.get("display_name")
-        and profile.get("age")
-        and profile.get("gender")
-        and profile.get("interested_in")
-        and profile.get("city")
+        and (profile.get("adult_confirmed_at") or profile.get("age"))
     )
 
 
@@ -365,8 +363,20 @@ def _agent_user_context(user: CurrentUser | None) -> dict[str, object] | None:
         "email": user.email,
         "display_name": display_name or None,
         "country": profile.get("country") or DEFAULT_AGENT_COUNTRY,
-        "location": city or profile.get("location") or DEFAULT_AGENT_COUNTRY,
+        "location": _location_text(profile, city),
     }
+
+
+def _location_text(profile: dict[str, object], city: str) -> str:
+    """Where the user is, saying plainly when it is only estimated from their connection."""
+    place = ", ".join(
+        str(part) for part in (city, profile.get("region"), profile.get("country")) if part
+    )
+    if not place:
+        return str(profile.get("location") or DEFAULT_AGENT_COUNTRY)
+    if profile.get("location_source") == "ip":
+        return f"{place} (approximate, estimated from their internet connection; not confirmed)"
+    return place
 
 
 def _detected_user_city(user_id: str) -> str | None:

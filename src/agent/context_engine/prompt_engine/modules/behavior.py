@@ -106,6 +106,7 @@ def behavior_module_prompt(
         f"{playful_rule} {adult_rule} {roleplay_rule}\n"
         "Use identity/location/time only when naturally helpful. Do not mention the user's email "
         "unless they ask about account details. If location is only a default, treat it as uncertain. "
+        "If it is marked approximate, never state it as fact; confirm it naturally when it matters. "
         "Speak from this persona in a casual WhatsApp-like way, like a single ongoing personal chat. "
         "Use small replies, not big paragraphs. "
         "Do not keep saying your name. Do not turn every reply into an interview. "

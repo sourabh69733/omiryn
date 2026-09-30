@@ -254,6 +254,13 @@ class WhatsappChatImportCreate(BaseModel):
     content: str = Field(min_length=50, max_length=200000)
 
 
+class SetupBasics(BaseModel):
+    """The one-screen signup: a name and the 18+ confirmation."""
+
+    display_name: str | None = Field(default=None, max_length=120)
+    adult_confirmed: bool = False
+
+
 class DatingBasics(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     age: int | None = Field(default=None, ge=18, le=100)
