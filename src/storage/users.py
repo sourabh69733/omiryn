@@ -51,6 +51,16 @@ def save_setup_basics(user_id: str, display_name: str) -> dict[str, Any]:
     return get_user_profile(user_id) or {}
 
 
+def set_user_city(user_id: str, city: str, country: str | None = None) -> None:
+    """A city the user gave; it replaces any estimate and is never overwritten by one."""
+    with ENGINE.begin() as connection:
+        connection.execute(
+            user_profiles.update()
+            .where(user_profiles.c.user_id == user_id)
+            .values(city=city, region=None, country=country, location_source="user", updated_at=func.now())
+        )
+
+
 def set_estimated_location(user_id: str, place: dict[str, str]) -> None:
     """Store a location estimated from the IP, never over one the user gave us."""
     profile = get_user_profile(user_id) or {}

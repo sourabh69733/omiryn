@@ -8,6 +8,7 @@ from security.auth import CurrentUser, require_user
 from storage import (
     save_setup_basics,
     set_estimated_location,
+    set_user_city,
     delete_profile_fact,
     delete_user_private_data,
     get_profile_fact,
@@ -105,13 +106,31 @@ async def put_setup_basics(
     if not display_name:
         raise HTTPException(status_code=422, detail="Name is required.")
     save_setup_basics(user.id, display_name)
-    place = locate_ip(
-        client_ip(request.headers.get("x-forwarded-for"), request.client.host if request.client else None)
-    )
-    if place:
+    place = _request_location(request)
+    typed_city = _clean_optional_text(payload.city)
+    if typed_city:
+        set_user_city(user.id, typed_city, (place or {}).get("country"))
+    elif place:
         set_estimated_location(user.id, place)
     profile = _profile_with_auth_defaults(get_user_profile(user.id), user)
     return {"complete": _basic_profile_complete(profile), "profile": profile}
+
+
+@router.get("/api/me/location-estimate")
+async def get_location_estimate(
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Where the connection suggests the user is, to show (and let them correct) at signup."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return {"estimate": _request_location(request)}
+
+
+def _request_location(request: Request) -> dict[str, str] | None:
+    return locate_ip(
+        client_ip(request.headers.get("x-forwarded-for"), request.client.host if request.client else None)
+    )
 
 
 @router.put("/api/me/dating-basics")

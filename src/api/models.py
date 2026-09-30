@@ -259,6 +259,8 @@ class SetupBasics(BaseModel):
 
     display_name: str | None = Field(default=None, max_length=120)
     adult_confirmed: bool = False
+    # Only when the user typed or corrected it; otherwise the IP estimate is kept as approximate.
+    city: str | None = Field(default=None, max_length=120)
 
 
 class DatingBasics(BaseModel):

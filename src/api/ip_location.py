@@ -24,7 +24,10 @@ DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "dbip-city-lite.mmdb"
 
 
 def client_ip(forwarded_for: str | None, peer_host: str | None) -> str | None:
-    """The user's public IP: the first X-Forwarded-For entry (Cloud Run), else the peer."""
+    """The user's public IP: the first X-Forwarded-For entry (Cloud Run), else the peer.
+
+    Local development has no public IP; IP_LOCATION_DEV_IP stands in for it there.
+    """
     for candidate in [*(forwarded_for or "").split(","), peer_host or ""]:
         text = candidate.strip()
         try:
@@ -33,7 +36,7 @@ def client_ip(forwarded_for: str | None, peer_host: str | None) -> str | None:
             continue
         if address.is_global:
             return text
-    return None
+    return os.getenv("IP_LOCATION_DEV_IP", "").strip() or None
 
 
 def locate_ip(ip: str | None) -> dict[str, str] | None:
