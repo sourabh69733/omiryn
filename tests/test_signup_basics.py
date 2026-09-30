@@ -88,6 +88,29 @@ class SignupApiTest(unittest.TestCase):
         self.assertIn("Jaipur, Rajasthan, India", location)
         self.assertIn("approximate", location)
 
+    def test_estimate_is_shown_before_signup_without_saving(self) -> None:
+        with patch("api.routes.profile.locate_ip", side_effect=lambda ip: JAIPUR if ip == "49.36.12.8" else None):
+            response = self.client.get("/api/me/location-estimate", headers={"X-Forwarded-For": "49.36.12.8"})
+        self.assertEqual(response.json()["estimate"]["city"], "Jaipur")
+        self.assertIsNone(get_user_profile(USER.id))
+
+    def test_a_city_typed_at_signup_is_the_users_own(self) -> None:
+        with patch("api.routes.profile.locate_ip", side_effect=lambda ip: JAIPUR if ip == "49.36.12.8" else None):
+            self.client.put(
+                "/api/me/basics",
+                json={"display_name": "Sourabh", "adult_confirmed": True, "city": "Udaipur"},
+                headers={"X-Forwarded-For": "49.36.12.8"},
+            )
+        profile = get_user_profile(USER.id)
+        self.assertEqual(
+            (profile["city"], profile["country"], profile["location_source"]), ("Udaipur", "India", "user")
+        )
+        self.assertNotIn("approximate", _agent_user_context(USER)["location"])
+
+    def test_dev_setting_stands_in_for_a_missing_public_ip(self) -> None:
+        with patch.dict(os.environ, {"IP_LOCATION_DEV_IP": "49.36.12.8"}):
+            self.assertEqual(client_ip(None, "127.0.0.1"), "49.36.12.8")
+
     def test_no_estimate_without_a_public_ip(self) -> None:
         self._signup(adult=True, forwarded_for="10.0.0.2")
         self.assertIsNone(get_user_profile(USER.id)["city"])
