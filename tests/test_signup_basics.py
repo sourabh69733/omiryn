@@ -135,3 +135,44 @@ class LocationSourceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VpnTimezoneTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.env = patch.dict(os.environ, {"AUTH_REQUIRED": "false", "AGENT_PROVIDER": "mock"})
+        self.env.start()
+        app.dependency_overrides.clear()
+
+        async def signed_in_user() -> CurrentUser:
+            return USER
+
+        app.dependency_overrides[current_user] = signed_in_user
+        reset_db()
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+        self.env.stop()
+
+    def _estimate(self, timezone_name: str) -> object:
+        korea = {"country": "South Korea", "country_code": "KR", "region": "North Chungcheong", "city": "Yeongdong-gun"}
+        with patch("api.routes.profile.locate_ip", return_value=korea):
+            return self.client.get(
+                "/api/me/location-estimate",
+                headers={"X-Forwarded-For": "104.28.157.93", "X-Timezone": timezone_name},
+            ).json()["estimate"]
+
+    def test_a_vpn_exit_in_another_country_is_ignored(self) -> None:
+        # Browser in India, exit address in Korea (Cloudflare WARP): no estimate, the city field shows.
+        self.assertIsNone(self._estimate("Asia/Kolkata"))
+        self.assertIsNone(self._estimate("Asia/Calcutta"))  # the older name Chrome still reports
+
+    def test_matching_country_keeps_the_estimate(self) -> None:
+        self.assertEqual(self._estimate("Asia/Seoul")["city"], "Yeongdong-gun")
+
+    def test_country_for_timezone(self) -> None:
+        from api.ip_location import country_for_timezone
+
+        self.assertEqual(country_for_timezone("Asia/Kolkata"), "IN")
+        self.assertEqual(country_for_timezone("America/New_York"), "US")
+        self.assertIsNone(country_for_timezone("../../etc/passwd"))
