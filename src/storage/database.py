@@ -167,6 +167,7 @@ def _ensure_runtime_columns() -> None:
             "agent_mode",
             "agent_tone",
             "agent_name",
+            "agent_voice",
             "agent_style_source_id",
         ),
     }

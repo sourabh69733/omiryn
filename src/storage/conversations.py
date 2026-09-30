@@ -88,6 +88,7 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
         "agent_mode": conversation.get("agent_mode") or "know_me",
         "agent_tone": conversation.get("agent_tone") or "auto",
         "agent_name": conversation.get("agent_name"),
+        "agent_voice": conversation.get("agent_voice"),
         "agent_style_source_id": conversation.get("agent_style_source_id"),
         "messages_json": _protect_messages(conversation_user_id, conversation["messages"]),
     }
@@ -112,6 +113,14 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
             connection.execute(agent_conversations.insert().values(**payload))
 
 
+# Chats from before the voice setting were named for a voice; keep it so nothing changes for them.
+_LEGACY_NAME_VOICES = {"Annie": "female", "Kabir": "male"}
+
+
+def _stored_voice(row: Any) -> str:
+    return row.get("agent_voice") or _LEGACY_NAME_VOICES.get(str(row.get("agent_name") or ""), "neutral")
+
+
 def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[str, Any] | None:
     owner_id = _require_user_id(user_id, "conversation")
     statement = select(agent_conversations).where(
@@ -132,6 +141,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_mode": row.get("agent_mode") or "know_me",
         "agent_tone": row.get("agent_tone") or "auto",
         "agent_name": row.get("agent_name"),
+        "agent_voice": _stored_voice(row),
         "agent_style_source_id": row.get("agent_style_source_id"),
         "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
@@ -158,6 +168,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_mode": row.get("agent_mode") or "know_me",
             "agent_tone": row.get("agent_tone") or "auto",
             "agent_name": row.get("agent_name"),
+            "agent_voice": _stored_voice(row),
             "agent_style_source_id": row.get("agent_style_source_id"),
             "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),

@@ -35,6 +35,8 @@ agent_conversations = Table(
     Column("agent_mode", String, nullable=True),
     Column("agent_tone", String, nullable=True),
     Column("agent_name", String, nullable=True),
+    # How the companion speaks about itself: neutral (default), female or male.
+    Column("agent_voice", String, nullable=True),
     Column("agent_style_source_id", String, nullable=True),
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
