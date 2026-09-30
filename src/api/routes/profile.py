@@ -3,9 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from agent.context_engine.assembly import STYLE_CONTEXT_SOURCE_TYPES
+from agent.shared.timeline import valid_timezone_name
 from agent.memory_engine.data_points.feedback import normalize_data_point_feedback
 from security.auth import CurrentUser, require_user
 from storage import (
+    get_user_timezone,
     save_setup_basics,
     set_estimated_location,
     set_user_city,
@@ -56,7 +58,7 @@ from ..models import (
     ProfileFactPatch,
     UserProfilePatch,
 )
-from ..ip_location import client_ip, locate_ip
+from ..ip_location import client_ip, locate_ip, matches_timezone
 from ..photo_processing import sanitize_profile_photo
 router = APIRouter()
 
@@ -106,7 +108,7 @@ async def put_setup_basics(
     if not display_name:
         raise HTTPException(status_code=422, detail="Name is required.")
     save_setup_basics(user.id, display_name)
-    place = _request_location(request)
+    place = _request_location(request, user.id)
     typed_city = _clean_optional_text(payload.city)
     if typed_city:
         set_user_city(user.id, typed_city, (place or {}).get("country"))
@@ -124,13 +126,19 @@ async def get_location_estimate(
     """Where the connection suggests the user is, to show (and let them correct) at signup."""
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
-    return {"estimate": _request_location(request)}
+    return {"estimate": _request_location(request, user.id)}
 
 
-def _request_location(request: Request) -> dict[str, str] | None:
-    return locate_ip(
+def _request_location(request: Request, user_id: str | None = None) -> dict[str, str] | None:
+    """The IP estimate, unless the browser's timezone says the user is in another country
+    (a VPN or relay exit address says nothing about where they are)."""
+    place = locate_ip(
         client_ip(request.headers.get("x-forwarded-for"), request.client.host if request.client else None)
     )
+    timezone_name = valid_timezone_name(request.headers.get("x-timezone")) or (
+        get_user_timezone(user_id) if user_id else None
+    )
+    return place if matches_timezone(place, timezone_name) else None
 
 
 @router.put("/api/me/dating-basics")

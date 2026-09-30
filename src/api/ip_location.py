@@ -9,6 +9,7 @@ IP geolocation by DB-IP (https://db-ip.com), CC BY 4.0.
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import re
 import logging
@@ -37,6 +38,70 @@ def client_ip(forwarded_for: str | None, peer_host: str | None) -> str | None:
         if address.is_global:
             return text
     return os.getenv("IP_LOCATION_DEV_IP", "").strip() or None
+
+
+def matches_timezone(place: dict[str, str] | None, timezone_name: str | None) -> bool:
+    """False when the IP's country differs from the browser timezone's country.
+
+    That mismatch almost always means a VPN or relay (Cloudflare WARP, a corporate VPN), whose
+    exit address says nothing about where the user is. Unknown data never counts as a mismatch.
+    """
+    if not place or not place.get("country_code"):
+        return True
+    timezone_country = country_for_timezone(timezone_name)
+    return timezone_country is None or timezone_country == place["country_code"]
+
+
+def country_for_timezone(timezone_name: str | None) -> str | None:
+    """ISO country code of an IANA timezone, from the system tz database's zone.tab.
+
+    Old names browsers still report ("Asia/Calcutta") are not in zone.tab; they are matched by
+    their timezone file, which is the same file as the current name's.
+    """
+    name = (timezone_name or "").strip()
+    if not name:
+        return None
+    by_name, by_content = _zone_countries()
+    if name in by_name:
+        return by_name[name]
+    content = _zone_file_hash(name)
+    return by_content.get(content) if content else None
+
+
+@cache
+def _zone_countries() -> tuple[dict[str, str], dict[str, str]]:
+    by_name: dict[str, str] = {}
+    for root in _tz_roots():
+        table = root / "zone.tab"
+        if not table.is_file():
+            continue
+        for line in table.read_text(encoding="utf-8").splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3 and not line.startswith("#"):
+                by_name[parts[2]] = parts[0]
+        break
+    by_content = {}
+    for zone, country in by_name.items():
+        content = _zone_file_hash(zone)
+        if content:
+            by_content.setdefault(content, country)
+    return by_name, by_content
+
+
+def _zone_file_hash(name: str) -> str | None:
+    if ".." in name or name.startswith("/"):
+        return None
+    for root in _tz_roots():
+        path = root / name
+        if path.is_file():
+            return hashlib.sha1(path.read_bytes()).hexdigest()
+    return None
+
+
+def _tz_roots() -> list[Path]:
+    import zoneinfo
+
+    return [Path(root) for root in zoneinfo.TZPATH if Path(root).is_dir()]
 
 
 def locate_ip(ip: str | None) -> dict[str, str] | None:
@@ -85,4 +150,4 @@ def _name(entry: Any) -> str:
     return str((names or {}).get("en") or "").strip()
 
 
-__all__ = ["client_ip", "locate_ip"]
+__all__ = ["client_ip", "country_for_timezone", "locate_ip", "matches_timezone"]
