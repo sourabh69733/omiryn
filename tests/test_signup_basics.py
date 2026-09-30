@@ -24,7 +24,7 @@ class _FakeReader:
         return {
             "country": {"iso_code": "IN", "names": {"en": "India"}},
             "subdivisions": [{"names": {"en": "Rajasthan"}}],
-            "city": {"names": {"en": "Jaipur"}},
+            "city": {"names": {"en": "Jaipur (Malviya Nagar)"}},
         }
 
 

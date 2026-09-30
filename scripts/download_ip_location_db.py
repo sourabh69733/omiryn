@@ -20,6 +20,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TARGET = PROJECT_ROOT / "data" / "dbip-city-lite.mmdb"
 URL = "https://download.db-ip.com/free/dbip-city-lite-{month}.mmdb.gz"
+# DB-IP refuses Python's default user agent (403); a named client is accepted.
+USER_AGENT = "omiryn-build/1.0 (+https://omiryn.com)"
 
 
 def _months(today: date) -> list[str]:
@@ -32,11 +34,12 @@ def download(target: Path) -> str:
     partial = target.with_suffix(".part")
     for month in _months(date.today()):
         try:
-            with urllib.request.urlopen(URL.format(month=month), timeout=120) as response:
+            request = urllib.request.Request(URL.format(month=month), headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(request, timeout=120) as response:
                 with gzip.GzipFile(fileobj=response) as unzipped, partial.open("wb") as out:
                     shutil.copyfileobj(unzipped, out)
         except Exception as error:
-            print(f"{month}: not available ({type(error).__name__}); trying an older month")
+            print(f"{month}: not available ({type(error).__name__}: {error}); trying an older month")
             continue
         partial.replace(target)
         return month

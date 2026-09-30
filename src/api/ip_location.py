@@ -10,6 +10,7 @@ IP geolocation by DB-IP (https://db-ip.com), CC BY 4.0.
 from __future__ import annotations
 
 import ipaddress
+import re
 import logging
 import os
 from functools import cache
@@ -55,7 +56,8 @@ def locate_ip(ip: str | None) -> dict[str, str] | None:
         "country": _name(country),
         "country_code": str(country.get("iso_code") or ""),
         "region": _name(subdivisions[0] if subdivisions else {}),
-        "city": _name(record.get("city") or {}),
+        # DB-IP adds a neighbourhood ("Navi Mumbai (Ghansoli)"); the city alone is plenty.
+        "city": re.sub(r"\s*\(.*\)\s*$", "", _name(record.get("city") or {})),
     }
     return {key: value for key, value in place.items() if value} or None
 
