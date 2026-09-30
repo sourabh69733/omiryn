@@ -4414,13 +4414,23 @@ p {
   transition: opacity 0.5s ease;
 }
 
-.agent-orb.is-active::after {
+/* A new state's image fades in rather than snapping. */
+.agent-orb-blob {
+  animation: agent-orb-iridescence 9s ease-in-out infinite, agent-orb-swap 0.35s ease-out;
+}
+
+.agent-orb.is-thinking::after {
   animation-duration: 2.2s;
 }
 
-.agent-orb.is-active .agent-orb-glow {
+.agent-orb.is-thinking .agent-orb-glow {
   opacity: 1;
   animation: agent-orb-glow 2.2s ease-in-out infinite;
+}
+
+.agent-orb.is-listening .agent-orb-glow {
+  opacity: 0.6;
+  animation: agent-orb-glow 3.2s ease-in-out infinite;
 }
 
 /* The blob is the avatar, so drop the white circle around it. */
@@ -4445,6 +4455,11 @@ p {
 @keyframes agent-orb-sheen {
   0%, 55% { background-position: 150% 0; }
   100% { background-position: -50% 0; }
+}
+
+@keyframes agent-orb-swap {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes agent-orb-glow {

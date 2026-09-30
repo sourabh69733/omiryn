@@ -678,7 +678,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         </aside>
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={sending || (conversation && typingConversationId === conversation.id) ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
               <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
               {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null}

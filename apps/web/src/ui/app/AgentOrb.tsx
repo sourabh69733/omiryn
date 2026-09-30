@@ -1,16 +1,24 @@
 // The agent's face: a glossy "vibe" blob, not a photo of a person, since
-// Omiryn is not a person. It breathes when idle; `active` marks the typing
-// state (faster wobble plus a glow).
-type AgentOrbProps = { active?: boolean };
+// Omiryn is not a person. Each state has its own image; CSS adds a faint
+// breath and light sweep so it feels alive without bouncing around.
+export type AgentOrbState = "idle" | "thinking" | "listening" | "happy";
 
-export function AgentOrb({ active = false }: AgentOrbProps) {
+type AgentOrbProps = {
+  state?: AgentOrbState;
+  /** Older callers: `active` means the agent is writing a reply. */
+  active?: boolean;
+};
+
+export function AgentOrb({ state, active = false }: AgentOrbProps) {
+  const current: AgentOrbState = state ?? (active ? "thinking" : "idle");
   return (
-    <span className={`agent-orb${active ? " is-active" : ""}`} aria-hidden="true">
+    <span className={`agent-orb is-${current}`} aria-hidden="true">
       <span className="agent-orb-glow" />
       <img
+        key={current}
         className="agent-orb-blob"
-        src="/assets/agent/agent-idle-128.webp"
-        srcSet="/assets/agent/agent-idle-128.webp 1x, /assets/agent/agent-idle-256.webp 2x"
+        src={`/assets/agent/agent-${current}-128.webp`}
+        srcSet={`/assets/agent/agent-${current}-128.webp 1x, /assets/agent/agent-${current}-256.webp 2x`}
         alt=""
         draggable={false}
         decoding="async"
