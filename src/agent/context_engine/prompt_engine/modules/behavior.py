@@ -8,9 +8,10 @@ from typing import Any
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.modules.identity import (
-    agent_persona_for_interest,
+    agent_persona_for_voice,
     persona_card_prompt,
     persona_cards_enabled,
+    voice_prompt,
 )
 
 
@@ -30,6 +31,7 @@ class CompanionBehavior:
     version_name: str = "v1_companion_basic"
     data_point_targets: tuple[str, ...] = ()
     persona_card: str = ""
+    voice: str = "neutral"
 
 
 def build_companion_behavior(
@@ -38,13 +40,15 @@ def build_companion_behavior(
     agent_name: str | None = None,
     tone: str = "auto",
     prompt_version: PromptBehaviorVersion | None = None,
+    voice: str = "neutral",
 ) -> CompanionBehavior:
-    persona = agent_persona_for_interest(str((user_profile or {}).get("interested_in") or ""))
+    persona = agent_persona_for_voice(voice)
     if agent_name and agent_name.strip():
         persona = {**persona, "name": agent_name.strip()}
     return CompanionBehavior(
         persona_name=persona["name"],
         persona_presentation=persona["presentation"],
+        voice=voice,
         persona_card=(
             persona_card_prompt(persona["card"], persona["name"])
             if persona_cards_enabled()
@@ -93,6 +97,7 @@ def behavior_module_prompt(
         f"{time_awareness_prompt(user_profile)}\n"
         f"Agent persona: name={behavior.persona_name}, "
         f"presentation={behavior.persona_presentation}.\n"
+        f"{voice_prompt(behavior.voice)}\n"
         f"Reply budget: usually <= {behavior.max_reply_words} words per bubble; a story or scene "
         "the user asks for may run across several bubbles (see Output Format).\n"
         f"Question policy: {behavior.ask_question_policy}.\n"

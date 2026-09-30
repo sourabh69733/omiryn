@@ -120,6 +120,7 @@ def build_model_context_package(
             topic_states=topic_states,
             conversation_plan=conversation_plan,
             matching_understanding=matching_understanding,
+            agent_voice=_conversation_voice(conversation_id, user_id),
         )
         snapshot = build_context_snapshot_v2(
             reply_context.context_sources,
@@ -155,6 +156,7 @@ def build_model_context_package(
             agent_tone=agent_tone,
             agent_name=agent_name,
             prompt_version=prompt_version.version_id,
+            agent_voice=_conversation_voice(conversation_id, user_id),
         )
         snapshot = build_context_snapshot(
             reply_context.context_sources,
@@ -194,6 +196,12 @@ def _with_conversation_time(
         get_user_timezone(user_id) if user_id else None,
     )
     return {**(user_profile or {}), **timing.profile_fields()}
+
+
+def _conversation_voice(conversation_id: str, user_id: str | None) -> str:
+    """How the companion speaks about itself in this chat: neutral, female or male."""
+    conversation = get_conversation(conversation_id, user_id) if user_id else None
+    return str((conversation or {}).get("agent_voice") or "neutral")
 
 
 def _planning_messages(

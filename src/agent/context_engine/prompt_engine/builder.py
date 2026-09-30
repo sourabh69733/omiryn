@@ -52,6 +52,7 @@ def build_companion_system_prompt(
     agent_name: str | None = None,
     base_prompt: str | None = None,
     prompt_version: str | None = None,
+    agent_voice: str = "neutral",
 ) -> str:
     version = get_prompt_behavior_version(prompt_version)
     behavior = build_companion_behavior(
@@ -59,6 +60,7 @@ def build_companion_system_prompt(
         agent_name=agent_name,
         tone=agent_tone,
         prompt_version=version,
+        voice=agent_voice,
     )
     return build_system_prompt(
         base_prompt=base_prompt or version.base_prompt,
@@ -110,12 +112,14 @@ def build_companion_system_prompt_v2(
     topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
     matching_understanding: MatchingUnderstanding | None = None,
+    agent_voice: str = "neutral",
 ) -> str:
     behavior = build_companion_behavior(
         user_profile,
         agent_name=agent_name,
         tone=agent_tone,
         prompt_version=prompt_version,
+        voice=agent_voice,
     )
     context_text = context_sources_text(context_sources)
     structure_context = _prompt_structure_context(
