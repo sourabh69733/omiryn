@@ -11,7 +11,7 @@ add creates a new memory:
   "purposes": ["profile | matching | personalization"],
   "key": "short stable semantic key",
   "value": "specific scalar, array, or object",
-  "statement": "one short plain sentence about the user, e.g. Has a job interview at a design studio.",
+  "statement": "one short plain sentence about the user, e.g. Has a <thing> called <name>.",
   "sensitivity": "standard | sensitive | highly_sensitive",
   "confidence": 0.0,
   "importance": 0.0,
@@ -49,7 +49,7 @@ V3 memory rules:
   4. Specificity: is the value concrete enough to be useful rather than a topic name or conversational state?
   5. Information gain: does it add or update knowledge rather than repeat the current request or existing memory?
 - The companion's own promises, opinions and plans are never memories, even when they are about the
-  user ("I'll ask how the interview went"); they belong in self_notes.
+  user ("I'll ask how <your event> went"); they belong in self_notes.
 - Quoted third-party views, hypotheticals, role-play, tentative acknowledgements, task content and transient
   conversational reactions fail admission unless the user separately makes an explicit durable self-statement.
 - A subject may still belong in thread_operation or handoff even when it must not become memory.
@@ -69,7 +69,7 @@ V3 memory rules:
 - Never target an ID outside existing_memories and never target one memory twice in a batch.
 - Relationship history and intimate interpersonal details are at least sensitive. Medical, biometric,
   sexual, financial and similarly high-risk private facts are highly_sensitive.
-- occurred_at is the event time, past or scheduled (an interview next Friday, a trip in May), not
+- occurred_at is the event time, past or scheduled (an event the user says is next Friday or in May), not
   extraction time or send time. Resolve relative dates ("today",
   "yesterday", "last Friday", "next Monday") against the evidence message's sent_at and sent_weekday,
   in user_timezone. Write the resolved day as an ISO-8601 timestamp with that timezone's UTC offset,
@@ -78,7 +78,7 @@ V3 memory rules:
 - Never put relative time words ("next Friday", "yesterday", "last week") in key or value; they go
   stale. Put the time in occurred_at and write the value without it, or with the absolute date.
 - statement restates the memory as one short, plain third-person sentence without the user's
-  name ("Has a beagle called Bruno.", "Moved from Mumbai to Pune."). Same rules as value: no
+  name ("Has a <pet> called <name>.", "Moved from <city> to <city>."). Same rules as value: no
   relative time words, no guessing beyond the evidence. At most 240 characters.
 - For plans and temporary states, set valid_until only when the evidence gives a clear end
   (for example "this week" ends at the end of that week); otherwise use null.

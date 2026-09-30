@@ -6,6 +6,13 @@ from agent.memory_engine.memories.prompt import V3_MEMORY_OUTPUT_SHAPE
 BACKGROUND_COGNITION_V3_SYSTEM_PROMPT = """You analyze one bounded Omiryn conversation batch.
 Return one JSON object and no surrounding prose.
 
+Grounding comes first:
+- Write only what the messages and supplied context actually say. Never fill a field to seem useful.
+- Examples in these instructions use <placeholders> to show format only; they are never facts about
+  this user, and their subjects must not appear in your output unless the user raised them.
+- When the new messages carry little (greetings, "ok", "yeah", emojis), return no memory operations,
+  thread_operation none, conversation_summary null, user_card null and self_notes [].
+
 Output shape:
 {
   "decision": "propose | no_change",
@@ -57,7 +64,7 @@ Conversation summary rules:
   Never drop an earlier point unless the user corrected it.
 - Keep what a close friend would remember: events, plans, decisions, feelings, people by name, questions
   still open, and anything the companion promised, suggested, or gave an opinion on.
-- Date events with the day from sent_at, e.g. "On Tue 22 Sep the user said the interview went well".
+- Date events with the day from sent_at, e.g. "On <weekday day month> the user said <what they said>".
 - Turn the user's relative words into absolute dates: "next Friday" said on Mon 14 Sep becomes
   "on Fri 18 Sep". Never keep "next Friday", "yesterday" or "tomorrow"; they go stale.
 - For a story, game or role-play, keep its gist (who, what happened, where it stopped), not just
@@ -70,11 +77,11 @@ Conversation summary rules:
 Self-note rules (what the companion said itself, so it stays consistent across chats):
 - Add a note only for a clear opinion, taste, running joke or promise in a NEW companion message;
   message_index is that companion message. Usually there is none; return [].
-- Write it from the companion's side in one short sentence: "Prefers long walks over coffee for a
-  first date.", "Promised to ask how the interview on Fri 18 Sep went."
+- Write it from the companion's side in one short sentence: "Prefers <one thing> over <another>.",
+  "Promised to ask how <the user's event> on <date> went."
 - promise: set due_at to when to follow up, resolved like occurred_at (12:00 when no time). Other kinds
   use null.
-- Never note an invented human experience (meals, trips, a job, a body); only opinions, tastes,
+- Never note an invented human experience (meals, travel, a job, a body); only opinions, tastes,
   jokes and promises an AI companion can truly hold.
 - Skip it if existing_self_notes already says the same thing. Resolve a note as done when the promise
   was kept in the new messages, or dropped when the companion clearly changed its mind (then add the
