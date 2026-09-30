@@ -4368,12 +4368,15 @@ p {
 
 /* Agent orb: replaces the illustrated avatar. A slowly drifting gradient with
    a thin wave ring, closer to a voice/presence mark than a face. */
-/* Agent avatar: glossy vibe blob image that breathes; faster wobble and glow while typing. */
+/* Agent avatar: glossy vibe blob. Liquid does not squash or spin; it looks alive
+   through a faint breath, a slow iridescent colour shift and light sliding over it.
+   Typing adds a soft pulsing glow and a quicker sheen. */
 .agent-orb {
   position: relative;
   display: block;
   width: 100%;
   height: 100%;
+  animation: agent-orb-breathe 6s ease-in-out infinite;
 }
 
 .agent-orb-blob {
@@ -4383,27 +4386,41 @@ p {
   height: 100%;
   object-fit: contain;
   user-select: none;
-  animation: agent-orb-breathe 4.8s ease-in-out infinite;
-  will-change: transform;
+  animation: agent-orb-iridescence 9s ease-in-out infinite;
+}
+
+/* Light sweep, clipped to the blob's own shape. */
+.agent-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  -webkit-mask: url("/assets/agent/agent-idle-128.webp") center / contain no-repeat;
+  mask: url("/assets/agent/agent-idle-128.webp") center / contain no-repeat;
+  mix-blend-mode: soft-light;
+  animation: agent-orb-sheen 7s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .agent-orb-glow {
   position: absolute;
-  inset: 8%;
+  inset: 4%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(240, 98, 168, 0.55), rgba(124, 58, 237, 0.35) 55%, transparent 72%);
+  background: radial-gradient(circle, rgba(240, 98, 168, 0.5), rgba(124, 58, 237, 0.3) 55%, transparent 72%);
   filter: blur(6px);
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.5s ease;
 }
 
-.agent-orb.is-active .agent-orb-blob {
-  animation: agent-orb-wobble 1.4s ease-in-out infinite;
+.agent-orb.is-active::after {
+  animation-duration: 2.2s;
 }
 
 .agent-orb.is-active .agent-orb-glow {
   opacity: 1;
-  animation: agent-orb-glow 1.4s ease-in-out infinite;
+  animation: agent-orb-glow 2.2s ease-in-out infinite;
 }
 
 /* The blob is the avatar, so drop the white circle around it. */
@@ -4416,23 +4433,28 @@ p {
 }
 
 @keyframes agent-orb-breathe {
-  0%, 100% { transform: scale(0.94) rotate(0deg); }
-  50% { transform: scale(1.04) rotate(-4deg); }
+  0%, 100% { transform: translateY(0) scale(0.985); }
+  50% { transform: translateY(-1px) scale(1.015); }
 }
 
-@keyframes agent-orb-wobble {
-  0%, 100% { transform: scale(1, 1) rotate(0deg); }
-  25% { transform: scale(1.08, 0.94) rotate(-6deg); }
-  50% { transform: scale(0.95, 1.07) rotate(4deg); }
-  75% { transform: scale(1.05, 0.97) rotate(-2deg); }
+@keyframes agent-orb-iridescence {
+  0%, 100% { filter: hue-rotate(0deg) saturate(1); }
+  50% { filter: hue-rotate(-14deg) saturate(1.12); }
+}
+
+@keyframes agent-orb-sheen {
+  0%, 55% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
 }
 
 @keyframes agent-orb-glow {
-  0%, 100% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.25); opacity: 1; }
+  0%, 100% { transform: scale(0.92); opacity: 0.55; }
+  50% { transform: scale(1.12); opacity: 0.95; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .agent-orb,
+  .agent-orb::after,
   .agent-orb-blob,
   .agent-orb-glow {
     animation: none;
