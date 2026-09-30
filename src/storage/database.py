@@ -147,6 +147,10 @@ def _ensure_runtime_columns() -> None:
             "gender",
             "interested_in",
             "city",
+            "region",
+            "country",
+            "location_source",
+            "adult_confirmed_at",
             "phone",
             "profile_photo_url",
             "profile_photo_urls",
@@ -179,6 +183,8 @@ def _ensure_runtime_columns() -> None:
                     column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
                     if column_name == "age":
                         column_type = "INTEGER"
+                    if column_name.endswith("_at"):
+                        column_type = "TIMESTAMP WITH TIME ZONE"
                     if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""

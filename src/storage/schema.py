@@ -568,6 +568,11 @@ user_profiles = Table(
     Column("gender", String, nullable=True),
     Column("interested_in", String, nullable=True),
     Column("city", String, nullable=True),
+    Column("region", String, nullable=True),
+    Column("country", String, nullable=True),
+    # "ip" while the location is only estimated from the connection; "user" once they set it.
+    Column("location_source", String, nullable=True),
+    Column("adult_confirmed_at", DateTime(timezone=True), nullable=True),
     Column("phone", String, nullable=True),
     Column("profile_photo_url", String, nullable=True),
     Column("profile_photo_urls", JSON, nullable=True),
