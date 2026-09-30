@@ -269,6 +269,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
 
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
+  const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
+  const lastVisibleIsAgent = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "assistant";
 
   useLayoutEffect(() => {
     if (!shouldStickToBottomRef.current) return;
@@ -697,7 +699,9 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
               const previousDate = previous ? messageDateKey(previous, index - 1) : "";
               const nextDate = next ? messageDateKey(next, index + 1) : "";
               const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
-              const sameAsNext = Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
+              // The typing row continues Omiryn's last bubble, so that bubble gives up its avatar.
+              const typingContinues = typingVisible && agent && !next;
+              const sameAsNext = typingContinues || Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
               const clusterClass = !sameAsPrevious && !sameAsNext ? "cluster-single" : !sameAsPrevious ? "cluster-start" : !sameAsNext ? "cluster-end" : "cluster-middle";
               const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, index - 1, message, index) >= 20;
               const showAvatar = !sameAsNext;
@@ -715,7 +719,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                 </Fragment>
               );
             })}
-            {sending || revealingBubbles || (conversation && typingConversationId === conversation.id) ? <div className="message-row agent"><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {typingVisible ? <div className={`message-row agent ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
