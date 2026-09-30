@@ -92,7 +92,8 @@
 
 .o-h1, .o-h2 { font-weight: 600; color: var(--fg); text-wrap: balance; }
 .o-h1 { font-size: clamp(56px, 7.6vw, 104px); line-height: 0.98; letter-spacing: -0.05em; }
-.o-h1 .w { display: inline-block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; vertical-align: top; }
+/* Extra room on each side so italic swashes and descenders are not clipped by the reveal mask. */
+.o-h1 .w { display: inline-block; overflow: hidden; padding: 0 0.12em 0.2em; margin: 0 -0.12em -0.2em; vertical-align: top; }
 .o-h1 .w > span { display: inline-block; }
 .o-h2 { max-width: 14ch; font-size: clamp(36px, 4.6vw, 56px); line-height: 1.04; letter-spacing: -0.04em; }
 .o-h1 em, .o-h2 em {
@@ -104,7 +105,10 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  padding-right: 0.06em;
+  /* The gradient only paints inside the box, so widen it to cover the italic g's overhang. */
+  display: inline-block;
+  padding: 0 0.1em 0.14em 0.14em;
+  margin: 0 -0.04em -0.14em -0.14em;
 }
 .o-lead { margin-top: 26px; max-width: 32ch; color: var(--fg-2); font-size: clamp(18px, 1.6vw, 20px); line-height: 1.55; }
 .o-sub { margin-top: 20px; max-width: 42ch; color: var(--fg-2); font-size: 17px; }

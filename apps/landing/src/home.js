@@ -264,7 +264,7 @@ function meetCycle() {
     .call(() => loadPartner(partner))
     .set(them.el, { left: "112%", autoAlpha: 0, scale: 0.6 })
     .set([vsGlow, vsReason], { autoAlpha: 0, scale: 0.6 })
-    .set(sharedChips, { autoAlpha: 0, scale: 0.6 })
+    .set(sharedChips, { autoAlpha: 0, scale: 0.6, y: 0 })
     // Someone new arrives.
     .to(them.el, { left: "70%", autoAlpha: 1, scale: 1, duration: 1.1, ease: "expo.out" })
     .fromTo(theirChips.slice(0, 2), { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, stagger: 0.1, duration: 0.4, ease: "back.out(2)" }, "-=0.5")
@@ -273,7 +273,7 @@ function meetCycle() {
     // They drift together; the overlap lights up.
     .to(you.el, { left: "41.5%", duration: 1.3, ease: "power3.inOut" }, "meet")
     .to(them.el, { left: "58.5%", duration: 1.3, ease: "power3.inOut" }, "meet")
-    .to(sharedChips, { autoAlpha: 0, scale: 0.4, duration: 0.4 }, "meet+=0.8")
+    .to(sharedChips, { autoAlpha: 0, scale: 0.6, y: -10, duration: 0.3 }, "meet")
     .to(vsGlow, { autoAlpha: 1, scale: 1, duration: 0.7, ease: "back.out(1.6)" }, "meet+=0.9")
     .to(vsReason, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2.2)" }, "meet+=1.1")
     .to([you, them], { energy: 1.8, duration: 0.6, yoyo: true, repeat: 1, ease: "sine.inOut" }, "meet+=0.9")
