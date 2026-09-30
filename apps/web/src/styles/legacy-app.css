@@ -4376,7 +4376,7 @@ p {
   display: block;
   width: 100%;
   height: 100%;
-  animation: agent-orb-breathe 6s ease-in-out infinite;
+  animation: agent-orb-breathe 4s ease-in-out infinite;
 }
 
 .agent-orb-blob {
@@ -4394,13 +4394,13 @@ p {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) no-repeat;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.85) 50%, transparent 62%) no-repeat;
   background-size: 250% 100%;
   background-position: 150% 0;
-  -webkit-mask: url("/assets/agent/agent-idle-128.webp") center / contain no-repeat;
-  mask: url("/assets/agent/agent-idle-128.webp") center / contain no-repeat;
-  mix-blend-mode: soft-light;
-  animation: agent-orb-sheen 7s ease-in-out infinite;
+  -webkit-mask: var(--orb-mask) center / contain no-repeat;
+  mask: var(--orb-mask) center / contain no-repeat;
+  mix-blend-mode: overlay;
+  animation: agent-orb-sheen 5s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -4428,6 +4428,17 @@ p {
   animation: agent-orb-glow 2.2s ease-in-out infinite;
 }
 
+/* Older message avatars: same image, no motion. */
+.agent-orb.is-still,
+.agent-orb.is-still::after,
+.agent-orb.is-still .agent-orb-blob {
+  animation: none;
+}
+
+.agent-orb.is-still::after {
+  opacity: 0;
+}
+
 .agent-orb.is-listening .agent-orb-glow {
   opacity: 0.6;
   animation: agent-orb-glow 3.2s ease-in-out infinite;
@@ -4443,13 +4454,13 @@ p {
 }
 
 @keyframes agent-orb-breathe {
-  0%, 100% { transform: translateY(0) scale(0.985); }
-  50% { transform: translateY(-1px) scale(1.015); }
+  0%, 100% { transform: translateY(0.5px) scale(0.96); }
+  50% { transform: translateY(-1px) scale(1.04); }
 }
 
 @keyframes agent-orb-iridescence {
-  0%, 100% { filter: hue-rotate(0deg) saturate(1); }
-  50% { filter: hue-rotate(-14deg) saturate(1.12); }
+  0%, 100% { filter: hue-rotate(0deg) saturate(1) brightness(1); }
+  50% { filter: hue-rotate(-22deg) saturate(1.2) brightness(1.06); }
 }
 
 @keyframes agent-orb-sheen {
