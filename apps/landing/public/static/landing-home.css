@@ -659,3 +659,122 @@
   .venn-note { font-size: 21px; }
   .o-stack { height: 440px; }
 }
+
+/* ═══════════ SUB PAGES (about, safety, privacy, terms, contact...) ═══════════
+   Same design system as the home page. The old landing.css rules use these
+   variables, so remap them to the light palette first, then restyle layout. */
+.home.page {
+  --bg-card: #fff;
+  --bg-card-hover: #fff;
+  --surface: #fff;
+  --border: var(--line);
+  --border-light: var(--line-strong);
+  --text-primary: var(--fg);
+  --text-secondary: var(--fg-2);
+  --text-muted: var(--fg-3);
+  --accent-1: var(--accent);
+  --accent-3: var(--accent);
+  --gradient-main: var(--brand-gradient);
+}
+.page .page-shell { min-height: auto; padding: 150px 0 40px; }
+.page .page-hero {
+  max-width: calc(var(--container) + var(--gutter) * 2);
+  margin: 0 auto;
+  padding: 0 var(--gutter) 56px;
+  text-align: left;
+}
+.page .section-label {
+  margin-bottom: 16px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+.page .page-hero h1 {
+  max-width: 18ch;
+  margin-bottom: 20px;
+  font-family: var(--font-sans);
+  font-size: clamp(40px, 5.6vw, 72px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.page .page-hero p { max-width: 60ch; margin: 0; color: var(--fg-2); font-size: 18px; line-height: 1.6; }
+.page .content-band {
+  max-width: calc(var(--container) + var(--gutter) * 2);
+  margin: 0 auto;
+  padding: 0 var(--gutter) 120px;
+}
+.page .content-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.page .content-panel,
+.page .step-card,
+.page .lead-form {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.page .content-panel:hover,
+.page .step-card:hover { transform: none; border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+.page .content-panel h2,
+.page .content-panel h3,
+.page .step-card h3,
+.page .lead-form h3 { margin-bottom: 10px; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.page .content-panel p,
+.page .content-panel li,
+.page .step-card p { color: var(--fg-2); font-size: 15.5px; line-height: 1.65; }
+.page .content-panel ul { display: grid; gap: 8px; padding-left: 18px; }
+.page .content-panel li::marker { color: var(--accent); }
+.page .content-panel a { color: var(--accent); text-underline-offset: 3px; }
+.page .steps-grid { max-width: none; margin-bottom: 16px; gap: 16px; }
+.page .step-number {
+  width: auto;
+  height: auto;
+  margin-bottom: 14px;
+  background: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  justify-content: flex-start;
+}
+.page .step-number::before { content: "0"; }
+.page .contact-grid { max-width: none; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 24px; }
+.page .lead-form { gap: 16px; }
+.page .lead-form label { color: var(--fg-2); font-size: 14px; font-weight: 500; }
+.page .lead-form input,
+.page .lead-form textarea {
+  padding: 13px 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: var(--fg);
+  font: 400 16px/1.5 var(--font-sans);
+}
+.page .lead-form input:focus,
+.page .lead-form textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.page .lead-form .btn-primary {
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 26px;
+  border-radius: 999px;
+  background: var(--fg);
+  color: #fff;
+  font: 500 15px/1 var(--font-sans);
+  box-shadow: 0 10px 30px rgba(24, 24, 27, 0.18);
+}
+.page .lead-form .btn-primary:hover { background: var(--accent); transform: none; }
+.page .form-helper { color: var(--fg-3); font-size: 13px; }
+
+@media (max-width: 900px) {
+  .page .page-shell { padding-top: 120px; }
+  .page .contact-grid { grid-template-columns: 1fr; }
+  .page .steps-grid { grid-template-columns: 1fr; max-width: none; }
+  .page .content-grid { grid-template-columns: 1fr; }
+}
