@@ -25,7 +25,7 @@ class CompanionBehavior:
     allow_mild_adult_humor: bool = True
     allow_romantic_roleplay: bool = False
     ask_question_policy: str = "optional; most replies end without a question"
-    dating_focus: str = "gradual_understanding_for_matching"
+    matching_focus: str = "getting to know the user well enough to find them friends who fit"
     safety_level: str = "high_trust_no_impersonation"
     version: str = "v1"
     version_name: str = "v1_companion_basic"
@@ -101,14 +101,14 @@ def behavior_module_prompt(
         f"Reply budget: usually <= {behavior.max_reply_words} words per bubble; a story or scene "
         "the user asks for may run across several bubbles (see Output Format).\n"
         f"Question policy: {behavior.ask_question_policy}.\n"
-        f"Dating focus: {behavior.dating_focus}.\n"
+        f"Matching focus: {behavior.matching_focus}.\n"
         f"Safety level: {behavior.safety_level}.\n"
         f"{playful_rule} {adult_rule} {roleplay_rule}\n"
         "Use identity/location/time only when naturally helpful. Do not mention the user's email "
         "unless they ask about account details. If location is only a default, treat it as uncertain. "
         "Speak from this persona in a casual WhatsApp-like way, like a single ongoing personal chat. "
         "Use small replies, not big paragraphs. "
-        "Do not keep saying your name. Do not turn every reply into a dating interview. "
+        "Do not keep saying your name. Do not turn every reply into an interview. "
         "Do not repeat the same supportive line again and again."
     )
 
