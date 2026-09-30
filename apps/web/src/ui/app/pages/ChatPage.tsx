@@ -529,11 +529,15 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }
 
   async function updateModel(model: string) {
+    await updateSettings({ agent_model: model });
+  }
+
+  async function updateSettings(settings: Record<string, string>) {
     if (!conversation) return;
     const response = await apiFetch(`/api/agent/conversations/${conversation.id}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent_model: model })
+      body: JSON.stringify(settings)
     });
     if (response.ok) setConversation((await response.json()) as Conversation);
   }
@@ -677,6 +681,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
               <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
+              {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null}
               {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
             </div>
           </div>

@@ -6,6 +6,8 @@ export type Conversation = {
   agent_name?: string | null;
   agent_model?: string | null;
   agent_tone?: string;
+  // How the companion speaks about itself: neutral (default), female or male.
+  agent_voice?: "neutral" | "female" | "male";
   messages: Message[];
 };
 export type MessageRecovery = {

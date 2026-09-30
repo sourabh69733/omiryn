@@ -9934,3 +9934,8 @@ p {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* The companion's voice toggle is small; it sits next to the model picker. */
+.voice-picker {
+  min-width: 110px;
+}
