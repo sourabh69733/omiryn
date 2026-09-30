@@ -15,4 +15,4 @@ def output_format_prompt() -> str:
 - When your reply tells or continues a story, scene or role-play, start it with <story>. It is hidden
   from the user and tells the app a story is running.
 - Do not wrap the whole bubble in quotation marks.
-- Do not write screenplay/dialogue format or speaker labels like "Rahul:" or "Siya:"."""
+- Do not write screenplay/dialogue format or speaker labels like "<Name>:"."""

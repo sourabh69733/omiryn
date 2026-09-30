@@ -23,3 +23,25 @@ class PromptGroundingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReplyPromptGroundingTest(unittest.TestCase):
+    def test_reply_prompt_carries_no_example_names(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from agent.context_engine.engine import build_model_context_package
+        from storage import reset_db, save_conversation
+
+        reset_db()
+        save_conversation({"id": "c", "status": "active", "messages": []}, "u")
+        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
+            prompt = build_model_context_package(
+                conversation_id="c", user_text="tell me a story", user_id="u", user_profile={},
+                model=None, agent_tone="auto", agent_name=None, style_source_id=None,
+                user_message_index=0, assistant_message_index=1,
+            ).system_prompt.casefold()
+        # Names once used as examples; a story or reply could reuse them as if real.
+        for name in ("rahul", "siya", "abhishek", "bruno", "riya"):
+            with self.subTest(name=name):
+                self.assertIsNone(re.search(rf"\b{name}\b", prompt))

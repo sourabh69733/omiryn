@@ -29,7 +29,7 @@ TOPIC_CATALOG: tuple[TopicDefinition, ...] = (
         bucket="whatsapp_context",
         label="Talk about a person, tone, topics, or messages from uploaded WhatsApp context.",
         data_targets=("communication_style", "tone_preference"),
-        trigger_terms=("whatsapp", "abhishek", "message", "tone", "style", "chat"),
+        trigger_terms=("whatsapp", "message", "tone", "style", "chat"),
         freshness_window=8,
     ),
     TopicDefinition(
