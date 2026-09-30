@@ -51,6 +51,16 @@ def strip_story_marker(text: str) -> tuple[str, bool]:
     return cleaned.strip(), count > 0
 
 
+# Written by the model when the user asks it to talk like a girl, a boy or neutrally again.
+_VOICE_MARKER = re.compile(r"[<\[]\s*voice\s*:\s*(neutral|female|male)\s*[>\]]", re.IGNORECASE)
+
+
+def strip_voice_marker(text: str) -> tuple[str, str | None]:
+    """Remove the voice marker; return the voice the user asked for, if any (the last one wins)."""
+    found = _VOICE_MARKER.findall(text)
+    return _VOICE_MARKER.sub("", text).strip(), (found[-1].lower() if found else None)
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = _soften_adult_safety_refusal(
         " ".join(

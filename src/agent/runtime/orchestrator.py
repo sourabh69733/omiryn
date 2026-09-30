@@ -13,6 +13,7 @@ from agent.context_engine.conversation_engine.policy.replies import (
     STORY_NOTE_PREFIX,
     strip_story_end,
     strip_story_marker,
+    strip_voice_marker,
 )
 from agent.runtime.story_mode import (
     schedule_story_part,
@@ -54,6 +55,8 @@ from storage import (
 class AgentTurnResult:
     messages: list[dict[str, Any]]
     quality_valid: bool
+    # Set when the user asked the companion to change how it talks (neutral, female, male).
+    agent_voice: str | None = None
 
 
 async def run_agent_turn(
@@ -288,6 +291,7 @@ async def run_agent_turn(
         )
         reply, story_ended = strip_story_end(reply)
         reply, story_marked = strip_story_marker(reply)
+        reply, requested_voice = strip_voice_marker(reply)
         reply_parts = split_assistant_reply(reply, user_text=user_text)
     except Exception as error:
         save_agent_trace_step(
@@ -385,7 +389,9 @@ async def run_agent_turn(
             "reply_part_count": len(reply_parts),
         },
     )
-    return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
+    return AgentTurnResult(
+        messages=updated_messages, quality_valid=quality_valid, agent_voice=requested_voice
+    )
 
 
 async def _freshen_reply(
