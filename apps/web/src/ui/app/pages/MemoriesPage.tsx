@@ -11,7 +11,7 @@ const memoryReviewReasons = [
   { value: "not_about_me", label: "Not about me" }
 ];
 
-export function StylePage() {
+export function MemoriesPage() {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [canonicalMemories, setCanonicalMemories] = useState<CanonicalMemory[]>([]);
   const [error, setError] = useState("");
@@ -100,7 +100,7 @@ export function StylePage() {
         : { source_type: "llm_profile", title: title.trim(), content: content.trim() };
       const response = await apiFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save memory."));
-      trackAppEvent("memory_import_completed", { source_type: importMode === "whatsapp" ? "whatsapp_chat" : "manual_notes" }, { page: "style" });
+      trackAppEvent("memory_import_completed", { source_type: importMode === "whatsapp" ? "whatsapp_chat" : "manual_notes" }, { page: "memories" });
       setContent(""); setShowImport(false); await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save memory."); }
     finally { setSaving(false); }
@@ -121,7 +121,7 @@ export function StylePage() {
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update that signal."));
-      trackAppEvent(eventName, { fact_category: fact.category || "unknown" }, { page: "style", target_type: "profile_fact", target_id: fact.id });
+      trackAppEvent(eventName, { fact_category: fact.category || "unknown" }, { page: "memories", target_type: "profile_fact", target_id: fact.id });
       setReviewItem(null);
       setReviewMode(null);
       setFeedbackReasons([]);
@@ -172,7 +172,7 @@ export function StylePage() {
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save feedback."));
       const factCategory = isCanonicalMemory(item) ? item.kind : item.category || "unknown";
-      trackAppEvent("learned_signal_feedback_sent", { fact_category: factCategory, rating }, { page: "style", target_type: canonical ? "agent_memory" : "profile_fact", target_id: item.id });
+      trackAppEvent("learned_signal_feedback_sent", { fact_category: factCategory, rating }, { page: "memories", target_type: canonical ? "agent_memory" : "profile_fact", target_id: item.id });
       setReviewItem(null);
       setReviewMode(null);
       setFeedbackReasons([]);
@@ -208,7 +208,7 @@ export function StylePage() {
           body: JSON.stringify({ allowed_uses: allowedUses })
         });
         if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not update memory usage."));
-        trackAppEvent("learned_signal_privacy_updated", { fact_category: reviewItem.kind }, { page: "style", target_type: "agent_memory", target_id: reviewItem.id });
+        trackAppEvent("learned_signal_privacy_updated", { fact_category: reviewItem.kind }, { page: "memories", target_type: "agent_memory", target_id: reviewItem.id });
         setReviewItem(null);
         setReviewMode(null);
         await load();
@@ -364,8 +364,8 @@ export function StylePage() {
     <section className="screen style-screen">
       <div className="style-hero">
         <div className="screen-copy compact">
-          <p className="eyebrow">Style</p>
-          <h1>Omiryn's understanding.</h1>
+          <p className="eyebrow">Memories</p>
+          <h1>What Omiryn remembers.</h1>
           <p>Review AI-inferred signals, confirm what feels right, and control what Omiryn can use.</p>
         </div>
       </div>
