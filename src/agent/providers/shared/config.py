@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from agent.context_engine.prompt_engine.versions.v1 import COMPANION_SYSTEM_PROMPT
+from agent.context_engine.prompt_engine.versions.v3 import V3_BASE_PROMPT
 
 from agent.providers.gateway.registry import (
     OPENAI_COMPATIBLE_PROVIDERS as OPENAI_COMPATIBLE_PROVIDERS,
@@ -27,7 +27,7 @@ STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500
 CHAT_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_REPLY_WORD_LIMIT", "35"))
 CHAT_ADVICE_REPLY_WORD_LIMIT = int(os.getenv("AGENT_CHAT_ADVICE_REPLY_WORD_LIMIT", "80"))
 STYLE_CONTEXT_TYPES = {"whatsapp_chat", "friend_style"}
-ONBOARDING_SYSTEM_PROMPT = COMPANION_SYSTEM_PROMPT
+ONBOARDING_SYSTEM_PROMPT = V3_BASE_PROMPT
 
 
 def _provider_name() -> str:
