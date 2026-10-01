@@ -57,7 +57,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
           <span className="brand-copy"><strong>Omiryn</strong><small>Talk first. Match better.</small></span>
         </button>
         <nav className={"app-nav " + (menuOpen ? "is-open" : "")} aria-label="Main navigation">
-          {(["chat", "vibe", "memories", "matches", "contact"] as Page[]).map((item) => (
+          {(["chat", "vibe", "memories", "matches"] as Page[]).map((item) => (
             <a
               className={page === item ? "active" : ""}
               data-nav={item === "chat" ? "interview" : item}
@@ -79,6 +79,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
             {accountOpen ? (
               <div className="account-menu">
                 <button type="button" onClick={() => navigate("profile")}>Profile</button>
+                <button type="button" onClick={() => navigate("contact")}>Contact</button>
                 <button type="button" onClick={() => void signOut()}>Sign out</button>
               </div>
             ) : null}
