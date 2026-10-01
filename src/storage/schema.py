@@ -623,6 +623,18 @@ agent_user_cards = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# The user's friend vibe: one line per compatibility area, written by background cognition from
+# what the user said (JSON, encrypted). The milestone is computed from how many areas are filled.
+agent_vibe_cards = Table(
+    "agent_vibe_cards",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("card", String, nullable=False),
+    Column("milestone", String, nullable=False),
+    Column("milestone_reached_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # What the companion said itself (opinions, tastes, jokes, promises), so it stays consistent
 # and keeps promises. Written by background cognition; text is encrypted.
 agent_self_notes = Table(
