@@ -9,6 +9,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
   const [vibe, setVibe] = useState<Vibe | null>(null);
   const [status, setStatus] = useState("Loading your vibe…");
   const [removing, setRemoving] = useState<string | null>(null);
+  const [openWhy, setOpenWhy] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch("/api/me/vibe")
@@ -74,13 +75,32 @@ export function VibePage({ onChat }: { onChat: () => void }) {
               <div className="vibe-cards">
                 {vibe.areas.filter((area) => area.stage === stage).map((area) => (
                   <article className={`vibe-card ${area.text ? "is-known" : ""}`} key={area.id}>
-                    <h3>{VIBE_AREA_LABELS[area.id] || area.id}</h3>
+                    <div className="vibe-card-top">
+                      <h3>{VIBE_AREA_LABELS[area.id] || area.id}</h3>
+                      {area.strength ? (
+                        <span className={`vibe-strength is-${area.strength}`} title={area.strength === "clear" ? "You've said this more than once." : "You've said this once; Omi will check as you chat."}>
+                          {area.strength === "clear" ? "Clear" : "Said once"}
+                        </span>
+                      ) : null}
+                    </div>
                     <p>{area.text || "Not yet. Omi picks this up as you chat."}</p>
+                    {area.text && openWhy === area.id && area.quotes.length ? (
+                      <ul className="vibe-quotes" aria-label="What you said">
+                        {area.quotes.map((quote, index) => <li key={index}>“{quote}”</li>)}
+                      </ul>
+                    ) : null}
                     {area.text ? (
-                      <button type="button" className="vibe-remove" onClick={() => void remove(area)} disabled={removing === area.id} aria-label={`Remove: ${VIBE_AREA_LABELS[area.id] || area.id}`}>
-                        <X aria-hidden="true" />
-                        {removing === area.id ? "Removing…" : "Not right"}
-                      </button>
+                      <div className="vibe-card-actions">
+                        {area.quotes.length ? (
+                          <button type="button" className="vibe-why" onClick={() => setOpenWhy(openWhy === area.id ? null : area.id)} aria-expanded={openWhy === area.id}>
+                            {openWhy === area.id ? "Hide" : "Why?"}
+                          </button>
+                        ) : null}
+                        <button type="button" className="vibe-remove" onClick={() => void remove(area)} disabled={removing === area.id} aria-label={`Remove: ${VIBE_AREA_LABELS[area.id] || area.id}`}>
+                          <X aria-hidden="true" />
+                          {removing === area.id ? "Removing…" : "Not right"}
+                        </button>
+                      </div>
                     ) : null}
                   </article>
                 ))}

@@ -1,6 +1,14 @@
 import type { RealtimeEvent } from "../../lib/realtime";
 
-export type VibeArea = { id: string; stage: "basics" | "deeper"; text: string | null };
+export type VibeArea = {
+  id: string;
+  stage: "basics" | "deeper";
+  text: string | null;
+  // clear: seen in 2+ of the user's messages; mentioned: once. Milestones past the first need clear.
+  strength: "clear" | "mentioned" | null;
+  evidence_count: number;
+  quotes: string[];
+};
 export type Vibe = {
   milestone: string;
   next_milestone: string | null;

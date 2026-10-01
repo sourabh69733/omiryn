@@ -217,12 +217,70 @@
   font-size: 15px;
 }
 
+.vibe-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vibe-strength {
+  flex: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.vibe-strength.is-clear {
+  background: rgba(47, 143, 120, 0.12);
+  color: var(--success);
+}
+
+.vibe-strength.is-mentioned {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.vibe-quotes {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--soft);
+  list-style: none;
+}
+
+.vibe-quotes li {
+  color: var(--ink-soft, var(--ink));
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.vibe-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.vibe-why {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 .vibe-remove {
   display: inline-flex;
   align-items: center;
   justify-self: start;
   gap: 4px;
-  margin-top: 4px;
   border: 0;
   background: none;
   color: var(--muted);
