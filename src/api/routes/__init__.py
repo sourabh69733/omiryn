@@ -14,6 +14,7 @@ from . import (
     public,
     realtime,
     usage,
+    vibe,
 )
 from .conversations import run_agent_turn
 
@@ -29,5 +30,6 @@ router.include_router(agent_settings.router)
 router.include_router(realtime.router)
 router.include_router(drafts.router)
 router.include_router(demo.router)
+router.include_router(vibe.router)
 
 __all__ = ["router", "run_agent_turn"]
