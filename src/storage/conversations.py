@@ -147,6 +147,17 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
     }
 
 
+def list_conversation_user_ids() -> list[str]:
+    """Every user who has at least one chat (for maintenance scripts)."""
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(agent_conversations.c.user_id)
+            .where(agent_conversations.c.user_id.is_not(None))
+            .distinct()
+        ).scalars().all()
+    return sorted(str(user_id) for user_id in rows)
+
+
 def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
     owner_id = _require_user_id(user_id, "conversation list")
     statement = (
