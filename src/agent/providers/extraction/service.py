@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import logging
 from typing import Any
 
@@ -14,7 +15,10 @@ from agent.memory_engine.data_points.extraction.prompts import (
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.vibe_prompt import VIBE_BACKFILL_SYSTEM_PROMPT
+from agent.cognition.background.vibe_prompt import (
+    VIBE_BACKFILL_SYSTEM_PROMPT,
+    VIBE_VERIFY_SYSTEM_PROMPT,
+)
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (
@@ -25,6 +29,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
     VIBE_BACKFILL,
+    VIBE_VERIFY,
 )
 
 from agent.providers.shared.config import _provider_name
@@ -117,6 +122,52 @@ async def analyze_vibe_backfill(
         temperature=0,
         conversation_id=conversation_id,
         request_kind=VIBE_BACKFILL,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
+
+
+# The proof check is short and runs in the background, so it uses a stronger model than replies:
+# in tests Llama 3.3 kept lines that did not fit their area, DeepSeek V3.2 dropped them.
+_DEFAULT_VIBE_VERIFY_MODELS = {"deepinfra": "deepseek-ai/DeepSeek-V3.2"}
+
+
+def vibe_verify_model(provider: str) -> str | None:
+    """VIBE_VERIFY_MODEL, else a strong default for the provider, else the provider's default."""
+    return os.getenv("VIBE_VERIFY_MODEL", "").strip() or _DEFAULT_VIBE_VERIFY_MODELS.get(provider)
+
+
+async def analyze_vibe_verification(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    """Check vibe lines against only their cited messages; returns {area: [kept message ids]}."""
+    provider = _provider_name()
+    model = model or vibe_verify_model(provider)
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=VIBE_VERIFY,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        # Offline runs keep every cited message.
+        payload = json.loads(text)
+        return {line["area"]: [item["id"] for item in line["messages"]] for line in payload["lines"]}
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=VIBE_VERIFY_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": text}],
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=VIBE_VERIFY,
         model=model,
         timeout_seconds=timeout_seconds,
         response_format={"type": "json_object"},

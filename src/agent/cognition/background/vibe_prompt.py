@@ -17,4 +17,21 @@ Return one JSON object and no surrounding prose:
 """ + VIBE_LINE_RULES
 
 
-__all__ = ["VIBE_BACKFILL_SYSTEM_PROMPT"]
+# Sees each line with only the messages cited for it, so it cannot fill gaps from the wider chat.
+VIBE_VERIFY_SYSTEM_PROMPT = """You check a friend-vibe card before it is saved. Omiryn uses it to
+introduce people as friends, so a line must be proven by what the user actually said.
+Return one JSON object and no surrounding prose:
+{"<area id>": ["<message id>", ...]}
+
+For each line you get the area's meaning, the line, and only the user's messages cited as proof.
+- First check the line fits the area's meaning. If it describes something else (wanting the
+  companion to tell a story is not a story that shaped them; liking a movie is not a value), return
+  an empty list for it.
+- Keep a message only if, read on its own, it directly shows what the line says about that area.
+- Drop a message that is about something else, only loosely related, needs guessing, or would fit
+  any line equally well.
+- One message rarely proves many different areas; be strict when the same message is cited often.
+- Return an empty list for a line no message proves. Include every area you were given."""
+
+
+__all__ = ["VIBE_BACKFILL_SYSTEM_PROMPT", "VIBE_VERIFY_SYSTEM_PROMPT"]

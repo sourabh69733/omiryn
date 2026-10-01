@@ -12,6 +12,7 @@ DATA_POINT_EXTRACT = "data_point_extract"
 MEMORY_SHADOW_EXTRACT = "memory_shadow_extract"
 BACKGROUND_COGNITION = "background_cognition"
 VIBE_BACKFILL = "vibe_backfill"
+VIBE_VERIFY = "vibe_verify"
 
 PROFILE_SIGNAL_EXTRACT = "profile_signal_extract"
 PROFILE_SIGNAL_BACKFILL = "profile_signal_backfill"
