@@ -14,6 +14,7 @@ from agent.memory_engine.data_points.extraction.prompts import (
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.vibe_prompt import VIBE_BACKFILL_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (
@@ -23,6 +24,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT,
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
+    VIBE_BACKFILL,
 )
 
 from agent.providers.shared.config import _provider_name
@@ -82,6 +84,39 @@ async def analyze_background_cognition(
         temperature=0,
         conversation_id=conversation_id,
         request_kind=request_kind,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
+
+
+async def analyze_vibe_backfill(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    """Write a vibe card from a user's past chats; returns {"vibe": {...}}."""
+    provider = _provider_name()
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=VIBE_BACKFILL,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        return {"vibe": {}}
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=VIBE_BACKFILL_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": text}],
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=VIBE_BACKFILL,
         model=model,
         timeout_seconds=timeout_seconds,
         response_format={"type": "json_object"},
