@@ -29,6 +29,7 @@ from storage.profile_facts import save_data_point_extraction_debug
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card, update_vibe_card
+from agent.memory_engine.memories.vibe import vibe_texts
 from realtime import conversation_event, realtime_hub
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
@@ -264,7 +265,7 @@ async def _run_claimed_background_cognition(
                 get_user_timezone(user_id),
                 user_card,
                 self_notes,
-                vibe_card["areas"] if vibe_card is not None else None,
+                vibe_texts(vibe_card["areas"]) if vibe_card is not None else None,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -503,7 +504,7 @@ async def _apply_vibe(
     conversation_id: str,
     user_id: str,
     current: dict[str, Any],
-    updates: dict[str, str],
+    updates: dict[str, dict[str, Any]],
 ) -> None:
     saved = update_vibe_card(user_id, updates)
     if saved["milestone"] != current["milestone"]:

@@ -92,7 +92,11 @@ def interpret_background_cognition(
         valid=not errors and memory.valid and bool(thread.get("valid")),
         errors=tuple(errors),
         user_card=validate_user_card(raw.get("user_card")) if memory_version == 3 else None,
-        vibe=validate_vibe_updates(raw.get("vibe")) if memory_version == 3 else {},
+        vibe=(
+            validate_vibe_updates(raw.get("vibe"), resolve_evidence=_user_message_resolver(batch))
+            if memory_version == 3
+            else {}
+        ),
         self_notes=(
             validate_self_notes(
                 raw.get("self_notes"),
@@ -103,6 +107,22 @@ def interpret_background_cognition(
             else SelfNoteChanges()
         ),
     )
+
+
+def _user_message_resolver(batch: MemoryBatch):
+    """Vibe evidence must be a user message the model saw in this batch."""
+    user_indexes = {
+        message.message_index
+        for message in batch.messages
+        if message.role == "user" and message.content.strip()
+    }
+
+    def resolve(ref: Any) -> tuple[str, int] | None:
+        if isinstance(ref, bool) or not isinstance(ref, int) or ref not in user_indexes:
+            return None
+        return batch.conversation_id, ref
+
+    return resolve
 
 
 __all__ = ["interpret_background_cognition"]

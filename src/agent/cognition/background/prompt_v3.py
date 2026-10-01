@@ -40,7 +40,7 @@ Output shape:
     "session_log": [{"session": "s1", "gist": "...", "unfinished": "... or null"}]
   },
   "user_card": "short profile of the user across all chats, or null to keep current_user_card",
-  "vibe": {"<area id>": "rewritten line for an area the new messages taught something about"},
+  "vibe": {"<area id>": {"line": "rewritten line", "evidence": [<message_index of each user message that shows it>]}},
   "self_notes": [
     {"operation": "add", "kind": "opinion | preference | joke | promise", "text": "...",
      "message_index": 0, "due_at": "timezone-aware ISO-8601 timestamp or null"},
@@ -116,6 +116,8 @@ Vibe rules (who the user would get along with as a friend; Omiryn uses it to fin
 - vibe_areas lists each area's id and meaning; current_vibe has the lines written so far.
 - Return a line only for an area the NEW user messages clearly show something about. Most batches
   return {}. At most 4 areas.
+- evidence lists the message_index of every user message in this batch that shows it. Only user
+  messages count; a line without one is dropped. The current line keeps its earlier evidence.
 """ + VIBE_LINE_RULES + """
 
 """ + V3_MEMORY_OUTPUT_SHAPE

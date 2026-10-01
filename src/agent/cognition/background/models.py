@@ -24,7 +24,7 @@ class BackgroundCognitionAnalysis:
     user_card: str | None = None
     self_notes: SelfNoteChanges = SelfNoteChanges()
     # Vibe area lines the model rewrote; empty keeps the stored card.
-    vibe: dict[str, str] = field(default_factory=dict)
+    vibe: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 __all__ = ["BackgroundCognitionAnalysis"]
