@@ -23,9 +23,13 @@ MESSAGES = [
 
 
 def line(text: str, *indexes: int, conversation_id: str = CONVERSATION_ID) -> dict:
+    """Proof from the given messages, each said on its own day."""
     return {
         "text": text,
-        "evidence": [{"conversation_id": conversation_id, "message_index": i} for i in indexes],
+        "evidence": [
+            {"conversation_id": conversation_id, "message_index": i, "sent_at": f"2026-09-{10 + i:02d}T10:00:00+00:00"}
+            for i in indexes
+        ],
     }
 
 

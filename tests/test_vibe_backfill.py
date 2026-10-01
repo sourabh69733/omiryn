@@ -70,7 +70,7 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(texts(card["areas"]), TEXTS)
         self.assertEqual(
             card["areas"]["deal_breakers"]["evidence"],
-            [{"conversation_id": "vibe-backfill-chat", "message_index": 3}],
+            [{"conversation_id": "vibe-backfill-chat", "message_index": 3, "sent_at": "2026-09-21T09:00:00+00:00"}],
         )
         self.assertEqual(card["milestone_reached_at"].strftime("%Y-%m-%d"), "2026-09-21")
 
@@ -123,7 +123,7 @@ class ChatTranscriptTest(unittest.TestCase):
         self.assertNotIn("old message 0 ", transcript)
         # Only ids still in the text can be cited.
         self.assertNotIn("m1", refs)
-        self.assertEqual(refs["m81"], ("c1", 80))
+        self.assertEqual(refs["m81"], {"conversation_id": "c1", "message_index": 80})
 
     def test_failed_messages_and_companion_only_chats_are_skipped(self) -> None:
         transcript, _, refs = chat_transcript(

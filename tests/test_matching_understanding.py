@@ -26,11 +26,19 @@ from storage import get_vibe_card, reset_db, save_conversation, update_vibe_card
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
-def line(text: str, messages: int = 2, conversation_id: str = "c1") -> dict:
-    """A vibe line backed by `messages` distinct user messages (2+ is clear)."""
+def line(text: str, messages: int = 2, conversation_id: str = "c1", days: int | None = None) -> dict:
+    """A vibe line backed by `messages` user messages, spread over `days` days (2+ days is clear)."""
+    days = messages if days is None else days
     return {
         "text": text,
-        "evidence": [{"conversation_id": conversation_id, "message_index": i} for i in range(messages)],
+        "evidence": [
+            {
+                "conversation_id": conversation_id,
+                "message_index": i,
+                "sent_at": f"2026-09-{10 + min(i, days - 1):02d}T10:00:00+00:00",
+            }
+            for i in range(messages)
+        ],
     }
 
 
@@ -39,7 +47,9 @@ def lines(*area_ids: str, messages: int = 2) -> dict[str, dict]:
 
 
 def resolve_any(ref):
-    return ("c1", ref) if isinstance(ref, int) and ref in {1, 3, 5} else None
+    if isinstance(ref, int) and ref in {1, 3, 5}:
+        return {"conversation_id": "c1", "message_index": ref, "sent_at": "2026-09-10T10:00:00+00:00"}
+    return None
 
 
 class VibeProgressTest(unittest.TestCase):
@@ -61,6 +71,12 @@ class VibeProgressTest(unittest.TestCase):
         self.assertEqual(progress.milestone, "first_impressions")
         self.assertEqual(progress.clear, ())
         self.assertEqual(progress.mentioned, VIBE_AREA_IDS)
+
+    def test_many_messages_on_one_day_are_still_said_once(self) -> None:
+        progress = vibe_progress(lines(*BASIC_AREA_IDS, messages=4) | {"humor": line("x", 4, days=1)})
+
+        self.assertNotIn("humor", progress.clear)
+        self.assertEqual(progress.milestone, "first_impressions")
 
     def test_old_text_only_lines_count_as_mentioned(self) -> None:
         progress = vibe_progress({area_id: "Old line." for area_id in BASIC_AREA_IDS})
@@ -88,10 +104,7 @@ class VibeProgressTest(unittest.TestCase):
         )
 
         self.assertEqual(updates["humor"]["text"], "Loves dry jokes.")
-        self.assertEqual(
-            updates["humor"]["evidence"],
-            [{"conversation_id": "c1", "message_index": 1}, {"conversation_id": "c1", "message_index": 3}],
-        )
+        self.assertEqual([item["message_index"] for item in updates["humor"]["evidence"]], [1, 3])
         self.assertEqual(set(updates), {"humor", "conflict"})
         self.assertLessEqual(len(updates["conflict"]["text"]), 220)
         self.assertEqual(len(updates["conflict"]["evidence"]), 1)
@@ -100,7 +113,9 @@ class VibeProgressTest(unittest.TestCase):
     def test_merge_replaces_the_text_and_keeps_adding_evidence(self) -> None:
         merged = merge_vibe(
             {"humor": line("Old.", 1), "values": line("Kept.", 2)},
-            {"humor": {"text": "New.", "evidence": [{"conversation_id": "c2", "message_index": 4}]}},
+            {"humor": {"text": "New.", "evidence": [
+                {"conversation_id": "c2", "message_index": 4, "sent_at": "2026-09-20T10:00:00+00:00"}
+            ]}},
         )
 
         self.assertEqual(merged["humor"]["text"], "New.")
@@ -127,7 +142,7 @@ class MatchingUnderstandingTest(unittest.TestCase):
         self.assertIn("who this user would truly get along with as a friend", prompt)
         self.assertIn("not a checklist", prompt)
         self.assertIn("- humor: Laughs at deadpan jokes.", prompt)
-        self.assertIn("- interests (said once): Loves F1.", prompt)
+        self.assertIn("- interests (said on one day only): Loves F1.", prompt)
         self.assertIn("friend wish:", prompt)
         self.assertNotIn("New (", prompt)
 
