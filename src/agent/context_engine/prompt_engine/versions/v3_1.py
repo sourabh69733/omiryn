@@ -11,6 +11,8 @@ V3_1_PROMPT_VERSION = replace(
     V3_PROMPT_VERSION,
     version_id="v3-1",
     name="v3_1_matching_discovery_companion",
+    # The Friend Vibe section already lists the areas, with what is known.
+    data_point_targets=(),
     prompt_contract=f"""{V3_PROMPT_VERSION.prompt_contract}
 
 V3.1 matching and companion rules:

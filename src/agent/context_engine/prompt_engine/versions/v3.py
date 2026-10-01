@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
-from agent.context_engine.prompt_engine.versions.v2 import V2_PROMPT_VERSION
+from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
+from agent.context_engine.prompt_engine.modules.memory_usage import CONTEXT_USAGE_RULES
+from agent.memory_engine.memories.vibe import VIBE_AREA_IDS
 
 
 # Facts about what Omiryn is, not scripted answers; the model words them itself.
@@ -38,11 +38,29 @@ humor, social energy, values and beliefs, the stories they relate to, what they 
 differences they can accept, and their deal-breakers."""
 
 
-V3_PROMPT_VERSION = replace(
-    V2_PROMPT_VERSION,
+# Standalone since v1 and v2 moved to _archive (they were built for dating).
+V3_PROMPT_VERSION = PromptBehaviorVersion(
     version_id="v3",
     name="v3_listener_first_companion",
     base_prompt=V3_BASE_PROMPT,
+    context_usage_rules=CONTEXT_USAGE_RULES,
+    reply_style={
+        "default_length": "short",
+        "max_questions_per_reply": 1,
+        "avoid_question_every_turn": True,
+        "whatsapp_like": True,
+        "allow_light_playful": True,
+        "allow_mild_adult_humor": True,
+    },
+    conversation_flow={
+        "dry_reply_strategy": "brief_react_or_soft_question",
+        "starter_strategy": "structured_conversation_planner",
+        "allow_imagined_scenes": True,
+        "emotional_depth": "light_to_medium",
+        "avoid_repeated_topics": True,
+        "use_topic_state": True,
+    },
+    data_point_targets=VIBE_AREA_IDS,
     prompt_contract="""Choose the turn in this strict order:
 1. Safety requirements.
 2. The user's explicit request, refusal, correction, or boundary.
