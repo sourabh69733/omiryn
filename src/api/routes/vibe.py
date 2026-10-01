@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from agent.memory_engine.memories.vibe import (
     VIBE_AREAS,
+    evidence_days,
     line_evidence,
     line_strength,
     line_text,
@@ -55,6 +56,7 @@ def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:
                 "text": line_text(areas.get(area_id)) or None,
                 "strength": line_strength(areas[area_id]) if area_id in areas else None,
                 "evidence_count": len(line_evidence(areas.get(area_id))),
+                "evidence_days": evidence_days(areas.get(area_id)),
                 "evidence": _evidence(line_evidence(areas.get(area_id)), user_id, conversations),
             }
             for area_id, stage, _ in VIBE_AREAS
