@@ -5,6 +5,7 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/legacy-app.css";
 import "./styles/onboarding.css";
+import "./styles/vibe.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>

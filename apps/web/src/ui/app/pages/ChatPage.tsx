@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Smile } from "lucide-react";
+import { Smile, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -9,7 +9,8 @@ import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { isFailedMessage } from "../messageDelivery";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
-import { canShowUsage } from "../appUtils";
+import { canShowUsage, pathForPage } from "../appUtils";
+import { milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
 import { cognitionResultLabel } from "../usagePresentation";
@@ -29,6 +30,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [slowReply, setSlowReply] = useState(false);
   // Conversation where the companion is writing a message of its own (from realtime).
   const [typingConversationId, setTypingConversationId] = useState<string | null>(null);
+  // A vibe milestone reached while this chat is open.
+  const [vibeNote, setVibeNote] = useState<{ conversationId: string; milestone: string } | null>(null);
   const shownConversationIdRef = useRef<string | null>(null);
   // Messages from this index on arrived while the chat was open, so they fade in; history does not.
   const newFromIndexRef = useRef(0);
@@ -66,6 +69,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const realtime = new RealtimeClient(
       (event) => {
         setTypingConversationId((current) => typingAfterEvent(event, current));
+        const milestone = milestoneFromEvent(event, event.scope_id ?? null);
+        if (milestone && event.scope_id) setVibeNote({ conversationId: event.scope_id, milestone });
         applyRealtimeEvent(event, setConversation);
       },
       (conversationId, afterSequence) => recoverConversation(conversationId, afterSequence),
@@ -729,6 +734,13 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           </div>
           {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
+          {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
+            <div className="vibe-milestone-note" role="status">
+              <span>{vibeStepNote(vibeNote.milestone)}</span>
+              <a href={pathForPage.matches} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.matches); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
+              <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss"><X aria-hidden="true" /></button>
+            </div>
+          ) : null}
           <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
             {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
             {emojiSuggestions.length ? (
