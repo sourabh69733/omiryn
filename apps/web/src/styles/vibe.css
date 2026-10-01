@@ -389,3 +389,24 @@
 .matches-coming-soon .vibe-chat-button {
   margin-top: 22px;
 }
+
+/* The app's global button style sets min-height 42px and a purple hover; small vibe controls opt out. */
+.vibe-card .vibe-strength,
+.vibe-card .vibe-remove,
+.vibe-milestone-note button {
+  min-height: 0;
+  line-height: 1.3;
+}
+
+.vibe-card .vibe-remove:hover,
+.vibe-milestone-note button:hover {
+  background: none;
+}
+
+.vibe-card .vibe-strength.is-clear:hover {
+  background: rgba(47, 143, 120, 0.12);
+}
+
+.vibe-card .vibe-strength.is-mentioned:hover {
+  background: var(--soft);
+}
