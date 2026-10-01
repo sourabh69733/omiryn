@@ -28,6 +28,8 @@ from storage import (
 from storage.profile_facts import save_data_point_extraction_debug
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
+from storage.vibe_cards import get_vibe_card, update_vibe_card
+from realtime import conversation_event, realtime_hub
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
 from agent.memory_engine.memories.embeddings import (
@@ -247,6 +249,7 @@ async def _run_claimed_background_cognition(
     )
     user_card = (get_user_card(user_id) or "") if memory_version == 3 else None
     self_notes = _self_note_context(user_id) if memory_version == 3 else None
+    vibe_card = get_vibe_card(user_id) if memory_version == 3 else None
     application_result = None
     thread_application_result = None
     live_attempted = (
@@ -261,6 +264,7 @@ async def _run_claimed_background_cognition(
                 get_user_timezone(user_id),
                 user_card,
                 self_notes,
+                vibe_card["areas"] if vibe_card is not None else None,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -378,6 +382,13 @@ async def _run_claimed_background_cognition(
             and (config.live_memory_writes or config.live_v3_memory_writes)
         ):
             _apply_self_notes(batch, cognition.self_notes)
+        if (
+            analysis.valid
+            and cognition.vibe
+            and vibe_card is not None
+            and (config.live_memory_writes or config.live_v3_memory_writes)
+        ):
+            await _apply_vibe(conversation_id, user_id, vibe_card, cognition.vibe)
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
@@ -409,6 +420,7 @@ async def _run_claimed_background_cognition(
                 "handoff": _handoff_dict(analysis.handoff),
                 # Raw, so a missing card or note shows whether the model wrote it at all.
                 "user_card": raw.get("user_card"),
+                "vibe": raw.get("vibe"),
                 "self_notes": raw.get("self_notes"),
             },
             review={
@@ -485,6 +497,24 @@ def _self_note_context(user_id: str) -> list[dict[str, Any]]:
         {key: note[key] for key in ("id", "kind", "text", "due_at")}
         for note in list_active_self_notes(user_id, limit=30)
     ]
+
+
+async def _apply_vibe(
+    conversation_id: str,
+    user_id: str,
+    current: dict[str, Any],
+    updates: dict[str, str],
+) -> None:
+    saved = update_vibe_card(user_id, updates)
+    if saved["milestone"] != current["milestone"]:
+        # The open chat shows it; the companion hears about it on its next reply.
+        await realtime_hub.publish(
+            conversation_event(
+                "vibe.milestone",
+                conversation_id,
+                payload={"milestone": saved["milestone"], "previous": current["milestone"]},
+            )
+        )
 
 
 def _apply_self_notes(batch: MemoryBatch, changes: SelfNoteChanges) -> None:
