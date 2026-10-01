@@ -301,3 +301,15 @@
     justify-content: center;
   }
 }
+
+/* Matches (coming soon): how close the user is to matching. */
+.matches-coming-soon p.matches-progress {
+  margin-top: 14px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.matches-coming-soon .vibe-chat-button {
+  margin-top: 22px;
+}
