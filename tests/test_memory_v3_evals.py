@@ -211,6 +211,26 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(passed)
         self.assertIn("Unexpected operation", " ".join(findings))
 
+    def test_vibe_grading_fails_ungrounded_lines_and_missing_ones(self) -> None:
+        small_talk = get_memory_v3_scenario("vibe_small_talk_fills_nothing")
+        showed = get_memory_v3_scenario("vibe_only_what_the_user_showed")
+
+        def grade(scenario, vibe):
+            return grade_memory_v3_result(
+                scenario=scenario, decision="no_change", operations=(), structurally_valid=True, vibe=vibe
+            )
+
+        self.assertTrue(grade(small_talk, {})[0])
+        passed, findings = grade(small_talk, {"humor": "Likes jokes."})
+        self.assertFalse(passed)
+        self.assertIn("did not show: humor", " ".join(findings))
+
+        self.assertTrue(grade(showed, {"humor": "Needs someone who gets sarcasm."})[0])
+        passed, findings = grade(showed, {"values": "Thinks loyalty is everything."})
+        self.assertFalse(passed)
+        self.assertIn("did not show: values", " ".join(findings))
+        self.assertIn("Expected a vibe line for humor", " ".join(findings))
+
     async def test_runner_uses_v3_provider_and_validator_contract(self) -> None:
         scenario = get_memory_v3_scenario("capture_lived_trip_as_episode")
         raw = {

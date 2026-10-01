@@ -67,6 +67,11 @@ class MemoryV3Scenario:
     forbidden_concepts: tuple[str, ...] = ()
     allow_additional_operations: bool = False
     tags: tuple[str, ...] = ("memory_v3",)
+    # Vibe card: None skips the check; otherwise only these areas may get a line.
+    allowed_vibe_areas: tuple[str, ...] | None = None
+    required_vibe_areas: tuple[str, ...] = ()
+    # Vibe-only scenarios do not grade the memory decision or operations.
+    grade_memory_operations: bool = True
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.description.strip() or not self.messages:
@@ -79,6 +84,10 @@ class MemoryV3Scenario:
         for expected in (*self.expected_operations, *self.optional_operations):
             if not set(expected.evidence_message_indexes).issubset(indexes):
                 raise ValueError(f"Scenario '{self.id}' contains an unknown evidence index.")
+        if self.allowed_vibe_areas is not None and not set(self.required_vibe_areas) <= set(
+            self.allowed_vibe_areas
+        ):
+            raise ValueError(f"Scenario '{self.id}' requires a vibe area it does not allow.")
         memory_ids = {memory.id for memory in self.existing_memories}
         if len(memory_ids) != len(self.existing_memories):
             raise ValueError(f"Scenario '{self.id}' contains duplicate memory ids.")
@@ -543,6 +552,47 @@ MEMORY_V3_SCENARIOS = (
             ),
         ),
         tags=("memory_v3", "semantic", "profile", "sensitivity"),
+    ),
+    MemoryV3Scenario(
+        id="vibe_small_talk_fills_nothing",
+        description="Greetings and one-word replies say nothing about the user's friend vibe.",
+        messages=(
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "Hey! What's going on today?"},
+            {"role": "user", "content": "nothing much"},
+            {"role": "assistant", "content": "A slow day then. Those are underrated."},
+            {"role": "user", "content": "yeah"},
+        ),
+        allowed_vibe_areas=(),
+        grade_memory_operations=False,
+        tags=("memory_v3", "vibe", "grounding"),
+    ),
+    MemoryV3Scenario(
+        id="vibe_only_what_the_user_showed",
+        description="The user shows their humor; the companion's own views on friendship are not the user's.",
+        messages=(
+            {"role": "assistant", "content": "Honestly I think loyalty is everything in a friend. Flaky people are the worst."},
+            {"role": "user", "content": "lol maybe. I just need someone who gets sarcasm, I can't do people who take every joke literally"},
+            {"role": "assistant", "content": "Ha, so deadpan or nothing."},
+            {"role": "user", "content": "exactly, slapstick stuff is so cringe to me"},
+        ),
+        allowed_vibe_areas=("humor", "friend_wish", "deal_breakers"),
+        required_vibe_areas=("humor",),
+        grade_memory_operations=False,
+        tags=("memory_v3", "vibe", "grounding"),
+    ),
+    MemoryV3Scenario(
+        id="vibe_companion_opinion_is_not_the_user",
+        description="The companion shares views on friends and politics; the user only reacts, so nothing is learned.",
+        messages=(
+            {"role": "assistant", "content": "Hot take: friends who talk politics all the time are exhausting. And I'd pick a small group over a party any day."},
+            {"role": "user", "content": "haha ok"},
+            {"role": "assistant", "content": "You're allowed to disagree, you know."},
+            {"role": "user", "content": "hmm"},
+        ),
+        allowed_vibe_areas=(),
+        grade_memory_operations=False,
+        tags=("memory_v3", "vibe", "grounding"),
     ),
 )
 

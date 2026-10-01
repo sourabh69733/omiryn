@@ -39,6 +39,7 @@ class MemoryV3ScenarioResult:
     raw_response: dict[str, Any] | None
     duration_seconds: float
     error: str | None = None
+    vibe: dict[str, str] | None = None
     semantic_judgment: dict[str, Any] | None = None
     semantic_judge_error: str | None = None
 
@@ -108,7 +109,8 @@ async def run_memory_v3_scenario(
     started = perf_counter()
     try:
         raw = await analyze_background_cognition(
-            background_cognition_prompt(batch, existing_memories, []),
+            # Like production: the model sees the vibe areas and an empty card.
+            background_cognition_prompt(batch, existing_memories, [], vibe={}),
             conversation_id=conversation_id,
             model=model,
             timeout_seconds=timeout_seconds,
@@ -152,6 +154,7 @@ async def run_memory_v3_scenario(
         operations=operations,
         structurally_valid=analysis.valid,
         validation_errors=analysis.errors,
+        vibe=cognition.vibe,
     )
     semantic_judgment = None
     semantic_judge_error = None
@@ -201,6 +204,7 @@ async def run_memory_v3_scenario(
         duration_seconds=duration,
         semantic_judgment=semantic_judgment,
         semantic_judge_error=semantic_judge_error,
+        vibe=dict(cognition.vibe),
     )
 
 
@@ -211,6 +215,7 @@ def grade_memory_v3_result(
     operations: tuple[dict[str, Any], ...],
     structurally_valid: bool,
     validation_errors: tuple[str, ...] = (),
+    vibe: dict[str, str] | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
     """Grade core meaning strictly while tolerating labels and phrasing."""
     if not structurally_valid:
@@ -218,7 +223,9 @@ def grade_memory_v3_result(
             "The model response failed structural validation: "
             + ("; ".join(validation_errors) or "unknown validation error"),
         )
-    findings: list[str] = []
+    findings = _vibe_findings(scenario, vibe or {})
+    if not scenario.grade_memory_operations:
+        return not findings, tuple(findings or ["Vibe card matched the expected areas."])
     if decision != scenario.expected_decision:
         findings.append(f"Expected decision {scenario.expected_decision}, observed {decision}.")
     remaining = list(operations)
@@ -262,6 +269,22 @@ def grade_memory_v3_result(
     return not findings, tuple(findings or ["V3 memory behavior matched the expected result."])
 
 
+def _vibe_findings(scenario: MemoryV3Scenario, vibe: dict[str, str]) -> list[str]:
+    if scenario.allowed_vibe_areas is None:
+        return []
+    findings = [
+        f"Vibe line written for an area the user did not show: {area_id} ({line!r})."
+        for area_id, line in vibe.items()
+        if area_id not in scenario.allowed_vibe_areas
+    ]
+    findings.extend(
+        f"Expected a vibe line for {area_id}; none was written."
+        for area_id in scenario.required_vibe_areas
+        if area_id not in vibe
+    )
+    return findings
+
+
 def scenario_result_payload(
     result: MemoryV3ScenarioResult, *, scenario: MemoryV3Scenario
 ) -> dict[str, Any]:
@@ -297,10 +320,17 @@ def scenario_result_payload(
             ],
             "forbidden_concepts": list(scenario.forbidden_concepts),
             "allow_additional_operations": scenario.allow_additional_operations,
+            "allowed_vibe_areas": (
+                list(scenario.allowed_vibe_areas)
+                if scenario.allowed_vibe_areas is not None
+                else None
+            ),
+            "required_vibe_areas": list(scenario.required_vibe_areas),
         },
         "observed": {
             "decision": result.decision,
             "operations": list(result.operations),
+            "vibe": result.vibe,
             "structurally_valid": result.structurally_valid,
             "validation_errors": list(result.validation_errors),
             "duration_seconds": result.duration_seconds,
