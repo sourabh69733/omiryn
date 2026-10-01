@@ -224,7 +224,7 @@ async def put_me_profile(
     profile = save_user_profile(
         user.id,
         payload.gender,
-        payload.interested_in,
+        payload.interested_in or existing_profile.get("interested_in") or "everyone",
         _clean_optional_text(payload.display_name),
         payload.age,
         _clean_optional_text(payload.city),

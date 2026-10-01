@@ -93,7 +93,7 @@ def _topic_policy_rules(
             key="avoid_generic_music_movie_starters",
             rule_text=(
                 "Do not start generic music/movie conversations unless the user brings them up "
-                "or they are tied to a sharper dating, memory, personality, or relationship angle."
+                "or they are tied to a sharper memory, personality, or opinion angle."
             ),
             avoid_text="generic music/movie starters",
             prefer_text="specific dating, memory, personality, or relationship angles",

@@ -267,7 +267,8 @@ class DatingBasics(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     age: int | None = Field(default=None, ge=18, le=100)
     gender: Gender
-    interested_in: InterestedIn
+    # No longer asked; kept for older clients.
+    interested_in: InterestedIn | None = None
     city: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=40)
 
@@ -276,6 +277,7 @@ class UserProfilePatch(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     age: int | None = Field(default=None, ge=18, le=100)
     gender: Gender
-    interested_in: InterestedIn
+    # No longer asked; kept for older clients.
+    interested_in: InterestedIn | None = None
     city: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=40)
