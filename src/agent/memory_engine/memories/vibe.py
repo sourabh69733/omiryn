@@ -54,15 +54,16 @@ VIBE_MILESTONE_MEANINGS = {
 }
 
 
-# A line is {"text": str, "evidence": [{"conversation_id": str, "message_index": int}]}. The evidence
-# is the user messages behind it, checked by code; older cards stored a bare string (no evidence).
+# A line is {"text": str, "evidence": [{"conversation_id", "message_index", "sent_at"?}]}. The
+# evidence is the user messages behind it: code checks each is a real user message, and a second
+# model call checks it really shows the line. Older cards stored a bare string (no evidence).
 MAX_VIBE_EVIDENCE = 8
-# Distinct user messages before a line counts as clear rather than mentioned once.
-CLEAR_EVIDENCE_COUNT = 2
+# Different days the user said it before a line counts as clear: a pattern, not one moment.
+CLEAR_DAY_COUNT = 2
 
-# Turns a model's evidence reference (an index or id) into (conversation_id, message_index), or None
-# when it does not point at a user message the model was shown.
-EvidenceResolver = Callable[[Any], "tuple[str, int] | None"]
+# Turns a model's evidence reference (an index or id) into an evidence item, or None when it does
+# not point at a user message the model was shown.
+EvidenceResolver = Callable[[Any], "dict[str, Any] | None"]
 
 
 @dataclass(frozen=True)
@@ -94,14 +95,27 @@ def line_evidence(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, dict):
         return []
     return [
-        {"conversation_id": str(item["conversation_id"]), "message_index": int(item["message_index"])}
+        {
+            "conversation_id": str(item["conversation_id"]),
+            "message_index": int(item["message_index"]),
+            **({"sent_at": item["sent_at"]} if isinstance(item.get("sent_at"), str) else {}),
+        }
         for item in value.get("evidence") or []
         if isinstance(item, dict) and item.get("conversation_id") and isinstance(item.get("message_index"), int)
     ]
 
 
+def evidence_days(value: Any) -> int:
+    """Distinct days (UTC) the cited messages were sent; proof without a time adds none."""
+    return len({item["sent_at"][:10] for item in line_evidence(value) if item.get("sent_at")})
+
+
 def line_strength(value: Any) -> str:
-    return "clear" if len(line_evidence(value)) >= CLEAR_EVIDENCE_COUNT else "mentioned"
+    return "clear" if evidence_days(value) >= CLEAR_DAY_COUNT else "mentioned"
+
+
+def _evidence_key(item: dict[str, Any]) -> tuple[str, int]:
+    return item["conversation_id"], item["message_index"]
 
 
 def vibe_texts(card: dict[str, Any] | None) -> dict[str, str]:
@@ -160,10 +174,8 @@ def validate_vibe_updates(
         evidence: list[dict[str, Any]] = []
         for ref in refs:
             resolved = resolve_evidence(ref)
-            if resolved and all(
-                (item["conversation_id"], item["message_index"]) != resolved for item in evidence
-            ):
-                evidence.append({"conversation_id": resolved[0], "message_index": resolved[1]})
+            if resolved and all(_evidence_key(item) != _evidence_key(resolved) for item in evidence):
+                evidence.append(resolved)
         if not evidence:
             continue
         if len(line) > MAX_VIBE_LINE_CHARS:
@@ -185,7 +197,7 @@ def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str
             continue
         evidence = line_evidence(current)
         for item in line_evidence(update):
-            if item not in evidence:
+            if all(_evidence_key(item) != _evidence_key(existing) for existing in evidence):
                 evidence.append(item)
         merged[area_id] = {"text": text, "evidence": evidence[-MAX_VIBE_EVIDENCE:]}
     return merged
@@ -193,7 +205,7 @@ def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str
 
 __all__ = [
     "BASIC_AREA_IDS",
-    "CLEAR_EVIDENCE_COUNT",
+    "CLEAR_DAY_COUNT",
     "DEEPER_AREA_IDS",
     "MAX_VIBE_LINE_CHARS",
     "VIBE_AREAS",
@@ -203,6 +215,7 @@ __all__ = [
     "VIBE_MILESTONES",
     "VIBE_MILESTONE_MEANINGS",
     "VibeProgress",
+    "evidence_days",
     "line_evidence",
     "line_strength",
     "line_text",
