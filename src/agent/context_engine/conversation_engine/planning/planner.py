@@ -1,4 +1,4 @@
-"""Builds the response plan from turn understanding, topic state, and user constraints."""
+"""Builds the response plan from turn understanding, conversation threads, and user constraints."""
 
 from __future__ import annotations
 
@@ -13,16 +13,8 @@ from agent.context_engine.contracts.models import (
     MatchingUnderstanding,
     ThreadGuidance,
     ThreadReference,
-    TopicState,
 )
-from agent.context_engine.conversation_engine.planning.topic_catalog import (
-    COMMON_STARTER_TOPIC_POLICY,
-    relevant_topics_for_intent,
-)
-from agent.context_engine.conversation_engine.planning.topic_state import (
-    active_topic_state,
-    avoid_topic_labels,
-)
+from agent.memory_engine.memories.vibe import VIBE_AREA_GOALS
 
 COMMON_STARTER_AVOID_TOPICS = (
     "Generic music preference starters.",
@@ -30,13 +22,18 @@ COMMON_STARTER_AVOID_TOPICS = (
     "Truth-or-dare game starters.",
     "Repeated how-was-your-day/opening-smalltalk questions.",
 )
+COMMON_STARTER_TOPIC_POLICY = (
+    "Do not start generic music, movie, truth-or-dare, or how-was-your-day topics.",
+    "Use common topics only when the user explicitly brings them up, or when tied to a sharper personal angle.",
+)
+# Fresh angles offered on a low-energy turn: the first open vibe areas.
+FRESH_ANGLE_LIMIT = 3
 
 
 def build_conversation_plan(
     *,
     user_text: str,
     intent: ContextQueryIntent,
-    topic_states: list[TopicState],
     emotion_state: EmotionState | None = None,
     conversational_stance: ConversationalStance | None = None,
     matching_understanding: MatchingUnderstanding | None = None,
@@ -47,29 +44,22 @@ def build_conversation_plan(
         return _build_listener_first_plan(
             user_text=user_text,
             intent=intent,
-            topic_states=topic_states,
             emotion_state=emotion_state or EmotionState(),
             stance=conversational_stance or ConversationalStance(),
             matching_understanding=matching_understanding,
             thread_guidance=thread_guidance,
         )
     labels = set(intent.labels)
-    active = active_topic_state(topic_states)
-    avoid_topics = _avoid_topics(labels, topic_states)
-    suggested_topics = tuple(
-        topic.label for topic in relevant_topics_for_intent(user_text, intent, limit=3)
-    )
-    data_targets = _data_targets(user_text, intent)
+    active = _active_subject(thread_guidance)
+    avoid_topics = _avoid_topics(labels)
     emotion = emotion_state or EmotionState()
     response_mode = _response_mode(user_text, labels, emotion)
     move = _conversation_move(labels, active, emotion)
     return ConversationPlan(
         current_move=move,
         response_mode=response_mode,
-        active_topic=active.label if active else None,
+        active_topic=active,
         avoid_topics=avoid_topics,
-        suggested_topics=suggested_topics,
-        data_targets=data_targets,
         tone_instruction=_tone_instruction(labels, emotion),
         reason=_plan_reason(labels, active, emotion),
         **_thread_decision(
@@ -127,7 +117,6 @@ def _build_listener_first_plan(
     *,
     user_text: str,
     intent: ContextQueryIntent,
-    topic_states: list[TopicState],
     emotion_state: EmotionState,
     stance: ConversationalStance,
     matching_understanding: MatchingUnderstanding | None,
@@ -135,13 +124,7 @@ def _build_listener_first_plan(
 ) -> ConversationPlan:
     labels = set(intent.labels)
     prioritized = _stance_requires_attention(stance)
-    active = _listener_first_active_topic(topic_states, labels, prioritized)
-    suggested_topics = _listener_first_suggested_topics(
-        user_text,
-        intent,
-        topic_states,
-        prioritized,
-    )
+    active = None if prioritized else _active_subject(thread_guidance)
     question_purpose = stance.question_purpose
     if question_purpose == "none" and not prioritized and labels & {"low_information", "boredom_complaint"}:
         question_purpose = "offer_choice"
@@ -153,10 +136,9 @@ def _build_listener_first_plan(
     return ConversationPlan(
         current_move=_listener_first_move(labels, active, emotion_state, stance),
         response_mode=_listener_first_response_mode(user_text, labels, emotion_state, stance),
-        active_topic=active.label if active else None,
-        avoid_topics=_avoid_topics(labels, topic_states),
-        suggested_topics=suggested_topics,
-        data_targets=_data_targets_for_suggestions(user_text, intent, suggested_topics),
+        active_topic=active,
+        avoid_topics=_avoid_topics(labels),
+        suggested_topics=_fresh_angles(labels, prioritized, matching_understanding),
         tone_instruction=_listener_first_tone_instruction(labels, emotion_state, stance),
         reason=_listener_first_reason(labels, active, emotion_state, stance),
         stance=stance.mode,
@@ -260,50 +242,6 @@ def _stance_requires_attention(stance: ConversationalStance) -> bool:
     )
 
 
-def _listener_first_active_topic(
-    topic_states: list[TopicState],
-    labels: set[str],
-    prioritized: bool,
-) -> TopicState | None:
-    if prioritized:
-        return None
-    if labels & {"low_information", "boredom_complaint"}:
-        return active_topic_state(topic_states)
-    return next(
-        (
-            state
-            for state in topic_states
-            if state.repeat_count > 0 and state.status in {"new", "active"}
-        ),
-        None,
-    )
-
-
-def _listener_first_suggested_topics(
-    user_text: str,
-    intent: ContextQueryIntent,
-    topic_states: list[TopicState],
-    prioritized: bool,
-) -> tuple[str, ...]:
-    if prioritized:
-        return ()
-    labels = set(intent.labels)
-    has_grounded_topic = any(state.repeat_count > 0 for state in topic_states)
-    if not has_grounded_topic and not labels & {"low_information", "boredom_complaint"}:
-        return ()
-    return tuple(topic.label for topic in relevant_topics_for_intent(user_text, intent, limit=3))
-
-
-def _data_targets_for_suggestions(
-    user_text: str,
-    intent: ContextQueryIntent,
-    suggested_topics: tuple[str, ...],
-) -> tuple[str, ...]:
-    if not suggested_topics:
-        return ()
-    return _data_targets(user_text, intent)
-
-
 def _listener_first_response_mode(
     user_text: str,
     labels: set[str],
@@ -326,7 +264,7 @@ def _listener_first_response_mode(
 
 def _listener_first_move(
     labels: set[str],
-    active: TopicState | None,
+    active: str | None,
     emotion: EmotionState,
     stance: ConversationalStance,
 ) -> str:
@@ -387,7 +325,7 @@ def _listener_first_tone_instruction(
 
 def _listener_first_reason(
     labels: set[str],
-    active: TopicState | None,
+    active: str | None,
     emotion: EmotionState,
     stance: ConversationalStance,
 ) -> str:
@@ -398,7 +336,7 @@ def _listener_first_reason(
 
 def _conversation_move(
     labels: set[str],
-    active: TopicState | None,
+    active: str | None,
     emotion: EmotionState,
 ) -> str:
     if "whatsapp" in labels and "style" in labels:
@@ -419,18 +357,7 @@ def _conversation_move(
         return "mini_story"
     if {"low_information", "boredom_complaint"} & labels:
         return "boredom_rescue"
-    if active and active.status == "avoid_repeating":
-        return "topic_bridge"
     return "specific_observation"
-
-
-def _data_targets(user_text: str, intent: ContextQueryIntent) -> tuple[str, ...]:
-    targets: list[str] = []
-    for topic in relevant_topics_for_intent(user_text, intent, limit=3):
-        for target in topic.data_targets:
-            if target not in targets:
-                targets.append(target)
-    return tuple(targets[:5])
 
 
 def _response_mode(user_text: str, labels: set[str], emotion: EmotionState) -> str:
@@ -473,18 +400,18 @@ def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
     )
 
 
-def _plan_reason(labels: set[str], active: TopicState | None, emotion: EmotionState) -> str:
+def _plan_reason(labels: set[str], active: str | None, emotion: EmotionState) -> str:
     if emotion.emotion != "neutral" and emotion.confidence >= 0.5:
         return f"Emotion={emotion.emotion}; need={emotion.need}; strategy={emotion.strategy}."
     if labels:
         return f"Intent labels: {', '.join(sorted(labels))}."
     if active:
-        return f"Continue from active topic bucket: {active.bucket}."
+        return f"Continue the active subject: {active}."
     return "Default companion flow."
 
 
-def _avoid_topics(labels: set[str], topic_states: list[TopicState]) -> tuple[str, ...]:
-    avoided = list(avoid_topic_labels(topic_states))
+def _avoid_topics(labels: set[str]) -> tuple[str, ...]:
+    avoided: list[str] = []
     for topic in COMMON_STARTER_AVOID_TOPICS:
         if topic not in avoided:
             avoided.append(topic)
@@ -493,3 +420,27 @@ def _avoid_topics(labels: set[str], topic_states: list[TopicState]) -> tuple[str
             if policy not in avoided:
                 avoided.append(policy)
     return tuple(avoided)
+
+
+def _active_subject(guidance: ThreadGuidance | None) -> str | None:
+    """The subject the background model is tracking as active; no keyword guessing."""
+    if guidance and guidance.active:
+        return guidance.active.title
+    return None
+
+
+def _fresh_angles(
+    labels: set[str],
+    prioritized: bool,
+    matching_understanding: MatchingUnderstanding | None,
+) -> tuple[str, ...]:
+    """On a low-energy turn, what the companion does not know about the user yet."""
+    if prioritized or not labels & {"low_information", "boredom_complaint"}:
+        return ()
+    if not matching_understanding:
+        return ()
+    return tuple(
+        f"Something about {VIBE_AREA_GOALS[area_id]}"
+        for area_id in matching_understanding.unexplored_dimensions[:FRESH_ANGLE_LIMIT]
+        if area_id in VIBE_AREA_GOALS
+    )
