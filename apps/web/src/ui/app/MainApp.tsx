@@ -4,8 +4,9 @@ import { initAppLogger, trackPageView } from "../../lib/appLogger";
 import { ChatPage } from "./pages/ChatPage";
 import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
+import { MemoriesPage } from "./pages/MemoriesPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { StylePage } from "./pages/StylePage";
+import { VibePage } from "./pages/VibePage";
 import { AvatarImage } from "./AvatarImage";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import type { AuthUser, Page, Profile, ProfileResponse } from "./types";
@@ -22,6 +23,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     if (!canShowUsage && window.location.pathname.startsWith("/usage")) {
       window.history.replaceState({}, "", "/");
     }
+    if (window.location.pathname.startsWith("/style")) window.history.replaceState({}, "", "/memories");
     apiFetch("/api/auth/me").then((response) => response.ok ? response.json() : null).then(setUser).catch(() => undefined);
     apiFetch("/api/me/profile")
       .then((response) => response.ok ? response.json() : null)
@@ -55,7 +57,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
           <span className="brand-copy"><strong>Omiryn</strong><small>Talk first. Match better.</small></span>
         </button>
         <nav className={"app-nav " + (menuOpen ? "is-open" : "")} aria-label="Main navigation">
-          {(["chat", "style", "matches", "contact"] as Page[]).map((item) => (
+          {(["chat", "vibe", "memories", "matches", "contact"] as Page[]).map((item) => (
             <a
               className={page === item ? "active" : ""}
               data-nav={item === "chat" ? "interview" : item}
@@ -85,8 +87,9 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       </header>
       <main>
         {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} /> : null}
-        {page === "style" ? <StylePage /> : null}
-        {page === "matches" ? <MatchesPage onChat={() => navigate("chat")} /> : null}
+        {page === "vibe" ? <VibePage onChat={() => navigate("chat")} /> : null}
+        {page === "memories" ? <MemoriesPage /> : null}
+        {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
         {page === "profile" ? <ProfilePage /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
       </main>

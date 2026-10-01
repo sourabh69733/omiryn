@@ -157,7 +157,8 @@ function sessionId() {
 function currentPage() {
   const path = window.location.pathname;
   if (path.startsWith("/contact")) return "contact";
-  if (path.startsWith("/style")) return "style";
+  if (path.startsWith("/vibe")) return "vibe";
+  if (path.startsWith("/memories") || path.startsWith("/style")) return "memories";
   if (path.startsWith("/matches")) return "matches";
   if (path.startsWith("/profile")) return "profile";
   return "chat";
