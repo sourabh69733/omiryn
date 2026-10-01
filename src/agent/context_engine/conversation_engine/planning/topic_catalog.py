@@ -9,7 +9,7 @@ from agent.context_engine.shared.text import memory_terms, normalized_memory_tex
 
 COMMON_STARTER_TOPIC_POLICY = (
     "Do not start generic music, movie, truth-or-dare, or how-was-your-day topics.",
-    "Use common topics only when the user explicitly brings them up, or when tied to a sharper dating/personal angle.",
+    "Use common topics only when the user explicitly brings them up, or when tied to a sharper personal angle.",
 )
 
 
@@ -33,53 +33,61 @@ TOPIC_CATALOG: tuple[TopicDefinition, ...] = (
         freshness_window=8,
     ),
     TopicDefinition(
-        id="future_partner_attention",
-        bucket="romantic",
-        label="Playful partner attention: consistency, effort, texting, possessiveness, care.",
-        data_targets=("affection_style", "partner_expectations", "communication_style"),
-        trigger_terms=("partner", "crush", "attention", "love", "relationship"),
+        id="friendship",
+        bucket="friendship",
+        label="Friendship: who they click with, a friend who mattered, what they want from new friends.",
+        data_targets=("friend_wish", "social_energy", "keeping_in_touch"),
+        trigger_terms=("friend", "friends", "friendship", "dost", "yaar", "lonely"),
     ),
     TopicDefinition(
-        id="future_partner_intent",
-        bucket="future_partner",
-        label="Future relationship direction: exploring, serious, long-term, marriage, family fit.",
-        data_targets=("relationship_intent", "family_expectations", "dealbreakers"),
-        trigger_terms=("marriage", "serious", "long", "future", "family"),
+        id="humor_and_takes",
+        bucket="humor",
+        label="Humor and honest takes: what makes them laugh, an opinion they would defend.",
+        data_targets=("humor", "values"),
+        trigger_terms=("funny", "joke", "meme", "laugh", "opinion"),
+    ),
+    TopicDefinition(
+        id="everyday_life",
+        bucket="everyday_life",
+        label="Their days: study or work, routine, something they could talk about for hours.",
+        data_targets=("daily_life", "interests"),
+        trigger_terms=("college", "class", "exam", "work", "office", "hobby"),
     ),
     TopicDefinition(
         id="emotional_side",
         bucket="emotional_depth",
-        label="Emotional side: loneliness, trust, attachment, comfort, what makes the user feel safe.",
-        data_targets=("attachment_style", "values", "emotional_needs"),
+        label="Emotional side: loneliness, trust, comfort, what makes the user feel safe.",
+        data_targets=("values", "conflict", "friend_wish"),
         trigger_terms=("feel", "trust", "alone", "hurt", "emotional"),
     ),
     TopicDefinition(
         id="personal_stories",
         bucket="personal_story",
-        label="Personal stories: childhood, school, first crush, embarrassing/funny memory.",
-        data_targets=("personality", "attraction_preferences", "social_lifestyle"),
-        trigger_terms=("school", "childhood", "memory", "crush"),
+        label="Personal stories: childhood, school, an embarrassing or funny memory.",
+        data_targets=("stories", "humor"),
+        trigger_terms=("school", "childhood", "memory"),
     ),
     TopicDefinition(
         id="social_life",
         bucket="social_life",
-        label="Social life: friends, weekends, parties, close circle, introvert/extrovert pattern.",
-        data_targets=("lifestyle", "social_lifestyle", "values"),
-        trigger_terms=("friends", "weekend", "party", "social", "circle"),
+        label="Social life: weekends, parties, close circle, quiet or loud, planned or spontaneous.",
+        data_targets=("social_energy", "interests"),
+        trigger_terms=("weekend", "party", "social", "circle", "plans"),
     ),
     TopicDefinition(
         id="conflict_style",
         bucket="conflict_style",
-        label="Conflict style: anger, silent treatment, repair, expectations during fights.",
-        data_targets=("conflict_style", "communication_style", "dealbreakers"),
+        label="Conflict: anger, silent treatment, making up, what they will not tolerate.",
+        data_targets=("conflict", "deal_breakers", "accepts"),
         trigger_terms=("fight", "anger", "ignore", "argument", "sorry"),
     ),
     TopicDefinition(
-        id="safe_intimacy",
-        bucket="intimate_safe",
-        label="Safe intimacy: chemistry, affection, comfort, boundaries, romantic closeness.",
-        data_targets=("affection_style", "boundaries", "attraction_preferences"),
-        trigger_terms=("intimate", "romantic", "sexy", "hot", "chemistry", "touch"),
+        # Fine to talk about when the user raises it; never steered to, never flirting.
+        id="relationships",
+        bucket="relationships",
+        label="Relationships, crushes or marriage the user brings up: listen and give an honest take.",
+        data_targets=("values", "stories"),
+        trigger_terms=("crush", "relationship", "marriage", "partner", "breakup"),
     ),
 )
 
@@ -119,11 +127,9 @@ def _topic_score(
         score += 8
     if "style" in labels and topic.id == "whatsapp_person_analysis":
         score += 5
-    if "adult_flirty" in labels and topic.bucket == "intimate_safe":
-        score += 6
     if (
         {"low_information", "boredom_complaint"} & labels
-        and topic.bucket in {"romantic", "personal_story", "intimate_safe"}
+        and topic.bucket in {"humor", "personal_story", "friendship"}
     ):
         score += 2
     return score
@@ -131,7 +137,7 @@ def _topic_score(
 
 def _default_topic_rotation(labels: set[str]) -> tuple[TopicDefinition, ...]:
     if {"low_information", "boredom_complaint"} & labels:
-        preferred = {"future_partner_attention", "personal_stories", "safe_intimacy"}
+        preferred = {"humor_and_takes", "personal_stories", "friendship"}
     else:
-        preferred = {"future_partner_attention", "emotional_side", "social_life"}
+        preferred = {"friendship", "everyday_life", "social_life"}
     return tuple(topic for topic in TOPIC_CATALOG if topic.id in preferred)
