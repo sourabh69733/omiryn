@@ -15,7 +15,6 @@ from .retrieval import (
     DEFAULT_REPLY_MEMORY_LIMIT,
     retrieve_agent_memories_for_reply,
 )
-from .matching import matching_progress_memories
 from .taxonomy import V3_MEMORY_TAXONOMY_GUIDANCE, V3_MEMORY_VALUE_GUIDANCE
 
 __all__ = [
@@ -32,5 +31,4 @@ __all__ = [
     "V3_MEMORY_TAXONOMY_GUIDANCE",
     "V3_MEMORY_VALUE_GUIDANCE",
     "retrieve_agent_memories_for_reply",
-    "matching_progress_memories",
 ]

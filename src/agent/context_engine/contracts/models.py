@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 
@@ -137,6 +138,9 @@ class MatchingUnderstanding:
     known_dimensions: tuple[str, ...] = ()
     unexplored_dimensions: tuple[str, ...] = ()
     can_deepen_dimensions: tuple[str, ...] = ()
+    # (area id, line) from the vibe card, and when the current level was reached.
+    area_lines: tuple[tuple[str, str], ...] = ()
+    milestone_reached_at: datetime | None = None
 
 
 @dataclass(frozen=True)
