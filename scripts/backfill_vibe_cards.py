@@ -41,7 +41,7 @@ async def run(args: argparse.Namespace) -> int:
         print(f"{user_id}: {result['status']} · milestone {result['milestone']} · areas {areas}")
         if args.show:
             for area_id, line in result["areas"].items():
-                print(f"    {area_id}: {line}")
+                print(f"    {area_id} ({len(line['evidence'])} msg): {line['text']}")
     if not args.apply:
         print("Dry run. Run again with --apply to write.")
     return 1 if failed else 0

@@ -17,7 +17,7 @@ from .utils import _protect_text, _require_user_id, _unprotect_text
 
 
 def get_vibe_card(user_id: str) -> dict[str, Any]:
-    """{"areas": {area_id: line}, "milestone": id, "milestone_reached_at": datetime | None}."""
+    """{"areas": {area_id: {"text", "evidence"}}, "milestone": id, "milestone_reached_at": datetime | None}."""
     owner_id = _require_user_id(user_id, "agent vibe card")
     with ENGINE.begin() as connection:
         row = connection.execute(
@@ -34,7 +34,7 @@ def get_vibe_card(user_id: str) -> dict[str, Any]:
 
 def update_vibe_card(
     user_id: str,
-    updates: dict[str, str],
+    updates: dict[str, dict[str, Any]],
     *,
     remove: tuple[str, ...] = (),
     now: datetime | None = None,
@@ -67,7 +67,7 @@ def update_vibe_card(
     return {"areas": areas, "milestone": milestone, "milestone_reached_at": reached_at}
 
 
-def _areas(owner_id: str, stored: str) -> dict[str, str]:
+def _areas(owner_id: str, stored: str) -> dict[str, dict[str, Any]]:
     try:
         value = json.loads(_unprotect_text(owner_id, stored) or "{}")
     except (TypeError, ValueError):

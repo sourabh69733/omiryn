@@ -11,6 +11,7 @@ from agent.memory_engine.memories.vibe import (
     VIBE_AREA_IDS,
     merge_vibe,
     validate_vibe_updates,
+    vibe_texts,
     vibe_progress,
 )
 from agent.providers import analyze_vibe_backfill
@@ -29,19 +30,19 @@ async def backfill_user_vibe(
     model: str | None = None,
     timeout_seconds: float | None = 180,
 ) -> dict[str, Any]:
-    """{"status", "areas": {area: line}, "milestone"}. Writes only with apply=True."""
+    """{"status", "areas": {area: {"text", "evidence"}}, "milestone"}. Writes only with apply=True."""
     current = get_vibe_card(user_id)
     if current["areas"] and not force:
         return {"status": "has_card", "areas": {}, "milestone": current["milestone"]}
     conversations = list_conversations(user_id)
-    transcript, last_sent_at = chat_transcript(conversations)
+    transcript, last_sent_at, refs = chat_transcript(conversations)
     if not transcript:
         return {"status": "no_messages", "areas": {}, "milestone": current["milestone"]}
     raw = await analyze_vibe_backfill(
         json.dumps(
             {
                 "vibe_areas": [{"id": area_id, "meaning": goal} for area_id, _, goal in VIBE_AREAS],
-                "current_vibe": current["areas"],
+                "current_vibe": vibe_texts(current["areas"]),
                 "chats": transcript,
             },
             ensure_ascii=False,
@@ -51,7 +52,9 @@ async def backfill_user_vibe(
         timeout_seconds=timeout_seconds,
     )
     updates = validate_vibe_updates(
-        raw.get("vibe") if isinstance(raw, dict) else None, max_updates=len(VIBE_AREA_IDS)
+        raw.get("vibe") if isinstance(raw, dict) else None,
+        resolve_evidence=lambda ref: refs.get(ref) if isinstance(ref, str) else None,
+        max_updates=len(VIBE_AREA_IDS),
     )
     milestone = vibe_progress(merge_vibe(current["areas"], updates)).milestone
     if not updates:
@@ -62,34 +65,47 @@ async def backfill_user_vibe(
     return {"status": "written" if apply else "would_write", "areas": updates, "milestone": milestone}
 
 
-def chat_transcript(conversations: list[dict[str, Any]]) -> tuple[str, datetime | None]:
-    """Chats oldest first as "user: ..." / "companion: ..." lines, trimmed to the budget."""
-    lines: list[str] = []
+def chat_transcript(
+    conversations: list[dict[str, Any]],
+) -> tuple[str, datetime | None, dict[str, tuple[str, int]]]:
+    """Chats oldest first as "[m3] user: ..." / "companion: ..." lines, trimmed to the budget.
+
+    Only user lines get an id; refs maps each id still in the text to (conversation_id, index),
+    so a vibe line can cite only user messages the model actually saw.
+    """
+    lines: list[tuple[str, str | None, tuple[str, int] | None]] = []
     has_user_text = False
     last_sent_at: datetime | None = None
+    next_id = 1
     for conversation in sorted(conversations, key=lambda row: row.get("created_at") or ""):
-        lines.append(f"--- chat {conversation['id'][:8]} ---")
-        for message in conversation.get("messages") or []:
+        lines.append((f"--- chat {conversation['id'][:8]} ---", None, None))
+        for index, message in enumerate(conversation.get("messages") or []):
             role = message.get("role")
             text = " ".join(str(message.get("content") or "").split())
             if role not in {"user", "assistant"} or not text or message.get("delivery_status") == "failed":
                 continue
-            has_user_text = has_user_text or role == "user"
-            speaker = "user" if role == "user" else "companion"
-            lines.append(f"{speaker}: {text[:MESSAGE_CHAR_LIMIT]}")
+            if role == "user":
+                has_user_text = True
+                ref_id = f"m{next_id}"
+                next_id += 1
+                lines.append((f"[{ref_id}] user: {text[:MESSAGE_CHAR_LIMIT]}", ref_id, (conversation["id"], index)))
+            else:
+                lines.append((f"companion: {text[:MESSAGE_CHAR_LIMIT]}", None, None))
             sent_at = _parse_time(message.get("created_at"))
             if sent_at and (last_sent_at is None or sent_at > last_sent_at):
                 last_sent_at = sent_at
     if not has_user_text:
-        return "", None
-    kept: list[str] = []
+        return "", None, {}
+    kept: list[tuple[str, str | None, tuple[str, int] | None]] = []
     used = 0
     for line in reversed(lines):
-        used += len(line) + 1
+        used += len(line[0]) + 1
         if used > TRANSCRIPT_CHAR_BUDGET:
             break
         kept.append(line)
-    return "\n".join(reversed(kept)), last_sent_at
+    kept.reverse()
+    refs = {ref_id: target for _, ref_id, target in kept if ref_id and target}
+    return "\n".join(text for text, _, _ in kept), last_sent_at, refs
 
 
 def _parse_time(value: Any) -> datetime | None:
