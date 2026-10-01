@@ -40,7 +40,10 @@ def matching_understanding_prompt(
         )
     lines.append("What you understand so far:")
     if progress.area_lines:
-        lines.extend(f"- {area_id.replace('_', ' ')}: {text}" for area_id, text in progress.area_lines)
+        lines.extend(
+            f"- {area_id.replace('_', ' ')}{' (said once)' if strength == 'mentioned' else ''}: {text}"
+            for area_id, text, strength in progress.area_lines
+        )
     else:
         lines.append("- nothing yet")
     return "\n".join(lines)

@@ -10,6 +10,9 @@ from agent.memory_engine.memories.vibe import (
     BASIC_AREA_IDS,
     DEEPER_AREA_IDS,
     VIBE_AREA_IDS,
+    line_evidence,
+    line_strength,
+    line_text,
     vibe_progress,
 )
 
@@ -33,14 +36,18 @@ def build_matching_understanding(
 
 
 def calculate_matching_understanding(
-    areas: dict[str, str],
+    areas: dict[str, Any],
     *,
     milestone_reached_at: datetime | None = None,
 ) -> MatchingUnderstanding:
     progress = vibe_progress(areas)
     known = set(progress.known)
     dimensions = tuple(
-        MatchingDimensionProgress(id=area_id, depth="clear" if area_id in known else "unknown")
+        MatchingDimensionProgress(
+            id=area_id,
+            depth=line_strength(areas[area_id]) if area_id in known else "unknown",
+            evidence_count=len(line_evidence(areas.get(area_id))),
+        )
         for area_id in VIBE_AREA_IDS
     )
     breadth = round(len(progress.known) / len(VIBE_AREA_IDS) * 100)
@@ -56,7 +63,11 @@ def calculate_matching_understanding(
         unexplored_dimensions=tuple(
             area_id for area_id in (*BASIC_AREA_IDS, *DEEPER_AREA_IDS) if area_id not in known
         ),
-        can_deepen_dimensions=(),
-        area_lines=tuple((area_id, areas[area_id]) for area_id in progress.known),
+        # Said once: worth hearing about again before it counts toward matching.
+        can_deepen_dimensions=progress.mentioned,
+        area_lines=tuple(
+            (area_id, line_text(areas[area_id]), line_strength(areas[area_id]))
+            for area_id in progress.known
+        ),
         milestone_reached_at=milestone_reached_at if progress.milestone != "starting" else None,
     )
