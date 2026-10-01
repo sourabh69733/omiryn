@@ -7,7 +7,7 @@ validates the shape and counts filled areas into milestones; it never decides wh
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 # (id, stage, goal). The goal tells the models what the area means; it is not a question to ask.
 VIBE_AREAS: tuple[tuple[str, str, str], ...] = (
@@ -54,13 +54,29 @@ VIBE_MILESTONE_MEANINGS = {
 }
 
 
+# A line is {"text": str, "evidence": [{"conversation_id": str, "message_index": int}]}. The evidence
+# is the user messages behind it, checked by code; older cards stored a bare string (no evidence).
+MAX_VIBE_EVIDENCE = 8
+# Distinct user messages before a line counts as clear rather than mentioned once.
+CLEAR_EVIDENCE_COUNT = 2
+
+# Turns a model's evidence reference (an index or id) into (conversation_id, message_index), or None
+# when it does not point at a user message the model was shown.
+EvidenceResolver = Callable[[Any], "tuple[str, int] | None"]
+
+
 @dataclass(frozen=True)
 class VibeProgress:
     milestone: str
     known: tuple[str, ...]
+    clear: tuple[str, ...]
     open: tuple[str, ...]
     basics_known: int
     deeper_known: int
+
+    @property
+    def mentioned(self) -> tuple[str, ...]:
+        return tuple(area_id for area_id in self.known if area_id not in self.clear)
 
     @property
     def next_milestone(self) -> str | None:
@@ -68,12 +84,39 @@ class VibeProgress:
         return VIBE_MILESTONES[position + 1] if position + 1 < len(VIBE_MILESTONES) else None
 
 
-def vibe_progress(card: dict[str, str] | None) -> VibeProgress:
+def line_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return str(value.get("text") or "")
+    return value if isinstance(value, str) else ""
+
+
+def line_evidence(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, dict):
+        return []
+    return [
+        {"conversation_id": str(item["conversation_id"]), "message_index": int(item["message_index"])}
+        for item in value.get("evidence") or []
+        if isinstance(item, dict) and item.get("conversation_id") and isinstance(item.get("message_index"), int)
+    ]
+
+
+def line_strength(value: Any) -> str:
+    return "clear" if len(line_evidence(value)) >= CLEAR_EVIDENCE_COUNT else "mentioned"
+
+
+def vibe_texts(card: dict[str, Any] | None) -> dict[str, str]:
+    """Just the lines, for prompts."""
+    return {area_id: line_text(value) for area_id, value in (card or {}).items() if line_text(value)}
+
+
+def vibe_progress(card: dict[str, Any] | None) -> VibeProgress:
+    """First impressions count any line; later milestones count only clear lines."""
     card = card or {}
-    known = tuple(area_id for area_id in VIBE_AREA_IDS if card.get(area_id))
-    basics = sum(area_id in known for area_id in BASIC_AREA_IDS)
-    deeper = sum(area_id in known for area_id in DEEPER_AREA_IDS)
-    if len(known) == len(VIBE_AREA_IDS):
+    known = tuple(area_id for area_id in VIBE_AREA_IDS if line_text(card.get(area_id)))
+    clear = tuple(area_id for area_id in known if line_strength(card[area_id]) == "clear")
+    basics = sum(area_id in clear for area_id in BASIC_AREA_IDS)
+    deeper = sum(area_id in clear for area_id in DEEPER_AREA_IDS)
+    if len(clear) == len(VIBE_AREA_IDS):
         milestone = "deep"
     elif basics == len(BASIC_AREA_IDS) and deeper >= 3:
         milestone = "ready_to_match"
@@ -86,39 +129,71 @@ def vibe_progress(card: dict[str, str] | None) -> VibeProgress:
     return VibeProgress(
         milestone=milestone,
         known=known,
+        clear=clear,
         open=tuple(area_id for area_id in VIBE_AREA_IDS if area_id not in known),
         basics_known=basics,
         deeper_known=deeper,
     )
 
 
-def validate_vibe_updates(raw: Any, *, max_updates: int = MAX_VIBE_UPDATES) -> dict[str, str]:
-    """Area lines the model rewrote. Unknown areas, empty lines and extras are dropped."""
+def validate_vibe_updates(
+    raw: Any,
+    *,
+    resolve_evidence: EvidenceResolver,
+    max_updates: int = MAX_VIBE_UPDATES,
+) -> dict[str, dict[str, Any]]:
+    """Area lines the model wrote, each backed by at least one real user message.
+
+    Unknown areas, empty lines, and lines whose evidence does not resolve to a user message (a
+    companion message, an unknown index, nothing at all) are dropped.
+    """
     if not isinstance(raw, dict):
         return {}
-    updates: dict[str, str] = {}
-    for area_id, text in raw.items():
-        if area_id not in VIBE_AREA_GOALS or not isinstance(text, str):
+    updates: dict[str, dict[str, Any]] = {}
+    for area_id, value in raw.items():
+        if area_id not in VIBE_AREA_GOALS or not isinstance(value, dict):
             continue
-        line = " ".join(text.split())
-        if not line:
+        line = " ".join(str(value.get("line") or "").split())
+        refs = value.get("evidence")
+        if not line or not isinstance(refs, list):
+            continue
+        evidence: list[dict[str, Any]] = []
+        for ref in refs:
+            resolved = resolve_evidence(ref)
+            if resolved and all(
+                (item["conversation_id"], item["message_index"]) != resolved for item in evidence
+            ):
+                evidence.append({"conversation_id": resolved[0], "message_index": resolved[1]})
+        if not evidence:
             continue
         if len(line) > MAX_VIBE_LINE_CHARS:
             line = line[:MAX_VIBE_LINE_CHARS].rsplit(" ", 1)[0]
-        updates[area_id] = line
+        updates[area_id] = {"text": line, "evidence": evidence[:MAX_VIBE_EVIDENCE]}
         if len(updates) >= max_updates:
             break
     return updates
 
 
-def merge_vibe(card: dict[str, str] | None, updates: dict[str, str]) -> dict[str, str]:
-    merged = {area_id: text for area_id, text in (card or {}).items() if area_id in VIBE_AREA_GOALS}
-    merged.update(updates)
-    return {area_id: merged[area_id] for area_id in VIBE_AREA_IDS if merged.get(area_id)}
+def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """New text replaces the old line; evidence accumulates (most recent kept)."""
+    merged: dict[str, dict[str, Any]] = {}
+    for area_id in VIBE_AREA_IDS:
+        current = (card or {}).get(area_id)
+        update = updates.get(area_id)
+        text = line_text(update) or line_text(current)
+        if not text:
+            continue
+        evidence = line_evidence(current)
+        for item in line_evidence(update):
+            if item not in evidence:
+                evidence.append(item)
+        merged[area_id] = {"text": text, "evidence": evidence[-MAX_VIBE_EVIDENCE:]}
+    return merged
 
 
 __all__ = [
     "BASIC_AREA_IDS",
+    "CLEAR_EVIDENCE_COUNT",
     "DEEPER_AREA_IDS",
     "MAX_VIBE_LINE_CHARS",
     "VIBE_AREAS",
@@ -128,7 +203,11 @@ __all__ = [
     "VIBE_MILESTONES",
     "VIBE_MILESTONE_MEANINGS",
     "VibeProgress",
+    "line_evidence",
+    "line_strength",
+    "line_text",
     "merge_vibe",
     "validate_vibe_updates",
     "vibe_progress",
+    "vibe_texts",
 ]
