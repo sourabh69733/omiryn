@@ -15,7 +15,18 @@ from storage.user_deletion import delete_user_private_data
 
 USER_ID = "vibe-card-user"
 CONVERSATION_ID = "vibe-card-conversation"
-MESSAGES = [{"role": "user", "content": "Honestly I just want one friend who gets dark humor."}]
+MESSAGES = [
+    {"role": "user", "content": "Honestly I just want one friend who gets dark humor."},
+    {"role": "assistant", "content": "Loyalty matters most in a friend, I think."},
+    {"role": "user", "content": "and someone who doesn't flake, seriously"},
+]
+
+
+def line(text: str, *indexes: int, conversation_id: str = CONVERSATION_ID) -> dict:
+    return {
+        "text": text,
+        "evidence": [{"conversation_id": conversation_id, "message_index": i} for i in indexes],
+    }
 
 
 def _response(vibe: object) -> dict:
@@ -38,6 +49,7 @@ class VibePromptTest(unittest.TestCase):
         self.assertIn("Vibe rules", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
         self.assertIn("never fill an area just because it is empty", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
         self.assertIn("Most batches\n  return {}", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
+        self.assertIn("Only user\n  messages count", BACKGROUND_COGNITION_V3_SYSTEM_PROMPT)
 
 
 class VibeFlowTest(unittest.IsolatedAsyncioTestCase):
@@ -64,39 +76,58 @@ class VibeFlowTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(result["status"], {"live_invalid", "live_error"}, result)
         return provider, publish
 
-    async def test_background_sends_areas_and_current_card(self) -> None:
-        update_vibe_card(USER_ID, {"humor": "Likes dark humor."})
+    async def test_background_sends_areas_and_current_lines_only(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0)})
         provider, _ = await self._run({})
 
         payload = json.loads(provider.await_args.args[0])
         self.assertEqual(payload["current_vibe"], {"humor": "Likes dark humor."})
         self.assertIn("friend_wish", {area["id"] for area in payload["vibe_areas"]})
 
-    async def test_new_lines_are_saved_and_a_milestone_is_announced(self) -> None:
-        update_vibe_card(USER_ID, {"humor": "Likes dark humor."})
-        _, publish = await self._run({"friend_wish": "Wants one close friend who gets dark humor."})
+    async def test_lines_keep_their_user_message_evidence_and_announce_a_milestone(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0)})
+        _, publish = await self._run(
+            {"friend_wish": {"line": "Wants one close friend who doesn't flake.", "evidence": [0, 2]}}
+        )
 
-        self.assertEqual(get_vibe_card(USER_ID)["milestone"], "first_impressions")
+        card = get_vibe_card(USER_ID)
+        self.assertEqual(card["milestone"], "first_impressions")
+        self.assertEqual(
+            [item["message_index"] for item in card["areas"]["friend_wish"]["evidence"]], [0, 2]
+        )
         event = publish.await_args.args[0]
         self.assertEqual(event.type, "vibe.milestone")
         self.assertEqual(event.scope_id, CONVERSATION_ID)
-        self.assertEqual(event.payload["milestone"], "first_impressions")
 
-    async def test_no_event_when_the_milestone_holds(self) -> None:
-        _, publish = await self._run({"humor": "Likes dark humor."})
+    async def test_companion_messages_and_unknown_indexes_are_not_evidence(self) -> None:
+        _, publish = await self._run(
+            {
+                "values": {"line": "Thinks loyalty matters most.", "evidence": [1]},
+                "deal_breakers": {"line": "Can't stand flaky friends.", "evidence": [7]},
+                "humor": {"line": "Likes dark humor."},
+            }
+        )
 
-        self.assertEqual(get_vibe_card(USER_ID)["areas"], {"humor": "Likes dark humor."})
+        self.assertEqual(get_vibe_card(USER_ID)["areas"], {})
         publish.assert_not_awaited()
 
+    async def test_saying_it_again_adds_evidence_and_makes_the_line_clear(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0)})
+        await self._run({"humor": {"line": "Likes dark, deadpan humor.", "evidence": [2]}})
+
+        humor = get_vibe_card(USER_ID)["areas"]["humor"]
+        self.assertEqual(humor["text"], "Likes dark, deadpan humor.")
+        self.assertEqual(len(humor["evidence"]), 2)
+
     async def test_empty_or_bad_vibe_keeps_the_card(self) -> None:
-        update_vibe_card(USER_ID, {"humor": "Likes dark humor."})
-        for raw in (None, {}, "funny", {"zodiac": "Leo"}):
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0)})
+        for raw in (None, {}, "funny", {"zodiac": {"line": "Leo", "evidence": [0]}}, {"humor": "old shape"}):
             with self.subTest(raw=raw):
                 await self._run(raw)
-                self.assertEqual(get_vibe_card(USER_ID)["areas"], {"humor": "Likes dark humor."})
+                self.assertEqual(get_vibe_card(USER_ID)["areas"]["humor"]["text"], "Likes dark humor.")
 
     def test_card_is_deleted_with_the_user(self) -> None:
-        update_vibe_card(USER_ID, {"humor": "Likes dark humor."})
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0)})
         delete_user_private_data(USER_ID)
         self.assertEqual(get_vibe_card(USER_ID)["areas"], {})
 
@@ -116,23 +147,42 @@ class VibeApiTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.app.dependency_overrides.clear()
 
-    def test_get_lists_every_area_with_progress(self) -> None:
-        update_vibe_card(USER_ID, {area_id: "Known." for area_id in BASIC_AREA_IDS})
+    def test_get_lists_areas_with_strength_and_the_users_own_words(self) -> None:
+        save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": MESSAGES}, USER_ID)
+        update_vibe_card(
+            USER_ID,
+            {
+                **{area_id: line("Known.", 0, 2) for area_id in BASIC_AREA_IDS},
+                "values": line("Said once.", 0),
+            },
+        )
 
         body = self.client.get("/api/me/vibe").json()
+        areas = {area["id"]: area for area in body["areas"]}
 
         self.assertEqual(body["milestone"], "basics")
         self.assertEqual(body["next_milestone"], "ready_to_match")
-        self.assertEqual(body["known"], len(BASIC_AREA_IDS))
         self.assertEqual(len(body["areas"]), body["total"])
-        self.assertIsNotNone(body["milestone_reached_at"])
+        self.assertEqual(areas["humor"]["strength"], "clear")
+        self.assertEqual(areas["humor"]["quotes"][0], "and someone who doesn't flake, seriously")
+        self.assertEqual(areas["values"]["strength"], "mentioned")
+        self.assertIsNone(areas["conflict"]["strength"])
+        self.assertEqual(areas["conflict"]["quotes"], [])
+
+    def test_quotes_skip_deleted_chats(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0, conversation_id="gone")})
+
+        areas = {area["id"]: area for area in self.client.get("/api/me/vibe").json()["areas"]}
+
+        self.assertEqual(areas["humor"]["quotes"], [])
+        self.assertEqual(areas["humor"]["evidence_count"], 1)
 
     def test_user_can_remove_a_wrong_line(self) -> None:
-        update_vibe_card(USER_ID, {"humor": "Wrong.", "values": "Right."})
+        update_vibe_card(USER_ID, {"humor": line("Wrong.", 0), "values": line("Right.", 0)})
 
         body = self.client.delete("/api/me/vibe/humor").json()
 
-        self.assertEqual(get_vibe_card(USER_ID)["areas"], {"values": "Right."})
+        self.assertEqual(set(get_vibe_card(USER_ID)["areas"]), {"values"})
         self.assertEqual(body["known"], 1)
         self.assertEqual(self.client.delete("/api/me/vibe/zodiac").status_code, 404)
 

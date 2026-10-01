@@ -26,7 +26,16 @@ MESSAGES = [
     {"role": "assistant", "content": "Ha, fair.", "created_at": "2026-09-20T10:01:05+00:00"},
     {"role": "user", "content": "And I hate people who flake.", "created_at": "2026-09-21T09:00:00+00:00"},
 ]
-LINES = {"humor": "Only laughs at deadpan jokes.", "deal_breakers": "Hates people who flake on plans."}
+# What the model returns: lines citing transcript ids (m1 is message 1, m2 is message 3).
+LINES = {
+    "humor": {"line": "Only laughs at deadpan jokes.", "evidence": ["m1"]},
+    "deal_breakers": {"line": "Hates people who flake on plans.", "evidence": ["m2"]},
+}
+TEXTS = {"humor": "Only laughs at deadpan jokes.", "deal_breakers": "Hates people who flake on plans."}
+
+
+def texts(areas: dict) -> dict:
+    return {area_id: line["text"] for area_id, line in areas.items()}
 
 
 class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
@@ -50,7 +59,7 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["milestone"], "first_impressions")
         self.assertEqual(get_vibe_card(USER_ID)["areas"], {})
         payload = json.loads(provider.await_args.args[0])
-        self.assertIn("user: I only laugh at deadpan jokes.", payload["chats"])
+        self.assertIn("[m1] user: I only laugh at deadpan jokes.", payload["chats"])
         self.assertIn("companion: Ha, fair.", payload["chats"])
 
     async def test_apply_writes_and_dates_the_milestone_to_the_last_chat(self) -> None:
@@ -58,11 +67,18 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
 
         card = get_vibe_card(USER_ID)
         self.assertEqual(result["status"], "written")
-        self.assertEqual(card["areas"], LINES)
+        self.assertEqual(texts(card["areas"]), TEXTS)
+        self.assertEqual(
+            card["areas"]["deal_breakers"]["evidence"],
+            [{"conversation_id": "vibe-backfill-chat", "message_index": 3}],
+        )
         self.assertEqual(card["milestone_reached_at"].strftime("%Y-%m-%d"), "2026-09-21")
 
     async def test_existing_card_is_skipped_unless_forced(self) -> None:
-        update_vibe_card(USER_ID, {"interests": "Loves F1."})
+        update_vibe_card(
+            USER_ID,
+            {"interests": {"text": "Loves F1.", "evidence": [{"conversation_id": "x", "message_index": 0}]}},
+        )
 
         skipped, provider = await self._run(LINES, apply=True)
         self.assertEqual(skipped["status"], "has_card")
@@ -70,10 +86,11 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
 
         forced, _ = await self._run(LINES, apply=True, force=True)
         self.assertEqual(forced["status"], "written")
-        self.assertEqual(get_vibe_card(USER_ID)["areas"], {"interests": "Loves F1.", **LINES})
+        self.assertEqual(texts(get_vibe_card(USER_ID)["areas"]), {"interests": "Loves F1.", **TEXTS})
 
     async def test_nothing_found_and_bad_output_write_nothing(self) -> None:
-        for vibe in ({}, None, "funny", {"zodiac": "Leo"}):
+        bad_evidence = {"humor": {"line": "Likes jokes.", "evidence": ["m9", "companion", 1]}}
+        for vibe in ({}, None, "funny", {"zodiac": {"line": "Leo", "evidence": ["m1"]}}, bad_evidence):
             with self.subTest(vibe=vibe):
                 result, _ = await self._run(vibe, apply=True)
                 self.assertEqual(result["status"], "nothing_found")
@@ -99,22 +116,27 @@ class ChatTranscriptTest(unittest.TestCase):
     def test_long_history_keeps_the_most_recent_text(self) -> None:
         old = [{"role": "user", "content": f"old message {i} " + "x" * 500} for i in range(80)]
         recent = [{"role": "user", "content": "the newest thing I said"}]
-        transcript, _ = chat_transcript([{"id": "c1", "messages": old + recent}])
+        transcript, _, refs = chat_transcript([{"id": "c1", "messages": old + recent}])
 
         self.assertLessEqual(len(transcript), TRANSCRIPT_CHAR_BUDGET)
-        self.assertTrue(transcript.endswith("the newest thing I said"))
+        self.assertTrue(transcript.endswith("user: the newest thing I said"))
         self.assertNotIn("old message 0 ", transcript)
+        # Only ids still in the text can be cited.
+        self.assertNotIn("m1", refs)
+        self.assertEqual(refs["m81"], ("c1", 80))
 
     def test_failed_messages_and_companion_only_chats_are_skipped(self) -> None:
-        transcript, _ = chat_transcript(
+        transcript, _, refs = chat_transcript(
             [{"id": "c1", "messages": [{"role": "user", "content": "lost", "delivery_status": "failed"},
                                        {"role": "assistant", "content": "Hi!"}]}]
         )
         self.assertEqual(transcript, "")
+        self.assertEqual(refs, {})
 
     def test_prompt_shares_the_grounding_rules(self) -> None:
         self.assertIn("never fill an area just because it is empty", VIBE_BACKFILL_SYSTEM_PROMPT)
         self.assertIn("returning {} is fine", VIBE_BACKFILL_SYSTEM_PROMPT)
+        self.assertIn("companion messages have no id and never count", VIBE_BACKFILL_SYSTEM_PROMPT)
         self.assertIn("Never health, mental health", VIBE_BACKFILL_SYSTEM_PROMPT)
         self.assertIn("dating or marriage partner are not friend preferences", VIBE_BACKFILL_SYSTEM_PROMPT)
 
