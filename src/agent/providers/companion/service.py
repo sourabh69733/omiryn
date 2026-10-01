@@ -114,7 +114,7 @@ def reply_timeout_seconds() -> float:
 
 
 # Known-fast backups; the next "available" model can be a slow one (gpt-oss-120b takes ~90s).
-_DEFAULT_FALLBACK_MODELS = {"deepinfra": "meta-llama/Llama-3.1-70B-Instruct-Turbo"}
+_DEFAULT_FALLBACK_MODELS = {"deepinfra": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"}
 
 
 def reply_fallback_model(provider: str, model: str | None) -> str | None:

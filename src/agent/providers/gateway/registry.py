@@ -53,7 +53,7 @@ PROVIDER_REGISTRY = {
         available_models_env="DEEPINFRA_AVAILABLE_MODELS",
         default_available_models=(
             "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            "meta-llama/Llama-3.1-70B-Instruct-Turbo",
+            "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
             "deepseek-ai/DeepSeek-V3",
         ),
         timeout_env="DEEPINFRA_TIMEOUT_SECONDS",

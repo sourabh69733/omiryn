@@ -108,9 +108,9 @@ class ReplyFallbackTest(unittest.TestCase):
         with patch.dict(os.environ, {"AGENT_REPLY_FALLBACK_MODEL": ""}):
             self.assertEqual(
                 reply_fallback_model("deepinfra", "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
-                "meta-llama/Llama-3.1-70B-Instruct-Turbo",
+                "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
             )
-            self.assertIsNone(reply_fallback_model("deepinfra", "meta-llama/Llama-3.1-70B-Instruct-Turbo"))
+            self.assertIsNone(reply_fallback_model("deepinfra", "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"))
             self.assertIsNone(reply_fallback_model("groq", "some-model"))
         with patch.dict(os.environ, {"AGENT_REPLY_FALLBACK_MODEL": "off"}):
             self.assertIsNone(reply_fallback_model("deepinfra", None))
