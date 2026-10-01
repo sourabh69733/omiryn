@@ -86,7 +86,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       <main>
         {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} /> : null}
         {page === "style" ? <StylePage /> : null}
-        {page === "matches" ? <MatchesPage /> : null}
+        {page === "matches" ? <MatchesPage onChat={() => navigate("chat")} /> : null}
         {page === "profile" ? <ProfilePage /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
       </main>
