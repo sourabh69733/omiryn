@@ -27,8 +27,8 @@ class CompanionBehavior:
     ask_question_policy: str = "optional; most replies end without a question"
     matching_focus: str = "getting to know the user well enough to find them friends who fit"
     safety_level: str = "high_trust_no_impersonation"
-    version: str = "v1"
-    version_name: str = "v1_companion_basic"
+    version: str = "v3"
+    version_name: str = "v3_listener_first_companion"
     data_point_targets: tuple[str, ...] = ()
     persona_card: str = ""
     voice: str = "neutral"
@@ -59,8 +59,8 @@ def build_companion_behavior(
         allow_light_playful=_allow_light_playful(prompt_version),
         allow_mild_adult_humor=_allow_mild_adult_humor(prompt_version),
         allow_romantic_roleplay=False,
-        version=prompt_version.version_id if prompt_version else "v1",
-        version_name=prompt_version.name if prompt_version else "v1_companion_basic",
+        version=prompt_version.version_id if prompt_version else "v3",
+        version_name=prompt_version.name if prompt_version else "v3_listener_first_companion",
         data_point_targets=prompt_version.data_point_targets if prompt_version else (),
     )
 
@@ -70,7 +70,6 @@ def behavior_module_prompt(
     user_profile: dict[str, Any] | None,
 ) -> str:
     gender = (user_profile or {}).get("gender") or "unknown"
-    interested_in = (user_profile or {}).get("interested_in") or "unknown"
     display_name = (user_profile or {}).get("display_name") or "unknown"
     email = (user_profile or {}).get("email") or "unknown"
     location = (user_profile or {}).get("location") or "unknown"
@@ -92,7 +91,7 @@ def behavior_module_prompt(
     )
     return (
         f"User identity: display_name={display_name}, email={email}.\n"
-        f"User basics: gender={gender}, interested_in={interested_in}, "
+        f"User basics: gender={gender}, "
         f"location={location}, country={country}.\n"
         f"{time_awareness_prompt(user_profile)}\n"
         f"Agent persona: name={behavior.persona_name}, "
