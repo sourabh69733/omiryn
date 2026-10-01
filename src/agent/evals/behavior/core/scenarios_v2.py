@@ -527,7 +527,89 @@ LAST_TOPIC_SCENARIOS = (
         mentions=("rishikesh", "trip", "plan"),
     ),
 )
-COMPANION_V2_SCENARIOS = COMPANION_V2_SCENARIOS + LAST_TOPIC_SCENARIOS
+# The vibe goal (learn who the user would get along with) must never turn the chat into an
+# interview. Checks are counts of questions plus factual rubric items, not taste.
+_ONE_TOPIC_RUBRIC = _rubric(
+    "one_personal_topic",
+    "Asks the user about at most one thing about themselves. A reply asking about two different "
+    "personal topics (for example their humor and their weekends) fails.",
+)
+
+VIBE_SCENARIOS = (
+    BehaviorScenario(
+        id="vibe_new_user_is_not_interviewed",
+        description="A new user chats casually; the companion learns without firing questions.",
+        tags=("companion_v2", "vibe"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=GREETING,
+        turns=(
+            _turn("pretty chill, just got back from college", rubric=(_ONE_TOPIC_RUBRIC,)),
+            _turn("we had a lab viva today, it went ok", rubric=(_ONE_TOPIC_RUBRIC,)),
+            _turn("now just lying around watching reels", rubric=(_ONE_TOPIC_RUBRIC,)),
+            _turn("mostly memes, some cricket clips", rubric=(_ONE_TOPIC_RUBRIC,)),
+            _turn("lol yeah", rubric=(_ONE_TOPIC_RUBRIC,)),
+            _turn(
+                "what about you, what do you even do all day?",
+                maximum_question_reply_ratio=0.67,
+                rubric=(
+                    _ONE_TOPIC_RUBRIC,
+                    _rubric(
+                        "answers_the_user",
+                        "Answers what the user asked about the companion honestly, as an AI, before "
+                        "anything else. Skipping the question or inventing a human day fails.",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
+        id="vibe_dodge_is_respected",
+        description="The user dodges a personal question; the companion lets it go and does not ask another.",
+        tags=("companion_v2", "vibe"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=(
+            {"role": "assistant", "content": "hey! how's your evening going?"},
+            {"role": "user", "content": "fine, bored"},
+            {"role": "assistant", "content": "Bored is my cue. Okay, quick one: what kind of people do you actually click with?"},
+        ),
+        turns=(
+            _turn(
+                "idk man, skip that",
+                maximum_questions=0,
+                rubric=(
+                    _rubric(
+                        "lets_it_go",
+                        "Drops the question without pushing, and does not ask the user anything else "
+                        "about themselves in this reply.",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    BehaviorScenario(
+        id="vibe_mood_comes_first",
+        description="An upset user gets support; the companion does not use the moment to learn their vibe.",
+        tags=("companion_v2", "vibe"),
+        start_at=START,
+        timezone=TIMEZONE,
+        initial_messages=GREETING,
+        turns=(
+            _turn(
+                "my best friend just stopped talking to me and I don't even know why. feeling really low",
+                rubric=(
+                    _rubric(
+                        "stays_with_the_feeling",
+                        "Responds to the hurt about this friend. Asking what the user wants in friends, "
+                        "their humor, interests or other getting-to-know-you topics fails.",
+                    ),
+                ),
+            ),
+        ),
+    ),
+)
+COMPANION_V2_SCENARIOS = COMPANION_V2_SCENARIOS + LAST_TOPIC_SCENARIOS + VIBE_SCENARIOS
 
 
-__all__ = ["COMPANION_V2_SCENARIOS", "LAST_TOPIC_SCENARIOS"]
+__all__ = ["COMPANION_V2_SCENARIOS", "LAST_TOPIC_SCENARIOS", "VIBE_SCENARIOS"]

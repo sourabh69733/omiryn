@@ -282,7 +282,7 @@ class CompanionV2CatalogueTest(unittest.TestCase):
                 self.assertIsNotNone(scenario.start_at)
                 for turn in scenario.turns:
                     # Technical gate only: every reply keeps the question rules, no taste scores.
-                    self.assertEqual(turn.expectation.maximum_questions, 1)
+                    self.assertLessEqual(turn.expectation.maximum_questions, 1)
                     self.assertEqual(turn.expectation.maximum_question_streak, 2)
                     self.assertNotIn(
                         "naturalness", {dimension.id for dimension in turn.expectation.rubric}
