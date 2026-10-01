@@ -77,8 +77,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
             ],
         )
 
-        self.assertIn("Internal prompt behavior version: v1_companion_basic", prompt)
-        self.assertNotIn("Prompt behavior version: v1 (v1_companion_basic)", prompt)
+        self.assertIn("Choose the turn in this strict order", prompt)
+        self.assertNotIn("Internal prompt behavior version", prompt)
         self.assertIn("Agent persona: name=Annie", prompt)
         self.assertIn("Tone setting: Warm", prompt)
         self.assertIn("[llm_profile] Imported profile", prompt)
@@ -90,8 +90,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
             context_sources=[],
         )
 
-        self.assertIn("Roman Hinglish/English by default", prompt)
-        self.assertIn("avoid Devanagari", prompt)
+        self.assertIn("reply only in Latin/Roman script", prompt)
+        self.assertIn("Do not use Devanagari", prompt)
 
     def test_prompt_builder_allows_only_mild_user_led_adult_humor(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
@@ -175,14 +175,16 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertEqual(version.version_id, "v3-1")
         self.assertEqual(version.name, "v3_1_matching_discovery_companion")
-        self.assertIn("relationship_intent", version.data_point_targets)
+        self.assertIn("friend_wish", get_prompt_behavior_version("v3").data_point_targets)
+        self.assertNotIn("relationship_intent", get_prompt_behavior_version("v3").data_point_targets)
 
     def test_prompt_versions_are_independently_selectable(self) -> None:
         versions = {version.version_id: version for version in available_prompt_versions()}
 
-        self.assertEqual(set(versions), {"v1", "v2", "v3", "v3-1"})
-        self.assertEqual(get_prompt_behavior_version("v1").name, "v1_companion_basic")
-        self.assertEqual(get_prompt_behavior_version("v2").name, "v2_structured_context_companion")
+        self.assertEqual(set(versions), {"v3", "v3-1"})
+        # v1 and v2 are archived; asking for them gets the default.
+        self.assertEqual(get_prompt_behavior_version("v1").version_id, "v3-1")
+        self.assertEqual(get_prompt_behavior_version("v2").version_id, "v3-1")
         self.assertEqual(get_prompt_behavior_version("v3").name, "v3_listener_first_companion")
         self.assertEqual(
             get_prompt_behavior_version("v3-1").name,
@@ -222,29 +224,6 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertNotIn("v2", package.system_prompt.lower())
         self.assertNotIn("v3", package.system_prompt.lower())
         self.assertEqual(package.snapshot["summary"]["prompt_version"], "v3")
-
-    def test_v2_context_package_includes_planner_debug(self) -> None:
-        package = build_model_context_package(
-            conversation_id="conversation-a",
-            user_text="haan",
-            user_id="user-a",
-            user_profile={"user_id": "user-a", "interested_in": "women"},
-            model="llama-70b",
-            agent_tone="auto",
-            agent_name="Annie",
-            style_source_id=None,
-            user_message_index=0,
-            assistant_message_index=1,
-            prompt_version_id="v2",
-        )
-
-        self.assertEqual(package.prompt_version, "v2")
-        self.assertIn("Conversation plan for this turn", package.system_prompt)
-        self.assertIn("Boredom recovery", package.system_prompt)
-        self.assertEqual(package.snapshot["summary"]["engine_version"], "context_v2")
-        self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
-        self.assertEqual(package.snapshot["summary"]["response_mode"], "normal_chat")
-        self.assertIn("conversation_plan", package.snapshot["context"])
 
     def test_v2_prompt_structure_skips_dynamic_boredom_section_when_not_needed(self) -> None:
         package = build_model_context_package(
@@ -392,7 +371,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertIn("do not defend yourself", package.system_prompt.lower())
         self.assertIn("Respond to the feeling before choosing a new topic", package.system_prompt)
 
-    def test_v2_sad_user_gets_listen_first_mode(self) -> None:
+    def test_sad_user_gets_listen_first_mode(self) -> None:
         package = build_model_context_package(
             conversation_id="conversation-a",
             user_text="i feel sad and very alone today",
@@ -404,13 +383,12 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=0,
             assistant_message_index=1,
-            prompt_version_id="v2",
+            prompt_version_id="v3",
         )
 
         self.assertEqual(package.snapshot["summary"]["emotion"], "lonely")
         self.assertEqual(package.snapshot["summary"]["response_mode"], "empathize_listen")
         self.assertIn("If response mode is empathize_listen, do not give advice", package.system_prompt)
-        self.assertIn("Listen first", package.system_prompt)
 
     def test_user_taught_agent_behavior_rule_is_saved_and_included_in_v2_context(self) -> None:
         capture_profile_facts_from_user_message(

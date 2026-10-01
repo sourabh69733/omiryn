@@ -347,24 +347,6 @@ class TurnUnderstandingIntegrationTest(unittest.TestCase):
         self.assertNotIn("primary_script", package.system_prompt)
         self.assertNotIn("Taml", package.system_prompt)
 
-    def test_v2_does_not_include_turn_understanding_metadata(self) -> None:
-        package = self._package("வணக்கம் hello", "v2")
-
-        self.assertNotIn("turn_interpreter", package.snapshot["summary"])
-        self.assertNotIn("detected_scripts", package.snapshot["summary"])
-        self.assertNotIn("turn_understanding", package.snapshot["context"])
-
-    def test_v1_and_v2_do_not_call_the_new_interpreter(self) -> None:
-        with patch(
-            "agent.context_engine.engine.interpret_turn",
-            side_effect=AssertionError("legacy versions must not call interpreter"),
-        ):
-            v1 = self._package("hello", "v1")
-            v2 = self._package("hello", "v2")
-
-        self.assertEqual(v1.prompt_version, "v1")
-        self.assertEqual(v2.prompt_version, "v2")
-
     def test_v3_calls_the_interpreter_once(self) -> None:
         real_result = interpret_turn(user_text="hello", history_messages=[])
         with patch("agent.context_engine.engine.interpret_turn", return_value=real_result) as mocked:

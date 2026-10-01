@@ -243,15 +243,6 @@ class V3ContextPackageIntegrationTest(unittest.TestCase):
         self.assertIn("Do not ask a question in this reply", package.system_prompt)
         self.assertNotIn("Internal prompt behavior version", package.system_prompt)
 
-    def test_v2_same_message_keeps_existing_routing_and_engine(self) -> None:
-        self._save_history(assistant_history("I get it.", "That sounds rough.", "I am listening."))
-
-        package = self._package(QUESTION_COMPLAINT, "v2")
-
-        self.assertEqual(package.snapshot["summary"]["engine_version"], "context_v2")
-        self.assertIn("whatsapp", package.query_intent.labels)
-        self.assertNotIn("Conversational stance:", package.system_prompt)
-
     def test_v3_no_advice_boundary_reaches_prompt_and_snapshot(self) -> None:
         package = self._package("I don't want advice right now, bas meri baat suno.", "v3")
         summary = package.snapshot["summary"]
