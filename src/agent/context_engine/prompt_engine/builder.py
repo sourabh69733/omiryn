@@ -343,7 +343,7 @@ def _v2_prompt_sections(
         sections.append(
             PromptSection(
                 id="matching_understanding",
-                title="Matching Understanding",
+                title="Friend Vibe",
                 content=matching_understanding_prompt(matching_understanding),
                 position="middle",
                 priority=75,

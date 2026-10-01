@@ -42,7 +42,7 @@ SECTION_CHAR_LIMITS: dict[str, int] = {
     "behavior": 2200,
     "conversation_plan": 2600,
     "empathy": 1500,
-    "matching_understanding": 1600,
+    "matching_understanding": 3600,
     # Matches the 7500-char context source budget in assembly/budget.py, plus headings.
     "context_sources": 10800,
     "boredom_recovery": 1200,

@@ -1,29 +1,64 @@
-"""Supplies private matching-understanding guidance to the companion prompt."""
+"""Supplies the companion's private goal: understand the user's friend vibe."""
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from agent.context_engine.contracts.models import MatchingUnderstanding
+from agent.memory_engine.memories.vibe import VIBE_AREA_GOALS, VIBE_MILESTONE_MEANINGS
+from agent.shared.clock import utc_now
+
+# How long a newly reached milestone stays news the companion may mention.
+MILESTONE_NEWS_WINDOW = timedelta(hours=24)
 
 
-def matching_understanding_prompt(progress: MatchingUnderstanding) -> str:
-    known = _dimension_list(progress.known_dimensions)
-    unexplored = _dimension_list(progress.unexplored_dimensions)
-    can_deepen = _dimension_list(progress.can_deepen_dimensions)
-    return (
-        "Private matching-understanding context:\n"
-        f"- Known areas: {known}\n"
-        f"- Possible areas not yet understood: {unexplored}\n"
-        f"- Known areas that may naturally deepen later: {can_deepen}\n"
-        "Treat this as quiet background awareness, not a checklist, target, or completion gate. "
-        "This prompt deliberately does not provide a user-facing score or level because none exists. "
-        "Do not expose these internal area labels to the user. Do not ask about a "
-        "missing area merely because it is missing. The user's present emotion, boundary, request, "
-        "and active topic remain more important; learn naturally only when the conversation makes "
-        "it relevant. If asked what you know, answer with concrete remembered facts only."
+def matching_understanding_prompt(
+    progress: MatchingUnderstanding,
+    *,
+    now: datetime | None = None,
+) -> str:
+    # Rules first: a long card is trimmed from the end, never the rules.
+    lines = [
+        "Your purpose (private): over many chats, understand who this user would truly get along "
+        "with as a friend, so Omiryn can find those friends. You learn it by being good company, "
+        "never by interviewing.",
+        "This is a goal, not a checklist. The user's mood, request and current topic always come "
+        "first. When the moment is open, you may steer toward something not understood yet in "
+        "your own way: an opinion, a story, a playful this-or-that, or one curious question. "
+        "Never two of these areas in one reply, never right after they dodged one. Do not name "
+        "these areas or show progress numbers. If asked what you know about them, say it plainly.",
+    ]
+    news = _milestone_news(progress, now or utc_now())
+    lines.append(
+        news or f"Where you are: {VIBE_MILESTONE_MEANINGS.get(progress.level, progress.level)}."
     )
+    if progress.unexplored_dimensions:
+        lines.append("Not understood yet (earlier ones matter more):")
+        lines.extend(
+            f"- {area_id.replace('_', ' ')}: {VIBE_AREA_GOALS.get(area_id, '')}"
+            for area_id in progress.unexplored_dimensions
+        )
+    lines.append("What you understand so far:")
+    if progress.area_lines:
+        lines.extend(f"- {area_id.replace('_', ' ')}: {text}" for area_id, text in progress.area_lines)
+    else:
+        lines.append("- nothing yet")
+    return "\n".join(lines)
 
 
-def _dimension_list(dimensions: tuple[str, ...]) -> str:
-    if not dimensions:
-        return "none"
-    return ", ".join(dimension.replace("_", " ") for dimension in dimensions)
+def _milestone_news(progress: MatchingUnderstanding, now: datetime) -> str | None:
+    reached_at = progress.milestone_reached_at
+    if reached_at is None:
+        return None
+    if reached_at.tzinfo is None:
+        reached_at = reached_at.replace(tzinfo=timezone.utc)
+    if now - reached_at > MILESTONE_NEWS_WINDOW:
+        return None
+    hours = max(0, int((now - reached_at).total_seconds() // 3600))
+    when = "within the last hour" if hours == 0 else f"about {hours} hour{'s' if hours != 1 else ''} ago"
+    return (
+        f"New ({when}): you now have {VIBE_MILESTONE_MEANINGS.get(progress.level, progress.level)}. "
+        "The app shows them this too. If you have not mentioned it in this chat and it fits the "
+        "moment, you may tell them in your own words what it means for finding them friends; "
+        "skip it when they are busy with something else."
+    )
