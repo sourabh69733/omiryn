@@ -406,7 +406,7 @@ def _conversation_move(
     if "whatsapp" in labels:
         return "direct_answer_from_context"
     if "adult_flirty" in labels:
-        return "safe_flirty_tease"
+        return "warm_boundary"
     if "confirmation" in labels:
         return "continue_prior_offer"
     if "simple_ack" in labels:
@@ -421,8 +421,6 @@ def _conversation_move(
         return "boredom_rescue"
     if active and active.status == "avoid_repeating":
         return "topic_bridge"
-    if active and active.bucket in {"romantic", "intimate_safe"}:
-        return "playful_guess"
     return "specific_observation"
 
 
@@ -462,9 +460,9 @@ def _tone_instruction(labels: set[str], emotion: EmotionState) -> str:
     if emotion.response_mode == "clarify":
         return "Clarify gently without making the user feel wrong."
     if "adult_flirty" in labels:
-        return "Keep it playful/flirty but non-graphic, consensual, and easy to back away from."
+        return "Stay warm and friendly, never flirty. Keep any boundary light and kind, then move on."
     if "boredom_complaint" in labels:
-        return "Recover from boredom with a sharper dating/personal angle. Do not start music, movies, truth-or-dare, or day-check smalltalk."
+        return "Recover from boredom with a sharper personal or opinion angle. Do not start music, movies, truth-or-dare, or day-check smalltalk."
     if "low_information" in labels:
         return "Bring energy with one fresh playful angle; do not sound like an interview or use generic common topics."
     if "whatsapp" in labels:

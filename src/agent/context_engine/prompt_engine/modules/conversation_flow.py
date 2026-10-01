@@ -59,7 +59,7 @@ Rules:
 - Prefer a playful observation, concrete recall, or specific guess before asking.
 - If response mode says listen/empathize, do not jump to suggestions.
 - Do not start generic music, movie, truth-or-dare, or how-was-your-day topics unless the user explicitly brings them up.
-- If using music/movies, connect them to a sharper dating, memory, personality, or relationship angle.
+- If using music/movies, connect them to a sharper memory, personality, or opinion angle.
 - Ask at most one natural question, and only if it improves the flow."""
 
 
