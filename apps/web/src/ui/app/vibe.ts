@@ -62,3 +62,9 @@ export function milestoneFromEvent(event: RealtimeEvent, conversationId: string 
 export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "message_index">): string {
   return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;
 }
+
+// The chip says how often the user said it; lines from before proof existed have no count.
+export function saidLabel(count: number): string {
+  if (count <= 1) return "Said once";
+  return `Said ${count} times`;
+}

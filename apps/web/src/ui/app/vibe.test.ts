@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evidenceChatPath, milestoneFromEvent, vibeStepNote } from "./vibe";
+import { evidenceChatPath, milestoneFromEvent, saidLabel, vibeStepNote } from "./vibe";
 
 const reached = (milestone: string, previous: string, id = "c1") => ({ type: "vibe.milestone", scope: "conversation" as const, scope_id: id, version: 1, payload: { milestone, previous } });
 
@@ -22,4 +22,10 @@ test("every milestone past starting has a note", () => {
 
 test("proof links open the chat at that message", () => {
   assert.equal(evidenceChatPath({ conversation_id: "a b", message_index: 7 }), "/?conversation_id=a%20b#message-7");
+});
+
+test("the chip says how often it was said", () => {
+  assert.equal(saidLabel(0), "Said once");
+  assert.equal(saidLabel(1), "Said once");
+  assert.equal(saidLabel(3), "Said 3 times");
 });
