@@ -106,7 +106,6 @@ class MatchingUnderstandingTest(unittest.TestCase):
         plan = build_conversation_plan(
             user_text="I have a quiet evening today.",
             intent=ContextQueryIntent(),
-            topic_states=[],
             emotion_state=EmotionState(),
             conversational_stance=ConversationalStance(),
             matching_understanding=progress,
@@ -121,7 +120,6 @@ class MatchingUnderstandingTest(unittest.TestCase):
         plan = build_conversation_plan(
             user_text="Bas meri baat suno, questions mat puchna.",
             intent=ContextQueryIntent(),
-            topic_states=[],
             emotion_state=EmotionState(),
             conversational_stance=ConversationalStance(constraints=("listen_only", "no_questions")),
             matching_understanding=calculate_matching_understanding({}),

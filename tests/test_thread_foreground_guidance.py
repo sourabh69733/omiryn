@@ -115,7 +115,6 @@ class ThreadForegroundGuidanceTest(unittest.TestCase):
         return build_conversation_plan(
             user_text="hmm",
             intent=intent,
-            topic_states=[],
             emotion_state=EmotionState(),
             conversational_stance=stance or ConversationalStance(),
             matching_understanding=None,

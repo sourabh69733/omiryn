@@ -141,7 +141,6 @@ class V3IntentAndPlannerTest(unittest.TestCase):
         plan = build_conversation_plan(
             user_text=QUESTION_COMPLAINT,
             intent=context_query_intent(QUESTION_COMPLAINT, strict_whatsapp=True),
-            topic_states=[],
             emotion_state=EmotionState(emotion="frustrated", confidence=0.9),
             conversational_stance=stance,
             listener_first=True,
@@ -160,7 +159,6 @@ class V3IntentAndPlannerTest(unittest.TestCase):
         plan = build_conversation_plan(
             user_text=text,
             intent=ContextQueryIntent(),
-            topic_states=[],
             emotion_state=EmotionState(),
             conversational_stance=stance,
             listener_first=True,
@@ -176,7 +174,6 @@ class V3IntentAndPlannerTest(unittest.TestCase):
         plan = build_conversation_plan(
             user_text=text,
             intent=ContextQueryIntent(),
-            topic_states=[],
             conversational_stance=stance,
             listener_first=True,
         )
