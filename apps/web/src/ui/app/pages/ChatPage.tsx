@@ -693,7 +693,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={sending || (conversation && typingConversationId === conversation.id) ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
             <div className="chat-controls">
               <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
-              {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null}
+              {/* Commented for now, as it will conversation confusion and increase user expectation from agent which it might not be able to support. */}
+              {/* {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null} */}
               {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
             </div>
           </div>
