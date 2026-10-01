@@ -8167,10 +8167,12 @@ p {
     content: "●";
   }
 
-  .app-nav a[data-nav="style"]::before {
-    content: "Aa";
-    font-size: 13px;
-    font-weight: 700;
+  .app-nav a[data-nav="vibe"]::before {
+    content: "✦";
+  }
+
+  .app-nav a[data-nav="memories"]::before {
+    content: "❖";
   }
 
   .app-nav a[data-nav="matches"]::before {

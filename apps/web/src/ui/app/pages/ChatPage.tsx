@@ -737,7 +737,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
             <div className="vibe-milestone-note" role="status">
               <span>{vibeStepNote(vibeNote.milestone)}</span>
-              <a href={pathForPage.matches} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.matches); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
+              <a href={pathForPage.vibe} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.vibe); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
               <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss"><X aria-hidden="true" /></button>
             </div>
           ) : null}
