@@ -9,7 +9,6 @@ from agent.context_engine.assembly.snapshot import build_context_snapshot, build
 from agent.context_engine.conversation_engine.planning import (
     apply_question_cooldown,
     build_conversation_plan,
-    build_topic_state,
 )
 from agent.context_engine.conversation_engine.understanding import interpret_turn
 from agent.context_engine.conversation_engine.understanding.rules import (
@@ -94,11 +93,9 @@ def build_model_context_package(
                 query_intent,
                 labels=query_intent.labels + ("story_or_long_reply", "story_continuation"),
             )
-        topic_states = build_topic_state(planning_messages, user_text, query_intent)
         conversation_plan = build_conversation_plan(
             user_text=user_text,
             intent=query_intent,
-            topic_states=topic_states,
             emotion_state=emotion_state,
             conversational_stance=conversational_stance,
             matching_understanding=matching_understanding,
@@ -117,7 +114,6 @@ def build_model_context_package(
             prompt_version=prompt_version,
             query_intent=query_intent,
             emotion_state=emotion_state,
-            topic_states=topic_states,
             conversation_plan=conversation_plan,
             matching_understanding=matching_understanding,
             agent_voice=_conversation_voice(conversation_id, user_id),
@@ -142,7 +138,6 @@ def build_model_context_package(
             ),
             query_intent=query_intent,
             emotion_state=emotion_state,
-            topic_states=topic_states,
             conversation_plan=conversation_plan,
             turn_understanding=turn_understanding,
             matching_understanding=matching_understanding,

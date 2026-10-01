@@ -10,7 +10,6 @@ from agent.context_engine.contracts.models import (
     ConversationPlan,
     EmotionState,
     MatchingUnderstanding,
-    TopicState,
 )
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.modules.behavior import (
@@ -109,7 +108,6 @@ def build_companion_system_prompt_v2(
     prompt_version: PromptBehaviorVersion,
     query_intent: ContextQueryIntent,
     emotion_state: EmotionState,
-    topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
     matching_understanding: MatchingUnderstanding | None = None,
     agent_voice: str = "neutral",
@@ -135,7 +133,6 @@ def build_companion_system_prompt_v2(
         context_text=context_text,
         query_intent=query_intent,
         emotion_state=emotion_state,
-        topic_states=topic_states,
         conversation_plan=conversation_plan,
         matching_understanding=matching_understanding,
     )
@@ -178,7 +175,6 @@ def _v2_prompt_sections(
     context_text: str,
     query_intent: ContextQueryIntent,
     emotion_state: EmotionState,
-    topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
     matching_understanding: MatchingUnderstanding | None,
 ) -> list[PromptSection]:
@@ -238,7 +234,7 @@ def _v2_prompt_sections(
         PromptSection(
             id="conversation_plan",
             title="Conversation Plan",
-            content=conversation_plan_prompt(conversation_plan, topic_states),
+            content=conversation_plan_prompt(conversation_plan),
             position="start",
             priority=84,
             can_skip=False,

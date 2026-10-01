@@ -12,7 +12,6 @@ from agent.context_engine.contracts.models import (
     ConversationPlan,
     EmotionState,
     MatchingUnderstanding,
-    TopicState,
 )
 from agent.context_engine.conversation_engine.understanding.contract import TurnUnderstanding
 
@@ -83,7 +82,6 @@ def build_context_snapshot_v2(
     prompt_version_name: str | None,
     query_intent: ContextQueryIntent,
     emotion_state: EmotionState,
-    topic_states: list[TopicState],
     conversation_plan: ConversationPlan,
     engine_version: str = "context_v2",
     turn_understanding: TurnUnderstanding | None = None,
@@ -152,7 +150,6 @@ def build_context_snapshot_v2(
             "is_low_information": query_intent.is_low_information,
         },
         "emotion_state": _emotion_state_snapshot(emotion_state),
-        "topic_state": [_topic_state_snapshot(state) for state in topic_states],
         "conversation_plan": _conversation_plan_snapshot(conversation_plan),
         "blocks": selected_blocks,
         "skipped_blocks": skipped_blocks,
@@ -319,19 +316,6 @@ def _skipped_source_snapshot(source: dict[str, Any], index: int) -> dict[str, An
         "original_chars": len(content),
         "rough_tokens": _rough_tokens(len(content)),
         "metadata": _safe_metadata(source.get("metadata") or {}),
-    }
-
-
-def _topic_state_snapshot(state: TopicState) -> dict[str, Any]:
-    return {
-        "topic_id": state.topic_id,
-        "label": state.label,
-        "bucket": state.bucket,
-        "status": state.status,
-        "depth": state.depth,
-        "last_seen_turns_ago": state.last_seen_turns_ago,
-        "repeat_count": state.repeat_count,
-        "user_interest": state.user_interest,
     }
 
 

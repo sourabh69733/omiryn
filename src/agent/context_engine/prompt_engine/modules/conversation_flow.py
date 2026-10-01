@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
-from agent.context_engine.contracts.models import ConversationPlan, TopicState
+from agent.context_engine.contracts.models import ConversationPlan
 
 
 def conversation_flow_prompt(prompt_version: PromptBehaviorVersion) -> str:
@@ -19,14 +19,7 @@ def conversation_flow_prompt(prompt_version: PromptBehaviorVersion) -> str:
     )
 
 
-def conversation_plan_prompt(
-    plan: ConversationPlan,
-    topic_states: list[TopicState],
-) -> str:
-    active_topics = "\n".join(
-        f"- {state.label} | status={state.status}; depth={state.depth}; repeats={state.repeat_count}"
-        for state in topic_states[:5]
-    )
+def conversation_plan_prompt(plan: ConversationPlan) -> str:
     avoid_topics = "\n".join(f"- {topic}" for topic in plan.avoid_topics[:8])
     suggested_topics = "\n".join(f"- {topic}" for topic in plan.suggested_topics[:3])
     stance_context = _stance_context(plan)
@@ -42,14 +35,11 @@ def conversation_plan_prompt(
 {stance_rules}
 {thread_context}
 
-Active/recent topic state:
-{active_topics or "- No strong topic state yet."}
-
 Avoid repeating these unless the user brings them back:
 {avoid_topics or "- None."}
 
 Possible fresh angles:
-{suggested_topics or "- Continue the current topic with a specific observation."}
+{suggested_topics or "- Continue the current subject with a specific observation."}
 
 Rules:
 - Do not behave like an interviewer.
