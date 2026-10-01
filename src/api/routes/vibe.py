@@ -12,8 +12,8 @@ from agent.memory_engine.memories.vibe import (
 from security.auth import CurrentUser, require_user
 from storage import get_conversation, get_vibe_card, update_vibe_card
 
-# Quotes shown under "Why?" for one line.
-MAX_QUOTES = 3
+# Messages shown as proof for one line, newest first.
+MAX_QUOTES = 5
 QUOTE_CHARS = 200
 
 router = APIRouter()
@@ -55,20 +55,23 @@ def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:
                 "text": line_text(areas.get(area_id)) or None,
                 "strength": line_strength(areas[area_id]) if area_id in areas else None,
                 "evidence_count": len(line_evidence(areas.get(area_id))),
-                "quotes": _quotes(line_evidence(areas.get(area_id)), user_id, conversations),
+                "evidence": _evidence(line_evidence(areas.get(area_id)), user_id, conversations),
             }
             for area_id, stage, _ in VIBE_AREAS
         ],
     }
 
 
-def _quotes(
+def _evidence(
     evidence: list[dict[str, object]],
     user_id: str,
     conversations: dict[str, list[dict[str, object]]],
-) -> list[str]:
-    """The user's own messages behind a line, newest first; deleted chats are skipped."""
-    quotes: list[str] = []
+) -> list[dict[str, object]]:
+    """The user's own messages behind a line, newest first, with where to find them in chat.
+
+    Messages from deleted chats are skipped.
+    """
+    items: list[dict[str, object]] = []
     for item in reversed(evidence):
         conversation_id = str(item["conversation_id"])
         if conversation_id not in conversations:
@@ -76,9 +79,17 @@ def _quotes(
             conversations[conversation_id] = list((conversation or {}).get("messages") or [])
         messages = conversations[conversation_id]
         index = int(item["message_index"])
-        if 0 <= index < len(messages) and messages[index].get("role") == "user":
-            text = " ".join(str(messages[index].get("content") or "").split())
-            quotes.append(text if len(text) <= QUOTE_CHARS else text[: QUOTE_CHARS - 1] + "…")
-        if len(quotes) >= MAX_QUOTES:
+        if not (0 <= index < len(messages)) or messages[index].get("role") != "user":
+            continue
+        text = " ".join(str(messages[index].get("content") or "").split())
+        items.append(
+            {
+                "quote": text if len(text) <= QUOTE_CHARS else text[: QUOTE_CHARS - 1] + "…",
+                "conversation_id": conversation_id,
+                "message_index": index,
+                "sent_at": messages[index].get("created_at"),
+            }
+        )
+        if len(items) >= MAX_QUOTES:
             break
-    return quotes
+    return items

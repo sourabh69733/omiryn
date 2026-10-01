@@ -164,17 +164,19 @@ class VibeApiTest(unittest.TestCase):
         self.assertEqual(body["next_milestone"], "ready_to_match")
         self.assertEqual(len(body["areas"]), body["total"])
         self.assertEqual(areas["humor"]["strength"], "clear")
-        self.assertEqual(areas["humor"]["quotes"][0], "and someone who doesn't flake, seriously")
+        newest = areas["humor"]["evidence"][0]
+        self.assertEqual(newest["quote"], "and someone who doesn't flake, seriously")
+        self.assertEqual((newest["conversation_id"], newest["message_index"]), (CONVERSATION_ID, 2))
         self.assertEqual(areas["values"]["strength"], "mentioned")
         self.assertIsNone(areas["conflict"]["strength"])
-        self.assertEqual(areas["conflict"]["quotes"], [])
+        self.assertEqual(areas["conflict"]["evidence"], [])
 
     def test_quotes_skip_deleted_chats(self) -> None:
         update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0, conversation_id="gone")})
 
         areas = {area["id"]: area for area in self.client.get("/api/me/vibe").json()["areas"]}
 
-        self.assertEqual(areas["humor"]["quotes"], [])
+        self.assertEqual(areas["humor"]["evidence"], [])
         self.assertEqual(areas["humor"]["evidence_count"], 1)
 
     def test_user_can_remove_a_wrong_line(self) -> None:
