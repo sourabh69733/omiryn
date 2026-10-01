@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from datetime import datetime, timedelta, timezone
 
 from agent.context_engine.engine import build_model_context_package
 from agent.context_engine.conversation_engine.planning import build_conversation_plan
@@ -9,148 +9,99 @@ from agent.context_engine.assembly.matching import (
     build_matching_understanding,
     calculate_matching_understanding,
 )
-from agent.memory_engine.data_points import normalize_data_point
-from storage import create_agent_memory, reset_db, save_conversation, upsert_profile_fact
+from agent.context_engine.prompt_engine.modules.matching_understanding import (
+    matching_understanding_prompt,
+)
+from agent.memory_engine.memories.vibe import (
+    BASIC_AREA_IDS,
+    DEEPER_AREA_IDS,
+    VIBE_AREA_IDS,
+    merge_vibe,
+    validate_vibe_updates,
+    vibe_progress,
+)
+from storage import get_vibe_card, reset_db, save_conversation, update_vibe_card
+
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
-def matching_fact(
-    category: str,
-    *,
-    key: str | None = None,
-    confidence: float = 0.8,
-    confidence_state: str = "active",
-    evidence: list[dict[str, object]] | None = None,
-    status: str = "active",
-    used_for_matching: bool = True,
-) -> dict[str, object]:
-    return {
-        "user_id": "matching-user",
-        "category": category,
-        "key": key or category,
-        "label": f"Signal for {category}",
-        "value": {"detail": category},
-        "confidence": confidence,
-        "confidence_state": confidence_state,
-        "source_kind": "agent_turn_output_v2",
-        "source_id": "matching-conversation",
-        "evidence": evidence
-        if evidence is not None
-        else [{"conversation_id": "matching-conversation", "message_index": 1, "text": category}],
-        "status": status,
-        "visibility": "internal",
-        "fact_type": "matching_fact",
-        "used_for_matching": used_for_matching,
-        "used_for_chat_context": True,
-    }
+def lines(*area_ids: str) -> dict[str, str]:
+    return {area_id: f"Line about {area_id}." for area_id in area_ids}
 
 
-class MatchingUnderstandingUnitTest(unittest.TestCase):
-    def test_empty_profile_starts_with_every_dimension_unexplored(self) -> None:
-        progress = calculate_matching_understanding([])
+class VibeProgressTest(unittest.TestCase):
+    def test_milestones_follow_filled_areas(self) -> None:
+        self.assertEqual(vibe_progress({}).milestone, "starting")
+        self.assertEqual(vibe_progress(lines("humor")).milestone, "starting")
+        self.assertEqual(vibe_progress(lines("humor", "values")).milestone, "first_impressions")
+        self.assertEqual(vibe_progress(lines(*BASIC_AREA_IDS)).milestone, "basics")
+        self.assertEqual(
+            vibe_progress(lines(*BASIC_AREA_IDS, *DEEPER_AREA_IDS[:3])).milestone,
+            "ready_to_match",
+        )
+        self.assertEqual(vibe_progress(lines(*VIBE_AREA_IDS)).milestone, "deep")
+        self.assertIsNone(vibe_progress(lines(*VIBE_AREA_IDS)).next_milestone)
+
+    def test_many_deeper_areas_without_the_basics_are_not_ready(self) -> None:
+        progress = vibe_progress(lines(*DEEPER_AREA_IDS))
+
+        self.assertEqual(progress.milestone, "first_impressions")
+        self.assertEqual(progress.next_milestone, "basics")
+
+    def test_model_updates_keep_only_known_areas_and_clean_lines(self) -> None:
+        updates = validate_vibe_updates(
+            {
+                "humor": "  Loves   dry jokes.  ",
+                "zodiac": "Leo",
+                "values": "",
+                "interests": None,
+                "conflict": "x" * 400,
+            }
+        )
+
+        self.assertEqual(updates["humor"], "Loves dry jokes.")
+        self.assertNotIn("zodiac", updates)
+        self.assertNotIn("values", updates)
+        self.assertNotIn("interests", updates)
+        self.assertLessEqual(len(updates["conflict"]), 220)
+        self.assertEqual(validate_vibe_updates("humor"), {})
+
+    def test_merge_replaces_a_line_and_keeps_the_rest(self) -> None:
+        merged = merge_vibe({"humor": "Old.", "values": "Kept."}, {"humor": "New."})
+
+        self.assertEqual(merged, {"humor": "New.", "values": "Kept."})
+
+
+class MatchingUnderstandingTest(unittest.TestCase):
+    def test_empty_card_starts_with_every_area_open_basics_first(self) -> None:
+        progress = calculate_matching_understanding({})
 
         self.assertEqual(progress.level, "starting")
         self.assertEqual(progress.breadth_percent, 0)
-        self.assertEqual(progress.depth_percent, 0)
-        self.assertEqual(progress.foundation_covered, 0)
-        self.assertEqual(progress.unexplored_dimensions, MATCHING_DIMENSIONS)
+        self.assertEqual(set(progress.unexplored_dimensions), set(MATCHING_DIMENSIONS))
+        self.assertEqual(progress.unexplored_dimensions[: len(BASIC_AREA_IDS)], BASIC_AREA_IDS)
 
-    def test_existing_interested_in_profile_counts_as_confirmed_desired_partner(self) -> None:
-        progress = calculate_matching_understanding(
-            [],
-            user_profile={"interested_in": "women"},
-        )
-        desired_partner = next(
-            item for item in progress.dimensions if item.id == "desired_partner"
-        )
+    def test_prompt_states_the_goal_and_what_is_known(self) -> None:
+        progress = calculate_matching_understanding({"humor": "Laughs at deadpan jokes."})
+        prompt = matching_understanding_prompt(progress, now=NOW)
 
-        self.assertEqual(desired_partner.depth, "deep")
-        self.assertEqual(progress.foundation_covered, 1)
+        self.assertIn("who this user would truly get along with as a friend", prompt)
+        self.assertIn("not a checklist", prompt)
+        self.assertIn("- humor: Laughs at deadpan jokes.", prompt)
+        self.assertIn("friend wish:", prompt)
+        self.assertNotIn("New (", prompt)
 
-    def test_three_foundation_areas_reach_soft_basic_level(self) -> None:
-        progress = calculate_matching_understanding(
-            [
-                matching_fact("relationship_intent"),
-                matching_fact("age_preference"),
-                matching_fact("location_preference"),
-            ]
-        )
+    def test_new_milestone_is_news_for_a_day_only(self) -> None:
+        areas = lines(*BASIC_AREA_IDS)
+        fresh = calculate_matching_understanding(areas, milestone_reached_at=NOW - timedelta(hours=3))
+        stale = calculate_matching_understanding(areas, milestone_reached_at=NOW - timedelta(days=2))
 
-        self.assertEqual(progress.level, "basic")
-        self.assertEqual(progress.foundation_covered, 3)
-        self.assertIn("desired_partner", progress.unexplored_dimensions)
-
-    def test_useful_level_needs_breadth_beyond_foundation(self) -> None:
-        progress = calculate_matching_understanding(
-            [
-                matching_fact("relationship_intent"),
-                matching_fact("desired_partner"),
-                matching_fact("age_preference"),
-                matching_fact("location_preference"),
-                matching_fact("values"),
-                matching_fact("lifestyle"),
-                matching_fact("communication"),
-            ]
-        )
-
-        self.assertEqual(progress.level, "useful")
-        self.assertEqual(progress.foundation_covered, 4)
-
-    def test_repeated_evidence_deepens_a_dimension(self) -> None:
-        progress = calculate_matching_understanding(
-            [
-                matching_fact(
-                    "partner_qualities",
-                    evidence=[
-                        {"conversation_id": "c", "message_index": 1, "text": "kind"},
-                        {"conversation_id": "c", "message_index": 5, "text": "emotionally mature"},
-                    ],
-                )
-            ]
-        )
-        personality = next(
-            item for item in progress.dimensions if item.id == "desired_personality"
-        )
-
-        self.assertEqual(personality.depth, "deep")
-        self.assertEqual(personality.evidence_count, 2)
-        self.assertNotIn("desired_personality", progress.can_deepen_dimensions)
-
-    def test_candidate_fact_is_only_mentioned(self) -> None:
-        progress = calculate_matching_understanding(
-            [matching_fact("location_preference", confidence=0.95, confidence_state="candidate")]
-        )
-        location = next(
-            item for item in progress.dimensions if item.id == "location_preference"
-        )
-
-        self.assertEqual(location.depth, "mentioned")
-        self.assertIn("location_preference", progress.can_deepen_dimensions)
-
-    def test_rejected_and_non_matching_facts_do_not_advance_progress(self) -> None:
-        progress = calculate_matching_understanding(
-            [
-                matching_fact("relationship_intent", status="rejected"),
-                matching_fact("age_preference", used_for_matching=False),
-            ]
-        )
-
-        self.assertEqual(progress.level, "starting")
-        self.assertEqual(progress.foundation_covered, 0)
-
-    def test_labels_and_evidence_are_not_keyword_scanned(self) -> None:
-        fact = matching_fact("other", key="miscellaneous")
-        fact["label"] = "Wants a serious partner from Bengaluru aged 25 to 30"
-        fact["evidence"] = [{"text": "I want a serious partner from Bengaluru aged 25 to 30"}]
-
-        progress = calculate_matching_understanding([fact])
-
-        self.assertEqual(progress.foundation_covered, 0)
-        self.assertEqual(progress.known_dimensions, ())
+        self.assertIn("New (about 3 hours ago)", matching_understanding_prompt(fresh, now=NOW))
+        self.assertIn("in your own words", matching_understanding_prompt(fresh, now=NOW))
+        self.assertNotIn("New (", matching_understanding_prompt(stale, now=NOW))
 
     def test_listener_first_planner_receives_a_private_discovery_hint_when_open(self) -> None:
-        progress = calculate_matching_understanding(
-            [matching_fact("location_preference", confidence=0.5)]
-        )
+        progress = calculate_matching_understanding(lines("humor"))
 
         plan = build_conversation_plan(
             user_text="I have a quiet evening today.",
@@ -163,19 +114,17 @@ class MatchingUnderstandingUnitTest(unittest.TestCase):
         )
 
         self.assertTrue(plan.matching_discovery_allowed)
-        self.assertEqual(plan.matching_discovery_topics[0], "location_preference")
-        self.assertIn("relationship_intent", plan.matching_discovery_topics)
+        self.assertEqual(plan.matching_discovery_topics[0], "friend_wish")
+        self.assertNotIn("humor", plan.matching_discovery_topics)
 
     def test_listener_first_planner_defers_discovery_for_a_listening_boundary(self) -> None:
-        progress = calculate_matching_understanding([matching_fact("location_preference")])
-
         plan = build_conversation_plan(
             user_text="Bas meri baat suno, questions mat puchna.",
             intent=ContextQueryIntent(),
             topic_states=[],
             emotion_state=EmotionState(),
             conversational_stance=ConversationalStance(constraints=("listen_only", "no_questions")),
-            matching_understanding=progress,
+            matching_understanding=calculate_matching_understanding({}),
             listener_first=True,
         )
 
@@ -183,100 +132,61 @@ class MatchingUnderstandingUnitTest(unittest.TestCase):
         self.assertEqual(plan.matching_discovery_topics, ())
 
 
-class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
+class VibeCardStorageTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_db()
 
-    def test_v3_projects_canonical_matching_memory_into_progress(self) -> None:
+    def test_milestone_time_moves_only_when_the_milestone_changes(self) -> None:
+        first = update_vibe_card("vibe-user", lines("humor", "values"), now=NOW)
+        later = update_vibe_card("vibe-user", {"humor": "Rewritten."}, now=NOW + timedelta(hours=5))
+
+        self.assertEqual(first["milestone"], "first_impressions")
+        self.assertEqual(later["milestone"], "first_impressions")
+        self.assertEqual(
+            get_vibe_card("vibe-user")["milestone_reached_at"].replace(tzinfo=timezone.utc),
+            NOW,
+        )
+        self.assertEqual(get_vibe_card("vibe-user")["areas"]["humor"], "Rewritten.")
+
+    def test_removing_a_line_can_drop_the_milestone(self) -> None:
+        update_vibe_card("vibe-user", lines("humor", "values"), now=NOW)
+        saved = update_vibe_card("vibe-user", {}, remove=("values",))
+
+        self.assertEqual(saved["areas"], lines("humor"))
+        self.assertEqual(saved["milestone"], "starting")
+
+    def test_card_is_per_user(self) -> None:
+        update_vibe_card("vibe-user", lines("humor"))
+
+        self.assertEqual(get_vibe_card("other-user")["areas"], {})
+
+
+class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        reset_db()
         save_conversation(
-            {
-                "id": "matching-conversation",
-                "status": "active",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": "I want a serious relationship.",
-                    }
-                ],
-            },
+            {"id": "matching-conversation", "status": "active", "messages": []},
             "matching-user",
         )
-        create_agent_memory(
-            {
-                "user_id": "matching-user",
-                "kind": "semantic",
-                "purposes": ["matching"],
-                "key": "relationship_intent",
-                "value": "serious relationship",
-                "allowed_uses": ["reply_context"],
-                "confidence": 0.9,
-                "importance": 0.9,
-                "evidence": [
-                    {
-                        "conversation_id": "matching-conversation",
-                        "message_index": 0,
-                        "exact_quote": "I want a serious relationship.",
-                        "observed_at": "2026-09-16T10:00:00Z",
-                    }
-                ],
-            }
-        )
 
-        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v3"}, clear=True):
-            progress = build_matching_understanding(user_id="matching-user")
+    def test_build_reads_the_stored_card(self) -> None:
+        update_vibe_card("matching-user", lines("humor", "interests"))
 
-        relationship_intent = next(
-            item for item in progress.dimensions if item.id == "relationship_intent"
-        )
-        self.assertEqual(relationship_intent.depth, "clear")
-        self.assertEqual(progress.foundation_covered, 1)
+        progress = build_matching_understanding(user_id="matching-user")
 
-    def test_v3_profile_only_memory_does_not_advance_matching_progress(self) -> None:
-        save_conversation(
-            {
-                "id": "matching-conversation",
-                "status": "active",
-                "messages": [{"role": "user", "content": "I live in Bengaluru."}],
-            },
-            "matching-user",
-        )
-        create_agent_memory(
-            {
-                "user_id": "matching-user",
-                "kind": "semantic",
-                "purposes": ["profile"],
-                "key": "location_preference",
-                "value": "Bengaluru",
-                "allowed_uses": ["reply_context"],
-                "confidence": 0.95,
-                "importance": 0.7,
-                "evidence": [
-                    {
-                        "conversation_id": "matching-conversation",
-                        "message_index": 0,
-                        "exact_quote": "I live in Bengaluru.",
-                        "observed_at": "2026-09-16T10:00:00Z",
-                    }
-                ],
-            }
-        )
+        self.assertEqual(progress.level, "first_impressions")
+        self.assertEqual(progress.known_dimensions, ("humor", "interests"))
 
-        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v3"}, clear=True):
-            progress = build_matching_understanding(user_id="matching-user")
-
-        self.assertEqual(progress.foundation_covered, 0)
-
-    def test_v3_1_adds_quiet_progress_awareness_without_changing_v3(self) -> None:
-        upsert_profile_fact(normalize_data_point(matching_fact("relationship_intent")))
-        profile = {"user_id": "matching-user", "interested_in": "women"}
+    def test_v3_1_adds_the_friend_vibe_section_without_changing_v3(self) -> None:
+        update_vibe_card("matching-user", {"humor": "Laughs at deadpan jokes."})
         common = {
             "conversation_id": "matching-conversation",
             "user_text": "Today was exhausting, bas meri baat suno.",
             "user_id": "matching-user",
-            "user_profile": profile,
+            "user_profile": {"user_id": "matching-user"},
             "model": "llama-70b",
             "agent_tone": "auto",
-            "agent_name": "Annie",
+            "agent_name": "Omi",
             "style_source_id": None,
             "user_message_index": 0,
             "assistant_message_index": 1,
@@ -285,27 +195,12 @@ class MatchingUnderstandingContextIntegrationTest(unittest.TestCase):
         v3 = build_model_context_package(**common, prompt_version_id="v3")
         v3_1 = build_model_context_package(**common, prompt_version_id="v3-1")
 
-        self.assertEqual(v3_1.prompt_version, "v3-1")
-        self.assertEqual(v3_1.snapshot["summary"]["engine_version"], "context_v3_1")
-        self.assertEqual(v3_1.snapshot["summary"]["matching_foundation_covered"], 2)
         self.assertEqual(v3_1.snapshot["context"]["matching_understanding"]["level"], "starting")
-        self.assertIn("listen_only", v3_1.snapshot["summary"]["user_constraints"])
         self.assertFalse(v3_1.snapshot["summary"]["matching_discovery_allowed"])
-        self.assertEqual(
-            v3_1.snapshot["context"]["conversation_plan"]["matching_discovery_topics"],
-            [],
-        )
-        self.assertNotIn("## Matching Understanding", v3.system_prompt)
-        self.assertIn("## Matching Understanding", v3_1.system_prompt)
-        self.assertNotIn("Current understanding level: starting", v3_1.system_prompt)
-        self.assertNotIn("Foundation understood: 2 of 5", v3_1.system_prompt)
-        self.assertIn("Known areas: relationship intent, desired partner", v3_1.system_prompt)
-        self.assertIn("not a checklist, target, or completion gate", v3_1.system_prompt)
-        self.assertIn("Do not ask about a missing area merely because it is missing", v3_1.system_prompt)
-        self.assertIn("does not provide a user-facing score or level", v3_1.system_prompt)
-        self.assertIn("Never invent or reveal understanding levels", v3_1.system_prompt)
+        self.assertNotIn("## Friend Vibe", v3.system_prompt)
+        self.assertIn("## Friend Vibe", v3_1.system_prompt)
+        self.assertIn("- humor: Laughs at deadpan jokes.", v3_1.system_prompt)
         self.assertIn("A correction replaces the earlier meaning exactly", v3_1.system_prompt)
-        self.assertIn("Do not merely paraphrase", v3_1.system_prompt)
         self.assertNotIn("matching_understanding", v3.snapshot["context"])
 
 
