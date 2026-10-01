@@ -1,7 +1,7 @@
 import { Check, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
-import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, vibeStepIndex } from "../vibe";
+import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, evidenceChatPath, vibeStepIndex } from "../vibe";
 
 // The user's vibe: what Omi has understood about who they'd get along with.
 // Everything here is learned in chat; the user can only remove a line that is wrong.
@@ -78,24 +78,37 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                     <div className="vibe-card-top">
                       <h3>{VIBE_AREA_LABELS[area.id] || area.id}</h3>
                       {area.strength ? (
-                        <span className={`vibe-strength is-${area.strength}`} title={area.strength === "clear" ? "You've said this more than once." : "You've said this once; Omi will check as you chat."}>
-                          {area.strength === "clear" ? "Clear" : "Said once"}
-                        </span>
+                        <button
+                          type="button"
+                          className={`vibe-strength is-${area.strength}`}
+                          onClick={() => setOpenWhy(openWhy === area.id ? null : area.id)}
+                          aria-expanded={openWhy === area.id}
+                          title="See what you said"
+                        >
+                          {area.strength === "clear" ? "Clear" : "Said once"} · {area.evidence_count || 0}
+                        </button>
                       ) : null}
                     </div>
                     <p>{area.text || "Not yet. Omi picks this up as you chat."}</p>
-                    {area.text && openWhy === area.id && area.quotes.length ? (
-                      <ul className="vibe-quotes" aria-label="What you said">
-                        {area.quotes.map((quote, index) => <li key={index}>“{quote}”</li>)}
-                      </ul>
+                    {area.text && openWhy === area.id ? (
+                      area.evidence.length ? (
+                        <ul className="vibe-quotes" aria-label="What you said">
+                          {area.evidence.map((item) => (
+                            <li key={`${item.conversation_id}:${item.message_index}`}>
+                              <span>“{item.quote}”</span>
+                              <small>
+                                {item.sent_at ? new Date(item.sent_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " · " : ""}
+                                <a href={evidenceChatPath(item)} onClick={(event) => { event.preventDefault(); openInChat(evidenceChatPath(item)); }}>Open in chat</a>
+                              </small>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="vibe-no-proof">No messages linked. This line was written before Omi kept proof.</p>
+                      )
                     ) : null}
                     {area.text ? (
                       <div className="vibe-card-actions">
-                        {area.quotes.length ? (
-                          <button type="button" className="vibe-why" onClick={() => setOpenWhy(openWhy === area.id ? null : area.id)} aria-expanded={openWhy === area.id}>
-                            {openWhy === area.id ? "Hide" : "Why?"}
-                          </button>
-                        ) : null}
                         <button type="button" className="vibe-remove" onClick={() => void remove(area)} disabled={removing === area.id} aria-label={`Remove: ${VIBE_AREA_LABELS[area.id] || area.id}`}>
                           <X aria-hidden="true" />
                           {removing === area.id ? "Removing…" : "Not right"}
@@ -111,4 +124,9 @@ export function VibePage({ onChat }: { onChat: () => void }) {
       ) : null}
     </section>
   );
+}
+
+function openInChat(path: string) {
+  window.history.pushState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }

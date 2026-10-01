@@ -7,8 +7,10 @@ export type VibeArea = {
   // clear: seen in 2+ of the user's messages; mentioned: once. Milestones past the first need clear.
   strength: "clear" | "mentioned" | null;
   evidence_count: number;
-  quotes: string[];
+  // The user's own messages behind the line, newest first.
+  evidence: VibeEvidence[];
 };
+export type VibeEvidence = { quote: string; conversation_id: string; message_index: number; sent_at: string | null };
 export type Vibe = {
   milestone: string;
   next_milestone: string | null;
@@ -54,4 +56,9 @@ export function milestoneFromEvent(event: RealtimeEvent, conversationId: string 
   const milestone = typeof event.payload.milestone === "string" ? event.payload.milestone : "";
   const previous = typeof event.payload.previous === "string" ? event.payload.previous : "starting";
   return vibeStepIndex(milestone) > vibeStepIndex(previous) ? milestone : null;
+}
+
+// Opens the chat at that message; ChatPage scrolls to #message-N and highlights it.
+export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "message_index">): string {
+  return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;
 }

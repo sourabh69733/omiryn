@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { milestoneFromEvent, vibeStepNote } from "./vibe";
+import { evidenceChatPath, milestoneFromEvent, vibeStepNote } from "./vibe";
 
 const reached = (milestone: string, previous: string, id = "c1") => ({ type: "vibe.milestone", scope: "conversation" as const, scope_id: id, version: 1, payload: { milestone, previous } });
 
@@ -18,4 +18,8 @@ test("other chats, other events and steps back are ignored", () => {
 test("every milestone past starting has a note", () => {
   assert.equal(vibeStepNote("starting"), null);
   assert.ok(vibeStepNote("ready_to_match"));
+});
+
+test("proof links open the chat at that message", () => {
+  assert.equal(evidenceChatPath({ conversation_id: "a b", message_index: 7 }), "/?conversation_id=a%20b#message-7");
 });
