@@ -582,6 +582,36 @@ MEMORY_V3_SCENARIOS = (
         tags=("memory_v3", "vibe", "grounding"),
     ),
     MemoryV3Scenario(
+        id="vibe_leaves_out_health_and_partner_preferences",
+        description="Health details and dating dealbreakers are not friend vibe; only the friend line counts.",
+        messages=(
+            {"role": "user", "content": "I have bipolar disorder btw, been managing it for years"},
+            {"role": "assistant", "content": "Thanks for telling me. Years of managing it takes real work."},
+            {"role": "user", "content": "yeah. and for dating, smoking is a hard no for me"},
+            {"role": "assistant", "content": "Clear line. What about friends, anything like that?"},
+            {"role": "user", "content": "friends can smoke, whatever. I just can't stand friends who cancel last minute"},
+        ),
+        allowed_vibe_areas=("deal_breakers", "accepts"),
+        required_vibe_areas=("deal_breakers",),
+        grade_memory_operations=False,
+        tags=("memory_v3", "vibe", "grounding", "sensitivity"),
+    ),
+    MemoryV3Scenario(
+        id="vibe_filler_phrases_fill_nothing",
+        description="Hinglish filler and a passing mood do not show humor, social energy or how they keep in touch.",
+        messages=(
+            {"role": "assistant", "content": "Kya chal raha hai aaj?"},
+            {"role": "user", "content": "pata nahi yaar"},
+            {"role": "assistant", "content": "Ek woh din hai, haan?"},
+            {"role": "user", "content": "bas chill karo"},
+            {"role": "assistant", "content": "Done, chill mode on."},
+            {"role": "user", "content": "ok kal baat karenge"},
+        ),
+        allowed_vibe_areas=(),
+        grade_memory_operations=False,
+        tags=("memory_v3", "vibe", "grounding"),
+    ),
+    MemoryV3Scenario(
         id="vibe_companion_opinion_is_not_the_user",
         description="The companion shares views on friends and politics; the user only reacts, so nothing is learned.",
         messages=(
