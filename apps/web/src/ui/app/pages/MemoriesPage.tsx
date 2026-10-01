@@ -49,36 +49,6 @@ export function MemoriesPage() {
   const canonicalMemoryGroups = partitionCanonicalMemories(canonicalMemories);
   const canonicalSections = groupCanonicalMemories(canonicalMemoryGroups.active);
   const showRejectedCanonical = visibleSectionCounts["rejected-canonical"] !== undefined;
-  const facts = data?.learned_facts || [];
-  const activeFacts = facts.filter((fact) => fact.status !== "rejected");
-  const rejectedFacts = facts.filter((fact) => fact.status === "rejected");
-  const needsReviewFacts = activeFacts.filter((fact) => !fact.feedback && (fact.confidence || 0) < 0.75);
-  const needsReviewIds = new Set(needsReviewFacts.map((fact) => fact.id));
-  const reviewRemainingFacts = activeFacts.filter((fact) => !needsReviewIds.has(fact.id));
-  const confirmationFacts = reviewRemainingFacts.filter((fact) => dataPointType(fact) === "needs_confirmation");
-  const confirmationIds = new Set(confirmationFacts.map((fact) => fact.id));
-  const typedFacts = reviewRemainingFacts.filter((fact) => !confirmationIds.has(fact.id));
-  const profileFacts = typedFacts.filter((fact) => dataPointType(fact) === "profile_fact");
-  const profileIds = new Set(profileFacts.map((fact) => fact.id));
-  const matchingFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && dataPointType(fact) === "matching_fact");
-  const matchingIds = new Set(matchingFacts.map((fact) => fact.id));
-  const temporaryFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && !matchingIds.has(fact.id) && dataPointType(fact) === "temporary_context");
-  const temporaryIds = new Set(temporaryFacts.map((fact) => fact.id));
-  const chatFacts = typedFacts.filter((fact) => !profileIds.has(fact.id) && !matchingIds.has(fact.id) && !temporaryIds.has(fact.id) && dataPointType(fact) === "chat_learning");
-  const typedIds = new Set([...profileIds, ...matchingIds, ...temporaryIds, ...chatFacts.map((fact) => fact.id)]);
-  const otherFacts = typedFacts.filter((fact) => !typedIds.has(fact.id));
-  const notUsedFacts = rejectedFacts;
-  const factSections: Array<{ id: string; title: string; summary: string; rows: ProfileFact[] }> = [
-    { id: "review", title: "Review these signals", summary: "Tell Omiryn if these are right or wrong. This improves what it remembers about you.", rows: needsReviewFacts },
-    { id: "profile", title: "Profile facts", summary: "Stable basics about you, like location, language, identity, or life background.", rows: profileFacts },
-    { id: "matching", title: "Matching facts", summary: "Preferences, values, boundaries, relationship intent, lifestyle, and compatibility signals.", rows: matchingFacts },
-    { id: "chat", title: "Chat learning", summary: "How Omiryn should talk with you: tone, pacing, question style, humor, and sensitivities.", rows: chatFacts },
-    { id: "temporary", title: "Temporary context", summary: "Short-lived context from the current phase of life or current conversation.", rows: temporaryFacts },
-    { id: "confirmation", title: "Needs confirmation", summary: "Possible signals Omiryn should ask about before trusting or using strongly.", rows: confirmationFacts },
-    { id: "other", title: "Other saved signals", summary: "Older or imported signals that do not yet map cleanly to the V2 types.", rows: otherFacts }
-  ].filter((section) => section.rows.length);
-  const showNotUsed = visibleSectionCounts["not-used"] !== undefined;
-
   async function importContext(event: FormEvent) {
     event.preventDefault();
     if (content.trim().length < 20) return;
@@ -281,92 +251,13 @@ export function MemoriesPage() {
     );
   }
 
-  function renderSignalCard(fact: ProfileFact, sectionId = "") {
-    const confidence = Math.round((fact.confidence || 0) * 100);
-    const hasEvidence = Boolean(fact.evidence?.length);
-    const isSaving = savingFactId === fact.id;
-    const wasRejected = fact.status === "rejected";
-    const values = signalValues(fact);
-    return (
-      <article className={`profile-fact-card signal-review-card ${wasRejected ? "is-rejected" : ""}`} key={fact.id}>
-        <div className="profile-fact-card-top">
-          <div>
-            <strong>{fact.label || fact.key}</strong>
-            {values.length ? <p className="profile-fact-values">{values.join(" · ")}</p> : null}
-            <div className="profile-fact-meta">
-              <span className={`confidence-pill ${confidenceLevel(fact.confidence)}`}>{confidenceLabel(fact.confidence)} · {confidence}%</span>
-              <span className="fact-tag fact-tag-type">{humanizeDataPointType(dataPointType(fact))}</span>
-              {fact.category ? <span className="fact-tag fact-tag-key">{humanizeLabel(fact.category)}</span> : null}
-              {fact.confidence_state && fact.confidence_state !== "active" ? <span className="fact-tag fact-tag-status">{humanizeLabel(fact.confidence_state)}</span> : null}
-              {hasEvidence ? (
-                <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceItem(fact)}>
-                  {fact.evidence?.length} evidence
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        {fact.feedback?.rating ? <p>{fact.feedback.rating === "agree" ? "Feedback saved: feels right." : "Feedback saved: not true."}</p> : null}
-        <div className="signal-card-actions">
-          {!wasRejected ? (
-            <>
-              {sectionId === "review" ? (
-                <>
-                  <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => void saveSignalFeedback(fact, "agree")}>Looks right</button>
-                  <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(fact, "disagree")}>Correct / mark wrong</button>
-                </>
-              ) : (
-                <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(fact)}>Review accuracy</button>
-              )}
-              <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(fact)}>Usage</button>
-            </>
-          ) : (
-            <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void patchFact(fact, { status: "active", confirmed: false }, "learned_signal_restored")}>Restore</button>
-          )}
-        </div>
-      </article>
-    );
-  }
-
-  function renderFactSection(section: { id: string; title: string; summary: string; rows: ProfileFact[] }) {
-    const visibleCount = visibleSectionCounts[section.id] || 5;
-    const visibleRows = section.rows.slice(0, visibleCount);
-    const hasMore = visibleCount < section.rows.length;
-    return (
-      <section className={`profile-fact-group signal-section signal-section-${section.id}`} key={section.id}>
-        <div className="profile-fact-group-heading">
-          <div>
-            <h3>{section.title}</h3>
-            <p>{section.summary}</p>
-          </div>
-          <span>{section.rows.length}</span>
-        </div>
-        <div className="profile-fact-list">
-          {visibleRows.map((fact) => renderSignalCard(fact, section.id))}
-        </div>
-        {section.rows.length > 5 ? (
-          <button
-            className="secondary-button signal-show-more"
-            type="button"
-            onClick={() => setVisibleSectionCounts((current) => ({
-              ...current,
-              [section.id]: hasMore ? visibleCount + 5 : 5
-            }))}
-          >
-            {hasMore ? `Show ${Math.min(5, section.rows.length - visibleCount)} more` : "Show less"}
-          </button>
-        ) : null}
-      </section>
-    );
-  }
-
   return (
     <section className="screen style-screen">
       <div className="style-hero">
         <div className="screen-copy compact">
           <p className="eyebrow">Memories</p>
           <h1>What Omiryn remembers.</h1>
-          <p>Review AI-inferred signals, confirm what feels right, and control what Omiryn can use.</p>
+          <p>Review what Omiryn has learned, confirm what feels right, and control what it can use.</p>
         </div>
       </div>
       <div className="style-snapshot-grid" aria-label="Memory summary">
@@ -384,11 +275,6 @@ export function MemoriesPage() {
           <span>Matching use</span>
           <strong>{canonicalMemories.filter((memory) => memory.allowed_uses?.includes("matching")).length}</strong>
           <small>Allowed to support future matching</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>Legacy signals</span>
-          <strong>{activeFacts.length}</strong>
-          <small>Saved by the previous data-point system</small>
         </div>
       </div>
       <div className="style-layout">
@@ -426,42 +312,6 @@ export function MemoriesPage() {
                 <div className="profile-fact-list">{canonicalMemoryGroups.rejected.map(renderCanonicalMemory)}</div>
               </section>
             ) : null}
-          </div>
-        </section>
-        <section className="profile-panel profile-panel-wide style-learning-panel">
-          <div className="panel-heading profile-facts-heading">
-            <div>
-              <p className="eyebrow">Legacy signals</p>
-              <h2>Earlier learned data points</h2>
-              <p>These were saved by the earlier data-point system and remain visible for review.</p>
-              <p className="privacy-note">Marked-wrong signals are not used for personalization or matching. High-confidence rejections ask for a correction to help the AI improve.</p>
-            </div>
-            <span className="profile-fact-total">{facts.length} signals</span>
-          </div>
-          <div className="profile-fact-groups">
-            {facts.length ? factSections.map(renderFactSection) : <div className="profile-facts-empty"><strong>No learned signals yet.</strong><span>Chat naturally with Omiryn and this section will fill up.</span></div>}
-            {notUsedFacts.length ? (
-              <div className="signal-archive-toggle-row">
-                <button
-                  className="secondary-button signal-show-more"
-                  type="button"
-                  onClick={() => setVisibleSectionCounts((current) => {
-                    const next = { ...current };
-                    if (showNotUsed) delete next["not-used"];
-                    else next["not-used"] = 5;
-                    return next;
-                  })}
-                >
-                  {showNotUsed ? "Hide not used signals" : `Show not used signals (${notUsedFacts.length})`}
-                </button>
-              </div>
-            ) : null}
-            {showNotUsed ? renderFactSection({
-              id: "not-used",
-              title: "Not used by Omiryn",
-              summary: "Signals you turned off or marked wrong. Omiryn will not use them for personalization or matching.",
-              rows: notUsedFacts
-            }) : null}
           </div>
         </section>
 
