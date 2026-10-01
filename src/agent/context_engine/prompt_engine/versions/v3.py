@@ -58,7 +58,6 @@ V3_PROMPT_VERSION = PromptBehaviorVersion(
         "allow_imagined_scenes": True,
         "emotional_depth": "light_to_medium",
         "avoid_repeated_topics": True,
-        "use_topic_state": True,
     },
     data_point_targets=VIBE_AREA_IDS,
     prompt_contract="""Choose the turn in this strict order:

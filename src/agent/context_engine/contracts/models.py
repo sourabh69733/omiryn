@@ -31,18 +31,6 @@ class ContextBlock:
 
 
 @dataclass(frozen=True)
-class TopicState:
-    topic_id: str
-    label: str
-    bucket: str
-    status: str
-    depth: str = "shallow"
-    last_seen_turns_ago: int | None = None
-    repeat_count: int = 0
-    user_interest: str = "unknown"
-
-
-@dataclass(frozen=True)
 class ThreadReference:
     """Small private thread record used by foreground planning."""
 
