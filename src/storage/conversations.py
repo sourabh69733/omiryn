@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from .database import ENGINE
 from .schema import (
+    user_profiles,
     agent_memory_embeddings,
     agent_memory_reviews,
     agent_self_notes,
@@ -147,14 +148,20 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
     }
 
 
-def list_conversation_user_ids() -> list[str]:
-    """Every user who has at least one chat (for maintenance scripts)."""
+def list_conversation_user_ids(*, with_profile: bool = False) -> list[str]:
+    """Every user who has at least one chat (for maintenance scripts). with_profile keeps only
+    users who signed up, which leaves out eval and test accounts."""
+    statement = (
+        select(agent_conversations.c.user_id)
+        .where(agent_conversations.c.user_id.is_not(None))
+        .distinct()
+    )
+    if with_profile:
+        statement = statement.where(
+            agent_conversations.c.user_id.in_(select(user_profiles.c.user_id))
+        )
     with ENGINE.begin() as connection:
-        rows = connection.execute(
-            select(agent_conversations.c.user_id)
-            .where(agent_conversations.c.user_id.is_not(None))
-            .distinct()
-        ).scalars().all()
+        rows = connection.execute(statement).scalars().all()
     return sorted(str(user_id) for user_id in rows)
 
 

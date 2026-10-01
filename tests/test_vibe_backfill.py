@@ -10,7 +10,14 @@ from agent.cognition.background.vibe_backfill import (
     chat_transcript,
 )
 from agent.cognition.background.vibe_prompt import VIBE_BACKFILL_SYSTEM_PROMPT
-from storage import get_vibe_card, list_conversation_user_ids, reset_db, save_conversation, update_vibe_card
+from storage import (
+    get_vibe_card,
+    list_conversation_user_ids,
+    reset_db,
+    save_conversation,
+    save_user_profile,
+    update_vibe_card,
+)
 
 USER_ID = "vibe-backfill-user"
 MESSAGES = [
@@ -81,8 +88,11 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "no_messages")
         provider.assert_not_awaited()
 
-    def test_lists_users_with_chats(self) -> None:
+    def test_lists_users_with_chats_and_can_skip_test_accounts(self) -> None:
         self.assertIn(USER_ID, list_conversation_user_ids())
+        self.assertNotIn(USER_ID, list_conversation_user_ids(with_profile=True))
+        save_user_profile(USER_ID, "woman", "everyone", "Asha", 22, "Pune")
+        self.assertIn(USER_ID, list_conversation_user_ids(with_profile=True))
 
 
 class ChatTranscriptTest(unittest.TestCase):
@@ -105,6 +115,8 @@ class ChatTranscriptTest(unittest.TestCase):
     def test_prompt_shares_the_grounding_rules(self) -> None:
         self.assertIn("never fill an area just because it is empty", VIBE_BACKFILL_SYSTEM_PROMPT)
         self.assertIn("returning {} is fine", VIBE_BACKFILL_SYSTEM_PROMPT)
+        self.assertIn("Never health, mental health", VIBE_BACKFILL_SYSTEM_PROMPT)
+        self.assertIn("dating or marriage partner are not friend preferences", VIBE_BACKFILL_SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":

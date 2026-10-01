@@ -3,7 +3,8 @@
 
 Reads each user's past chats and asks the model for their friend vibe, with the same rules as the
 live background step. Dry run by default: prints which areas would be filled. Pass --apply to
-write. Users who already have a card are skipped unless --force (then lines are merged).
+write. Users who already have a card are skipped unless --force (then lines are merged). Only users who
+signed up (have a profile) are included unless --all-users.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ from storage import init_db, list_conversation_user_ids  # noqa: E402
 
 async def run(args: argparse.Namespace) -> int:
     init_db()
-    user_ids = [args.user] if args.user else list_conversation_user_ids()
+    user_ids = (
+        [args.user] if args.user else list_conversation_user_ids(with_profile=not args.all_users)
+    )
     failed = 0
     for user_id in user_ids:
         try:
@@ -49,6 +52,9 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Write the vibe cards.")
     parser.add_argument("--force", action="store_true", help="Also users who already have a card.")
     parser.add_argument("--user", help="Only this user id.")
+    parser.add_argument(
+        "--all-users", action="store_true", help="Include eval and test accounts (no profile)."
+    )
     parser.add_argument("--show", action="store_true", help="Print the lines, not just area names.")
     return asyncio.run(run(parser.parse_args()))
 
