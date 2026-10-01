@@ -14,6 +14,7 @@ from agent.memory_engine.memories.vibe import (
     vibe_texts,
     vibe_progress,
 )
+from agent.cognition.background.vibe_verify import verify_vibe_updates
 from agent.providers import analyze_vibe_backfill
 from storage import get_vibe_card, list_conversations, update_vibe_card
 
@@ -56,6 +57,15 @@ async def backfill_user_vibe(
         resolve_evidence=lambda ref: refs.get(ref) if isinstance(ref, str) else None,
         max_updates=len(VIBE_AREA_IDS),
     )
+    if updates:
+        messages = {row["id"]: row.get("messages") or [] for row in conversations}
+        # A second call keeps only proof that really shows each line; a failed check writes nothing.
+        updates = await verify_vibe_updates(
+            updates,
+            lambda item: _message_text(messages, item),
+            conversation_id=conversations[0]["id"],
+            timeout_seconds=timeout_seconds,
+        )
     milestone = vibe_progress(merge_vibe(current["areas"], updates)).milestone
     if not updates:
         return {"status": "nothing_found", "areas": {}, "milestone": milestone}
@@ -67,13 +77,13 @@ async def backfill_user_vibe(
 
 def chat_transcript(
     conversations: list[dict[str, Any]],
-) -> tuple[str, datetime | None, dict[str, tuple[str, int]]]:
+) -> tuple[str, datetime | None, dict[str, dict[str, Any]]]:
     """Chats oldest first as "[m3] user: ..." / "companion: ..." lines, trimmed to the budget.
 
-    Only user lines get an id; refs maps each id still in the text to (conversation_id, index),
+    Only user lines get an id; refs maps each id still in the text to its evidence item,
     so a vibe line can cite only user messages the model actually saw.
     """
-    lines: list[tuple[str, str | None, tuple[str, int] | None]] = []
+    lines: list[tuple[str, str | None, dict[str, Any] | None]] = []
     has_user_text = False
     last_sent_at: datetime | None = None
     next_id = 1
@@ -88,7 +98,10 @@ def chat_transcript(
                 has_user_text = True
                 ref_id = f"m{next_id}"
                 next_id += 1
-                lines.append((f"[{ref_id}] user: {text[:MESSAGE_CHAR_LIMIT]}", ref_id, (conversation["id"], index)))
+                target = {"conversation_id": conversation["id"], "message_index": index}
+                if isinstance(message.get("created_at"), str):
+                    target["sent_at"] = message["created_at"]
+                lines.append((f"[{ref_id}] user: {text[:MESSAGE_CHAR_LIMIT]}", ref_id, target))
             else:
                 lines.append((f"companion: {text[:MESSAGE_CHAR_LIMIT]}", None, None))
             sent_at = _parse_time(message.get("created_at"))
@@ -96,7 +109,7 @@ def chat_transcript(
                 last_sent_at = sent_at
     if not has_user_text:
         return "", None, {}
-    kept: list[tuple[str, str | None, tuple[str, int] | None]] = []
+    kept: list[tuple[str, str | None, dict[str, Any] | None]] = []
     used = 0
     for line in reversed(lines):
         used += len(line[0]) + 1
@@ -106,6 +119,14 @@ def chat_transcript(
     kept.reverse()
     refs = {ref_id: target for _, ref_id, target in kept if ref_id and target}
     return "\n".join(text for text, _, _ in kept), last_sent_at, refs
+
+
+def _message_text(messages: dict[str, list[dict[str, Any]]], item: dict[str, Any]) -> str | None:
+    rows = messages.get(item["conversation_id"]) or []
+    index = item["message_index"]
+    if 0 <= index < len(rows) and rows[index].get("role") == "user":
+        return str(rows[index].get("content") or "") or None
+    return None
 
 
 def _parse_time(value: Any) -> datetime | None:

@@ -111,16 +111,21 @@ def interpret_background_cognition(
 
 def _user_message_resolver(batch: MemoryBatch):
     """Vibe evidence must be a user message the model saw in this batch."""
-    user_indexes = {
-        message.message_index
+    user_messages = {
+        message.message_index: message
         for message in batch.messages
         if message.role == "user" and message.content.strip()
     }
 
-    def resolve(ref: Any) -> tuple[str, int] | None:
-        if isinstance(ref, bool) or not isinstance(ref, int) or ref not in user_indexes:
+    def resolve(ref: Any) -> dict[str, Any] | None:
+        if isinstance(ref, bool) or not isinstance(ref, int) or ref not in user_messages:
             return None
-        return batch.conversation_id, ref
+        sent_at = user_messages[ref].sent_at
+        return {
+            "conversation_id": batch.conversation_id,
+            "message_index": ref,
+            **({"sent_at": sent_at} if sent_at else {}),
+        }
 
     return resolve
 

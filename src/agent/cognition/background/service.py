@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid5
@@ -29,6 +30,7 @@ from storage.profile_facts import save_data_point_extraction_debug
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card, update_vibe_card
+from agent.cognition.background.vibe_verify import verify_vibe_updates
 from agent.memory_engine.memories.vibe import vibe_texts
 from realtime import conversation_event, realtime_hub
 
@@ -64,6 +66,8 @@ from agent.memory_engine.processing.service import (
 )
 from agent.memory_engine.processing.validation import MemoryAnalysis
 from .coordination import interpret_background_cognition
+
+logger = logging.getLogger(__name__)
 
 
 MAX_EXISTING_MEMORIES = 8
@@ -251,6 +255,7 @@ async def _run_claimed_background_cognition(
     user_card = (get_user_card(user_id) or "") if memory_version == 3 else None
     self_notes = _self_note_context(user_id) if memory_version == 3 else None
     vibe_card = get_vibe_card(user_id) if memory_version == 3 else None
+    vibe_verified: dict[str, Any] | None = None
     application_result = None
     thread_application_result = None
     live_attempted = (
@@ -389,7 +394,7 @@ async def _run_claimed_background_cognition(
             and vibe_card is not None
             and (config.live_memory_writes or config.live_v3_memory_writes)
         ):
-            await _apply_vibe(conversation_id, user_id, vibe_card, cognition.vibe)
+            vibe_verified = await _apply_vibe(batch, vibe_card, cognition.vibe)
         next_handoff = analysis.handoff if analysis.valid else batch.previous_handoff
         current_state = state or MemoryProcessingState(
             conversation_id=conversation_id,
@@ -422,6 +427,8 @@ async def _run_claimed_background_cognition(
                 # Raw, so a missing card or note shows whether the model wrote it at all.
                 "user_card": raw.get("user_card"),
                 "vibe": raw.get("vibe"),
+                # After the proof check; None when nothing was checked.
+                "vibe_verified": vibe_verified,
                 "self_notes": raw.get("self_notes"),
             },
             review={
@@ -501,12 +508,31 @@ def _self_note_context(user_id: str) -> list[dict[str, Any]]:
 
 
 async def _apply_vibe(
-    conversation_id: str,
-    user_id: str,
+    batch: MemoryBatch,
     current: dict[str, Any],
     updates: dict[str, dict[str, Any]],
-) -> None:
-    saved = update_vibe_card(user_id, updates)
+) -> dict[str, Any] | None:
+    """Saves only lines the proof check confirms; returns what was saved (or an error marker)."""
+    conversation_id, user_id = batch.conversation_id, batch.user_id
+    quotes = {
+        message.message_index: message.content
+        for message in batch.messages
+        if message.role == "user"
+    }
+    try:
+        verified = await verify_vibe_updates(
+            updates,
+            lambda item: quotes.get(item["message_index"])
+            if item["conversation_id"] == conversation_id
+            else None,
+            conversation_id=conversation_id,
+        )
+    except Exception as error:  # an unchecked line is never saved
+        logger.warning("agent.vibe.verify_failed conversation_id=%s error=%s", conversation_id, error)
+        return {"error": f"{type(error).__name__}: {str(error)[:200]}"}
+    if not verified:
+        return {}
+    saved = update_vibe_card(user_id, verified)
     if saved["milestone"] != current["milestone"]:
         # The open chat shows it; the companion hears about it on its next reply.
         await realtime_hub.publish(
@@ -516,6 +542,7 @@ async def _apply_vibe(
                 payload={"milestone": saved["milestone"], "previous": current["milestone"]},
             )
         )
+    return verified
 
 
 def _apply_self_notes(batch: MemoryBatch, changes: SelfNoteChanges) -> None:
