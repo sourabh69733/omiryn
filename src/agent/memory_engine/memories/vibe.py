@@ -31,11 +31,17 @@ MAX_VIBE_LINE_CHARS = 220
 MAX_VIBE_UPDATES = 4
 
 # How a vibe line is written; shared by the live background prompt and the backfill.
-VIBE_LINE_RULES = """- A line is one or two plain sentences in the user's own terms, folding in the current line:
-  "<what they said, specific>". Write what they showed, not a label: not "funny", but what makes
-  them laugh.
+VIBE_LINE_RULES = """- A line is one or two plain English sentences, folding in the current line, even when the chat
+  is in Hindi or Hinglish: "<what they said, specific>". Describe; do not paste their words. Write
+  what they showed, not a label: not "funny", but what makes them laugh.
 - Only what the user said or plainly showed about themselves. Never guess from one word, never from
-  the companion's messages, and never fill an area just because it is empty."""
+  the companion's messages, and never fill an area just because it is empty.
+- A line needs a clear statement from the user about themselves, or a pattern across several
+  messages. A filler phrase ("chill", "pata nahi", "kal baat karenge"), a passing mood or a
+  reaction to the companion is not enough. A short chat rarely shows more than one or two areas.
+- Preferences about a dating or marriage partner are not friend preferences; leave them out unless
+  the user said they apply to friends too.
+- Never health, mental health, sexual or financial details, even when the user shared them."""
 
 # In order. "ready_to_match" is what matching will wait for.
 VIBE_MILESTONES = ("starting", "first_impressions", "basics", "ready_to_match", "deep")
