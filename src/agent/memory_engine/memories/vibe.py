@@ -30,6 +30,13 @@ VIBE_AREA_GOALS = {area_id: goal for area_id, _, goal in VIBE_AREAS}
 MAX_VIBE_LINE_CHARS = 220
 MAX_VIBE_UPDATES = 4
 
+# How a vibe line is written; shared by the live background prompt and the backfill.
+VIBE_LINE_RULES = """- A line is one or two plain sentences in the user's own terms, folding in the current line:
+  "<what they said, specific>". Write what they showed, not a label: not "funny", but what makes
+  them laugh.
+- Only what the user said or plainly showed about themselves. Never guess from one word, never from
+  the companion's messages, and never fill an area just because it is empty."""
+
 # In order. "ready_to_match" is what matching will wait for.
 VIBE_MILESTONES = ("starting", "first_impressions", "basics", "ready_to_match", "deep")
 VIBE_MILESTONE_MEANINGS = {
@@ -79,7 +86,7 @@ def vibe_progress(card: dict[str, str] | None) -> VibeProgress:
     )
 
 
-def validate_vibe_updates(raw: Any) -> dict[str, str]:
+def validate_vibe_updates(raw: Any, *, max_updates: int = MAX_VIBE_UPDATES) -> dict[str, str]:
     """Area lines the model rewrote. Unknown areas, empty lines and extras are dropped."""
     if not isinstance(raw, dict):
         return {}
@@ -93,7 +100,7 @@ def validate_vibe_updates(raw: Any) -> dict[str, str]:
         if len(line) > MAX_VIBE_LINE_CHARS:
             line = line[:MAX_VIBE_LINE_CHARS].rsplit(" ", 1)[0]
         updates[area_id] = line
-        if len(updates) >= MAX_VIBE_UPDATES:
+        if len(updates) >= max_updates:
             break
     return updates
 
@@ -111,6 +118,7 @@ __all__ = [
     "VIBE_AREAS",
     "VIBE_AREA_GOALS",
     "VIBE_AREA_IDS",
+    "VIBE_LINE_RULES",
     "VIBE_MILESTONES",
     "VIBE_MILESTONE_MEANINGS",
     "VibeProgress",

@@ -1,6 +1,7 @@
 """Defines the combined background-cognition prompt for v3 durable memories."""
 
 from agent.memory_engine.memories.prompt import V3_MEMORY_OUTPUT_SHAPE
+from agent.memory_engine.memories.vibe import VIBE_LINE_RULES
 
 
 BACKGROUND_COGNITION_V3_SYSTEM_PROMPT = """You analyze one bounded Omiryn conversation batch.
@@ -115,11 +116,7 @@ Vibe rules (who the user would get along with as a friend; Omiryn uses it to fin
 - vibe_areas lists each area's id and meaning; current_vibe has the lines written so far.
 - Return a line only for an area the NEW user messages clearly show something about. Most batches
   return {}. At most 4 areas.
-- A line is one or two plain sentences in the user's own terms, folding in the current line:
-  "<what they said, specific>". Write what they showed, not a label: not "funny", but what makes
-  them laugh.
-- Only what the user said or plainly showed about themselves. Never guess from one word, never from
-  the companion's messages, and never fill an area just because it is empty.
+""" + VIBE_LINE_RULES + """
 
 """ + V3_MEMORY_OUTPUT_SHAPE
 
