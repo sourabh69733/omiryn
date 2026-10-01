@@ -4,9 +4,10 @@ export type VibeArea = {
   id: string;
   stage: "basics" | "deeper";
   text: string | null;
-  // clear: seen in 2+ of the user's messages; mentioned: once. Milestones past the first need clear.
+  // clear: said on 2+ different days; mentioned: one day only. Milestones past the first need clear.
   strength: "clear" | "mentioned" | null;
   evidence_count: number;
+  evidence_days: number;
   // The user's own messages behind the line, newest first.
   evidence: VibeEvidence[];
 };
@@ -63,8 +64,9 @@ export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "m
   return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;
 }
 
-// The chip says how often the user said it; lines from before proof existed have no count.
-export function saidLabel(count: number): string {
+// The chip says how often the user said it. Only different days make it solid (green).
+export function saidLabel(count: number, days: number): string {
+  if (days >= 2) return `Said on ${days} days`;
   if (count <= 1) return "Said once";
-  return `Said ${count} times`;
+  return `Said ${count} times, one day`;
 }

@@ -85,7 +85,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                           aria-expanded={openWhy === area.id}
                           title="See what you said"
                         >
-                          {saidLabel(area.evidence_count)}
+                          {saidLabel(area.evidence_count, area.evidence_days)}
                         </button>
                       ) : null}
                     </div>

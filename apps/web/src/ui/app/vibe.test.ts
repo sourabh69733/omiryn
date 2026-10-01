@@ -24,8 +24,9 @@ test("proof links open the chat at that message", () => {
   assert.equal(evidenceChatPath({ conversation_id: "a b", message_index: 7 }), "/?conversation_id=a%20b#message-7");
 });
 
-test("the chip says how often it was said", () => {
-  assert.equal(saidLabel(0), "Said once");
-  assert.equal(saidLabel(1), "Said once");
-  assert.equal(saidLabel(3), "Said 3 times");
+test("the chip says how often it was said, counting days", () => {
+  assert.equal(saidLabel(0, 0), "Said once");
+  assert.equal(saidLabel(1, 1), "Said once");
+  assert.equal(saidLabel(3, 1), "Said 3 times, one day");
+  assert.equal(saidLabel(4, 2), "Said on 2 days");
 });
