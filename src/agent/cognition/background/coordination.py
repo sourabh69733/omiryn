@@ -8,6 +8,7 @@ from agent.context_engine.conversation_engine.state import evaluate_thread_opera
 from agent.memory_engine.processing.models import MemoryBatch
 from agent.memory_engine.memories.self_notes import SelfNoteChanges, validate_self_notes
 from agent.memory_engine.memories.user_card import validate_user_card
+from agent.memory_engine.memories.vibe import validate_vibe_updates
 from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.validation import validate_memory_analysis
 from agent.shared.utils import unknown_fields
@@ -31,7 +32,7 @@ def interpret_background_cognition(
         errors.append("background cognition analysis must be an object")
     unsupported = unknown_fields(
         raw,
-        {"decision", "operations", "thread_operation", "handoff", "user_card", "self_notes"},
+        {"decision", "operations", "thread_operation", "handoff", "user_card", "vibe", "self_notes"},
     )
     if unsupported:
         errors.append(f"unsupported top-level fields: {', '.join(unsupported)}")
@@ -91,6 +92,7 @@ def interpret_background_cognition(
         valid=not errors and memory.valid and bool(thread.get("valid")),
         errors=tuple(errors),
         user_card=validate_user_card(raw.get("user_card")) if memory_version == 3 else None,
+        vibe=validate_vibe_updates(raw.get("vibe")) if memory_version == 3 else {},
         self_notes=(
             validate_self_notes(
                 raw.get("self_notes"),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from agent.memory_engine.memories.operations import MemoryAnalysisV3
@@ -23,6 +23,8 @@ class BackgroundCognitionAnalysis:
     # Rewritten per-user card; None keeps the stored one.
     user_card: str | None = None
     self_notes: SelfNoteChanges = SelfNoteChanges()
+    # Vibe area lines the model rewrote; empty keeps the stored card.
+    vibe: dict[str, str] = field(default_factory=dict)
 
 
 __all__ = ["BackgroundCognitionAnalysis"]

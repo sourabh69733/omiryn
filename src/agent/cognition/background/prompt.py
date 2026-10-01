@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from agent.memory_engine.memories.vibe import VIBE_AREAS
 from agent.memory_engine.processing.models import MemoryBatch
 from agent.memory_engine.processing.prompt import (
     MEMORY_OPERATION_RULES,
@@ -73,6 +74,7 @@ def background_cognition_prompt(
     timezone_name: str | None = None,
     user_card: str | None = None,
     self_notes: list[dict[str, Any]] | None = None,
+    vibe: dict[str, str] | None = None,
 ) -> str:
     """Serialize one shared batch for memory and thread analysis."""
     payload = json.loads(memory_batch_prompt(batch, existing_memories, timezone_name))
@@ -81,6 +83,9 @@ def background_cognition_prompt(
         payload["current_user_card"] = user_card
     if self_notes is not None:
         payload["existing_self_notes"] = self_notes
+    if vibe is not None:
+        payload["vibe_areas"] = [{"id": area_id, "meaning": goal} for area_id, _, goal in VIBE_AREAS]
+        payload["current_vibe"] = vibe
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 

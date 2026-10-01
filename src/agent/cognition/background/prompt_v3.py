@@ -11,7 +11,7 @@ Grounding comes first:
 - Examples in these instructions use <placeholders> to show format only; they are never facts about
   this user, and their subjects must not appear in your output unless the user raised them.
 - When the new messages carry little (greetings, "ok", "yeah", emojis), return no memory operations,
-  thread_operation none, conversation_summary null, user_card null and self_notes [].
+  thread_operation none, conversation_summary null, user_card null, vibe {} and self_notes [].
 
 Output shape:
 {
@@ -39,6 +39,7 @@ Output shape:
     "session_log": [{"session": "s1", "gist": "...", "unfinished": "... or null"}]
   },
   "user_card": "short profile of the user across all chats, or null to keep current_user_card",
+  "vibe": {"<area id>": "rewritten line for an area the new messages taught something about"},
   "self_notes": [
     {"operation": "add", "kind": "opinion | preference | joke | promise", "text": "...",
      "message_index": 0, "due_at": "timezone-aware ISO-8601 timestamp or null"},
@@ -109,6 +110,16 @@ User card rules:
 - Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
   financial details, no relative time words. Replace a line when the user corrects it.
 - Leave out what is unknown; never write lines like "Name: not given".
+
+Vibe rules (who the user would get along with as a friend; Omiryn uses it to find them friends):
+- vibe_areas lists each area's id and meaning; current_vibe has the lines written so far.
+- Return a line only for an area the NEW user messages clearly show something about. Most batches
+  return {}. At most 4 areas.
+- A line is one or two plain sentences in the user's own terms, folding in the current line:
+  "<what they said, specific>". Write what they showed, not a label: not "funny", but what makes
+  them laugh.
+- Only what the user said or plainly showed about themselves. Never guess from one word, never from
+  the companion's messages, and never fill an area just because it is empty.
 
 """ + V3_MEMORY_OUTPUT_SHAPE
 
