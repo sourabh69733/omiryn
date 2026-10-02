@@ -116,3 +116,81 @@ body {
 .vibe-chat-button {
   background: var(--primary);
 }
+
+.vibe-screen,
+.vibe-screen * {
+  min-width: 0;
+}
+
+.vibe-card,
+.vibe-callout,
+.vibe-quotes {
+  overflow-wrap: anywhere;
+}
+
+.vibe-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+@media (min-width: 681px) and (max-width: 980px) {
+  .app-header {
+    grid-template-columns: minmax(96px, 1fr) auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .header-actions {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .vibe-screen {
+    padding-inline: 8px;
+  }
+
+  .vibe-path {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .vibe-path li {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    min-height: 48px;
+    gap: 8px;
+    border: 1px solid var(--brand-line);
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .vibe-path li + li::before {
+    content: none;
+  }
+
+  .vibe-path-label {
+    font-size: 11px;
+  }
+
+  .vibe-card-top {
+    flex-wrap: wrap;
+  }
+
+  .vibe-card-top h3 {
+    flex-basis: 100%;
+  }
+
+  .chat-workspace,
+  .chat-card,
+  .chat-log,
+  .agentic-chat .message {
+    min-width: 0;
+  }
+
+  .chat-empty-state {
+    max-width: 100%;
+    padding: 18px;
+  }
+}
