@@ -18,19 +18,19 @@ from agent.cognition.background.service import background_cognition_enabled
 
 
 class AgentPipelineConfigTest(unittest.TestCase):
-    def test_default_is_v2_live(self) -> None:
+    def test_default_is_v3(self) -> None:
         config = self._config({})
 
-        self.assertEqual(config.version, "v2")
+        self.assertEqual(config.version, "v3")
         self.assertEqual(config.rollout, "live")
-        self.assertFalse(config.structured_turn_output)
-        self.assertFalse(config.inline_data_points)
-        self.assertTrue(config.conversation_state_enabled)
-        self.assertFalse(config.conversation_state_shadow)
+        self.assertEqual(config.memory_contract_version, 3)
         self.assertTrue(config.background_memory_enabled)
-        self.assertTrue(config.live_memory_writes)
+        self.assertTrue(config.live_v3_memory_writes)
         self.assertTrue(config.live_thread_writes)
         self.assertFalse(config.legacy_rules)
+
+    def test_v3_ignores_the_legacy_rollout_setting(self) -> None:
+        self.assertEqual(self._config({"AGENT_ROLLOUT": "off"}).rollout, "live")
 
     def test_v1_is_one_complete_legacy_rollback_mode(self) -> None:
         for rollout in ("off", "shadow", "live"):
@@ -93,7 +93,7 @@ class AgentPipelineConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "AGENT_PIPELINE_VERSION"):
             self._config({"AGENT_PIPELINE_VERSION": "v4"})
         with self.assertRaisesRegex(ValueError, "AGENT_ROLLOUT"):
-            self._config({"AGENT_ROLLOUT": "maybe"})
+            self._config({"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "maybe"})
 
     def test_runtime_consumers_share_v1_rollback_decision(self) -> None:
         with patch.dict(

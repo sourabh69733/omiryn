@@ -390,7 +390,9 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(package.snapshot["summary"]["response_mode"], "empathize_listen")
         self.assertIn("If response mode is empathize_listen, do not give advice", package.system_prompt)
 
+    @patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2"})
     def test_user_taught_agent_behavior_rule_is_saved_and_included_in_v2_context(self) -> None:
+        # Phrase rules are captured by the v2 data-point path; v3 uses voice markers instead.
         capture_profile_facts_from_user_message(
             "conversation-a",
             "user-a",

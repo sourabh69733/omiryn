@@ -414,7 +414,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
             )
         )
         invalid = self._combined_analysis(evidence_indexes=[3])
-        with patch(
+        with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}), patch(
             "agent.cognition.background.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=invalid,
