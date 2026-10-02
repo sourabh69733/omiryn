@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
+from agent.cognition.background.idle import catch_up_pending
 from agent.proactive import schedule_return_greeting
 from realtime import RealtimeTicketError, issue_realtime_ticket, realtime_hub
 from realtime.tickets import verify_realtime_ticket
@@ -37,6 +41,11 @@ async def realtime_websocket(
 
     await websocket.accept()
     connection = await realtime_hub.register(websocket, user_id)
+    # The open connection keeps the server's CPU on, so memory work missed while the user was
+    # away runs now.
+    task = asyncio.create_task(_catch_up(user_id))
+    _catch_up_tasks.add(task)
+    task.add_done_callback(_catch_up_tasks.discard)
     await websocket.send_json(
         {
             "type": "realtime.connected",
@@ -52,6 +61,17 @@ async def realtime_websocket(
         pass
     finally:
         await realtime_hub.unregister(connection)
+
+
+# Running catch-ups, held so they are not garbage-collected before they finish.
+_catch_up_tasks: set[asyncio.Task[None]] = set()
+
+
+async def _catch_up(user_id: str) -> None:
+    try:
+        await asyncio.to_thread(catch_up_pending, user_id)
+    except Exception:
+        logging.getLogger(__name__).exception("agent.memory_catch_up_failed")
 
 
 async def _handle_command(websocket: WebSocket, connection, command: object) -> None:

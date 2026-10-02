@@ -13,7 +13,7 @@ from typing import Any
 
 from agent.jobs.queue import cancel_job, schedule_job
 from agent.memory_engine.processing.service import get_processing_state
-from storage import get_conversation
+from storage import get_conversation, list_conversations
 
 from .service import (
     background_cognition_enabled,
@@ -43,6 +43,26 @@ def schedule_idle_flush(conversation_id: str, user_id: str) -> None:
 def request_flush_now(conversation_id: str, user_id: str) -> None:
     """Flush at the next worker pass, e.g. when the user ends the chat session."""
     schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=0)
+
+
+def catch_up_pending(user_id: str) -> list[str]:
+    """Queue a flush now for every chat of this user with unprocessed messages.
+
+    Called when the user comes back. Background work only gets CPU while a request is running
+    (Cloud Run with no always-on instance), so a flush that came due while nobody was online,
+    or one that ran out of retries, runs now instead of waiting for new messages.
+    """
+    if not background_cognition_enabled():
+        return []
+    queued: list[str] = []
+    for conversation in list_conversations(user_id):
+        messages = list(conversation.get("messages") or [])
+        if has_pending_background_cognition(conversation["id"], user_id, messages):
+            request_flush_now(conversation["id"], user_id)
+            queued.append(conversation["id"])
+    if queued:
+        logger.info("agent.memory_catch_up user_id=%s conversations=%s", user_id, len(queued))
+    return queued
 
 
 def cancel_idle_flush(conversation_id: str, user_id: str) -> None:
@@ -91,6 +111,7 @@ __all__ = [
     "DEFAULT_IDLE_FLUSH_SECONDS",
     "MEMORY_FLUSH_JOB",
     "cancel_idle_flush",
+    "catch_up_pending",
     "request_flush_now",
     "run_memory_flush_job",
     "schedule_idle_flush",
