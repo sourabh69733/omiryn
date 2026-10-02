@@ -1,17 +1,27 @@
 :root {
   color-scheme: light;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+  /* Shared with the landing page. App-specific surfaces live in brand-theme.css. */
+  --brand-bg: #fbfaf8;
+  --brand-ink: #18181b;
+  --brand-muted: #6b6b73;
+  --brand-line: rgba(24, 24, 27, 0.1);
+  --brand-violet: #7c3aed;
+  --brand-violet-hover: #6d28d9;
+  --brand-pink: #db2777;
+  --brand-gradient: linear-gradient(135deg, #6d4aff 0%, #b04dd9 50%, #f062a8 100%);
+  --font-sans: "Geist", "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: "Geist Mono", ui-monospace, monospace;
 
-  --ink: #101327;
+  --ink: var(--brand-ink);
   --ink-soft: #312b45;
-  --muted: #7a748e;
+  --muted: var(--brand-muted);
   --muted-2: #a7a0b8;
   --surface: rgba(255, 255, 255, 0.82);
   --surface-strong: rgba(255, 255, 255, 0.96);
   --line: #e5def5;
   --line-strong: #d6c9f8;
-  --purple: #7657dc;
+  --purple: var(--brand-violet);
   --purple-2: #8b72ea;
   --pink: #ff5f9a;
   --mint: #42d6c8;

@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
-  --ink: #252035;
-  --muted: #77718d;
-  --soft: #f4f0ff;
-  --surface: #fbf8ff;
+  --ink: var(--brand-ink);
+  --muted: var(--brand-muted);
+  --soft: #f5f1fb;
+  --surface: var(--brand-bg);
   --panel: #ffffff;
-  --line: #e7e1f4;
-  --primary: #7f67d8;
-  --primary-dark: #624cb7;
-  --accent: #d95f91;
+  --line: var(--brand-line);
+  --primary: var(--brand-violet);
+  --primary-dark: var(--brand-violet-hover);
+  --accent: var(--brand-pink);
   --success: #2f8f78;
   --warning: #c88a1d;
   --mist: #f2edff;
@@ -21,9 +21,9 @@
   --glass-border: rgba(255, 255, 255, 0.58);
   --glass-highlight: rgba(255, 255, 255, 0.72);
   --glass-shadow: 0 22px 70px rgba(64, 45, 118, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  --font-ui: Inter, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-chat: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-terminal: "JetBrains Mono", "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, ui-monospace, monospace;
+  --font-ui: var(--font-sans);
+  --font-chat: var(--font-sans);
+  --font-terminal: var(--font-mono);
 }
 
 * {
