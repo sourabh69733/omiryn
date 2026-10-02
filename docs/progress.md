@@ -146,6 +146,7 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 ## Related docs
 
+- [production-plan.md](production-plan.md): the end-to-end launch list (core loop, growth, safety, privacy, infra, metrics) and the launch gate.
 - [agent-roadmap.md](agent-roadmap.md): the phase plan for time, memory, persona and initiative.
 - [friends-first-audit.md](friends-first-audit.md): where the old dating idea lived and how each piece moved.
 - [agent-onboarding-plan.md](agent-onboarding-plan.md): first chat and new-user stages.

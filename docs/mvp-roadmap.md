@@ -1,5 +1,7 @@
 # MVP Roadmap
 
+> Outdated: written for the dating-era idea. See [production-plan.md](production-plan.md) for the current launch plan.
+
 ## Phase 1: Concierge MVP
 
 Goal: prove that structured AI onboarding creates better matches before
