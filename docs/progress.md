@@ -75,13 +75,41 @@ The core of the product: what Omi understands about who the user would get along
 | Screen | State |
 |---|---|
 | Signup | One screen: name, approximate location ("Around Kolkata, West Bengal · Change", from the IP via DB-IP Lite, dropped when the browser timezone is in another country), 18+ checkbox. Everything else is learned in chat. |
-| Chat | Omi with typing dots, bubble reveal, Retry on failed messages, "Talks like" setting, milestone note ("Omi knows what you want in friends · See your vibe"). |
+| Chat | Omi with typing dots, bubble reveal, Retry on failed messages, "Talks like" setting, milestone note ("Omi knows what you want in friends · See your vibe"). New bubbles fade in; history does not. The typing dots leave in the same render the reply lands, and only one avatar shows while later bubbles reveal. |
+| Agent avatar | Generated "vibe blob" images, one per state (idle, thinking, listening, happy) as WebP in `apps/web/public/assets/agent/`. Still by default; only the one writing a reply breathes. No sweeps or flashes. |
 | Vibe | Milestone path, each area's line with a chip ("Said on 2 days"). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line. |
 | Memories | Renamed from Style ("What Omiryn remembers"); `/style` redirects. Legacy signals hidden (data kept for export and deletion). |
 | Matches | Coming soon, plus how close the user is ("Matches need Ready to match") and a link to Vibe. |
 | Profile and Contact | Profile without "Interested in". Contact moved into the account menu. |
 
 Navigation: Chat, Vibe, Memories, Matches. Contact and Profile live in the account menu.
+
+### Landing site (`apps/landing`, port 5174)
+
+Plain HTML with GSAP and ScrollTrigger, light theme. Fonts Geist, Geist Mono and Instrument Serif italic accents; brand gradient `#6d4aff` -> `#b04dd9` -> `#f062a8`. No college or dating wording anywhere.
+
+| Section | State |
+|---|---|
+| Hero | Title, short subtext, button and one animation: two "vibe fingerprint" blobs with real portraits drift together and merge on shared traits. |
+| How it works | Pinned scroll story: a phone chat where Omi picks up traits, then a match pops. |
+| Vibe, reasons, match | Venn scrub, reasons marquee, draggable match card stack. |
+| Early access | Lead form (intent "feedback") and final CTA. |
+| Sub pages | About, How it works, Safety, AI disclosure, Privacy, Terms and Contact use the same look and nav. |
+
+Portraits are 320 px WebP in `public/static/assets/people/`; source images stay in `design-assets/` (not deployed). Reduced motion gets a static page. The landing dev server has its own Vite cache (`node_modules/.vite-landing`) so it never breaks the web app's pre-bundled deps.
+
+### UI next
+
+| # | Item | Why |
+|---|---|---|
+| 1 | Vibe page: a removed line can come back | "Not right" only deletes the line. Nothing records the rejection, so the background (or a forced backfill) can rewrite the same line from the same old messages. Fix: store the rejection, accept that area again only with proof sent after it, and tell the model. |
+| 2 | Sensitive vibe areas | Values, beliefs and deal-breakers need "used for matching, never shown to matches" before Matches shows anything. |
+| 3 | One design system | The app still runs on `legacy-app.css` (Inter, mixed colors); the landing site uses Geist and the new tokens. |
+| 4 | Profile cleanup | Gender select and the long privacy note feel dating-era and heavy. |
+| 5 | Chat header | Shows the raw tone value ("warm") under Omi's name. |
+| 6 | Limit messages | Fixed Hinglish lines in a female voice ("catch up karti hoon"); Omi is neutral by default. |
+| 7 | Mobile pass | Chat, history panel, composer and Vibe on phone widths. |
+| 8 | Empty, loading and error states | Consistent on every screen. |
 
 ## 5. Quality and checks
 
@@ -111,6 +139,10 @@ Navigation: Chat, Vibe, Memories, Matches. Contact and Profile live in the accou
 
 - Friend compatibility check: compare two vibe cards.
 - Matching: candidate pool, shortlist, both sides accept, introduction in chat.
+- Match screens: match card (2 or 3 "you'd click on" reasons, one accepted difference), accept or pass, user-to-user chat with report and block, "still talking?" check at day 3 and 7.
+- Vibe check by link (cold start): a friend opens a shared link, chats with Omi for about 2 minutes with no login, both get a shareable result card; sign-in is offered only after the result. The friend's chat is used for the score and then deleted.
+- Omi as host: opens a new match chat with an icebreaker and leaves once the talk flows. No live score. Whether they keep talking after it leaves is the chemistry signal.
+- Chat upload (backlog): WhatsApp "Export chat" file, parsed and cleaned in the browser (names, numbers, links removed), a recent sample processed in memory, text deleted, only the result kept. Few users are expected to upload, but the feature should exist. WhatsApp bots and APIs are ruled out (no access to personal chats; Meta's AI assistant policy).
 
 ## Related docs
 
