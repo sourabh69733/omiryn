@@ -6,6 +6,7 @@ import "./styles/base.css";
 import "./styles/legacy-app.css";
 import "./styles/onboarding.css";
 import "./styles/vibe.css";
+import "./styles/brand-theme.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
