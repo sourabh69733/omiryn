@@ -28,6 +28,8 @@ Working principles:
 
 ## 3. Agent architecture (pipeline v3, prompt v3-1)
 
+Everything below runs only with `AGENT_PIPELINE_VERSION=v3`. The code default is still `v2` (`src/agent/config.py`), and so are `.env.example`, `scripts/gcp/gcp-env.example` and the deploy scripts (`gcp-deploy.sh`, `gcp-sync-cloud-run-env.sh`). A deploy that does not set it runs v2: no vibe card, user card, self-notes or session log. The prompt default is v3-1.
+
 ```text
 user message
   -> reply path (foreground)
@@ -37,7 +39,7 @@ user message
        one model call per batch: memories, thread, session log, summary,
        user card, self-notes, vibe lines
        -> vibe proof check (second call) -> saved
-  -> proactive jobs: return greetings, promise follow-ups, story parts
+  -> initiative: return greetings, promise follow-ups and nudges, story parts
 ```
 
 ### Built
@@ -48,11 +50,11 @@ user message
 | Working memory | Recent messages, the previous session's tail, a session log (gist and what was left open per session), a rolling dated summary. Fixes "forgot the last topic". |
 | Long-term memory | V3 memories as plain sentences with evidence and dates. Embedding retrieval. User card (always in context) and self-notes (the companion's own opinions and promises). |
 | Stories | The model marks story replies with a hidden `<story>` marker; stories continue and autoplay in parts. No keyword detection. |
-| Proactive | Durable job queue: greeting on return, promise follow-ups, story parts, typing dots over realtime. |
+| Proactive | Story parts and the background memory flush run on the durable job table. The greeting on return is a delayed in-process task started when the chat connects; promise follow-ups and nudges run in an in-process loop for users who are online. Typing dots go over realtime. |
 | Reply failures | The user message is saved first. A failed reply shows "Not delivered · Retry"; fallback model on timeout. |
 | Prompt | Friends-first v3 base prompt, standalone. v1 and v2 (dating era) moved to `_archive/agent/behavior_versions/`. |
 | Topics | Keyword topic picker removed. The active subject comes from the background model's threads; fresh angles on a low-energy turn come from the open vibe areas. |
-| Stock phrases | Learned from chats plus a seed list; a reply using one is retried once. |
+| Reply checks | A draft that uses a stock phrase (learned from chats plus a seed list), repeats an earlier reply, or asks too many questions gets one rewrite; extra questions are then trimmed. |
 
 ### Friend Vibe (the matching data)
 
@@ -91,9 +93,10 @@ Navigation: Chat, Vibe, Memories, Matches. Contact and Profile live in the accou
 
 | # | Item | Why |
 |---|---|---|
+| 0 | Make v3 the default pipeline | Code, `.env.example` and the deploy scripts still default to v2; check the Cloud Run setting too. |
 | 1 | Backfill `--reset` | `--force` merges into old cards, so padded lines from before the proof check stay. |
 | 2 | Friends-first memories | Memory rules and evals still treat partner preferences as matching data. |
-| 3 | Empty user card and self-notes | Unknown cause; needs a look at the debug record (with the owner's OK). |
+| 3 | Empty user card and self-notes | Check the pipeline version first (v2 writes neither); then the debug record, with the owner's OK. |
 | 4 | Embedding per vibe line | Lets matching shortlist people quickly. |
 | 5 | Run the companion vibe evals and the full memory evals | Confirms the recent changes with the real model. |
 
