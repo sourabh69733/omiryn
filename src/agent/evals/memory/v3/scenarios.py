@@ -130,7 +130,7 @@ MEMORY_V3_SCENARIOS = (
     ),
     MemoryV3Scenario(
         id="capture_partner_location_preference",
-        description="A desired partner location is semantic matching knowledge, not the user's location.",
+        description="A dating preference may be personal context, not friend matching data.",
         messages=(
             {
                 "role": "user",
@@ -141,13 +141,32 @@ MEMORY_V3_SCENARIOS = (
             ExpectedMemoryV3Operation(
                 operation="add",
                 memory_kind="semantic",
-                required_purposes=("matching",),
+                required_purposes=("personalization",),
+                forbidden_purposes=("matching",),
                 value_concepts=("tamil nadu", "chennai"),
                 evidence_message_indexes=(0,),
                 sensitivity="standard",
             ),
         ),
-        tags=("memory_v3", "semantic", "matching", "partner_preference"),
+        tags=("memory_v3", "semantic", "personalization", "partner_preference"),
+    ),
+    MemoryV3Scenario(
+        id="capture_friend_preference_for_matching",
+        description="An explicit friend preference is matching knowledge.",
+        messages=(
+            {"role": "user", "content": "I get along best with friends who enjoy dry humor."},
+        ),
+        expected_operations=(
+            ExpectedMemoryV3Operation(
+                operation="add",
+                memory_kind="semantic",
+                required_purposes=("matching",),
+                value_concepts=("friend", "dry humor"),
+                evidence_message_indexes=(0,),
+                sensitivity="standard",
+            ),
+        ),
+        tags=("memory_v3", "semantic", "matching", "friend_preference"),
     ),
     MemoryV3Scenario(
         id="capture_lived_trip_as_episode",
@@ -214,12 +233,12 @@ MEMORY_V3_SCENARIOS = (
         id="use_previous_batch_context_without_old_evidence",
         description="Prior context may resolve meaning, but only the new user message may support the memory.",
         messages=(
-            {"role": "user", "content": "I want someone who makes difficult days lighter."},
+            {"role": "user", "content": "I want a friend who makes difficult days lighter."},
             {"role": "assistant", "content": "What does that look like to you?"},
             {"role": "user", "content": "Calm and funny, but not loud."},
         ),
         processed_through_message_index=1,
-        previous_handoff=MemoryHandoff(active_topics=("partner personality",)),
+        previous_handoff=MemoryHandoff(active_topics=("friend compatibility",)),
         expected_operations=(
             ExpectedMemoryV3Operation(
                 operation="add",
@@ -250,14 +269,15 @@ MEMORY_V3_SCENARIOS = (
             ExpectedMemoryV3Operation(
                 operation="add",
                 memory_kind="semantic",
-                required_purposes=("matching",),
+                required_purposes=("profile",),
+                forbidden_purposes=("matching",),
                 value_concepts=("team", "sports"),
                 evidence_message_indexes=(1,),
                 sensitivity="standard",
             ),
         ),
         forbidden_concepts=("hiking",),
-        tags=("memory_v3", "assistant_contamination", "semantic", "matching"),
+        tags=("memory_v3", "assistant_contamination", "semantic", "profile"),
     ),
     MemoryV3Scenario(
         id="reinforce_existing_preference_without_duplicate",
@@ -269,7 +289,7 @@ MEMORY_V3_SCENARIOS = (
             ExistingMemoryV3Fixture(
                 id="cars-memory",
                 memory_kind="semantic",
-                purposes=("matching",),
+                purposes=("profile",),
                 key="favorite_cars",
                 value=["Toyota Hilux", "Toyota Fortuner"],
             ),
@@ -322,7 +342,7 @@ MEMORY_V3_SCENARIOS = (
             ExistingMemoryV3Fixture(
                 id="partner-location-memory",
                 memory_kind="semantic",
-                purposes=("matching",),
+                purposes=("personalization",),
                 key="preferred_partner_location",
                 value="Bengaluru",
             ),
@@ -349,7 +369,7 @@ MEMORY_V3_SCENARIOS = (
             ExistingMemoryV3Fixture(
                 id="retracted-weekend-memory",
                 memory_kind="semantic",
-                purposes=("matching",),
+                purposes=("personalization",),
                 key="preferred_partner_activity",
                 value="enjoys weekend hikes together",
                 status="retracted",
@@ -374,7 +394,7 @@ MEMORY_V3_SCENARIOS = (
             ExistingMemoryV3Fixture(
                 id="retracted-weekend-memory",
                 memory_kind="semantic",
-                purposes=("matching",),
+                purposes=("personalization",),
                 key="preferred_partner_activity",
                 value="enjoys weekend hikes together",
                 status="retracted",
@@ -384,7 +404,8 @@ MEMORY_V3_SCENARIOS = (
             ExpectedMemoryV3Operation(
                 operation="add",
                 memory_kind="semantic",
-                required_purposes=("matching",),
+                required_purposes=("personalization",),
+                forbidden_purposes=("matching",),
                 value_concepts=("partner", "weekend", "hike"),
                 evidence_message_indexes=(0,),
                 sensitivity="standard",
@@ -434,12 +455,12 @@ MEMORY_V3_SCENARIOS = (
         tags=("memory_v3", "relationship", "personalization", "specific_value"),
     ),
     MemoryV3Scenario(
-        id="keep_partner_preference_semantic_and_specific",
-        description="A partner preference is semantic matching knowledge, not procedure.",
+        id="keep_friend_preference_semantic_and_specific",
+        description="A friend preference is semantic matching knowledge, not procedure.",
         messages=(
             {
                 "role": "user",
-                "content": "I connect best with someone curious who can disagree gently.",
+                "content": "I connect best with friends who are curious and can disagree gently.",
             },
         ),
         expected_operations=(
@@ -518,11 +539,11 @@ MEMORY_V3_SCENARIOS = (
     ),
     MemoryV3Scenario(
         id="capture_explicit_durable_preference",
-        description="A clear durable relationship constraint is useful matching memory.",
+        description="A clear durable friend preference is useful matching memory.",
         messages=(
             {
                 "role": "user",
-                "content": "I am certain I want a long-term relationship with someone who does not want children.",
+                "content": "I want close friends who respect a no and keep plans they make with me.",
             },
         ),
         expected_operations=(
@@ -530,7 +551,7 @@ MEMORY_V3_SCENARIOS = (
                 operation="add",
                 memory_kind="semantic",
                 required_purposes=("matching",),
-                value_concepts=("long-term", "children"),
+                value_concepts=("friends", "respect", "plans"),
                 evidence_message_indexes=(0,),
                 sensitivity="standard",
             ),

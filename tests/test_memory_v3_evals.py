@@ -142,13 +142,15 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.structurally_valid)
         self.assertIn("supplied active memory", " ".join(result.validation_errors))
 
-    def test_grader_accepts_semantic_wording_but_requires_kind_purpose_and_evidence(self) -> None:
+    def test_dating_preference_is_personal_context_not_friend_matching(self) -> None:
         scenario = get_memory_v3_scenario("capture_partner_location_preference")
+        self.assertEqual(scenario.expected_operations[0].required_purposes, ("personalization",))
+        self.assertEqual(scenario.expected_operations[0].forbidden_purposes, ("matching",))
         operation = {
             "operation": "add",
             "target_memory_id": None,
             "memory_kind": "semantic",
-            "purposes": ["matching"],
+            "purposes": ["personalization"],
             "key": "preferred_partner_location",
             "value": {"state": "Tamil Nadu", "near": "Chennai"},
             "sensitivity": "standard",
@@ -166,7 +168,7 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(passed, findings)
 
-        wrong = dict(operation, memory_kind="relationship", purposes=["personalization"])
+        wrong = dict(operation, memory_kind="relationship")
         passed, findings = grade_memory_v3_result(
             scenario=scenario,
             decision="propose",
@@ -177,7 +179,7 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(passed)
         self.assertIn("Missing expected operation", " ".join(findings))
 
-        overclassified = dict(operation, purposes=["matching", "profile"])
+        overclassified = dict(operation, purposes=["personalization", "matching"])
         passed, findings = grade_memory_v3_result(
             scenario=scenario,
             decision="propose",
@@ -186,6 +188,11 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(passed)
         self.assertIn("Missing expected operation", " ".join(findings))
+
+    def test_friend_preference_is_matching_memory(self) -> None:
+        scenario = get_memory_v3_scenario("capture_friend_preference_for_matching")
+        self.assertEqual(scenario.expected_operations[0].required_purposes, ("matching",))
+        self.assertEqual(scenario.expected_operations[0].evidence_message_indexes, (0,))
 
     def test_grader_rejects_unexpected_memory_for_incidental_content(self) -> None:
         scenario = get_memory_v3_scenario("ignore_incidental_technical_subject")

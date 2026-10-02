@@ -92,11 +92,11 @@ MEMORY_V3_JUDGE_CALIBRATION_CASES = (
     ),
     _case(
         case_id="reject_v3_wrong_relationship_kind",
-        message="I want a partner who is calm and curious.",
+        message="I want a friend who is calm and curious.",
         memory_kind="relationship",
         purposes=("matching",),
         key="past_relationship_pattern",
-        value="Usually dates calm and curious people",
+        value="Usually befriends calm and curious people",
         sensitivity="sensitive",
         supported=False,
         required_issues=("wrong_memory_type",),
@@ -144,7 +144,7 @@ def _context_case(*, assistant_claim: bool) -> MemoryJudgeCalibrationCase:
                  else "accept_v3_cross_batch_reference"),
         message=("That is your guess, not my preference." if assistant_claim
                  else "Calm and funny, but not loud."),
-        memory_kind="semantic", purposes=("matching",), key="partner_personality",
+        memory_kind="semantic", purposes=("matching",), key="friend_personality",
         value="calm and funny, but not loud", sensitivity="standard",
         supported=not assistant_claim,
         required_issues=("unsupported_inference",) if assistant_claim else (),
@@ -152,9 +152,9 @@ def _context_case(*, assistant_claim: bool) -> MemoryJudgeCalibrationCase:
     return replace(
         case,
         messages=(
-            {"role": "user", "content": "I want someone who makes difficult days lighter."},
+            {"role": "user", "content": "I want a friend who makes difficult days lighter."},
             {"role": "assistant", "content": (
-                "You want a calm, funny partner who is not loud." if assistant_claim
+                "You want a calm, funny friend who is not loud." if assistant_claim
                 else "What does that look like to you?"
             )},
             *case.messages,

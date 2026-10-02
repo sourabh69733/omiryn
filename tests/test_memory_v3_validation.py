@@ -134,6 +134,8 @@ class MemoryV3ProviderPromptTest(unittest.IsolatedAsyncioTestCase):
         system_prompt = provider.await_args.kwargs["system_prompt"]
         self.assertIn('"memory_kind"', system_prompt)
         self.assertNotIn('"data_point_type"', system_prompt)
+        self.assertIn("matching is only for finding friends", system_prompt.lower())
+        self.assertIn("dating preferences", system_prompt.lower())
         self.assertEqual(provider.await_args.kwargs["request_kind"], "background_cognition")
         self.assertEqual(provider.await_count, 1)
 

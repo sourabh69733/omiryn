@@ -6,11 +6,14 @@ V3_MEMORY_TAXONOMY_GUIDANCE = """Memory kinds:
 - relationship: lived history or an interaction pattern involving a specific person or relationship;
   preserve whose behavior it was and do not convert it into a general personality trait.
 - procedural: instructions or learned preferences for how this companion should interact with the user;
-  ordinary interests and partner preferences are semantic, not procedural.
+  ordinary interests and friend preferences are semantic, not procedural.
 
 Purposes are independent of kind:
 - profile describes the user.
-- matching captures explicitly compatibility-relevant information.
+- matching is only for finding friends the user would get along with. Use it for explicitly stated
+  friend preferences and grounded compatibility information, not dating preferences or partner criteria.
+- Dating preferences may be remembered for personalization when durable and useful, but never mark
+  them for matching or infer a friend preference from them.
 - personalization helps the companion interact better."""
 
 V3_MEMORY_VALUE_GUIDANCE = """The key is only a stable retrieval handle. The value is the memory.
