@@ -13,7 +13,7 @@ The product works only when all eight steps work for two real users.
 | # | Step | Status | What is left | Done when |
 |---|---|---|---|---|
 | 1 | Signup | Done | Nothing for launch. | A new user reaches Omi's first message in under 60 s; 18+ cannot be skipped. |
-| 2 | Talk to Omi | Partial | Make pipeline v3 the default (code, `.env.example`, deploy scripts, Cloud Run); friends-first memories; find why the user card and self-notes are empty; run the companion vibe evals with the real model. | Testers chat 10+ minutes on their own; replies never read like a template. |
+| 2 | Talk to Omi | Partial | Confirm Cloud Run runs pipeline v3 (`GET /health`; code and scripts now default to it); friends-first memories; find why the user card and self-notes are empty; run the companion vibe evals with the real model. | Testers chat 10+ minutes on their own; replies never read like a template. |
 | 3 | Vibe extraction | Done | Backfill `--reset`; embedding per vibe line for matching. A failed proof check saves nothing, so lines from that batch are lost; retry the check through the job table. | Grounding evals pass with the real model; every line has proof. |
 | 4 | Vibe page | Partial | A removed line can come back (store the rejection, accept only newer proof); sensitive areas marked "matching only". | The user removes a wrong line and it stays gone until new proof. |
 | 5 | Matching | Missing | Candidate pool (city, age band, recently active), minimum vibe ("Ready to match"), pair score (humor fit, values same or accepted, deal-breaker clashes, interests, energy), AI-written reasons. Score only proof-checked lines said on 2+ days; values and beliefs only with consent (section 4). | Real friend pairs score higher than random pairs; reasons read true to both people. |
@@ -27,13 +27,13 @@ How the agent's background work and models behave on Cloud Run. Details: [progre
 
 | Item | Status | Notes |
 |---|---|---|
-| Background work keeps running | Missing | The job worker (memory flush, story parts) and the proactive loop (return greetings, promise follow-ups, nudges) run inside the API process, and background cognition after a reply runs as an in-request background task. Cloud Run has 0 minimum instances and throttles CPU between requests, so this work stalls or is lost when nobody is chatting. Fix: CPU always allocated with 1 minimum instance, or a worker endpoint triggered by Cloud Scheduler or Cloud Tasks. |
+| Background work keeps running | Partial | The job worker (memory flush, story parts) and the proactive loop (return greetings, promise follow-ups, nudges) run inside the API process, which only gets CPU while a request is open (0 minimum instances). Proactive messages only go to online users, whose open connection keeps CPU on. Memory work missed while a user was away is caught up when they come back: every chat with unprocessed messages gets a flush queued on connect. Left: a user who never returns keeps their last messages unprocessed; a free Cloud Scheduler job calling a "run due jobs" endpoint would close that. |
 | Proactive messages are durable | Missing | Return greetings and promise follow-ups are in-process timers and a loop, not rows in the job table, so a restart drops them. Move them onto the job table. |
 | Model roles | Done | Replies: Llama 3.3 70B with a Llama 3.1 70B fallback after 25 s. Background cognition: same model, 180 s timeout, retried through jobs. Vibe proof check: DeepSeek V3.2 (`VIBE_VERIFY_MODEL`). |
 | Provider outages | Partial | DeepInfra 502s and timeouts happen. Replies fall back and show Retry; background batches retry. No alert yet when the provider is failing. |
 | Cost per active user | Missing | Each chat costs the reply, a background call every few messages, the proof check and embeddings. Track spend per active user and alert on spikes. |
 | Agent eval gate | Missing | Before a prompt or model change: real-model memory and vibe evals (`run_memory_evals.py --scenario-tag vibe`) and the companion evals (`run_behavior_evals.py --scenario-set companion_v2`, two judge models from different families). Unit tests in CI. |
-| Config visible | Missing | Show the pipeline and prompt version on a health or admin page, so a deploy running v2 by mistake is caught at once. |
+| Config visible | Done | `GET /health` returns the pipeline version, memory contract and prompt version. |
 
 ## 2. Growth and cold start
 
@@ -76,8 +76,8 @@ See [gcp-deployment.md](gcp-deployment.md) and the security checklist for the fu
 |---|---|---|
 | Cloud Run, Postgres, GCS photos, secrets | Partial | Terraform and scripts exist; production `DATABASE_URL` and Supabase production redirects are not confirmed. |
 | Backups and a tested restore | Missing | |
-| Pipeline v3 in production | Missing | Deploy scripts still default to v2. |
-| Background work on Cloud Run | Missing | See section 1b; needs always-on CPU or a scheduled worker. |
+| Pipeline v3 in production | Partial | Code and deploy scripts default to v3; confirm the live Cloud Run setting with `GET /health`. |
+| Background work on Cloud Run | Partial | Caught up when the user returns (section 1b); optional scheduled worker for users who never return. |
 | Realtime across instances | Missing | Redis Pub/Sub before running more than one instance. |
 | Error and cost monitoring | Partial | Client errors and request IDs exist; no alerts for chat failures, provider rate limits or spend. |
 | Model fallback | Done | Llama 3.1 70B after a 25 s timeout. |
@@ -101,8 +101,8 @@ Tracked in [progress.md](progress.md) under "UI next": one design system for app
 Ship when all of these are done; everything else can follow.
 
 - [x] Signup with 18+ (step 1)
-- [ ] Pipeline v3 is the default everywhere (step 2)
-- [ ] Background work and proactive messages keep running on Cloud Run (section 1b)
+- [ ] Pipeline v3 confirmed on Cloud Run with `GET /health` (step 2; code and scripts done)
+- [x] Background memory work caught up when users return (section 1b)
 - [x] Vibe extraction with proof (step 3)
 - [ ] Vibe page: removed lines stay removed; sensitive areas private (step 4)
 - [ ] Matching, match flow and user-to-user chat (steps 5 to 7)

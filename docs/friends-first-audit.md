@@ -54,7 +54,7 @@ Proposed friend compatibility areas, to replace the partner dimensions:
 | v1 prompt | `versions/v1.py` | "You are Omiryn's private dating companion", partner preferences, flirty rules |
 | v2 data points | `memory_engine/data_points/extraction/` (prompts, legacy rules, WhatsApp rules) | Partner-preference extraction |
 
-Recommendation: delete v1 and the v2 data-point pipeline instead of rewriting them; v3 is what runs. Before that, confirm production: the code default is `AGENT_PIPELINE_VERSION=v2` (`agent/config.py`), and the infra files do not set it, so production may still be on v2 unless it is set in the Cloud Run settings.
+Recommendation: delete v1 and the v2 data-point pipeline instead of rewriting them; v3 is what runs. Update (2 October): the code and deploy scripts now default to v3, and v1 and v2 prompts are archived; `GET /health` shows what a deploy runs.
 
 ## 5. Evals and docs: medium priority
 

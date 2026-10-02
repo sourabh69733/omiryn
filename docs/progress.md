@@ -28,7 +28,9 @@ Working principles:
 
 ## 3. Agent architecture (pipeline v3, prompt v3-1)
 
-Everything below runs only with `AGENT_PIPELINE_VERSION=v3`. The code default is still `v2` (`src/agent/config.py`), and so are `.env.example`, `scripts/gcp/gcp-env.example` and the deploy scripts (`gcp-deploy.sh`, `gcp-sync-cloud-run-env.sh`). A deploy that does not set it runs v2: no vibe card, user card, self-notes or session log. The prompt default is v3-1.
+Pipeline v3 is the default (`src/agent/config.py`, `.env.example`, the GCP env example and deploy scripts); v1 and v2 remain only when set explicitly. The prompt default is v3-1. `GET /health` shows the running pipeline and prompt version, so a deploy on the wrong one is seen at once. A Cloud Run service that still sets `AGENT_PIPELINE_VERSION=v2` keeps v2 until that setting is changed.
+
+Background work and Cloud Run: the job worker, the proactive loop and the after-reply background step run inside the API process, which only gets CPU while a request is open. When the user comes back (the realtime connection opens), every chat with unprocessed messages gets a memory flush queued at once, including flushes that ran out of retries. No always-on instance is needed; a user who never returns keeps their last few messages unprocessed.
 
 ```text
 user message
@@ -121,10 +123,10 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 | # | Item | Why |
 |---|---|---|
-| 0 | Make v3 the default pipeline | Code, `.env.example` and the deploy scripts still default to v2; check the Cloud Run setting too. |
+| 0 | Check the Cloud Run setting | Code and scripts now default to v3; confirm the live service with `GET /health`. |
 | 1 | Backfill `--reset` | `--force` merges into old cards, so padded lines from before the proof check stay. |
 | 2 | Friends-first memories | Memory rules and evals still treat partner preferences as matching data. |
-| 3 | Empty user card and self-notes | Check the pipeline version first (v2 writes neither); then the debug record, with the owner's OK. |
+| 3 | Empty user card and self-notes | Check `GET /health` first (v2 writes neither); then the debug record, with the owner's OK. |
 | 4 | Embedding per vibe line | Lets matching shortlist people quickly. |
 | 5 | Run the companion vibe evals and the full memory evals | Confirms the recent changes with the real model. |
 
