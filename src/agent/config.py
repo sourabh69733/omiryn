@@ -74,7 +74,8 @@ class AgentPipelineConfig:
 
 def agent_pipeline_config() -> AgentPipelineConfig:
     """Read and validate the two public runtime settings without hidden overrides."""
-    version = os.getenv("AGENT_PIPELINE_VERSION", "v2").strip().lower()
+    # v3 is the only pipeline with the vibe card, user card, self-notes and session log.
+    version = os.getenv("AGENT_PIPELINE_VERSION", "v3").strip().lower()
     # V3 is live by version alone. Rollout remains only for v1 and v2 compatibility.
     rollout = (
         "live"
