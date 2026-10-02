@@ -149,6 +149,7 @@ MEMORY_V3_SCENARIOS = (
             ),
         ),
         tags=("memory_v3", "semantic", "personalization", "partner_preference"),
+        allowed_vibe_areas=(),
     ),
     MemoryV3Scenario(
         id="capture_friend_preference_for_matching",

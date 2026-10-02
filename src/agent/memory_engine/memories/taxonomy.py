@@ -20,6 +20,8 @@ V3_MEMORY_VALUE_GUIDANCE = """The key is only a stable retrieval handle. The val
 Make the value understandable on its own and preserve the evidence's subject, ownership, action,
 negation, qualifiers, frequency, certainty, named entities and outcome. Use a scalar when it remains
 complete, an array for a genuine list, and an object when several roles or details must be preserved.
+For a preference, name what the user prefers and whom or what it applies to in the value itself;
+the key and statement cannot supply a missing subject.
 Do not compress an activity into a job title, a shared past pattern into the user's current trait, or a
 specific preference into a vague category. Never add details merely to make the value look complete."""
 

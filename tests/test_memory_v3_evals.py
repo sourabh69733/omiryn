@@ -194,6 +194,27 @@ class MemoryV3EvaluationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(scenario.expected_operations[0].required_purposes, ("matching",))
         self.assertEqual(scenario.expected_operations[0].evidence_message_indexes, (0,))
 
+    def test_dating_preference_cannot_fill_friend_vibe(self) -> None:
+        scenario = get_memory_v3_scenario("capture_partner_location_preference")
+        operation = {
+            "operation": "add",
+            "memory_kind": "semantic",
+            "purposes": ["personalization"],
+            "key": "partner_location_preference",
+            "value": "Wants a dating partner from Tamil Nadu, ideally near Chennai",
+            "sensitivity": "standard",
+            "evidence_message_indexes": [0],
+        }
+        passed, findings = grade_memory_v3_result(
+            scenario=scenario,
+            decision="propose",
+            operations=(operation,),
+            structurally_valid=True,
+            vibe={"deal_breakers": "May not prefer a partner from other locations."},
+        )
+        self.assertFalse(passed)
+        self.assertIn("Vibe line written for an area", " ".join(findings))
+
     def test_grader_rejects_unexpected_memory_for_incidental_content(self) -> None:
         scenario = get_memory_v3_scenario("ignore_incidental_technical_subject")
         operation = {
