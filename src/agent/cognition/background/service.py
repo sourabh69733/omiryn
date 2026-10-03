@@ -18,6 +18,7 @@ from agent.cognition.background.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import (
     attach_agent_usage_result,
+    get_conversation,
     get_user_card,
     get_user_timezone,
     latest_agent_usage_event_id,
@@ -25,6 +26,7 @@ from storage import (
     list_agent_memory_embeddings,
     list_data_point_extraction_debug,
     list_profile_facts,
+    record_memory_batch_failure,
 )
 from storage.profile_facts import save_data_point_extraction_debug
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
@@ -68,6 +70,9 @@ from agent.memory_engine.processing.validation import MemoryAnalysis
 from .coordination import interpret_background_cognition
 
 logger = logging.getLogger(__name__)
+
+# Content failures on one batch before it is skipped (provider outages never count).
+MAX_BATCH_CONTENT_FAILURES = 3
 
 
 MAX_EXISTING_MEMORIES = 8
@@ -199,6 +204,13 @@ async def run_background_cognition(
             state=state,
             model=model,
         )
+        if result.get("status") in {"live_error", "shadow_error"} and get_conversation(
+            conversation_id, user_id
+        ) is None:
+            # The chat was deleted while this batch waited; nothing to do.
+            result = {"status": "conversation_unavailable", "batch_key": batch.batch_key, "operation_count": 0}
+        elif result.pop("content_failure", False):
+            result = _count_failure_or_skip(batch, result)
         attach_agent_usage_result(
             conversation_id,
             user_id,
@@ -261,6 +273,9 @@ async def _run_claimed_background_cognition(
     live_attempted = (
         config.live_memory_writes or config.live_v3_memory_writes or config.live_thread_writes
     )
+    # Errors before the model answers (timeouts, outages) are retried forever; errors after it
+    # come from the content and count toward skipping the batch.
+    model_answered = False
     try:
         raw = await analyze_background_cognition(
             background_cognition_prompt(
@@ -278,6 +293,7 @@ async def _run_claimed_background_cognition(
             timeout_seconds=_timeout_seconds(),
             memory_version=memory_version,
         )
+        model_answered = True
         cognition = interpret_background_cognition(
             raw,
             batch=batch,
@@ -313,6 +329,7 @@ async def _run_claimed_background_cognition(
                 "batch_key": batch.batch_key,
                 "operation_count": 0,
                 "errors": list(analysis.errors),
+                "content_failure": True,
             }
         if analysis.valid and (config.live_memory_writes or config.live_v3_memory_writes):
             try:
@@ -367,6 +384,7 @@ async def _run_claimed_background_cognition(
                     "thread_operation": cognition.thread_operation,
                     "thread_valid": bool(cognition.thread.get("valid")),
                     "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
+                    "content_failure": True,
                 }
         if bool(cognition.thread.get("valid")) and config.live_thread_writes:
             thread_application_result = apply_validated_thread_proposal(
@@ -500,7 +518,55 @@ async def _run_claimed_background_cognition(
                 else 0
             ),
             "errors": [f"{type(error).__name__}: {str(error)[:300]}"],
+            "content_failure": model_answered and memory_version == 3,
         }
+
+
+def _count_failure_or_skip(batch: MemoryBatch, result: dict[str, Any]) -> dict[str, Any]:
+    """Count a content failure; after a few on the same batch, move the cursor past it.
+
+    The model runs at temperature 0, so a batch that fails on its content fails the same way on
+    every retry and would stop the conversation's memory for good.
+    """
+    error = "; ".join(result.get("errors") or [str(result.get("status"))])
+    attempts = record_memory_batch_failure(
+        batch.batch_key, batch.conversation_id, batch.user_id, error
+    )
+    if attempts < MAX_BATCH_CONTENT_FAILURES:
+        return {**result, "failed_attempts": attempts}
+    current = get_processing_state(batch.conversation_id, batch.user_id) or MemoryProcessingState(
+        conversation_id=batch.conversation_id,
+        user_id=batch.user_id,
+    )
+    # The previous summary and session log are kept; only this batch's messages are passed over.
+    saved = save_processing_state(
+        replace(
+            current,
+            processed_through_message_index=batch.new_end_message_index,
+            last_batch_key=batch.batch_key,
+        )
+    )
+    _save_cognition_debug_once(
+        batch=batch,
+        memory_version=3,
+        decision="skipped_after_failures",
+        candidate={},
+        review={"valid": False, "errors": [error[:300]], "attempts": attempts, "live_writes": False},
+        state_version=saved.version,
+    )
+    logger.warning(
+        "agent.memory_batch_skipped conversation_id=%s batch_key=%s attempts=%s",
+        batch.conversation_id,
+        batch.batch_key,
+        attempts,
+    )
+    return {
+        "status": "skipped_after_failures",
+        "batch_key": batch.batch_key,
+        "operation_count": 0,
+        "errors": result.get("errors") or [],
+        "processed_through_message_index": saved.processed_through_message_index,
+    }
 
 
 def _self_note_context(user_id: str) -> list[dict[str, Any]]:
