@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -31,6 +32,8 @@ from .schema import (
 )
 from .utils import _isoformat_utc, _protect_text, _require_user_id, _unprotect_text
 
+
+logger = logging.getLogger(__name__)
 
 def create_agent_memory(payload: dict[str, Any]) -> dict[str, Any]:
     """Create one validated memory; storage owns its ID and audit timestamps."""
@@ -529,14 +532,21 @@ def _same_memory_content(row, memory: dict[str, Any]) -> bool:
 
 
 def _validate_idempotent_retry(rows, operations: list[dict[str, Any]]) -> None:
-    if len(rows) != len(operations):
-        raise ValueError("memory batch retry does not match its committed operation count")
-    for row, operation in zip(rows, operations, strict=True):
-        if (
-            int(row["operation_index"]) != int(operation["operation_index"])
-            or row["operation_fingerprint"] != operation["operation_fingerprint"]
-        ):
-            raise ValueError("memory batch retry does not match its committed operations")
+    """The batch is already saved; the first answer wins.
+
+    A retry runs only when a later step failed after this commit. The model can answer slightly
+    differently the second time; refusing that would fail the batch forever, so the saved result
+    is reused and the difference is only logged.
+    """
+    same = len(rows) == len(operations) and all(
+        int(row["operation_index"]) == int(operation["operation_index"])
+        and row["operation_fingerprint"] == operation["operation_fingerprint"]
+        for row, operation in zip(rows, operations)
+    )
+    if not same:
+        logger.info(
+            "agent.memory_batch_retry_differs committed=%s retried=%s", len(rows), len(operations)
+        )
 
 
 def _application_rows(connection, user_id: str, conversation_id: str, batch_key: str):

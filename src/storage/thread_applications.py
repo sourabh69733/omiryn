@@ -67,10 +67,7 @@ def apply_thread_operation_once(payload: dict[str, Any]) -> dict[str, Any]:
             )
         ).mappings().first()
         if existing:
-            if existing["operation_fingerprint"] != fingerprint:
-                raise ValueError(
-                    "thread batch retry does not match its committed operation"
-                )
+            # Already saved for this batch: the first answer wins (see memories retry).
             return _application_from_row(existing, idempotent=True)
 
         if operation_kind in {"pause", "complete", "block"}:
