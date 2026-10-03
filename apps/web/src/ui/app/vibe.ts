@@ -3,6 +3,8 @@ import type { RealtimeEvent } from "../../lib/realtime";
 export type VibeArea = {
   id: string;
   stage: "basics" | "deeper";
+  // Used for matching only; never shown to matches.
+  private: boolean;
   text: string | null;
   // clear: said on 2+ different days; mentioned: one day only. Milestones past the first need clear.
   strength: "clear" | "mentioned" | null;

@@ -250,6 +250,20 @@
   color: var(--muted);
 }
 
+.vibe-card p.vibe-private {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.vibe-card p.vibe-private svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
 .vibe-quotes {
   display: grid;
   gap: 6px;

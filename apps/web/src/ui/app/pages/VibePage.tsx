@@ -1,4 +1,4 @@
-import { Check, MessageCircle, X } from "lucide-react";
+import { Check, Lock, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, evidenceChatPath, saidLabel, vibeStepIndex } from "../vibe";
@@ -92,6 +92,12 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                       ) : null}
                     </div>
                     <p>{area.text || "Not yet. Omi picks this up as you chat."}</p>
+                    {area.private ? (
+                      <p className="vibe-private">
+                        <Lock aria-hidden="true" />
+                        Private. Helps find your matches, never shown to them.
+                      </p>
+                    ) : null}
                     {area.text && openWhy === area.id ? (
                       area.evidence.length ? (
                         <ul className="vibe-quotes" aria-label="What you said">
