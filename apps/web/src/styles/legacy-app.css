@@ -9930,34 +9930,62 @@ p {
   }
 }
 
-/* A user message whose reply failed stays in the chat with a Retry. */
+/* A user message whose reply failed stays in the chat with a quiet "Not sent" and a Retry pill,
+   tucked right under the bubble (the avatar column is 31px + 9px gap). */
 .message-status-row {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  margin: 3px 0 2px;
-  padding-right: 44px;
+  margin: -6px 0 2px;
+  padding-right: 40px;
   font-size: 12px;
-  color: var(--accent);
+  line-height: 1;
 }
 
-.message-retry-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
+.message-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #c2410c;
+}
+
+.message-status-text svg {
+  width: 13px;
+  height: 13px;
+}
+
+button.message-retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--primary-dark);
   font: inherit;
   font-weight: 600;
-  text-decoration: underline;
   cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+button.message-retry-button:hover {
+  border-color: var(--primary);
+  background: var(--soft);
+}
+
+.message-retry-button svg {
+  width: 12px;
+  height: 12px;
 }
 
 .message-retry-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .typing-slow-note {
