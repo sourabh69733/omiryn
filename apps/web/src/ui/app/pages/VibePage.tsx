@@ -24,8 +24,10 @@ export function VibePage({ onChat }: { onChat: () => void }) {
   async function remove(area: VibeArea) {
     setRemoving(area.id);
     const response = await apiFetch(`/api/me/vibe/${area.id}`, { method: "DELETE" });
-    if (response.ok) setVibe((await response.json()) as Vibe);
-    else setStatus(await apiErrorMessage(response, "Could not remove that line."));
+    if (response.ok) {
+      setVibe((await response.json()) as Vibe);
+      setStatus("Removed. Omi won't bring it back unless you say something new about it.");
+    } else setStatus(await apiErrorMessage(response, "Could not remove that line."));
     setRemoving(null);
   }
 
