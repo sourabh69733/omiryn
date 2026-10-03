@@ -690,7 +690,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         </aside>
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={sending || (conversation && typingConversationId === conversation.id) ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status">{conversation?.agent_tone || "warm"}</p></div></div>
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "AI companion"}</p></div></div>
             <div className="chat-controls">
               <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
               {/* Commented for now, as it will conversation confusion and increase user expectation from agent which it might not be able to support. */}
