@@ -77,6 +77,20 @@ memory_processing_states = Table(
 )
 Index("ix_memory_processing_states_user", memory_processing_states.c.user_id)
 
+# Content failures per background batch (not provider outages). After a few, the batch is
+# skipped so one bad batch cannot stop a conversation's memory for good.
+memory_batch_failures = Table(
+    "memory_batch_failures",
+    metadata,
+    Column("batch_key", String, primary_key=True),
+    Column("conversation_id", String, nullable=False),
+    Column("user_id", String, nullable=False),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("last_error", String, nullable=True),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_memory_batch_failures_user", memory_batch_failures.c.user_id)
+
 # Claims one bounded cognition batch before its model call. The expiring owner
 # token prevents duplicate calls while allowing recovery after a crashed worker.
 memory_processing_leases = Table(

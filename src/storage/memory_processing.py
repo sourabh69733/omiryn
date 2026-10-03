@@ -13,6 +13,7 @@ from security.encryption import decrypt_json, maybe_encrypt_json
 
 from .database import ENGINE
 from .schema import (
+    memory_batch_failures,
     agent_conversations,
     memory_processing_leases,
     memory_processing_states,
@@ -230,6 +231,37 @@ def save_memory_processing_state(
             )
         ).mappings().one()
     return _state_from_row(row)
+
+
+def record_memory_batch_failure(
+    batch_key: str,
+    conversation_id: str,
+    user_id: str,
+    error: str,
+) -> int:
+    """Count one content failure for this batch; returns how many it has had."""
+    with ENGINE.begin() as connection:
+        current = connection.execute(
+            select(memory_batch_failures.c.attempts).where(
+                memory_batch_failures.c.batch_key == batch_key,
+                memory_batch_failures.c.user_id == user_id,
+            )
+        ).scalar_one_or_none()
+        attempts = int(current or 0) + 1
+        values = {"attempts": attempts, "last_error": error[:500], "updated_at": func.now()}
+        if current is None:
+            connection.execute(
+                memory_batch_failures.insert().values(
+                    batch_key=batch_key, conversation_id=conversation_id, user_id=user_id, **values
+                )
+            )
+        else:
+            connection.execute(
+                memory_batch_failures.update()
+                .where(memory_batch_failures.c.batch_key == batch_key)
+                .values(**values)
+            )
+    return attempts
 
 
 def _require_owned_conversation(connection, conversation_id: str, user_id: str) -> None:
