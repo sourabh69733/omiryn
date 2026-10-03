@@ -120,6 +120,9 @@ Vibe rules (who the user would get along with as a friend; Omiryn uses it to fin
   return {}. At most 4 areas.
 - evidence lists the message_index of every user message in this batch that shows it. Only user
   messages count; a line without one is dropped. The current line keeps its earlier evidence.
+- rejected_vibe has lines the user said are wrong about them. Do not write that reading again. Fill
+  that area only when the NEW messages clearly show something, and only proof sent after the user
+  said so counts.
 """ + VIBE_LINE_RULES + """
 
 """ + V3_MEMORY_OUTPUT_SHAPE

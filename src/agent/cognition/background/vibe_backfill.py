@@ -10,6 +10,8 @@ from agent.memory_engine.memories.vibe import (
     VIBE_AREAS,
     VIBE_AREA_IDS,
     merge_vibe,
+    proof_after_rejection,
+    rejected_texts,
     validate_vibe_updates,
     vibe_texts,
     vibe_progress,
@@ -44,6 +46,7 @@ async def backfill_user_vibe(
             {
                 "vibe_areas": [{"id": area_id, "meaning": goal} for area_id, _, goal in VIBE_AREAS],
                 "current_vibe": vibe_texts(current["areas"]),
+                "rejected_vibe": rejected_texts(current.get("rejected")),
                 "chats": transcript,
             },
             ensure_ascii=False,
@@ -66,6 +69,8 @@ async def backfill_user_vibe(
             conversation_id=conversations[0]["id"],
             timeout_seconds=timeout_seconds,
         )
+        # Old chats already led to a line the user marked wrong; they cannot bring it back.
+        updates = proof_after_rejection(updates, current.get("rejected"))
     milestone = vibe_progress(merge_vibe(current["areas"], updates)).milestone
     if not updates:
         return {"status": "nothing_found", "areas": {}, "milestone": milestone}

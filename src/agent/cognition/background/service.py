@@ -31,7 +31,7 @@ from storage.self_notes import add_self_notes, list_active_self_notes, resolve_s
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card, update_vibe_card
 from agent.cognition.background.vibe_verify import verify_vibe_updates
-from agent.memory_engine.memories.vibe import vibe_texts
+from agent.memory_engine.memories.vibe import rejected_texts, vibe_texts
 from realtime import conversation_event, realtime_hub
 
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
@@ -271,6 +271,7 @@ async def _run_claimed_background_cognition(
                 user_card,
                 self_notes,
                 vibe_texts(vibe_card["areas"]) if vibe_card is not None else None,
+                rejected_texts(vibe_card.get("rejected")) if vibe_card is not None else None,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -533,6 +534,7 @@ async def _apply_vibe(
     if not verified:
         return {}
     saved = update_vibe_card(user_id, verified)
+    verified = {area_id: verified[area_id] for area_id in saved.get("applied", verified)}
     if saved["milestone"] != current["milestone"]:
         # The open chat shows it; the companion hears about it on its next reply.
         await realtime_hub.publish(

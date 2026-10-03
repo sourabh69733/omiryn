@@ -8,6 +8,7 @@ Return one JSON object and no surrounding prose:
 {"vibe": {"<area id>": {"line": "<line>", "evidence": ["<id of each user message that shows it>"]}}}
 
 - vibe_areas lists each area's id and meaning; current_vibe has any lines written so far.
+- rejected_vibe has lines the user said are wrong about them. Do not write that reading again.
 - In chats, each user message starts with an id like [m12]. evidence lists the ids of the user
   messages behind a line; companion messages have no id and never count. A line without
   evidence is dropped.
