@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from agent.memory_engine.memories.vibe import (
+    PRIVATE_AREA_IDS,
     VIBE_AREAS,
     evidence_days,
     line_evidence,
@@ -53,6 +54,7 @@ def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:
             {
                 "id": area_id,
                 "stage": stage,
+                "private": area_id in PRIVATE_AREA_IDS,
                 "text": line_text(areas.get(area_id)) or None,
                 "strength": line_strength(areas[area_id]) if area_id in areas else None,
                 "evidence_count": len(line_evidence(areas.get(area_id))),

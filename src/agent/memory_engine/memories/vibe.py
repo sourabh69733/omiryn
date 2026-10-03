@@ -27,6 +27,9 @@ VIBE_AREAS: tuple[tuple[str, str, str], ...] = (
 VIBE_AREA_IDS = tuple(area_id for area_id, _, _ in VIBE_AREAS)
 BASIC_AREA_IDS = tuple(area_id for area_id, stage, _ in VIBE_AREAS if stage == "basics")
 DEEPER_AREA_IDS = tuple(area_id for area_id, stage, _ in VIBE_AREAS if stage == "deeper")
+# Beliefs, life stories and deal-breakers: matching may weigh them, but they are never shown to
+# another user, quoted in a match reason or used as an icebreaker.
+PRIVATE_AREA_IDS = ("values", "stories", "deal_breakers")
 VIBE_AREA_GOALS = {area_id: goal for area_id, _, goal in VIBE_AREAS}
 MAX_VIBE_LINE_CHARS = 220
 MAX_VIBE_UPDATES = 4
@@ -252,6 +255,7 @@ __all__ = [
     "CLEAR_DAY_COUNT",
     "DEEPER_AREA_IDS",
     "MAX_VIBE_LINE_CHARS",
+    "PRIVATE_AREA_IDS",
     "VIBE_AREAS",
     "VIBE_AREA_GOALS",
     "VIBE_AREA_IDS",
