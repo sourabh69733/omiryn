@@ -233,6 +233,23 @@ def save_memory_processing_state(
     return _state_from_row(row)
 
 
+def reset_memory_processing_state(conversation_id: str, user_id: str) -> None:
+    """Forget how far background cognition got in one chat, so it is processed again.
+
+    Only for maintenance (reprocessing chats handled by an older pipeline). Saved memories,
+    vibe lines and threads stay; the rerun reinforces what it finds again instead of copying it.
+    """
+    with ENGINE.begin() as connection:
+        _require_owned_conversation(connection, conversation_id, user_id)
+        for table in (memory_processing_states, memory_processing_leases):
+            connection.execute(
+                table.delete().where(
+                    table.c.conversation_id == conversation_id,
+                    table.c.user_id == user_id,
+                )
+            )
+
+
 def record_memory_batch_failure(
     batch_key: str,
     conversation_id: str,
