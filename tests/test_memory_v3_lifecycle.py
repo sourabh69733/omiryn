@@ -194,8 +194,9 @@ def test_rejects_unknown_or_repeated_lifecycle_target() -> None:
         existing_memory_ids={str(existing["id"])},
     )
 
-    assert not unknown.valid
-    assert "supplied active memory" in " ".join(unknown.errors)
+    assert unknown.valid
+    assert unknown.operations == ()
+    assert "supplied active memory" in " ".join(unknown.dropped)
     repeated_raw = {
         "decision": "propose",
         "operations": [
@@ -223,8 +224,10 @@ def test_rejects_unknown_or_repeated_lifecycle_target() -> None:
         existing_memory_ids={str(existing["id"])},
     )
 
-    assert not repeated.valid
-    assert "targeted only once" in " ".join(repeated.errors)
+    # The first retract stands; the repeat is dropped.
+    assert repeated.valid
+    assert len(repeated.operations) == 1
+    assert "targeted only once" in " ".join(repeated.dropped)
 
 
 def test_exact_duplicate_add_reinforces_instead_of_creating_second_memory() -> None:

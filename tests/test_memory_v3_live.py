@@ -99,7 +99,7 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(memories[0]["evidence"][0]["message_index"], 0)
         self.assertEqual(list_profile_facts(self.user_id), [])
 
-    async def test_invalid_v3_evidence_does_not_write_or_advance_cursor(self) -> None:
+    async def test_bad_evidence_drops_that_memory_and_moves_on(self) -> None:
         response = self._valid_response()
         response["operations"][0]["evidence_message_indexes"] = [99]
         with (
@@ -116,9 +116,12 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
                 self.messages,
             )
 
-        self.assertEqual(result["status"], "live_invalid")
+        # The bad memory is not written, but the batch is done: the cursor moves past it.
+        self.assertNotIn(result["status"], {"live_invalid", "live_error"})
         self.assertEqual(list_agent_memories(self.user_id), [])
-        self.assertIsNone(get_processing_state(self.conversation_id, self.user_id))
+        state = get_processing_state(self.conversation_id, self.user_id)
+        self.assertIsNotNone(state)
+        self.assertEqual(state.processed_through_message_index, len(self.messages) - 1)
 
     async def test_retry_after_cursor_failure_reuses_committed_memory_batch(self) -> None:
         environment = {"AGENT_PIPELINE_VERSION": "v3"}

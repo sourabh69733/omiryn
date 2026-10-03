@@ -40,8 +40,38 @@ class MemoryV3ValidationTest(unittest.TestCase):
                     self._analysis(evidence_message_indexes=[index]),
                     batch=self.batch,
                 )
-                self.assertFalse(result.valid)
-                self.assertIn("ineligible message indexes", " ".join(result.errors))
+                # The memory citing a companion message (or none) is dropped, not saved.
+                self.assertEqual(result.operations, ())
+                self.assertIn("ineligible message indexes", " ".join(result.dropped))
+
+    def test_one_bad_operation_keeps_the_good_ones(self) -> None:
+        good = self._analysis()["operations"][0]
+        bad = {**good, "evidence_message_indexes": [99]}
+        result = validate_memory_analysis_v3(
+            {**self._analysis(), "operations": [bad, good]},
+            batch=self.batch,
+        )
+
+        self.assertTrue(result.valid)
+        self.assertEqual(len(result.operations), 1)
+        self.assertEqual(result.decision, "propose")
+        self.assertIn("operations[0]", " ".join(result.dropped))
+
+    def test_a_bad_handoff_keeps_the_previous_one_and_the_memories(self) -> None:
+        result = validate_memory_analysis_v3(
+            {**self._analysis(), "handoff": "not an object"},
+            batch=self.batch,
+        )
+
+        self.assertTrue(result.valid)
+        self.assertEqual(len(result.operations), 1)
+        self.assertEqual(result.handoff, self.batch.previous_handoff)
+        self.assertIn("handoff", " ".join(result.dropped))
+
+    def test_only_a_malformed_response_is_invalid(self) -> None:
+        for raw in ("text", {"operations": "nope"}):
+            with self.subTest(raw=raw):
+                self.assertFalse(validate_memory_analysis_v3(raw, batch=self.batch).valid)
 
     def test_rejects_unknown_taxonomy_and_duplicate_purposes(self) -> None:
         result = validate_memory_analysis_v3(
@@ -52,9 +82,10 @@ class MemoryV3ValidationTest(unittest.TestCase):
             batch=self.batch,
         )
 
-        self.assertFalse(result.valid)
-        self.assertIn("memory_kind", " ".join(result.errors))
-        self.assertIn("duplicates", " ".join(result.errors))
+        self.assertTrue(result.valid)
+        self.assertEqual(result.operations, ())
+        self.assertIn("memory_kind", " ".join(result.dropped))
+        self.assertIn("duplicates", " ".join(result.dropped))
 
     def test_keeps_a_plain_statement(self) -> None:
         result = validate_memory_analysis_v3(
