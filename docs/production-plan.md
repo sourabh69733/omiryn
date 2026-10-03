@@ -15,7 +15,7 @@ The product works only when all eight steps work for two real users.
 | 1 | Signup | Done | Nothing for launch. | A new user reaches Omi's first message in under 60 s; 18+ cannot be skipped. |
 | 2 | Talk to Omi | Partial | Confirm Cloud Run runs pipeline v3 (`GET /health`; code and scripts now default to it); friends-first memories; find why the user card and self-notes are empty; run the companion vibe evals with the real model. | Testers chat 10+ minutes on their own; replies never read like a template. |
 | 3 | Vibe extraction | Done | Backfill `--reset`; embedding per vibe line for matching. A failed proof check saves nothing, so lines from that batch are lost; retry the check through the job table. | Grounding evals pass with the real model; every line has proof. |
-| 4 | Vibe page | Partial | A removed line can come back (store the rejection, accept only newer proof); sensitive areas marked "matching only". | The user removes a wrong line and it stays gone until new proof. |
+| 4 | Vibe page | Partial | Sensitive areas marked "matching only". (Removed lines now stay gone until newer proof.) | The user removes a wrong line and it stays gone until new proof. |
 | 5 | Matching | Missing | Candidate pool (city, age band, recently active), minimum vibe ("Ready to match"), pair score (humor fit, values same or accepted, deal-breaker clashes, interests, energy), AI-written reasons. Score only proof-checked lines said on 2+ days; values and beliefs only with consent (section 4). | Real friend pairs score higher than random pairs; reasons read true to both people. |
 | 6 | Match flow | Missing | Match card (first name, photo if given, 2 or 3 "you'd click on" reasons, one accepted difference), accept or pass, chat opens only on both accepting, a few matches a day, expiry. | Two test users get matched, both accept, the chat opens for both. |
 | 7 | User-to-user chat | Missing | Realtime 1:1 chat (reuse the Omi realtime layer), Omi icebreaker, notifications, report and block. | Two users chat on phones, get notified, and can block each other. |
@@ -104,7 +104,7 @@ Ship when all of these are done; everything else can follow.
 - [ ] Pipeline v3 confirmed on Cloud Run with `GET /health` (step 2; code and scripts done)
 - [x] Background memory work caught up when users return (section 1b)
 - [x] Vibe extraction with proof (step 3)
-- [ ] Vibe page: removed lines stay removed; sensitive areas private (step 4)
+- [ ] Vibe page: sensitive areas private (removed lines stay removed: done) (step 4)
 - [ ] Matching, match flow and user-to-user chat (steps 5 to 7)
 - [ ] Day-3 and day-7 check and the still-talking signal (step 8)
 - [ ] Report, block, moderation and crisis replies

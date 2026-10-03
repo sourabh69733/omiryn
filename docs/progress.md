@@ -79,7 +79,7 @@ The core of the product: what Omi understands about who the user would get along
 | Signup | One screen: name, approximate location ("Around Kolkata, West Bengal · Change", from the IP via DB-IP Lite, dropped when the browser timezone is in another country), 18+ checkbox. Everything else is learned in chat. |
 | Chat | Omi with typing dots, bubble reveal, Retry on failed messages, "Talks like" setting, milestone note ("Omi knows what you want in friends · See your vibe"). New bubbles fade in; history does not. The typing dots leave in the same render the reply lands, and only one avatar shows while later bubbles reveal. |
 | Agent avatar | Generated "vibe blob" images, one per state (idle, thinking, listening, happy) as WebP in `apps/web/public/assets/agent/`. Still by default; only the one writing a reply breathes. No sweeps or flashes. |
-| Vibe | Milestone path, each area's line with a chip ("Said on 2 days"). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line. |
+| Vibe | Milestone path, each area's line with a chip ("Said on 2 days"). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line and it stays gone until the user says something new about that area. |
 | Memories | Renamed from Style ("What Omiryn remembers"); `/style` redirects. Legacy signals hidden (data kept for export and deletion). |
 | Matches | Coming soon, plus how close the user is ("Matches need Ready to match") and a link to Vibe. |
 | Profile and Contact | Profile without "Interested in". Contact moved into the account menu. |
@@ -104,14 +104,12 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Vibe page: a removed line can come back | "Not right" only deletes the line. Nothing records the rejection, so the background (or a forced backfill) can rewrite the same line from the same old messages. Fix: store the rejection, accept that area again only with proof sent after it, and tell the model. |
-| 2 | Sensitive vibe areas | Values, beliefs and deal-breakers need "used for matching, never shown to matches" before Matches shows anything. |
-| 3 | One design system | The app still runs on `legacy-app.css` (Inter, mixed colors); the landing site uses Geist and the new tokens. |
-| 4 | Profile cleanup | Gender select and the long privacy note feel dating-era and heavy. |
-| 5 | Chat header | Shows the raw tone value ("warm") under Omi's name. |
-| 6 | Limit messages | Fixed Hinglish lines in a female voice ("catch up karti hoon"); Omi is neutral by default. |
-| 7 | Mobile pass | Chat, history panel, composer and Vibe on phone widths. |
-| 8 | Empty, loading and error states | Consistent on every screen. |
+| 1 | Sensitive vibe areas | Values, beliefs and deal-breakers need "used for matching, never shown to matches" before Matches shows anything. |
+| 2 | Finish the design system | Chat and Vibe use the landing tokens and fonts; Memories, Matches and Profile still need a visual pass. |
+| 3 | Mobile pass on the rest | Chat and Vibe reflow on narrow screens; Memories, Matches, Profile and the history panel are not checked. |
+| 4 | Empty, loading and error states | Consistent on every screen. |
+
+Done in this round: "Not right" now stays gone (the rejection is stored; that area takes a new line only with proof sent afterwards, and the models see the rejected line); the chat header says "typing…" or "AI companion" instead of the tone value; limit messages are short and neutral; profile gender is optional ("helps Omi address you correctly in Hindi") with a one-line privacy note.
 
 ## 5. Quality and checks
 
