@@ -7,6 +7,7 @@ validates the shape and counts filled areas into milestones; it never decides wh
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 # (id, stage, goal). The goal tells the models what the area means; it is not a question to ask.
@@ -186,6 +187,49 @@ def validate_vibe_updates(
     return updates
 
 
+def rejected_texts(rejected: dict[str, Any] | None) -> dict[str, str]:
+    """Lines the user marked wrong, for prompts."""
+    return {area_id: str(value.get("text") or "") for area_id, value in (rejected or {}).items() if isinstance(value, dict)}
+
+
+def proof_after_rejection(
+    updates: dict[str, dict[str, Any]], rejected: dict[str, Any] | None
+) -> dict[str, dict[str, Any]]:
+    """For an area the user marked wrong, keep only proof sent after they did.
+
+    Old messages already led to the wrong line, so they cannot bring it back. Proof without a send
+    time cannot show it is newer and is dropped; an area left with no proof is not written.
+    """
+    kept: dict[str, dict[str, Any]] = {}
+    for area_id, update in updates.items():
+        record = (rejected or {}).get(area_id)
+        rejected_at = _parse_time(record.get("at")) if isinstance(record, dict) else None
+        if rejected_at is None:
+            kept[area_id] = update
+            continue
+        old = {_evidence_key(item) for item in line_evidence(record)}
+        evidence = [
+            item
+            for item in line_evidence(update)
+            if _evidence_key(item) not in old
+            and (sent_at := _parse_time(item.get("sent_at"))) is not None
+            and sent_at > rejected_at
+        ]
+        if evidence:
+            kept[area_id] = {"text": line_text(update), "evidence": evidence}
+    return kept
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """New text replaces the old line; evidence accumulates (most recent kept)."""
     merged: dict[str, dict[str, Any]] = {}
@@ -220,6 +264,8 @@ __all__ = [
     "line_strength",
     "line_text",
     "merge_vibe",
+    "proof_after_rejection",
+    "rejected_texts",
     "validate_vibe_updates",
     "vibe_progress",
     "vibe_texts",

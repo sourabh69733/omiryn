@@ -30,12 +30,12 @@ async def get_vibe(user: CurrentUser = Depends(require_user)) -> dict[str, objec
 
 @router.delete("/api/me/vibe/{area_id}")
 async def delete_vibe_area(area_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
-    """The user says a line is wrong; it goes, and the companion learns that area again."""
+    """The user says a line is wrong; it goes, and only proof sent after this can fill that area again."""
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     if area_id not in {item_id for item_id, _, _ in VIBE_AREAS}:
         raise HTTPException(status_code=404, detail="Unknown vibe area.")
-    return _vibe_payload(update_vibe_card(user.id, {}, remove=(area_id,)), user.id)
+    return _vibe_payload(update_vibe_card(user.id, {}, reject=(area_id,)), user.id)
 
 
 def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:

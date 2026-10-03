@@ -204,7 +204,7 @@ class VibeCardStorageTest(unittest.TestCase):
 
     def test_removing_a_line_can_drop_the_milestone(self) -> None:
         update_vibe_card("vibe-user", lines("humor", "values"), now=NOW)
-        saved = update_vibe_card("vibe-user", {}, remove=("values",))
+        saved = update_vibe_card("vibe-user", {}, reject=("values",))
 
         self.assertEqual(set(saved["areas"]), {"humor"})
         self.assertEqual(saved["milestone"], "starting")
