@@ -152,8 +152,9 @@ async def run_memory_v3_scenario(
         scenario=scenario,
         decision=analysis.decision,
         operations=operations,
-        structurally_valid=analysis.valid,
-        validation_errors=analysis.errors,
+        # Production drops a bad operation and keeps going; an eval still counts it as a mistake.
+        structurally_valid=analysis.valid and not analysis.dropped,
+        validation_errors=analysis.errors + analysis.dropped,
         vibe=cognition.vibe,
     )
     semantic_judgment = None
@@ -197,8 +198,9 @@ async def run_memory_v3_scenario(
         passed=passed,
         decision=analysis.decision,
         operations=operations,
-        structurally_valid=analysis.valid,
-        validation_errors=analysis.errors,
+        # Production drops a bad operation and keeps going; an eval still counts it as a mistake.
+        structurally_valid=analysis.valid and not analysis.dropped,
+        validation_errors=analysis.errors + analysis.dropped,
         findings=findings,
         raw_response=raw,
         duration_seconds=duration,

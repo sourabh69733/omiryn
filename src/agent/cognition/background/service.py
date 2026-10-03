@@ -435,6 +435,8 @@ async def _run_claimed_background_cognition(
             review={
                 "valid": analysis.valid,
                 "errors": list(analysis.errors),
+                # Parts the model got wrong that were dropped; the rest of the batch was saved.
+                "dropped": list(getattr(analysis, "dropped", ())),
                 "combined_valid": cognition.valid,
                 "combined_errors": list(cognition.errors),
                 "thread_valid": bool(cognition.thread.get("valid")),

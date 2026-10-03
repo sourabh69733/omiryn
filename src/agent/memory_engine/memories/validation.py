@@ -1,4 +1,9 @@
-"""Pure fail-closed validation for v3 background-memory proposals."""
+"""Pure validation for v3 background-memory proposals.
+
+A malformed response fails closed. Anything smaller (one bad operation, a bad handoff, a wrong
+decision label) is dropped on its own and recorded, so the rest of the batch is still saved and
+the conversation's memory never gets stuck on one mistake.
+"""
 
 from __future__ import annotations
 
@@ -51,20 +56,17 @@ def validate_memory_analysis_v3(
     """Validate lifecycle proposals without interpreting natural-language content."""
     if not isinstance(raw, dict):
         return _invalid("memory analysis must be an object", batch.previous_handoff)
-    errors: list[str] = []
+    raw_operations = raw.get("operations")
+    if raw_operations is None:
+        raw_operations = []
+    if not isinstance(raw_operations, list):
+        return _invalid("operations must be an array", batch.previous_handoff)
+    dropped: list[str] = []
     unsupported = unknown_fields(raw, {"decision", "operations", "handoff"})
     if unsupported:
-        errors.append(f"unsupported top-level fields: {', '.join(unsupported)}")
-    decision = raw.get("decision")
-    if decision not in {"propose", "no_change"}:
-        errors.append("decision must be propose or no_change")
-
-    raw_operations = raw.get("operations")
-    if not isinstance(raw_operations, list):
-        errors.append("operations must be an array")
-        raw_operations = []
+        dropped.append(f"ignored top-level fields: {', '.join(unsupported)}")
     if len(raw_operations) > MAX_MEMORY_OPERATIONS:
-        errors.append(f"operations cannot contain more than {MAX_MEMORY_OPERATIONS} items")
+        dropped.append(f"operations beyond the first {MAX_MEMORY_OPERATIONS} were ignored")
 
     operations: list[MemoryProposalV3] = []
     eligible_indexes = set(batch.evidence_message_indexes)
@@ -82,30 +84,23 @@ def validate_memory_analysis_v3(
             operation = None
         elif target_memory_id:
             targeted_memory_ids.add(target_memory_id)
-        errors.extend(f"operations[{index}]: {error}" for error in operation_errors)
-        if operation is not None:
+        if operation_errors:
+            dropped.extend(f"operations[{index}]: {error}" for error in operation_errors)
+        elif operation is not None:
             operations.append(operation)
 
-    if decision == "no_change" and raw_operations:
-        errors.append("no_change cannot include operations")
-    if decision == "propose" and not raw_operations:
-        errors.append("propose requires at least one operation")
-
     handoff, handoff_errors = _validate_handoff(raw.get("handoff"), batch.previous_handoff, batch)
-    errors.extend(f"handoff: {error}" for error in handoff_errors)
-    if errors:
-        return MemoryAnalysisV3(
-            decision=str(decision or "invalid"),
-            operations=(),
-            handoff=batch.previous_handoff,
-            valid=False,
-            errors=tuple(errors),
-        )
+    if handoff_errors:
+        # Keep the previous summary and session log rather than lose the whole batch.
+        dropped.extend(f"handoff: {error}" for error in handoff_errors)
+        handoff = batch.previous_handoff
     return MemoryAnalysisV3(
-        decision=str(decision),
+        # The label follows what survived, whatever the model called it.
+        decision="propose" if operations else "no_change",
         operations=tuple(operations),
         handoff=handoff,
         valid=True,
+        dropped=tuple(dropped),
     )
 
 

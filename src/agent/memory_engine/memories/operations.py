@@ -62,13 +62,18 @@ MemoryProposalV3: TypeAlias = (
 
 @dataclass(frozen=True)
 class MemoryAnalysisV3:
-    """Fail-closed validation result for one v3 memory lane."""
+    """Validation result for one v3 memory lane.
+
+    Only a malformed response is invalid. A bad operation or handoff is dropped and listed in
+    `dropped`, so one mistake does not throw away the rest of the batch.
+    """
 
     decision: str
     operations: tuple[MemoryProposalV3, ...]
     handoff: MemoryHandoff
     valid: bool
     errors: tuple[str, ...] = ()
+    dropped: tuple[str, ...] = ()
 
 
 __all__ = ["MemoryAddProposal", "MemoryAnalysisV3"]
