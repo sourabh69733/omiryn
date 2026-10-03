@@ -104,7 +104,7 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Sensitive vibe areas | Values, beliefs and deal-breakers need "used for matching, never shown to matches" before Matches shows anything. |
+| 1 | Consent for private areas | Values, stories and deal-breakers are marked private (`PRIVATE_AREA_IDS`, "Private" on the Vibe page). Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
 | 2 | Finish the design system | Chat and Vibe use the landing tokens and fonts; Memories, Matches and Profile still need a visual pass. |
 | 3 | Mobile pass on the rest | Chat and Vibe reflow on narrow screens; Memories, Matches, Profile and the history panel are not checked. |
 | 4 | Empty, loading and error states | Consistent on every screen. |
