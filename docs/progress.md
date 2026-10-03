@@ -51,6 +51,7 @@ user message
 | Time | Message times, user timezone from the browser, time notes on messages ("(Sat 26 Sep, 5:13 pm)"), sessions shown as spans. Honesty rule: never guess a time or fact. |
 | Working memory | Recent messages, the previous session's tail, a session log (gist and what was left open per session), a rolling dated summary. Fixes "forgot the last topic". |
 | Long-term memory | V3 memories as plain sentences with evidence and dates. Embedding retrieval. User card (always in context) and self-notes (the companion's own opinions and promises). |
+| Background reliability | One bad memory or handoff is dropped on its own; the rest of the batch (memories, user card, vibe, summary) is still saved. A batch that fails on its content 3 times is skipped (provider outages never count), a retried batch keeps its first saved answer, and a chat deleted mid-run is skipped quietly. Every run is recorded in an encrypted debug record, including what was dropped. |
 | Stories | The model marks story replies with a hidden `<story>` marker; stories continue and autoplay in parts. No keyword detection. |
 | Proactive | Story parts and the background memory flush run on the durable job table. The greeting on return is a delayed in-process task started when the chat connects; promise follow-ups and nudges run in an in-process loop for users who are online. Typing dots go over realtime. |
 | Reply failures | The user message is saved first. A failed reply shows "Not delivered · Retry"; fallback model on timeout. |
