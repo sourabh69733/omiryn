@@ -162,6 +162,42 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(retried["idempotent"])
         self.assertEqual(len(list_agent_memories(self.user_id)), 1)
 
+    async def test_a_retry_that_answers_differently_keeps_the_saved_batch(self) -> None:
+        environment = {"AGENT_PIPELINE_VERSION": "v3"}
+        changed = self._valid_response()
+        changed["operations"][0]["value"] = {"name": "Omiryn", "role": "founder"}
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+                return_value=self._valid_response(),
+            ),
+            patch(
+                "agent.cognition.background.service.save_processing_state",
+                side_effect=RuntimeError("cursor write failed"),
+            ),
+        ):
+            await run_background_cognition(self.conversation_id, self.user_id, self.messages)
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch(
+                "agent.cognition.background.service.analyze_background_cognition",
+                new_callable=AsyncMock,
+                return_value=changed,
+            ),
+        ):
+            retried = await run_background_cognition(
+                self.conversation_id, self.user_id, self.messages
+            )
+
+        self.assertEqual(retried["status"], "live_applied")
+        self.assertTrue(retried["idempotent"])
+        memories = list_agent_memories(self.user_id)
+        self.assertEqual(len(memories), 1)
+        self.assertEqual(memories[0]["value"]["role"], "builder")
+        self.assertEqual(get_processing_state(self.conversation_id, self.user_id).processed_through_message_index, 0)
+
     def _valid_response(self) -> dict[str, object]:
         return {
             "decision": "propose",

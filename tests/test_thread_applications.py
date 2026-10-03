@@ -229,7 +229,7 @@ class ThreadApplicationTest(unittest.TestCase):
             self.conversation_id,
         )
 
-    def test_update_is_applied_once_and_changed_retry_is_rejected(self) -> None:
+    def test_update_is_applied_once_and_a_changed_retry_keeps_the_first(self) -> None:
         thread = create_thread(
             user_id=self.user_id,
             conversation_id=self.conversation_id,
@@ -283,14 +283,17 @@ class ThreadApplicationTest(unittest.TestCase):
                 }
             ],
         }
-        with self.assertRaisesRegex(ValueError, "does not match"):
-            apply(
-                batch_key="batch-update",
-                conversation_id=self.conversation_id,
-                user_id=self.user_id,
-                message_index=6,
-                proposal=changed,
-            )
+        # A retry that answers differently does not fail the batch; the first answer stands.
+        retried = apply(
+            batch_key="batch-update",
+            conversation_id=self.conversation_id,
+            user_id=self.user_id,
+            message_index=6,
+            proposal=changed,
+        )
+        self.assertTrue(retried.idempotent)
+        self.assertEqual(get_thread(thread.id, self.user_id).version, 2)
+        self.assertNotEqual(get_thread(thread.id, self.user_id).summary, "A different retry payload.")
 
     def _application_function(self):
         module = importlib.import_module(
