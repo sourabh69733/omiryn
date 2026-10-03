@@ -844,12 +844,13 @@ function conversationSortTime(row: ConversationSummary) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Short and neutral; the countdown under it says when sending opens again.
 function friendlyQuotaMessage(detail: string) {
   if (detail.toLowerCase().includes("short time")) {
-    return randomCooldownMessage();
+    return "You're quick. Give Omi a moment to catch up.";
   }
   if (detail.toLowerCase().includes("monthly limit")) {
-    return randomMonthlyQuotaMessage();
+    return "You've used this month's chats. Your draft is saved.";
   }
   return detail;
 }
@@ -872,28 +873,6 @@ function formatLimitCountdown(totalSeconds: number) {
   if (hours < 24) return `${hours} hr`;
   const days = Math.ceil(hours / 24);
   return `${days} day${days === 1 ? "" : "s"}`;
-}
-
-function randomCooldownMessage() {
-  const messages = [
-    "Arre, aap toh bahut fast ho. Bas 1 minute do, mujhe aapki speed catch karne do.",
-    "Aap rocket mode mein ho. Mujhe ek minute do replies thoughtful rakhne ke liye.",
-    "Bas ek chhota sa breather. 1 minute mein phir full speed.",
-    "Thoda sa pause. Omiryn ko aapki speed se sync hone do.",
-    "Speed impressive hai. Main bas ek minute mein catch up karti hoon.",
-    "Hold that thought. Ek minute ka tiny cooldown, phir baat continue.",
-  ];
-  return messages[Math.floor(Math.random() * messages.length)];
-}
-
-function randomMonthlyQuotaMessage() {
-  const messages = [
-    "Aaj ke liye Omiryn ka quota full ho gaya. Your draft is safe, but sending is paused until quota frees up.",
-    "You have reached your chat quota for now. Thoda sa pause, thoughtful replies need some breathing room.",
-    "Omiryn needs a longer breather now. Chat quota is full, and sending will unlock when quota resets.",
-    "Full speed used up for this quota window. Main yahin hoon, bas sending abhi paused hai.",
-  ];
-  return messages[Math.floor(Math.random() * messages.length)];
 }
 
 function messageDate(message: Message, index: number) {
