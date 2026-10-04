@@ -75,4 +75,24 @@ async def verify_vibe_updates(
     return verified
 
 
-__all__ = ["verify_vibe_updates"]
+def stored_quote_lookup(user_id: str) -> QuoteLookup:
+    """Reads cited messages from the user's saved chats (old proof can be in any chat)."""
+    from storage import get_conversation
+
+    chats: dict[str, list[dict[str, Any]]] = {}
+
+    def quote(item: dict[str, Any]) -> str | None:
+        conversation_id = item["conversation_id"]
+        if conversation_id not in chats:
+            conversation = get_conversation(conversation_id, user_id)
+            chats[conversation_id] = list((conversation or {}).get("messages") or [])
+        messages = chats[conversation_id]
+        index = item["message_index"]
+        if 0 <= index < len(messages) and messages[index].get("role") == "user":
+            return str(messages[index].get("content") or "") or None
+        return None
+
+    return quote
+
+
+__all__ = ["stored_quote_lookup", "verify_vibe_updates"]

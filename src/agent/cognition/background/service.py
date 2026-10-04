@@ -32,7 +32,8 @@ from storage.profile_facts import save_data_point_extraction_debug
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card, update_vibe_card
-from agent.cognition.background.vibe_verify import verify_vibe_updates
+from agent.cognition.background.vibe_verify import stored_quote_lookup, verify_vibe_updates
+from agent.memory_engine.memories.vibe import with_current_proof
 from agent.memory_engine.memories.vibe import rejected_texts, vibe_texts
 from realtime import conversation_event, realtime_hub
 
@@ -583,17 +584,12 @@ async def _apply_vibe(
 ) -> dict[str, Any] | None:
     """Saves only lines the proof check confirms; returns what was saved (or an error marker)."""
     conversation_id, user_id = batch.conversation_id, batch.user_id
-    quotes = {
-        message.message_index: message.content
-        for message in batch.messages
-        if message.role == "user"
-    }
     try:
+        # A rewritten line is re-proven with its old and new proof; only what shows the new
+        # text is kept, so proof for what the line used to say does not linger.
         verified = await verify_vibe_updates(
-            updates,
-            lambda item: quotes.get(item["message_index"])
-            if item["conversation_id"] == conversation_id
-            else None,
+            with_current_proof(updates, current["areas"]),
+            stored_quote_lookup(user_id),
             conversation_id=conversation_id,
         )
     except Exception as error:  # an unchecked line is never saved
@@ -601,7 +597,7 @@ async def _apply_vibe(
         return {"error": f"{type(error).__name__}: {str(error)[:200]}"}
     if not verified:
         return {}
-    saved = update_vibe_card(user_id, verified)
+    saved = update_vibe_card(user_id, verified, replace_evidence=True)
     verified = {area_id: verified[area_id] for area_id in saved.get("applied", verified)}
     if saved["milestone"] != current["milestone"]:
         # The open chat shows it; the companion hears about it on its next reply.

@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agent.cognition.background.vibe_backfill import backfill_user_vibe  # noqa: E402
+from agent.cognition.background.vibe_backfill import backfill_user_vibe, recheck_user_vibe  # noqa: E402
 from storage import init_db, list_conversation_user_ids  # noqa: E402
 
 
@@ -31,6 +31,18 @@ async def run(args: argparse.Namespace) -> int:
     )
     failed = 0
     for user_id in user_ids:
+        if args.recheck:
+            try:
+                checked = await recheck_user_vibe(user_id, apply=args.apply)
+            except Exception as error:
+                failed += 1
+                print(f"{user_id}: error {type(error).__name__}: {str(error)[:200]}")
+                continue
+            print(
+                f"{user_id}: {checked['status']} · milestone {checked['milestone']} · "
+                f"kept {', '.join(checked['kept']) or '-'} · dropped {', '.join(checked['dropped']) or '-'}"
+            )
+            continue
         try:
             result = await backfill_user_vibe(user_id, apply=args.apply, force=args.force)
         except Exception as error:  # one bad user or a provider timeout must not stop the rest
@@ -56,6 +68,11 @@ def main() -> int:
         "--all-users", action="store_true", help="Include eval and test accounts (no profile)."
     )
     parser.add_argument("--show", action="store_true", help="Print the lines, not just area names.")
+    parser.add_argument(
+        "--recheck",
+        action="store_true",
+        help="Re-prove existing cards instead: drop proof that is gone or does not fit, and lines left without proof.",
+    )
     return asyncio.run(run(parser.parse_args()))
 
 
