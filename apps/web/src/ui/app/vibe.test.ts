@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evidenceChatPath, milestoneFromEvent, proofSummary, strengthLabel, vibeStepNote } from "./vibe";
+import { confidenceLevel, evidenceChatPath, milestoneFromEvent, proofSummary, strengthLabel, vibeStepNote } from "./vibe";
 
 const reached = (milestone: string, previous: string, id = "c1") => ({ type: "vibe.milestone", scope: "conversation" as const, scope_id: id, version: 1, payload: { milestone, previous } });
 
@@ -26,7 +26,14 @@ test("proof links open the chat at that message", () => {
 
 test("the chip says New or Confirmed; the panel has the count", () => {
   assert.equal(strengthLabel("clear"), "Confirmed");
-  assert.equal(strengthLabel("mentioned"), "New");
+  assert.equal(strengthLabel("mentioned"), "Still learning");
   assert.equal(proofSummary(1, 1), "From 1 of your messages");
   assert.equal(proofSummary(4, 2), "From 4 of your messages, on 2 different days");
+});
+
+test("the chip color deepens with the proof", () => {
+  assert.equal(confidenceLevel(1, 1), 1);
+  assert.equal(confidenceLevel(3, 1), 2);
+  assert.equal(confidenceLevel(2, 2), 3);
+  assert.equal(confidenceLevel(5, 3), 4);
 });

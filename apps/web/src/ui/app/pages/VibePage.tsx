@@ -1,7 +1,7 @@
 import { Check, Lock, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
-import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, evidenceChatPath, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
+import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, confidenceLevel, evidenceChatPath, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
 
 // The user's vibe: what Omi has understood about who they'd get along with.
 // Everything here is learned in chat; the user can only remove a line that is wrong.
@@ -82,12 +82,12 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                       {area.strength ? (
                         <button
                           type="button"
-                          className={`vibe-strength is-${area.strength}`}
+                          className={`vibe-strength is-level-${confidenceLevel(area.evidence_count, area.evidence_days)}`}
                           onClick={() => setOpenWhy(openWhy === area.id ? null : area.id)}
                           aria-expanded={openWhy === area.id}
                           title="See what you said"
                         >
-                          {strengthLabel(area.strength)}
+                          {strengthLabel(area.strength)} <span aria-hidden="true">›</span>
                         </button>
                       ) : null}
                     </div>

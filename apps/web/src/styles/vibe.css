@@ -240,14 +240,25 @@
   box-shadow: inset 0 0 0 1px currentColor;
 }
 
-.vibe-strength.is-clear {
-  background: rgba(47, 143, 120, 0.12);
+/* Confidence levels: the color deepens as more proof comes in (see confidenceLevel). */
+.vibe-strength.is-level-1 {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.vibe-strength.is-level-2 {
+  background: rgba(200, 138, 29, 0.14);
+  color: #9a6510;
+}
+
+.vibe-strength.is-level-3 {
+  background: rgba(47, 143, 120, 0.14);
   color: var(--success);
 }
 
-.vibe-strength.is-mentioned {
-  background: var(--soft);
-  color: var(--muted);
+.vibe-strength.is-level-4 {
+  background: var(--success);
+  color: #fff;
 }
 
 .vibe-card p.vibe-private {
@@ -419,12 +430,21 @@
   background: none;
 }
 
-.vibe-card .vibe-strength.is-clear:hover {
-  background: rgba(47, 143, 120, 0.12);
+/* Keep each level's own color on hover (the global button hover is purple). */
+.vibe-card .vibe-strength.is-level-1:hover {
+  background: var(--soft);
 }
 
-.vibe-card .vibe-strength.is-mentioned:hover {
-  background: var(--soft);
+.vibe-card .vibe-strength.is-level-2:hover {
+  background: rgba(200, 138, 29, 0.14);
+}
+
+.vibe-card .vibe-strength.is-level-3:hover {
+  background: rgba(47, 143, 120, 0.14);
+}
+
+.vibe-card .vibe-strength.is-level-4:hover {
+  background: var(--success);
 }
 
 .vibe-quotes li.vibe-proof-summary {

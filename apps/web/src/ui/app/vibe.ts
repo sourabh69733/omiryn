@@ -66,9 +66,17 @@ export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "m
   return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;
 }
 
-// The chip says one thing: Confirmed when said on different days (counts toward matches), else New.
+// The chip says one thing: Confirmed when said on different days (counts toward matches), else
+// Still learning. Its color deepens with the proof (see confidenceLevel).
 export function strengthLabel(strength: VibeArea["strength"]): string {
-  return strength === "clear" ? "Confirmed" : "New";
+  return strength === "clear" ? "Confirmed" : "Still learning";
+}
+
+// 1: one message. 2: several messages, one day. 3: two days. 4: three or more days.
+export function confidenceLevel(count: number, days: number): 1 | 2 | 3 | 4 {
+  if (days >= 3) return 4;
+  if (days >= 2) return 3;
+  return count >= 2 ? 2 : 1;
 }
 
 // The count lives in the proof panel, under the chip.
