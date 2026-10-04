@@ -101,7 +101,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                     {area.text && openWhy === area.id ? (
                       area.evidence.length ? (
                         <ul className="vibe-quotes" aria-label="What you said">
-                          <li className="vibe-proof-summary">{proofSummary(area.evidence_count, area.evidence_days)}</li>
+                          {/* <li className="vibe-proof-summary">{proofSummary(area.evidence_count, area.evidence_days)}</li> */}
                           {area.evidence.map((item) => (
                             <li key={`${item.conversation_id}:${item.message_index}`}>
                               <span>“{item.quote}”</span>
