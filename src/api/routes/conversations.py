@@ -26,6 +26,7 @@ from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
     count_memories_only_from_conversation,
+    threads_only_from_conversation,
     vibe_deletion_impact,
     delete_conversation as storage_delete_conversation,
     list_agent_message_feedback,
@@ -243,6 +244,9 @@ async def agent_conversation_deletion_impact(
         "memories_forgotten": count_memories_only_from_conversation(owner_id, conversation_id),
         "vibe_removed": vibe["removed"],
         "vibe_weakened": vibe["weakened"],
+        "topics_dropped": [
+            thread["title"] for thread in threads_only_from_conversation(owner_id, conversation_id)
+        ],
     }
 
 

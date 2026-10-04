@@ -13,7 +13,7 @@ from realtime import RealtimeTicketError, issue_realtime_ticket, realtime_hub
 from realtime.tickets import verify_realtime_ticket
 from security.auth import CurrentUser, production_runtime_enabled, require_user
 from security.config import configured_cors_origins
-from storage import get_conversation
+from storage import get_conversation, prune_threads_from_missing_chats
 
 router = APIRouter()
 
@@ -69,6 +69,7 @@ _catch_up_tasks: set[asyncio.Task[None]] = set()
 
 async def _catch_up(user_id: str) -> None:
     try:
+        await asyncio.to_thread(prune_threads_from_missing_chats, user_id)
         await asyncio.to_thread(catch_up_pending, user_id)
     except Exception:
         logging.getLogger(__name__).exception("agent.memory_catch_up_failed")
