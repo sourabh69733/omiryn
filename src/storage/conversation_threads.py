@@ -7,8 +7,13 @@ from typing import Any
 from sqlalchemy import func, select
 
 from .database import ENGINE
-from .schema import agent_conversations, conversation_states, conversation_threads
-from .utils import _isoformat_utc, _protect_text, _unprotect_text
+from .schema import (
+    agent_conversations,
+    conversation_states,
+    conversation_threads,
+    thread_operation_applications,
+)
+from .utils import _isoformat_utc, _protect_text, _require_user_id, _unprotect_text
 
 
 class ConversationStateConflictError(RuntimeError):
@@ -107,6 +112,78 @@ def _update_conversation_thread(
             select(conversation_threads).where(conversation_threads.c.id == thread_id)
         ).mappings().one()
     return _thread_from_row(row)
+
+
+def threads_only_from_conversation(user_id: str, conversation_id: str) -> list[dict[str, Any]]:
+    """Threads that started and last ran in this chat, so deleting the chat takes them."""
+    owner_id = _require_user_id(user_id, "conversation thread list")
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(conversation_threads).where(_only_from(owner_id, {conversation_id}))
+        ).mappings().all()
+    return [_thread_from_row(row) for row in rows]
+
+
+def _delete_threads_only_from(connection, user_id: str, conversation_ids: set[str]) -> int:
+    """Delete threads whose chats are all gone, and anything that still points at them."""
+    thread_ids = list(
+        connection.execute(
+            select(conversation_threads.c.id).where(_only_from(user_id, conversation_ids))
+        ).scalars().all()
+    )
+    if not thread_ids:
+        return 0
+    connection.execute(
+        conversation_states.update()
+        .where(
+            conversation_states.c.user_id == user_id,
+            conversation_states.c.active_thread_id.in_(thread_ids),
+        )
+        .values(active_thread_id=None, version=conversation_states.c.version + 1)
+    )
+    connection.execute(
+        thread_operation_applications.delete().where(
+            thread_operation_applications.c.user_id == user_id,
+            thread_operation_applications.c.thread_id.in_(thread_ids),
+        )
+    )
+    connection.execute(
+        conversation_threads.delete().where(
+            conversation_threads.c.user_id == user_id,
+            conversation_threads.c.id.in_(thread_ids),
+        )
+    )
+    return len(thread_ids)
+
+
+def prune_threads_from_missing_chats(user_id: str) -> int:
+    """Delete threads left behind by chats deleted before deletes cleaned threads."""
+    owner_id = _require_user_id(user_id, "conversation thread prune")
+    with ENGINE.begin() as connection:
+        existing = set(
+            connection.execute(
+                select(agent_conversations.c.id).where(agent_conversations.c.user_id == owner_id)
+            ).scalars().all()
+        )
+        referenced = {
+            conversation_id
+            for row in connection.execute(
+                select(
+                    conversation_threads.c.created_in_conversation_id,
+                    conversation_threads.c.last_conversation_id,
+                ).where(conversation_threads.c.user_id == owner_id)
+            ).all()
+            for conversation_id in row
+        }
+        return _delete_threads_only_from(connection, owner_id, referenced - existing)
+
+
+def _only_from(user_id: str, conversation_ids: set[str]):
+    return (
+        (conversation_threads.c.user_id == user_id)
+        & conversation_threads.c.created_in_conversation_id.in_(conversation_ids)
+        & conversation_threads.c.last_conversation_id.in_(conversation_ids)
+    )
 
 
 def _get_conversation_state(conversation_id: str, user_id: str) -> dict[str, Any] | None:
@@ -265,3 +342,6 @@ def _state_from_row(row: Any) -> dict[str, Any]:
 
 def _unprotect_optional_text(user_id: str, value: Any) -> str | None:
     return _unprotect_text(user_id, value) if value is not None else None
+
+
+__all__ = ["prune_threads_from_missing_chats", "threads_only_from_conversation"]

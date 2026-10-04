@@ -24,6 +24,7 @@ from .memories import *
 from .memory_embeddings import *
 from .memory_reviews import *
 from .thread_applications import *
+from .conversation_threads import *
 from .user_deletion import *
 from .utils import (
     _conversation_user_id,

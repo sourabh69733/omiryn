@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from .conversation_threads import _delete_threads_only_from
 from .database import ENGINE
 from .schema import (
     user_profiles,
@@ -23,6 +24,8 @@ from .schema import (
     memory_processing_leases,
     memory_processing_states,
     memory_operation_applications,
+    conversation_states,
+    thread_operation_applications,
 )
 from .utils import (
     _isoformat_utc,
@@ -322,6 +325,14 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
                 memory_operation_applications.c.user_id == owner_id,
             )
         )
+        # Topics that lived only in this chat go with it, so Omi never brings them up again.
+        _delete_threads_only_from(connection, owner_id, {conversation_id})
+        for table in (thread_operation_applications, conversation_states):
+            connection.execute(
+                table.delete().where(
+                    table.c.conversation_id == conversation_id, table.c.user_id == owner_id
+                )
+            )
         connection.execute(
             agent_conversations.delete().where(
                 agent_conversations.c.id == conversation_id,
