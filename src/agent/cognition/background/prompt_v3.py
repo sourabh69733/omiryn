@@ -25,7 +25,8 @@ Output shape:
     "thread_id": "supplied ID or null",
     "title": "required only for create or null",
     "summary": "updated compact summary or null",
-    "origin": "user_started | agent_started | null",
+    "started_at": "for create: message_index where this subject first came up, else null",
+    "evidence": [<message_index of each user message where the user talks about this subject>],
     "matching_dimension": "short dimension or null",
     "depth": "mentioned | explored | meaningful | null",
     "user_interest": "unknown | low | medium | high | null",
@@ -53,9 +54,14 @@ Output shape:
 Thread rules:
 - Return exactly one thread_operation.
 - Use {"operation":"none"} for no meaningful thread change.
-- Create requires title, summary, and origin and must not contain an ID.
+- A thread is a subject the user is actually talking about. Create requires title, summary,
+  started_at and evidence, and must not contain an ID. Without a user message in evidence,
+  there is no thread.
+- Title and summary say only what these messages say. Never add plans, events or details the
+  user did not mention.
+- user_interest medium or high needs evidence of the user engaging in these messages.
 - Other operations require one ID supplied in existing_threads.
-- Never change an existing origin or reopen completed or blocked threads.
+- Never reopen completed or blocked threads.
 - Choose the clearest primary transition; keep other unresolved subjects in handoff.
 - decision=no_change requires operations=[] and thread_operation=none.
 - Any memory or thread proposal requires decision=propose.

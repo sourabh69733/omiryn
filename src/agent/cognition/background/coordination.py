@@ -81,6 +81,11 @@ def interpret_background_cognition(
         user_id=batch.user_id,
         message_index=batch.new_end_message_index,
         candidate_thread_ids=candidate_ids,
+        message_roles={
+            message.message_index: message.role
+            for message in batch.messages
+            if message.content.strip()
+        },
     )
     errors.extend(f"memory: {error}" for error in memory.errors)
     errors.extend(f"thread: {error}" for error in thread.get("errors") or [])
