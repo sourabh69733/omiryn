@@ -45,4 +45,7 @@ test("the delete dialog says what goes with the chat", () => {
     "Removed from your vibe: Your humor.",
     "Less proof for: What you love.",
   ]);
+  assert.deepEqual(deletionImpactLines({ memories_forgotten: 0, vibe_removed: [], vibe_weakened: [], topics_dropped: ["Guitar", "Exams"] }), [
+    "Omi won't bring these up again: Guitar, Exams.",
+  ]);
 });

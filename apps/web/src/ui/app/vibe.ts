@@ -61,7 +61,12 @@ export function milestoneFromEvent(event: RealtimeEvent, conversationId: string 
   return vibeStepIndex(milestone) > vibeStepIndex(previous) ? milestone : null;
 }
 
-export type DeletionImpact = { memories_forgotten: number; vibe_removed: string[]; vibe_weakened: string[] };
+export type DeletionImpact = {
+  memories_forgotten: number;
+  vibe_removed: string[];
+  vibe_weakened: string[];
+  topics_dropped?: string[];
+};
 
 // Plain lines for the delete dialog: what goes with the chat.
 export function deletionImpactLines(impact: DeletionImpact): string[] {
@@ -71,6 +76,8 @@ export function deletionImpactLines(impact: DeletionImpact): string[] {
   else if (impact.memories_forgotten > 1) lines.push(`Omi will forget ${impact.memories_forgotten} things it learned only from this chat.`);
   if (impact.vibe_removed.length) lines.push(`Removed from your vibe: ${names(impact.vibe_removed)}.`);
   if (impact.vibe_weakened.length) lines.push(`Less proof for: ${names(impact.vibe_weakened)}.`);
+  const topics = impact.topics_dropped ?? [];
+  if (topics.length) lines.push(`Omi won't bring these up again: ${topics.join(", ")}.`);
   return lines;
 }
 

@@ -58,6 +58,7 @@ user message
 | Reply failures | The user message is saved first. A failed reply shows "Not delivered · Retry"; fallback model on timeout. |
 | Prompt | Friends-first v3 base prompt, standalone. v1 and v2 (dating era) moved to `_archive/agent/behavior_versions/`. |
 | Topics | Keyword topic picker removed. The active subject comes from the background model's threads; fresh angles on a low-energy turn come from the open vibe areas. |
+| Threads | A thread needs a user message as proof. Code sets who started it from the message it began at. Only the user's own topics from the last 14 days come back in another chat. Deleting a chat deletes threads that lived only in it (the delete dialog lists them); orphans from older deletes are pruned on connect. |
 | Reply checks | A draft that uses a stock phrase (learned from chats plus a seed list), repeats an earlier reply, or asks too many questions gets one rewrite; extra questions are then trimmed. |
 
 ### Friend Vibe (the matching data)
