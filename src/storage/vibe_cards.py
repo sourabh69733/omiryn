@@ -122,6 +122,34 @@ def drop_vibe_proof_from_conversation(user_id: str, conversation_id: str) -> dic
     )
 
 
+def vibe_deletion_impact(user_id: str, conversation_id: str) -> dict[str, list[str]]:
+    """Which vibe lines deleting this chat would remove, and which would only lose some proof."""
+    removed: list[str] = []
+    weakened: list[str] = []
+    for area_id, line in get_vibe_card(user_id)["areas"].items():
+        evidence = line_evidence(line)
+        from_chat = [item for item in evidence if item["conversation_id"] == conversation_id]
+        if not from_chat:
+            continue
+        (removed if len(from_chat) == len(evidence) else weakened).append(area_id)
+    return {"removed": removed, "weakened": weakened}
+
+
+def prune_vibe_proof_from_missing_chats(user_id: str, existing_conversation_ids: set[str]) -> bool:
+    """Drop proof from chats that no longer exist (deleted before deletes cleaned the vibe)."""
+    owner_id = _require_user_id(user_id, "agent vibe card")
+    current = get_vibe_card(owner_id)
+    missing = {
+        item["conversation_id"]
+        for line in current["areas"].values()
+        for item in line_evidence(line)
+        if item["conversation_id"] not in existing_conversation_ids
+    }
+    for conversation_id in missing:
+        drop_vibe_proof_from_conversation(owner_id, conversation_id)
+    return bool(missing)
+
+
 def _stored(owner_id: str, stored: str) -> dict[str, Any]:
     try:
         value = json.loads(_unprotect_text(owner_id, stored) or "{}")
@@ -139,4 +167,10 @@ def _rejected(stored: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-__all__ = ["drop_vibe_proof_from_conversation", "get_vibe_card", "update_vibe_card"]
+__all__ = [
+    "drop_vibe_proof_from_conversation",
+    "get_vibe_card",
+    "prune_vibe_proof_from_missing_chats",
+    "update_vibe_card",
+    "vibe_deletion_impact",
+]

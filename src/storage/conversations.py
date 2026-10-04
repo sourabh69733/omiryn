@@ -148,6 +148,17 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
     }
 
 
+def list_conversation_ids(user_id: str) -> set[str]:
+    """Just the ids of a user's chats, without loading their messages."""
+    owner_id = _require_user_id(user_id, "conversation list")
+    with ENGINE.begin() as connection:
+        return set(
+            connection.execute(
+                select(agent_conversations.c.id).where(agent_conversations.c.user_id == owner_id)
+            ).scalars().all()
+        )
+
+
 def list_conversation_user_ids(*, with_profile: bool = False) -> list[str]:
     """Every user who has at least one chat (for maintenance scripts). with_profile keeps only
     users who signed up, which leaves out eval and test accounts."""

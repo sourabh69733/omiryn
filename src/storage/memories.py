@@ -531,6 +531,30 @@ def _same_memory_content(row, memory: dict[str, Any]) -> bool:
     )
 
 
+def count_memories_only_from_conversation(user_id: str, conversation_id: str) -> int:
+    """Active memories whose proof is all in this chat; deleting the chat forgets them."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    in_chat = select(agent_memory_evidence.c.memory_id).where(
+        agent_memory_evidence.c.user_id == owner_id,
+        agent_memory_evidence.c.conversation_id == conversation_id,
+    )
+    elsewhere = select(agent_memory_evidence.c.memory_id).where(
+        agent_memory_evidence.c.user_id == owner_id,
+        agent_memory_evidence.c.conversation_id != conversation_id,
+    )
+    with ENGINE.begin() as connection:
+        return int(
+            connection.execute(
+                select(func.count()).select_from(agent_memories).where(
+                    agent_memories.c.user_id == owner_id,
+                    agent_memories.c.status == "active",
+                    agent_memories.c.id.in_(in_chat),
+                    ~agent_memories.c.id.in_(elsewhere),
+                )
+            ).scalar_one()
+        )
+
+
 def _validate_idempotent_retry(rows, operations: list[dict[str, Any]]) -> None:
     """The batch is already saved; the first answer wins.
 
@@ -742,6 +766,7 @@ def _optional_text(value: Any) -> str | None:
 
 
 __all__ = [
+    "count_memories_only_from_conversation",
     "apply_agent_memory_add_batch",
     "apply_agent_memory_operation_batch",
     "create_agent_memory",
