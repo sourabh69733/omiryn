@@ -317,4 +317,8 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
                 agent_conversations.c.user_id == owner_id,
             )
         )
+    # Like memories, vibe lines lose the proof that came from this chat (and go if none is left).
+    from .vibe_cards import drop_vibe_proof_from_conversation
+
+    drop_vibe_proof_from_conversation(owner_id, conversation_id)
     return True

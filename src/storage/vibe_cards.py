@@ -43,12 +43,16 @@ def update_vibe_card(
     updates: dict[str, dict[str, Any]],
     *,
     reject: tuple[str, ...] = (),
+    drop: tuple[str, ...] = (),
+    replace_evidence: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Merge area lines; the milestone moves (up or down) only when the count crosses one.
 
     reject: areas the user marked wrong. The line goes, and that area takes a new line only with
     proof sent afterwards; a saved new line clears the mark. "applied" lists the areas written.
+    drop: areas removed without marking them wrong (their proof is gone).
+    replace_evidence: the updates' proof replaces the old proof (see merge_vibe).
     """
     owner_id = _require_user_id(user_id, "agent vibe card")
     current = get_vibe_card(owner_id)
@@ -61,7 +65,9 @@ def update_vibe_card(
     for area_id in updates:
         rejected.pop(area_id, None)
     areas = merge_vibe(
-        {key: value for key, value in current["areas"].items() if key not in reject}, updates
+        {key: value for key, value in current["areas"].items() if key not in reject and key not in drop},
+        updates,
+        replace_evidence=replace_evidence,
     )
     milestone = vibe_progress(areas).milestone
     reached_at = (
@@ -93,6 +99,29 @@ def update_vibe_card(
     }
 
 
+def drop_vibe_proof_from_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | None:
+    """A deleted chat takes its proof with it; a line left without proof goes too."""
+    owner_id = _require_user_id(user_id, "agent vibe card")
+    current = get_vibe_card(owner_id)
+    touched = {
+        area_id: {
+            "text": line_text(line),
+            "evidence": [item for item in line_evidence(line) if item["conversation_id"] != conversation_id],
+        }
+        for area_id, line in current["areas"].items()
+        if any(item["conversation_id"] == conversation_id for item in line_evidence(line))
+    }
+    if not touched:
+        return None
+    keep = {area_id: line for area_id, line in touched.items() if line["evidence"]}
+    return update_vibe_card(
+        owner_id,
+        keep,
+        drop=tuple(area_id for area_id, line in touched.items() if not line["evidence"]),
+        replace_evidence=True,
+    )
+
+
 def _stored(owner_id: str, stored: str) -> dict[str, Any]:
     try:
         value = json.loads(_unprotect_text(owner_id, stored) or "{}")
@@ -110,4 +139,4 @@ def _rejected(stored: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-__all__ = ["get_vibe_card", "update_vibe_card"]
+__all__ = ["drop_vibe_proof_from_conversation", "get_vibe_card", "update_vibe_card"]
