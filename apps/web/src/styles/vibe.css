@@ -453,3 +453,17 @@
   font-style: normal;
   font-weight: 600;
 }
+
+/* Delete dialog: what goes with the chat. */
+.delete-impact {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(217, 95, 145, 0.08);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+  list-style: none;
+}

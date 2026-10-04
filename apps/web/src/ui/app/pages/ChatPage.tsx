@@ -10,7 +10,7 @@ import { nextBubbleDelay } from "../bubbleReveal";
 import { isFailedMessage } from "../messageDelivery";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { canShowUsage, pathForPage } from "../appUtils";
-import { milestoneFromEvent, vibeStepNote } from "../vibe";
+import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, UsageEvent, UsageSummary } from "../types";
 import { cognitionResultLabel } from "../usagePresentation";
@@ -47,6 +47,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
+  // What deleting the pending chat also removes; null while loading or unknown.
+  const [deleteImpact, setDeleteImpact] = useState<DeletionImpact | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState<EmojiQuery | null>(null);
@@ -573,6 +575,17 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }
 
   useEffect(() => {
+    setDeleteImpact(null);
+    if (!pendingDelete) return;
+    let cancelled = false;
+    apiFetch(`/api/agent/conversations/${pendingDelete.id}/deletion-impact`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((impact: DeletionImpact | null) => { if (!cancelled) setDeleteImpact(impact); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [pendingDelete?.id]);
+
+  useEffect(() => {
     if (!pendingDelete) return;
     cancelDeleteRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -789,7 +802,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           </form>
         </section>
       </div>
-      {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This will permanently remove the chat, attached context, and usage log for this conversation.</p><p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
+      {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This permanently removes the chat, its attached context and usage log, and what Omi learned only from it.</p>{deleteImpact && deletionImpactLines(deleteImpact).length ? <ul className="delete-impact">{deletionImpactLines(deleteImpact).map((line) => <li key={line}>{line}</li>)}</ul> : null}<p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
   );
 }

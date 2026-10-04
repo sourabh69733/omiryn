@@ -61,6 +61,19 @@ export function milestoneFromEvent(event: RealtimeEvent, conversationId: string 
   return vibeStepIndex(milestone) > vibeStepIndex(previous) ? milestone : null;
 }
 
+export type DeletionImpact = { memories_forgotten: number; vibe_removed: string[]; vibe_weakened: string[] };
+
+// Plain lines for the delete dialog: what goes with the chat.
+export function deletionImpactLines(impact: DeletionImpact): string[] {
+  const names = (ids: string[]) => ids.map((id) => VIBE_AREA_LABELS[id] || id).join(", ");
+  const lines: string[] = [];
+  if (impact.memories_forgotten === 1) lines.push("Omi will forget 1 thing it learned only from this chat.");
+  else if (impact.memories_forgotten > 1) lines.push(`Omi will forget ${impact.memories_forgotten} things it learned only from this chat.`);
+  if (impact.vibe_removed.length) lines.push(`Removed from your vibe: ${names(impact.vibe_removed)}.`);
+  if (impact.vibe_weakened.length) lines.push(`Less proof for: ${names(impact.vibe_weakened)}.`);
+  return lines;
+}
+
 // Opens the chat at that message; ChatPage scrolls to #message-N and highlights it.
 export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "message_index">): string {
   return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;

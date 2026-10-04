@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { confidenceLevel, evidenceChatPath, milestoneFromEvent, proofSummary, strengthLabel, vibeStepNote } from "./vibe";
+import { confidenceLevel, deletionImpactLines, evidenceChatPath, milestoneFromEvent, proofSummary, strengthLabel, vibeStepNote } from "./vibe";
 
 const reached = (milestone: string, previous: string, id = "c1") => ({ type: "vibe.milestone", scope: "conversation" as const, scope_id: id, version: 1, payload: { milestone, previous } });
 
@@ -36,4 +36,13 @@ test("the chip color deepens with the proof", () => {
   assert.equal(confidenceLevel(3, 1), 2);
   assert.equal(confidenceLevel(2, 2), 3);
   assert.equal(confidenceLevel(5, 3), 4);
+});
+
+test("the delete dialog says what goes with the chat", () => {
+  assert.deepEqual(deletionImpactLines({ memories_forgotten: 0, vibe_removed: [], vibe_weakened: [] }), []);
+  assert.deepEqual(deletionImpactLines({ memories_forgotten: 3, vibe_removed: ["humor"], vibe_weakened: ["interests"] }), [
+    "Omi will forget 3 things it learned only from this chat.",
+    "Removed from your vibe: Your humor.",
+    "Less proof for: What you love.",
+  ]);
 });
