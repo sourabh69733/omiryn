@@ -130,7 +130,12 @@ def vibe_texts(card: dict[str, Any] | None) -> dict[str, str]:
 def vibe_progress(card: dict[str, Any] | None) -> VibeProgress:
     """First impressions count any line; later milestones count only clear lines."""
     card = card or {}
-    known = tuple(area_id for area_id in VIBE_AREA_IDS if line_text(card.get(area_id)))
+    # No proof, no line: text without evidence does not count.
+    known = tuple(
+        area_id
+        for area_id in VIBE_AREA_IDS
+        if line_text(card.get(area_id)) and line_evidence(card.get(area_id))
+    )
     clear = tuple(area_id for area_id in known if line_strength(card[area_id]) == "clear")
     basics = sum(area_id in clear for area_id in BASIC_AREA_IDS)
     deeper = sum(area_id in clear for area_id in DEEPER_AREA_IDS)
@@ -233,8 +238,18 @@ def _parse_time(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
-def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """New text replaces the old line; evidence accumulates (most recent kept)."""
+def merge_vibe(
+    card: dict[str, Any] | None,
+    updates: dict[str, Any],
+    *,
+    replace_evidence: bool = False,
+) -> dict[str, dict[str, Any]]:
+    """New text replaces the old line. A line exists only while it has proof.
+
+    replace_evidence: the update's proof replaces the old proof instead of adding to it. Used when
+    the proof check has re-read old and new proof against the rewritten text, so proof for what
+    the line used to say does not linger.
+    """
     merged: dict[str, dict[str, Any]] = {}
     for area_id in VIBE_AREA_IDS:
         current = (card or {}).get(area_id)
@@ -242,12 +257,31 @@ def merge_vibe(card: dict[str, Any] | None, updates: dict[str, Any]) -> dict[str
         text = line_text(update) or line_text(current)
         if not text:
             continue
-        evidence = line_evidence(current)
+        if update is not None and replace_evidence:
+            evidence = line_evidence(update)
+        else:
+            evidence = line_evidence(current)
+            for item in line_evidence(update):
+                if all(_evidence_key(item) != _evidence_key(existing) for existing in evidence):
+                    evidence.append(item)
+        if evidence:
+            merged[area_id] = {"text": text, "evidence": evidence[-MAX_VIBE_EVIDENCE:]}
+    return merged
+
+
+def with_current_proof(
+    updates: dict[str, dict[str, Any]], card: dict[str, Any] | None
+) -> dict[str, dict[str, Any]]:
+    """Each rewritten line with its old proof added, for the proof check to re-read against the
+    new text; whatever the check keeps then replaces the old proof."""
+    combined: dict[str, dict[str, Any]] = {}
+    for area_id, update in updates.items():
+        evidence = line_evidence((card or {}).get(area_id))
         for item in line_evidence(update):
             if all(_evidence_key(item) != _evidence_key(existing) for existing in evidence):
                 evidence.append(item)
-        merged[area_id] = {"text": text, "evidence": evidence[-MAX_VIBE_EVIDENCE:]}
-    return merged
+        combined[area_id] = {"text": line_text(update), "evidence": evidence[-MAX_VIBE_EVIDENCE:]}
+    return combined
 
 
 __all__ = [
@@ -273,4 +307,5 @@ __all__ = [
     "validate_vibe_updates",
     "vibe_progress",
     "vibe_texts",
+    "with_current_proof",
 ]
