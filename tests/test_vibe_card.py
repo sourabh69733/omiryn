@@ -180,13 +180,13 @@ class VibeApiTest(unittest.TestCase):
 
         self.assertEqual({area_id for area_id, area in areas.items() if area["private"]}, {"values", "stories", "deal_breakers"})
 
-    def test_quotes_skip_deleted_chats(self) -> None:
+    def test_a_line_proven_only_by_a_deleted_chat_goes(self) -> None:
         update_vibe_card(USER_ID, {"humor": line("Likes dark humor.", 0, conversation_id="gone")})
 
         areas = {area["id"]: area for area in self.client.get("/api/me/vibe").json()["areas"]}
 
+        self.assertIsNone(areas["humor"]["text"])
         self.assertEqual(areas["humor"]["evidence"], [])
-        self.assertEqual(areas["humor"]["evidence_count"], 1)
 
     def test_user_can_remove_a_wrong_line(self) -> None:
         update_vibe_card(USER_ID, {"humor": line("Wrong.", 0), "values": line("Right.", 0)})
