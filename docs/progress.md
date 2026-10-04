@@ -69,7 +69,7 @@ The core of the product: what Omi understands about who the user would get along
 - **Proof on every line.** Each line cites the user messages behind it.
   1. Code checks each cited message is a real user message.
   2. A second model call (DeepSeek V3.2) sees each line with only its cited messages and keeps just the ones that really show it. Unproven lines are dropped; a failed check saves nothing.
-- **Strength by days.** A line is Confirmed only when said on 2 or more different days; otherwise it is New. The chip shows only that; the proof panel shows "From 4 of your messages, on 2 different days".
+- **Strength by days.** A line is Confirmed only when said on 2 or more different days; otherwise it is Still learning. The chip shows only that, colored by confidence (grey: one message, amber: several messages on one day, green: two days, solid green: three or more days); the proof panel shows "From 4 of your messages, on 2 different days".
 - **No proof, no line.** A rewritten line is re-proven with its old and new proof, and only proof that shows the new text stays. Deleting a chat removes its proof; a line left without proof goes and the milestone is recalculated. `backfill_vibe_cards.py --recheck` re-proves existing cards once.
 - **Milestones:** First impressions (any 2 lines) -> The basics -> Ready to match -> Deep. Every step after the first counts only solid lines.
 - **In chat:** the companion gets the goal ("understand who they'd get along with, by being good company, never by interviewing"), what it knows, what is open and fresh milestone news. Never two areas in one reply, never right after a dodge, mood always first.
@@ -82,7 +82,7 @@ The core of the product: what Omi understands about who the user would get along
 | Signup | One screen: name, approximate location ("Around Kolkata, West Bengal · Change", from the IP via DB-IP Lite, dropped when the browser timezone is in another country), 18+ checkbox. Everything else is learned in chat. |
 | Chat | Omi with typing dots, bubble reveal, Retry on failed messages, "Talks like" setting, milestone note ("Omi knows what you want in friends · See your vibe"). New bubbles fade in; history does not. The typing dots leave in the same render the reply lands, and only one avatar shows while later bubbles reveal. |
 | Agent avatar | Generated "vibe blob" images, one per state (idle, thinking, listening, happy) as WebP in `apps/web/public/assets/agent/`. Still by default; only the one writing a reply breathes. No sweeps or flashes. |
-| Vibe | Milestone path, each area's line with a chip (New or Confirmed). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line and it stays gone until the user says something new about that area. |
+| Vibe | Milestone path, each area's line with a chip (Still learning or Confirmed, colored by confidence). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line and it stays gone until the user says something new about that area. |
 | Memories | Renamed from Style ("What Omiryn remembers"); `/style` redirects. Legacy signals hidden (data kept for export and deletion). |
 | Matches | Coming soon, plus how close the user is ("Matches need Ready to match") and a link to Vibe. |
 | Profile and Contact | Profile without "Interested in". Contact moved into the account menu. |
