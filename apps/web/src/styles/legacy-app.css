@@ -3118,12 +3118,12 @@ p {
 }
 
 .history-item.active {
-  border-color: #c7dbd5;
-  background: #eff8f4;
+  border-color: rgba(127, 103, 216, 0.35);
+  background: #f4f0ff;
 }
 
 .history-item:hover {
-  border-color: #b8d6ce;
+  border-color: rgba(127, 103, 216, 0.3);
   color: var(--ink);
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(16, 24, 32, 0.08);
@@ -3139,20 +3139,52 @@ p {
   min-width: 0;
 }
 
-/* A chat with messages the user has not seen yet: bold name and a small dot, never auto-opened. */
+/* Two lines: name and time, then message count and a "New" pill for chats with unseen messages.
+   Chats with new messages are marked here, never opened on their own. */
+.history-item-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.history-item-line + .history-item-line {
+  margin-top: 4px;
+}
+
+.history-item-copy .history-item-line small {
+  flex: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
 .history-item.is-unread .history-item-copy strong {
   font-weight: 700;
 }
 
-.history-unread-dot,
-.history-item-copy strong .history-unread-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-left: 6px;
+.history-item-copy .history-item-line span {
+  margin: 0;
+}
+
+.history-item-copy .history-new-pill {
+  flex: none;
+  padding: 0 7px;
   border-radius: 999px;
   background: var(--primary);
-  vertical-align: middle;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 16px;
+}
+
+.history-unread-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--primary);
 }
 
 .mobile-history-button .history-unread-dot {

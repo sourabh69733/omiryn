@@ -710,7 +710,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <div className="history-list">
               {summaries.map((item) => (
                 <div className={`history-item ${item.id === conversation?.id ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
-                  <div className="history-item-copy"><strong>{item.agent_name || "Omiryn"}{isUnread(item, seen, openId) ? <span className="history-unread-dot" role="img" aria-label="New messages" /> : null}</strong><span>{item.message_count || 0} messages · {item.context_source_count || 0} signals</span><small>{item.updated_at ? new Date(item.updated_at).toLocaleString() : "New chat"}</small></div>
+                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line"><span>{item.message_count || 0} messages</span>{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
                   <button className="history-delete" type="button" onClick={(event) => { event.stopPropagation(); setPendingDelete(item); }} aria-label={`Delete conversation ${item.agent_name || "Omiryn"}`}><span aria-hidden="true">×</span></button>
                 </div>
               ))}
@@ -933,6 +933,18 @@ function formatLimitCountdown(totalSeconds: number) {
   if (hours < 24) return `${hours} hr`;
   const days = Math.ceil(hours / 24);
   return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+// History row time: "7:30 pm" today, "Yesterday", then "2 Oct" (with the year when it differs).
+function historyTimeLabel(value?: string | null) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "New";
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
 }
 
 function messageDate(message: Message, index: number) {
