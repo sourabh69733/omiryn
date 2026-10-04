@@ -23,7 +23,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  // Chats waiting on a reply. Each chat has its own: switching chats never carries the typing state.
+  const [sendingIds, setSendingIds] = useState<ReadonlySet<string>>(() => new Set());
   // How many messages are on screen; later bubbles of one reply are revealed one by one.
   const [shownCount, setShownCount] = useState(0);
   // Set after a reply has been pending a while, to say so under the typing dots.
@@ -33,6 +34,10 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   // A vibe milestone reached while this chat is open.
   const [vibeNote, setVibeNote] = useState<{ conversationId: string; milestone: string } | null>(null);
   const shownConversationIdRef = useRef<string | null>(null);
+  const sending = Boolean(conversation && sendingIds.has(conversation.id));
+  // The chat on screen right now, for replies that land after the user has moved on.
+  const openConversationIdRef = useRef<string | null>(null);
+  openConversationIdRef.current = conversation?.id ?? null;
   // Messages from this index on arrived while the chat was open, so they fade in; history does not.
   const newFromIndexRef = useRef(0);
   const [error, setError] = useState("");
@@ -455,36 +460,54 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     await sendText(message);
   }
 
-  async function sendText(message: string) {
-    if (!conversation) return;
+  async function sendText(message: string, target: Conversation | null = conversation) {
+    if (!target) return;
     shouldStickToBottomRef.current = true;
-    const previousConversation = conversation;
-    setSending(true);
+    setSendingFor(target.id, true);
     setError("");
     setComposerLimit(null);
     // A new message also answers for an earlier failed one; the server clears it the same way.
-    const earlier = conversation.messages.map((item) => (isFailedMessage(item) ? { ...item, delivery_status: "read" } : item));
-    setConversation({ ...conversation, messages: [...earlier, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending" }] });
-    await postReply(`/api/agent/conversations/${conversation.id}/messages`, { message }, previousConversation, message);
+    const earlier = target.messages.map((item) => (isFailedMessage(item) ? { ...item, delivery_status: "read" } : item));
+    updateIfOpen(target.id, () => ({ ...target, messages: [...earlier, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending" }] }));
+    await postReply(`/api/agent/conversations/${target.id}/messages`, { message }, target, message);
+  }
+
+  function setSendingFor(id: string, value: boolean) {
+    setSendingIds((current) => {
+      if (current.has(id) === value) return current;
+      const next = new Set(current);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  // Applies a change only while that chat is still on screen; a reply never pulls the user back.
+  function updateIfOpen(id: string, change: (current: Conversation) => Conversation) {
+    setConversation((current) => (current && current.id === id ? change(current) : current));
   }
 
   async function retryMessage(index: number) {
     if (!conversation || sending) return;
-    const text = conversation.messages[index]?.content || "";
+    const target = conversation;
+    const text = target.messages[index]?.content || "";
     shouldStickToBottomRef.current = true;
-    setSending(true);
+    setSendingFor(target.id, true);
     setError("");
-    setConversation({ ...conversation, messages: conversation.messages.map((item, position) => (position === index ? { ...item, delivery_status: "sending" } : item)) });
-    const outcome = await postReply(`/api/agent/conversations/${conversation.id}/messages/${index}/retry`, null, conversation, text);
+    updateIfOpen(target.id, (current) => ({ ...current, messages: current.messages.map((item, position) => (position === index ? { ...item, delivery_status: "sending" } : item)) }));
+    const outcome = await postReply(`/api/agent/conversations/${target.id}/messages/${index}/retry`, null, target, text);
     if (outcome === "not_retryable") {
       // The server never saved it (the connection dropped first): send it as a new message.
-      setConversation((current) => (current ? { ...current, messages: current.messages.filter((_, position) => position !== index) } : current));
-      await sendText(text);
+      const withoutFailed = { ...target, messages: target.messages.filter((_, position) => position !== index) };
+      updateIfOpen(target.id, () => withoutFailed);
+      await sendText(text, withoutFailed);
     }
   }
 
   // Sends the request and settles the pending bubble: replied, failed (with Retry), or rolled back.
   async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string): Promise<"ok" | "failed" | "not_retryable"> {
+    const id = previousConversation.id;
+    const stillOpen = () => openConversationIdRef.current === id;
     try {
       const response = await apiFetch(path, {
         method: "POST",
@@ -494,8 +517,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       if (!response.ok) {
         const detail = await apiErrorDetail(response, "Omiryn could not reply.");
         if (response.status === 429) {
-          setConversation(previousConversation);
-          setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
+          updateIfOpen(id, () => previousConversation);
+          if (stillOpen()) setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
           const friendly = friendlyQuotaMessage(detail.message);
           const retryAfterSeconds = retryAfterFromResponse(response);
           const pausedAt = Date.now();
@@ -509,34 +532,37 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         }
         if (response.status === 409 && body === null) return "not_retryable";
         if (detail.code === "reply_failed" || response.status >= 500) {
-          markLastUserMessageFailed();
+          markLastUserMessageFailed(id);
           return "failed";
         }
         // Rejected before it was saved (for example a finished conversation): nothing to retry.
-        setConversation(previousConversation);
-        setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
-        setError(detail.message);
+        updateIfOpen(id, () => previousConversation);
+        if (stillOpen()) {
+          setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
+          setError(detail.message);
+        }
         return "failed";
       }
       const nextConversation = (await response.json()) as Conversation;
-      setConversation(nextConversation);
+      // Shown only if the user is still in that chat; otherwise it waits there, marked unread.
+      updateIfOpen(id, () => nextConversation);
       // Drop the typing row in the same render the reply lands, not after the history refresh.
-      setSending(false);
+      setSendingFor(id, false);
       await fetchSummaries();
-      void loadConversationUsage(nextConversation.id);
+      if (stillOpen()) void loadConversationUsage(id);
       return "ok";
     } catch {
       // No answer at all (offline, server down): keep the bubble with a Retry.
-      markLastUserMessageFailed();
+      markLastUserMessageFailed(id);
       return "failed";
     } finally {
-      setSending(false);
+      setSendingFor(id, false);
     }
   }
 
-  function markLastUserMessageFailed() {
+  function markLastUserMessageFailed(id: string) {
     setConversation((current) => {
-      if (!current) return current;
+      if (!current || current.id !== id) return current;
       const index = current.messages.map((item) => item.role).lastIndexOf("user");
       return { ...current, messages: current.messages.map((item, position) => (position === index ? { ...item, delivery_status: "failed" } : item)) };
     });
