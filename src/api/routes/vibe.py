@@ -12,7 +12,13 @@ from agent.memory_engine.memories.vibe import (
     vibe_progress,
 )
 from security.auth import CurrentUser, require_user
-from storage import get_conversation, get_vibe_card, update_vibe_card
+from storage import (
+    get_conversation,
+    get_vibe_card,
+    list_conversation_ids,
+    prune_vibe_proof_from_missing_chats,
+    update_vibe_card,
+)
 
 # Messages shown as proof for one line, newest first.
 MAX_QUOTES = 5
@@ -26,6 +32,8 @@ async def get_vibe(user: CurrentUser = Depends(require_user)) -> dict[str, objec
     """What the companion understands about who the user would get along with."""
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
+    # Proof from chats deleted before deletes cleaned the vibe goes now (no model call).
+    prune_vibe_proof_from_missing_chats(user.id, list_conversation_ids(user.id))
     return _vibe_payload(get_vibe_card(user.id), user.id)
 
 

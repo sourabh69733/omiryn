@@ -25,6 +25,8 @@ from agent.providers import AgentProviderError, agent_runtime_status, extract_pr
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
+    count_memories_only_from_conversation,
+    vibe_deletion_impact,
     delete_conversation as storage_delete_conversation,
     list_agent_message_feedback,
     list_context_sources,
@@ -225,6 +227,22 @@ async def list_agent_messages_after_sequence(
         "after_sequence": after_sequence,
         "latest_sequence": len(conversation.messages) - 1,
         "messages": messages,
+    }
+
+
+@router.get("/api/agent/conversations/{conversation_id}/deletion-impact")
+async def agent_conversation_deletion_impact(
+    conversation_id: str,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """What deleting this chat also removes, shown in the delete dialog before confirming."""
+    _get_existing_conversation(conversation_id, user)
+    owner_id = _user_id(user)
+    vibe = vibe_deletion_impact(owner_id, conversation_id)
+    return {
+        "memories_forgotten": count_memories_only_from_conversation(owner_id, conversation_id),
+        "vibe_removed": vibe["removed"],
+        "vibe_weakened": vibe["weakened"],
     }
 
 
