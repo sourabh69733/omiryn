@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from agent.config import agent_pipeline_config
@@ -16,6 +17,8 @@ CONVERSATION_THREAD_SOURCE_TYPE = "conversation_threads"
 CONVERSATION_THREAD_CONTEXT_LIMIT = 3
 CROSS_SESSION_RELEVANCE_MINIMUM = 0.12
 BACKGROUND_THREAD_CANDIDATE_LIMIT = 4
+# A topic from another chat is brought back only if the user raised it and it is still fresh.
+CROSS_SESSION_THREAD_MAX_AGE = timedelta(days=14)
 
 
 def conversation_state_v2_enabled() -> bool:
@@ -205,6 +208,8 @@ def _rank_thread_candidates(
         if thread.id == excluded_thread_id:
             continue
         current_conversation = thread.last_conversation_id == conversation_id
+        if not current_conversation and not _carries_across_chats(thread):
+            continue
         thread_text = " ".join(
             value
             for value in (thread.title, thread.summary, thread.next_angle)
@@ -221,3 +226,15 @@ def _rank_thread_candidates(
         candidates.append((score, -recency_index, thread))
     candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [thread for _, _, thread in candidates]
+
+
+def _carries_across_chats(thread: ConversationThread, now: datetime | None = None) -> bool:
+    if thread.origin != "user_started" or not thread.updated_at:
+        return False
+    try:
+        updated = datetime.fromisoformat(thread.updated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=UTC)
+    return (now or datetime.now(UTC)) - updated <= CROSS_SESSION_THREAD_MAX_AGE
