@@ -3139,6 +3139,26 @@ p {
   min-width: 0;
 }
 
+/* A chat with messages the user has not seen yet: bold name and a small dot, never auto-opened. */
+.history-item.is-unread .history-item-copy strong {
+  font-weight: 700;
+}
+
+.history-unread-dot,
+.history-item-copy strong .history-unread-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  vertical-align: middle;
+}
+
+.mobile-history-button .history-unread-dot {
+  margin: 0 0 0 6px;
+}
+
 .history-title-row {
   display: flex;
   align-items: center;

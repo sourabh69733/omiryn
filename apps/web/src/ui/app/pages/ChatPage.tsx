@@ -7,6 +7,7 @@ import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
+import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { canShowUsage, pathForPage } from "../appUtils";
@@ -35,6 +36,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [vibeNote, setVibeNote] = useState<{ conversationId: string; milestone: string } | null>(null);
   const shownConversationIdRef = useRef<string | null>(null);
   const sending = Boolean(conversation && sendingIds.has(conversation.id));
+  // Messages seen per chat; a chat with more is highlighted in History instead of opening by itself.
+  const [seen, setSeen] = useState<SeenCounts>(loadSeen);
   // The chat on screen right now, for replies that land after the user has moved on.
   const openConversationIdRef = useRef<string | null>(null);
   openConversationIdRef.current = conversation?.id ?? null;
@@ -103,6 +106,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const data = await response.json();
     const rows = sortConversationSummaries((data.conversations || []) as ConversationSummary[]);
     setSummaries(rows);
+    setSeen((current) => withNewChatsSeen(current, rows));
     return rows;
   }
 
@@ -282,6 +286,23 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     return () => window.clearTimeout(timer);
   }, [sending]);
 
+  useEffect(() => {
+    if (conversation) setSeen((current) => markSeen(current, conversation.id, conversation.messages.length));
+  }, [conversation?.id, conversation?.messages.length]);
+
+  useEffect(() => saveSeen(seen), [seen]);
+
+  // Omi's own messages can land in other chats while the user is elsewhere; refresh History on return.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void fetchSummaries().catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, []);
+
+  const openId = conversation?.id ?? null;
+  const anyUnread = summaries.some((item) => isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
@@ -688,8 +709,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <p className="eyebrow">Chat History</p><h2>Conversations</h2>
             <div className="history-list">
               {summaries.map((item) => (
-                <div className={`history-item ${item.id === conversation?.id ? "active" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
-                  <div className="history-item-copy"><strong>{item.agent_name || "Omiryn"}</strong><span>{item.message_count || 0} messages · {item.context_source_count || 0} signals</span><small>{item.updated_at ? new Date(item.updated_at).toLocaleString() : "New chat"}</small></div>
+                <div className={`history-item ${item.id === conversation?.id ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
+                  <div className="history-item-copy"><strong>{item.agent_name || "Omiryn"}{isUnread(item, seen, openId) ? <span className="history-unread-dot" role="img" aria-label="New messages" /> : null}</strong><span>{item.message_count || 0} messages · {item.context_source_count || 0} signals</span><small>{item.updated_at ? new Date(item.updated_at).toLocaleString() : "New chat"}</small></div>
                   <button className="history-delete" type="button" onClick={(event) => { event.stopPropagation(); setPendingDelete(item); }} aria-label={`Delete conversation ${item.agent_name || "Omiryn"}`}><span aria-hidden="true">×</span></button>
                 </div>
               ))}
@@ -731,7 +752,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           <div className="card-heading">
             <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "AI companion"}</p></div></div>
             <div className="chat-controls">
-              <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History</button>
+              <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History{anyUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in another chat" /> : null}</button>
               {/* Commented for now, as it will conversation confusion and increase user expectation from agent which it might not be able to support. */}
               {/* {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null} */}
               {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
