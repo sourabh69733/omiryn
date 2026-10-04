@@ -78,11 +78,12 @@ class VibeProgressTest(unittest.TestCase):
         self.assertNotIn("humor", progress.clear)
         self.assertEqual(progress.milestone, "first_impressions")
 
-    def test_old_text_only_lines_count_as_mentioned(self) -> None:
+    def test_lines_without_proof_do_not_count(self) -> None:
         progress = vibe_progress({area_id: "Old line." for area_id in BASIC_AREA_IDS})
 
-        self.assertEqual(progress.milestone, "first_impressions")
-        self.assertEqual(progress.known, BASIC_AREA_IDS)
+        self.assertEqual(progress.milestone, "starting")
+        self.assertEqual(progress.known, ())
+        self.assertEqual(merge_vibe({"humor": "Old line."}, {}), {})
 
     def test_many_deeper_areas_without_the_basics_are_not_ready(self) -> None:
         progress = vibe_progress(lines(*DEEPER_AREA_IDS))
