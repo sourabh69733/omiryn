@@ -66,9 +66,13 @@ export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "m
   return `/?conversation_id=${encodeURIComponent(item.conversation_id)}#message-${item.message_index}`;
 }
 
-// The chip says how often the user said it. Only different days make it solid (green).
-export function saidLabel(count: number, days: number): string {
-  if (days >= 2) return `Said on ${days} days`;
-  if (count <= 1) return "Said once";
-  return `Said ${count} times, one day`;
+// The chip says one thing: Confirmed when said on different days (counts toward matches), else New.
+export function strengthLabel(strength: VibeArea["strength"]): string {
+  return strength === "clear" ? "Confirmed" : "New";
+}
+
+// The count lives in the proof panel, under the chip.
+export function proofSummary(count: number, days: number): string {
+  const messages = count === 1 ? "1 of your messages" : `${count} of your messages`;
+  return days >= 2 ? `From ${messages}, on ${days} different days` : `From ${messages}`;
 }

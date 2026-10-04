@@ -1,7 +1,7 @@
 import { Check, Lock, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
-import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, evidenceChatPath, saidLabel, vibeStepIndex } from "../vibe";
+import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, evidenceChatPath, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
 
 // The user's vibe: what Omi has understood about who they'd get along with.
 // Everything here is learned in chat; the user can only remove a line that is wrong.
@@ -87,7 +87,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                           aria-expanded={openWhy === area.id}
                           title="See what you said"
                         >
-                          {saidLabel(area.evidence_count, area.evidence_days)}
+                          {strengthLabel(area.strength)}
                         </button>
                       ) : null}
                     </div>
@@ -101,6 +101,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                     {area.text && openWhy === area.id ? (
                       area.evidence.length ? (
                         <ul className="vibe-quotes" aria-label="What you said">
+                          <li className="vibe-proof-summary">{proofSummary(area.evidence_count, area.evidence_days)}</li>
                           {area.evidence.map((item) => (
                             <li key={`${item.conversation_id}:${item.message_index}`}>
                               <span>“{item.quote}”</span>
@@ -112,7 +113,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                           ))}
                         </ul>
                       ) : (
-                        <p className="vibe-no-proof">No messages linked. This line was written before Omi kept proof.</p>
+                        <p className="vibe-no-proof">The messages behind this line are no longer available.</p>
                       )
                     ) : null}
                     {area.text ? (

@@ -426,3 +426,10 @@
 .vibe-card .vibe-strength.is-mentioned:hover {
   background: var(--soft);
 }
+
+.vibe-quotes li.vibe-proof-summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
