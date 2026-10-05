@@ -4,6 +4,8 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from agent.shared.clock import utc_now
+
 from .conversation_threads import _delete_threads_only_from
 from .database import ENGINE
 from .schema import (
@@ -147,8 +149,27 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_name": row.get("agent_name"),
         "agent_voice": _stored_voice(row),
         "agent_style_source_id": row.get("agent_style_source_id"),
+        "archived_at": _isoformat_utc(row.get("archived_at")),
         "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
+
+
+def set_conversation_archived(conversation_id: str, user_id: str, archived: bool) -> tuple[bool, str | None]:
+    """(found, archived_at). Leaves updated_at alone, so archiving never moves a chat in History."""
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            agent_conversations.update()
+            .where(
+                agent_conversations.c.id == conversation_id,
+                agent_conversations.c.user_id == owner_id,
+            )
+            .values(archived_at=utc_now() if archived else None)
+            .returning(agent_conversations.c.archived_at)
+        ).first()
+    if result is None:
+        return False, None
+    return True, _isoformat_utc(result[0])
 
 
 def list_conversation_ids(user_id: str) -> set[str]:
@@ -202,6 +223,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_name": row.get("agent_name"),
             "agent_voice": _stored_voice(row),
             "agent_style_source_id": row.get("agent_style_source_id"),
+            "archived_at": _isoformat_utc(row.get("archived_at")),
             "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),
             "updated_at": _isoformat_utc(row["updated_at"]),

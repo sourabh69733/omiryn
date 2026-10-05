@@ -38,6 +38,8 @@ agent_conversations = Table(
     # How the companion speaks about itself: neutral (default), female or male.
     Column("agent_voice", String, nullable=True),
     Column("agent_style_source_id", String, nullable=True),
+    # Set when the user archives the chat: it leaves the main History list and gets no proactive messages.
+    Column("archived_at", DateTime(timezone=True), nullable=True),
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),

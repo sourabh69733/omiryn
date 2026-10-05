@@ -173,6 +173,7 @@ def _ensure_runtime_columns() -> None:
             "agent_name",
             "agent_voice",
             "agent_style_source_id",
+            "archived_at",
         ),
     }
     with ENGINE.begin() as connection:
