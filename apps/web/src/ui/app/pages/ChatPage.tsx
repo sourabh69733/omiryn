@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { RotateCw, Smile, X } from "lucide-react";
+import { MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -38,6 +38,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const sending = Boolean(conversation && sendingIds.has(conversation.id));
   // Messages seen per chat; a chat with more is highlighted in History instead of opening by itself.
   const [seen, setSeen] = useState<SeenCounts>(loadSeen);
+  // History row whose "more" menu is open.
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   // The chat on screen right now, for replies that land after the user has moved on.
   const openConversationIdRef = useRef<string | null>(null);
   openConversationIdRef.current = conversation?.id ?? null;
@@ -300,6 +302,19 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
   }, []);
+
+  useEffect(() => {
+    if (!rowMenuId) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target instanceof Element && event.target.closest(".history-row-menu"))) setRowMenuId(null);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [rowMenuId]);
 
   const openId = conversation?.id ?? null;
   const anyUnread = summaries.some((item) => isUnread(item, seen, openId));
@@ -710,8 +725,15 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <div className="history-list">
               {summaries.map((item) => (
                 <div className={`history-item ${item.id === conversation?.id ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
-                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line"><span>{item.message_count || 0} messages</span>{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
-                  <button className="history-delete" type="button" onClick={(event) => { event.stopPropagation(); setPendingDelete(item); }} aria-label={`Delete conversation ${item.agent_name || "Omiryn"}`}><span aria-hidden="true">×</span></button>
+                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
+                  <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                    <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
+                    {rowMenuId === item.id ? (
+                      <div className="history-menu" role="menu">
+                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setRowMenuId(null); setPendingDelete(item); }}><Trash2 aria-hidden="true" />Delete</button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

@@ -3102,7 +3102,7 @@ p {
 
 .history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) 30px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -3110,16 +3110,19 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background: var(--soft);
+  background: #ffffff;
   padding: 12px;
   cursor: pointer;
   text-align: left;
   transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
+/* Rows are plain white; the open chat gets the brand tint, a solid border and a left bar. */
 .history-item.active {
-  border-color: rgba(127, 103, 216, 0.35);
-  background: #f4f0ff;
+  position: relative;
+  border-color: var(--primary);
+  background: #efe9ff;
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .history-item:hover {
@@ -3128,6 +3131,12 @@ p {
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(16, 24, 32, 0.08);
   transform: translateY(-1px);
+}
+
+.history-item.active:hover {
+  border-color: var(--primary);
+  background: #efe9ff;
+  box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(16, 24, 32, 0.08);
 }
 
 .history-item:focus-visible {
@@ -3281,6 +3290,104 @@ p {
 .history-delete:hover {
   color: #ffffff;
   background: var(--accent);
+}
+
+/* The "more" menu on each History row (Delete for now). */
+.history-row-menu {
+  position: relative;
+}
+
+button.history-menu-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-height: 0;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+button.history-menu-button:hover,
+button.history-menu-button[aria-expanded="true"] {
+  background: rgba(127, 103, 216, 0.12);
+  color: var(--primary-dark);
+}
+
+.history-menu-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.history-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(37, 32, 53, 0.14);
+}
+
+.history-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-menu button:hover {
+  background: var(--soft);
+}
+
+.history-menu button.is-danger {
+  color: #b42318;
+}
+
+.history-menu button.is-danger:hover {
+  background: #fef0ee;
+}
+
+.history-menu svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* A chat waiting on Omi's reply shows small typing dots in its row. */
+.history-item-copy .history-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-dark);
+  font-size: 12px;
+}
+
+.history-item-copy .history-typing .typing-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.history-item-copy .history-typing .typing-dots span {
+  width: 5px;
+  height: 5px;
+  margin: 0;
+  box-shadow: none;
 }
 
 .history-empty {
