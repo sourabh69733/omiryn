@@ -8,8 +8,10 @@ from typing import Any
 from storage.memory_processing import (
     MemoryProcessingStateConflictError,
     claim_memory_processing_batch,
+    claim_user_background_lease,
     get_memory_processing_state,
     release_memory_processing_batch,
+    release_user_background_lease,
     save_memory_processing_state,
 )
 
@@ -36,6 +38,14 @@ def claim_processing_batch(
 
 def release_processing_batch(batch_key: str, user_id: str, owner_token: str) -> bool:
     return release_memory_processing_batch(batch_key, user_id, owner_token)
+
+
+def claim_user_lease(user_id: str, conversation_id: str, *, lease_seconds: float) -> str | None:
+    return claim_user_background_lease(user_id, conversation_id, lease_seconds=lease_seconds)
+
+
+def release_user_lease(user_id: str, owner_token: str) -> bool:
+    return release_user_background_lease(user_id, owner_token)
 
 
 def get_processing_state(

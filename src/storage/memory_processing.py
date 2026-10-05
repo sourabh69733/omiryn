@@ -103,6 +103,59 @@ def claim_memory_processing_batch(
     return owner_token
 
 
+def claim_user_background_lease(
+    user_id: str,
+    conversation_id: str,
+    *,
+    lease_seconds: float,
+) -> str | None:
+    """One background run per user at a time, across all their chats.
+
+    Runs read the user card, vibe card and memories before a long model call and write them
+    after it; two chats doing that at once would overwrite each other. Returns an owner token
+    to the winner; an expired lease (a crashed worker) can be taken over by any chat.
+    """
+    if not user_id or not conversation_id:
+        raise ValueError("user background lease requires user and conversation")
+    if lease_seconds <= 0:
+        raise ValueError("user background lease duration must be positive")
+    key = _user_lease_key(user_id)
+    owner_token = str(uuid4())
+    now = datetime.now(UTC)
+    values = {
+        "conversation_id": conversation_id,
+        "owner_token": owner_token,
+        "expires_at": now + timedelta(seconds=lease_seconds),
+    }
+    try:
+        with ENGINE.begin() as connection:
+            connection.execute(
+                memory_processing_leases.insert().values(batch_key=key, user_id=user_id, **values)
+            )
+        return owner_token
+    except IntegrityError:
+        pass
+    with ENGINE.begin() as connection:
+        taken = connection.execute(
+            memory_processing_leases.update()
+            .where(
+                memory_processing_leases.c.batch_key == key,
+                memory_processing_leases.c.user_id == user_id,
+                memory_processing_leases.c.expires_at <= now,
+            )
+            .values(**values, updated_at=func.now())
+        )
+    return owner_token if taken.rowcount == 1 else None
+
+
+def release_user_background_lease(user_id: str, owner_token: str) -> bool:
+    return release_memory_processing_batch(_user_lease_key(user_id), user_id, owner_token)
+
+
+def _user_lease_key(user_id: str) -> str:
+    return f"user:{user_id}"
+
+
 def release_memory_processing_batch(
     batch_key: str,
     user_id: str,

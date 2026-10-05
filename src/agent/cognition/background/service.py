@@ -63,8 +63,10 @@ from agent.memory_engine.processing.models import (
 )
 from agent.memory_engine.processing.service import (
     claim_processing_batch,
+    claim_user_lease,
     get_processing_state,
     release_processing_batch,
+    release_user_lease,
     save_processing_state,
 )
 from agent.memory_engine.processing.validation import MemoryAnalysis
@@ -178,21 +180,42 @@ async def run_background_cognition(
     if batch is None or batch.meaningful_user_message_count == 0:
         return {"status": "no_pending_messages", "operation_count": 0}
 
-    lease_owner = claim_processing_batch(
-        conversation_id,
-        user_id,
-        batch.batch_key,
-        expected_processed_index=(
-            state.processed_through_message_index if state is not None else -1
-        ),
-        lease_seconds=_lease_seconds(),
-    )
-    if lease_owner is None:
+    # One chat at a time per user: each run reads the cards and memories the last one wrote.
+    user_lease = claim_user_lease(user_id, conversation_id, lease_seconds=_user_lease_seconds())
+    if user_lease is None:
         return {
             "status": "already_processing",
             "batch_key": batch.batch_key,
             "operation_count": 0,
         }
+    try:
+        lease_owner = claim_processing_batch(
+            conversation_id,
+            user_id,
+            batch.batch_key,
+            expected_processed_index=(
+                state.processed_through_message_index if state is not None else -1
+            ),
+            lease_seconds=_lease_seconds(),
+        )
+        if lease_owner is None:
+            return {
+                "status": "already_processing",
+                "batch_key": batch.batch_key,
+                "operation_count": 0,
+            }
+        return await _run_with_batch_lease(batch, state, model, lease_owner)
+    finally:
+        release_user_lease(user_id, user_lease)
+
+
+async def _run_with_batch_lease(
+    batch: MemoryBatch,
+    state: MemoryProcessingState | None,
+    model: str | None,
+    lease_owner: str,
+) -> dict[str, Any]:
+    conversation_id, user_id = batch.conversation_id, batch.user_id
 
     memory_version = agent_pipeline_config().memory_contract_version
     request_kind = BACKGROUND_COGNITION if memory_version == 3 else MEMORY_SHADOW_EXTRACT
@@ -837,6 +860,11 @@ def _timeout_seconds() -> float:
 def _lease_seconds() -> float:
     """Keep the claim beyond the bounded provider timeout without another flag."""
     return _timeout_seconds() + 30.0
+
+
+def _user_lease_seconds() -> float:
+    """A whole run: the main call, the vibe proof check, then embeddings."""
+    return _timeout_seconds() * 2 + 60.0
 
 
 __all__ = [
