@@ -38,6 +38,11 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const sending = Boolean(conversation && sendingIds.has(conversation.id));
   // Messages seen per chat; a chat with more is highlighted in History instead of opening by itself.
   const [seen, setSeen] = useState<SeenCounts>(loadSeen);
+  // The chat the user picked; the History row highlights at once, before the chat finishes loading.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const openRequestRef = useRef(0);
+  // Chats already opened this session, so going back to one is instant.
+  const conversationCacheRef = useRef(new Map<string, Conversation>());
   // History row whose "more" menu is open.
   const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   // The chat on screen right now, for replies that land after the user has moved on.
@@ -129,35 +134,56 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }
 
   async function openConversation(id: string) {
-    setLoading(true);
+    // Only the latest click wins; a slow earlier load never replaces a later choice.
+    const request = ++openRequestRef.current;
+    const isLatest = () => openRequestRef.current === request;
+    setSelectedId(id);
     setError("");
+    setHistoryOpen(false);
     const targetHash = window.location.hash.startsWith("#message-") ? window.location.hash : "";
     shouldStickToBottomRef.current = !targetHash;
     setUsage(null);
     setUsageError("");
+    // A chat opened before shows at once from memory, then refreshes quietly.
+    const cached = conversationCacheRef.current.get(id);
+    if (cached) {
+      setConversation(cached);
+      setLoading(false);
+      if (!targetHash) syncChatToBottomAfterRender();
+    } else {
+      setLoading(true);
+    }
+    window.localStorage.setItem("omiryn.activeConversationId", id);
+    const url = new URL("/", window.location.origin);
+    url.searchParams.set("conversation_id", id);
+    url.hash = targetHash;
+    window.history.replaceState({}, "", url);
     try {
       const response = await apiFetch(`/api/agent/conversations/${id}`);
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
       const data = (await response.json()) as Conversation;
+      if (!isLatest()) return;
       setConversation(data);
       trackAppEvent("chat_opened", { conversation_id: data.id }, { page: "chat", target_type: "conversation", target_id: data.id });
-      if (!targetHash) syncChatToBottomAfterRender();
+      if (!cached && !targetHash) syncChatToBottomAfterRender();
       void loadConversationUsage(data.id);
-      const contextResponse = await apiFetch(`/api/agent/conversations/${data.id}/context-sources`);
-      if (contextResponse.ok) {
-        const contextData = await contextResponse.json();
-        setContextSources(contextData.available_sources || []);
-      }
-      window.localStorage.setItem("omiryn.activeConversationId", data.id);
-      const url = new URL("/", window.location.origin);
-      url.searchParams.set("conversation_id", data.id);
-      url.hash = targetHash;
-      window.history.replaceState({}, "", url);
-      setHistoryOpen(false);
+      void loadContextSources(data.id, isLatest);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load conversation.");
+      if (isLatest()) setError(caught instanceof Error ? caught.message : "Could not load conversation.");
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
+    }
+  }
+
+  // Context sources load after the chat is on screen; they never hold it back.
+  async function loadContextSources(id: string, isLatest: () => boolean) {
+    try {
+      const response = await apiFetch(`/api/agent/conversations/${id}/context-sources`);
+      if (!response.ok || !isLatest()) return;
+      const data = await response.json();
+      setContextSources(data.available_sources || []);
+    } catch {
+      // Optional panel data; the chat works without it.
     }
   }
 
@@ -316,7 +342,11 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     };
   }, [rowMenuId]);
 
-  const openId = conversation?.id ?? null;
+  useEffect(() => {
+    if (conversation) conversationCacheRef.current.set(conversation.id, conversation);
+  }, [conversation]);
+
+  const openId = selectedId ?? conversation?.id ?? null;
   const anyUnread = summaries.some((item) => isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
@@ -665,6 +695,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       setDeleting(false);
       return;
     }
+    conversationCacheRef.current.delete(id);
     const rows = await fetchSummaries();
     if (conversation?.id === id) {
       const nextConversation = rows[0];
@@ -673,6 +704,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
       } else {
         window.localStorage.removeItem("omiryn.activeConversationId");
         window.history.replaceState({}, "", "/");
+        setSelectedId(null);
         setConversation(null);
         setContextSources([]);
         setUsage(null);
@@ -724,7 +756,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             <p className="eyebrow">Chat History</p><h2>Conversations</h2>
             <div className="history-list">
               {summaries.map((item) => (
-                <div className={`history-item ${item.id === conversation?.id ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
+                <div className={`history-item ${item.id === openId ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
                   <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
                   <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                     <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
