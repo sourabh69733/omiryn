@@ -42,6 +42,8 @@ Possible fresh angles:
 {suggested_topics or "- Continue the current subject with a specific observation."}
 
 Rules:
+- If the user asked something, or seems confused by your last reply, answer that first in plain
+  words. Do not move to another subject until they are with you.
 - Do not behave like an interviewer.
 - Choose emotional response mode before choosing a topic.
 - If response mode is simple_ack, reply in 1-4 words and stop.
