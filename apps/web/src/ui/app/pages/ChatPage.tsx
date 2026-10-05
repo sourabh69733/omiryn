@@ -7,6 +7,7 @@ import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
+import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
@@ -879,14 +880,14 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             </div>
           </div>
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
-            {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
-            {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
+            {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
+            {!loading && !conversation ? <StateView kind="empty" title="No chat open" detail="Pick a chat from History, or start a new one with Omi."><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></StateView> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
             {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
-          {error ? <p className="legacy-inline-error" role="alert">{error}</p> : null}
+          {error ? <div className="chat-error-notice"><Notice tone="error">{error}</Notice></div> : null}
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
           {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
             <div className="vibe-milestone-note" role="status">

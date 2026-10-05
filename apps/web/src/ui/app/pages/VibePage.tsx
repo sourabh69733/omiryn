@@ -1,33 +1,37 @@
 import { Check, Lock, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
+import { Notice, StateView } from "../StateView";
 import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, confidenceLevel, evidenceChatPath, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
 
 // The user's vibe: what Omi has understood about who they'd get along with.
 // Everything here is learned in chat; the user can only remove a line that is wrong.
 export function VibePage({ onChat }: { onChat: () => void }) {
   const [vibe, setVibe] = useState<Vibe | null>(null);
-  const [status, setStatus] = useState("Loading your vibe…");
+  const [loadError, setLoadError] = useState("");
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [openWhy, setOpenWhy] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
+    setLoadError("");
     apiFetch("/api/me/vibe")
       .then(async (response) => {
         if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load your vibe."));
         setVibe((await response.json()) as Vibe);
-        setStatus("");
       })
-      .catch((caught) => setStatus(caught instanceof Error ? caught.message : "Could not load your vibe."));
-  }, []);
+      .catch((caught) => setLoadError(caught instanceof Error ? caught.message : "Could not load your vibe."));
+  }
+
+  useEffect(load, []);
 
   async function remove(area: VibeArea) {
     setRemoving(area.id);
     const response = await apiFetch(`/api/me/vibe/${area.id}`, { method: "DELETE" });
     if (response.ok) {
       setVibe((await response.json()) as Vibe);
-      setStatus("Removed. Omi won't bring it back unless you say something new about it.");
-    } else setStatus(await apiErrorMessage(response, "Could not remove that line."));
+      setNotice({ tone: "success", text: "Removed. Omi won't bring it back unless you say something new about it." });
+    } else setNotice({ tone: "error", text: await apiErrorMessage(response, "Could not remove that line.") });
     setRemoving(null);
   }
 
@@ -43,7 +47,9 @@ export function VibePage({ onChat }: { onChat: () => void }) {
         <p>What Omi has picked up about who you'd get along with. It's how we'll find you friends.</p>
       </header>
 
-      {status ? <p className="vibe-status" role="status">{status}</p> : null}
+      {!vibe && !loadError ? <StateView kind="loading" title="Loading your vibe…" /> : null}
+      {loadError ? <StateView kind="error" title="Couldn't load your vibe" detail={loadError} onRetry={load} /> : null}
+      {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
 
       {vibe ? (
         <>
