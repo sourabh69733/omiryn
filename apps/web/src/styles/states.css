@@ -1,0 +1,108 @@
+/* Shared loading, empty and error states (StateView) and one-line notices (Notice). */
+.state-view {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  max-width: 340px;
+  margin: auto;
+  padding: 28px 20px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.state-view-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: var(--brand-violet);
+}
+
+.state-view.is-error .state-view-mark {
+  background: #fef0ee;
+  color: #b42318;
+}
+
+.state-view-mark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.state-view-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(124, 58, 237, 0.2);
+  border-top-color: var(--brand-violet);
+  border-radius: 999px;
+  animation: state-view-spin 0.8s linear infinite;
+}
+
+.state-view strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.state-view-detail {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.state-view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@keyframes state-view-spin {
+  to { transform: rotate(360deg); }
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.notice svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+}
+
+.notice.is-success {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.notice.is-error {
+  background: #fef0ee;
+  color: #b42318;
+}
+
+.notice.is-info {
+  background: #f4f0ff;
+  color: #5b21b6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-view-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.chat-error-notice {
+  padding: 0 16px;
+}
