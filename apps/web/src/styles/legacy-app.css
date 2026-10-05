@@ -3119,7 +3119,6 @@ p {
 
 /* Rows are plain white; the open chat gets the brand tint, a solid border and a left bar. */
 .history-item.active {
-  position: relative;
   border-color: var(--primary);
   background: #efe9ff;
   box-shadow: inset 3px 0 0 var(--primary);
@@ -3293,6 +3292,12 @@ p {
 }
 
 /* The "more" menu on each History row (Delete for now). */
+/* The row with an open menu sits above the rows after it, so the menu is never covered. */
+.history-item.menu-open {
+  position: relative;
+  z-index: 30;
+}
+
 .history-row-menu {
   position: relative;
 }
