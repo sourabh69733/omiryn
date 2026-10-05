@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from agent.memory_engine.memories.vibe import line_evidence, line_text, merge_vibe, proof_after_rejection, vibe_progress
 from agent.shared.clock import utc_now
@@ -15,6 +16,9 @@ from .database import ENGINE
 from .schema import agent_vibe_cards
 from .utils import _protect_text, _require_user_id, _unprotect_text
 
+# Writers that lose a race re-read the card and merge again, this many times at most.
+WRITE_ATTEMPTS = 5
+
 # Stored next to the area lines: lines the user marked wrong, with when and the proof behind them.
 REJECTED_KEY = "_rejected"
 
@@ -22,20 +26,24 @@ REJECTED_KEY = "_rejected"
 def get_vibe_card(user_id: str) -> dict[str, Any]:
     """{"areas": {area_id: {"text", "evidence"}}, "rejected": {area_id: {"text", "evidence", "at"}},
     "milestone": id, "milestone_reached_at": datetime | None}."""
-    owner_id = _require_user_id(user_id, "agent vibe card")
+    return _read(_require_user_id(user_id, "agent vibe card"))[0]
+
+
+def _read(owner_id: str) -> tuple[dict[str, Any], str | None]:
+    """The card, plus its stored text, which a write checks is unchanged before replacing it."""
     with ENGINE.begin() as connection:
         row = connection.execute(
             select(agent_vibe_cards).where(agent_vibe_cards.c.user_id == owner_id)
         ).mappings().first()
     if not row:
-        return {"areas": {}, "rejected": {}, "milestone": "starting", "milestone_reached_at": None}
+        return {"areas": {}, "rejected": {}, "milestone": "starting", "milestone_reached_at": None}, None
     stored = _stored(owner_id, row["card"])
     return {
         "areas": merge_vibe(stored, {}),
         "rejected": _rejected(stored),
         "milestone": row["milestone"],
         "milestone_reached_at": row["milestone_reached_at"],
-    }
+    }, row["card"]
 
 
 def update_vibe_card(
@@ -55,7 +63,25 @@ def update_vibe_card(
     replace_evidence: the updates' proof replaces the old proof (see merge_vibe).
     """
     owner_id = _require_user_id(user_id, "agent vibe card")
-    current = get_vibe_card(owner_id)
+    for _ in range(WRITE_ATTEMPTS):
+        current, version = _read(owner_id)
+        written = _write(owner_id, current, version, updates, reject, drop, replace_evidence, now)
+        if written is not None:
+            return written
+    raise RuntimeError("vibe card kept changing during the update")
+
+
+def _write(
+    owner_id: str,
+    current: dict[str, Any],
+    version: str | None,
+    updates: dict[str, dict[str, Any]],
+    reject: tuple[str, ...],
+    drop: tuple[str, ...],
+    replace_evidence: bool,
+    now: datetime | None,
+) -> dict[str, Any] | None:
+    """Merge onto the card read as `version`; None when someone else wrote it first."""
     rejected = dict(current["rejected"])
     rejected_at = utc_now().isoformat()
     for area_id in reject:
@@ -82,14 +108,18 @@ def update_vibe_card(
         "milestone": milestone,
         "milestone_reached_at": reached_at,
     }
-    with ENGINE.begin() as connection:
-        updated = connection.execute(
-            agent_vibe_cards.update()
-            .where(agent_vibe_cards.c.user_id == owner_id)
-            .values(**values, updated_at=func.now())
-        )
-        if not updated.rowcount:
-            connection.execute(agent_vibe_cards.insert().values(user_id=owner_id, **values))
+    try:
+        with ENGINE.begin() as connection:
+            if version is None:
+                connection.execute(agent_vibe_cards.insert().values(user_id=owner_id, **values))
+            elif not connection.execute(
+                agent_vibe_cards.update()
+                .where(agent_vibe_cards.c.user_id == owner_id, agent_vibe_cards.c.card == version)
+                .values(**values, updated_at=func.now())
+            ).rowcount:
+                return None
+    except IntegrityError:
+        return None
     return {
         "areas": areas,
         "rejected": rejected,
