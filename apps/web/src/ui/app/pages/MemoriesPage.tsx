@@ -1,5 +1,6 @@
 import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
+import { Notice, StateView } from "../StateView";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
 import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
@@ -15,6 +16,8 @@ export function MemoriesPage() {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [canonicalMemories, setCanonicalMemories] = useState<CanonicalMemory[]>([]);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importMode, setImportMode] = useState<"memory" | "whatsapp">("memory");
   const [content, setContent] = useState("");
@@ -38,12 +41,14 @@ export function MemoriesPage() {
       apiFetch("/api/me/memories")
     ]);
     if (!profileResponse.ok) throw new Error(await apiErrorMessage(profileResponse, "Could not load saved memories."));
-    if (!memoryResponse.ok) throw new Error(await apiErrorMessage(memoryResponse, "Could not load V3 memories."));
+    if (!memoryResponse.ok) throw new Error(await apiErrorMessage(memoryResponse, "Could not load your memories."));
     const memoryData = await memoryResponse.json() as MemoryResponse;
     setData(await profileResponse.json());
     setCanonicalMemories(memoryData.memories || []);
+    setLoaded(true);
   }
-  useEffect(() => { load().catch((caught) => setError(caught.message)); }, []);
+  function firstLoad() { setLoadError(""); load().catch((caught) => setLoadError(caught.message)); }
+  useEffect(firstLoad, []);
 
   const sources = [...(data?.memory_sources || []), ...(data?.style_sources || [])];
   const canonicalMemoryGroups = partitionCanonicalMemories(canonicalMemories);
@@ -251,6 +256,7 @@ export function MemoriesPage() {
     );
   }
 
+  if (!loaded) return <section className="screen style-screen">{loadError ? <StateView kind="error" title="Couldn't load your memories" detail={loadError} onRetry={firstLoad} /> : <StateView kind="loading" title="Loading your memories…" />}</section>;
   return (
     <section className="screen style-screen">
       <div className="style-hero">
@@ -262,9 +268,9 @@ export function MemoriesPage() {
       </div>
       <div className="style-snapshot-grid" aria-label="Memory summary">
         <div className="style-snapshot-card">
-          <span>V3 memories</span>
+          <span>Memories</span>
           <strong>{canonicalMemories.length}</strong>
-          <small>Canonical memories currently stored</small>
+          <small>Things Omi remembers about you</small>
         </div>
         <div className="style-snapshot-card">
           <span>Active</span>
@@ -281,15 +287,15 @@ export function MemoriesPage() {
         <section className="profile-panel profile-panel-wide style-learning-panel">
           <div className="panel-heading profile-facts-heading">
             <div>
-              <p className="eyebrow">V3 memory</p>
+              <p className="eyebrow">Memories</p>
               <h2>What Omiryn remembers</h2>
-              <p>These are canonical memories created by background cognition and grouped by their real memory kind.</p>
+              <p>Things Omi picked up from your chats, grouped by type.</p>
               <p className="privacy-note">Purpose describes why a memory matters. Allowed use controls where Omiryn may use it.</p>
             </div>
             <span className="profile-fact-total">{canonicalMemories.length} memories</span>
           </div>
           <div className="profile-fact-groups">
-            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <div className="profile-facts-empty"><strong>No active V3 memories yet.</strong><span>Background cognition creates them after enough meaningful conversation.</span></div>}
+            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
             {canonicalMemoryGroups.rejected.length ? (
               <div className="signal-archive-toggle-row">
                 <button
@@ -350,7 +356,7 @@ export function MemoriesPage() {
               </article>
             )) : <div className="table-empty">No saved memories yet.</div>}
           </div>
-          {error ? <p className="legacy-inline-error">{error}</p> : null}
+          {error ? <Notice tone="error">{error}</Notice> : null}
         </section> */}
       </div>
       {reviewItem && reviewMode ? (
@@ -392,7 +398,7 @@ export function MemoriesPage() {
                 ) : null}
                 <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder="Add context or a correction (optional)" />
                 {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">This moves the memory to the hidden rejected section without deleting its evidence.</p> : null}
-                {error ? <p className="legacy-inline-error">{error}</p> : null}
+                {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
                   <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
@@ -409,7 +415,7 @@ export function MemoriesPage() {
                   <input type="checkbox" checked={privacyForMatching} onChange={(event) => setPrivacyForMatching(event.target.checked)} />
                   <span><strong>Use for matching</strong><small>Lets this signal affect compatible people later.</small></span>
                 </label>
-                {error ? <p className="legacy-inline-error">{error}</p> : null}
+                {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
                   <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save privacy"}</button>
