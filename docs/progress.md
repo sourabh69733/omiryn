@@ -111,7 +111,8 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 | 1 | Consent for private areas | Values, stories and deal-breakers are marked private (`PRIVATE_AREA_IDS`, "Private" on the Vibe page). Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
 | 2 | Finish the design system | Chat and Vibe use the landing tokens and fonts; Memories, Matches and Profile still need a visual pass. |
 | 3 | Mobile pass on the rest | Chat and Vibe reflow on narrow screens; Memories, Matches, Profile and the history panel are not checked. |
-| 4 | Empty, loading and error states | Consistent on every screen. |
+
+Done: shared loading, empty and error states (`StateView`) and one-line notices (`Notice`) on Chat, Vibe, Profile and Memories; Memories no longer shows "no memories" while loading, and "V3" jargon is gone from its copy.
 
 Done in this round: "Not right" now stays gone (the rejection is stored; that area takes a new line only with proof sent afterwards, and the models see the rejected line); the chat header says "typing…" or "AI companion" instead of the tone value; limit messages are short and neutral; profile gender is optional ("helps Omi address you correctly in Hindi") with a one-line privacy note.
 
