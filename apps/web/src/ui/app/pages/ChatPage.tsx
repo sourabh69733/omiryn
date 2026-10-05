@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
@@ -742,6 +742,50 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     return () => window.removeEventListener("keydown", focusComposerOnType);
   }, [conversation, composerBlocked]);
 
+  // Typing in the composer re-renders this page on every key; the message list and History only
+  // rebuild when what they show changes, so long chats stay smooth to type in.
+  const historyRows = useMemo(() => summaries.map((item) => (
+                <div className={`history-item ${item.id === openId ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""} ${rowMenuId === item.id ? "menu-open" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
+                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
+                  <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                    <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
+                    {rowMenuId === item.id ? (
+                      <div className="history-menu" role="menu">
+                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setRowMenuId(null); setPendingDelete(item); }}><Trash2 aria-hidden="true" />Delete</button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )), [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId]);
+  const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
+              const agent = message.role === "assistant";
+              const currentDate = messageDateKey(message, index);
+              const previous = index > 0 ? visibleMessages[index - 1] : null;
+              const next = index < visibleMessages.length - 1 ? visibleMessages[index + 1] : null;
+              const previousDate = previous ? messageDateKey(previous, index - 1) : "";
+              const nextDate = next ? messageDateKey(next, index + 1) : "";
+              const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
+              // The typing row continues Omiryn's last bubble, so that bubble gives up its avatar.
+              const typingContinues = typingVisible && agent && !next;
+              const sameAsNext = typingContinues || Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
+              const clusterClass = !sameAsPrevious && !sameAsNext ? "cluster-single" : !sameAsPrevious ? "cluster-start" : !sameAsNext ? "cluster-end" : "cluster-middle";
+              const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, index - 1, message, index) >= 20;
+              const showAvatar = !sameAsNext;
+              return (
+                <Fragment key={index}>
+                  {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
+                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""}`} id={`message-${index}`} data-message-index={index}>
+                    {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    <div className={`message ${agent ? "agent" : "user"}`}>
+                      <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
+                    </div>
+                    {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                  </div>
+                  {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
+                </Fragment>
+              );
+            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar]);
+
   return (
     <section className="screen interview-screen legacy-chat-screen">
       <div className="chat-workspace">
@@ -755,19 +799,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
           <section className={`side-panel ${sidePanel === "history" ? "active" : ""}`} hidden={sidePanel !== "history"}>
             <p className="eyebrow">Chat History</p><h2>Conversations</h2>
             <div className="history-list">
-              {summaries.map((item) => (
-                <div className={`history-item ${item.id === openId ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""} ${rowMenuId === item.id ? "menu-open" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
-                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
-                  <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                    <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
-                    {rowMenuId === item.id ? (
-                      <div className="history-menu" role="menu">
-                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setRowMenuId(null); setPendingDelete(item); }}><Trash2 aria-hidden="true" />Delete</button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+              {historyRows}
             </div>
             <button className="secondary-button primary-wide" type="button" onClick={() => void createConversation()}>New conversation</button>
             {/* <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p> */}
@@ -816,34 +848,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
             {loading ? <div className="chat-empty-state"><strong>Loading conversation...</strong><span>Fetching the latest chat and context.</span></div> : null}
             {!loading && !conversation ? <div className="chat-empty-state"><strong>No conversation selected</strong><span>Choose an existing conversation or start fresh.</span><div className="chat-empty-actions"><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></div></div> : null}
             {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
-            {!loading && visibleMessages.map((message, index) => {
-              const agent = message.role === "assistant";
-              const currentDate = messageDateKey(message, index);
-              const previous = index > 0 ? visibleMessages[index - 1] : null;
-              const next = index < visibleMessages.length - 1 ? visibleMessages[index + 1] : null;
-              const previousDate = previous ? messageDateKey(previous, index - 1) : "";
-              const nextDate = next ? messageDateKey(next, index + 1) : "";
-              const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
-              // The typing row continues Omiryn's last bubble, so that bubble gives up its avatar.
-              const typingContinues = typingVisible && agent && !next;
-              const sameAsNext = typingContinues || Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
-              const clusterClass = !sameAsPrevious && !sameAsNext ? "cluster-single" : !sameAsPrevious ? "cluster-start" : !sameAsNext ? "cluster-end" : "cluster-middle";
-              const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, index - 1, message, index) >= 20;
-              const showAvatar = !sameAsNext;
-              return (
-                <Fragment key={index}>
-                  {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
-                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""}`} id={`message-${index}`} data-message-index={index}>
-                    {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
-                    <div className={`message ${agent ? "agent" : "user"}`}>
-                      <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
-                    </div>
-                    {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
-                  </div>
-                  {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
-                </Fragment>
-              );
-            })}
+            {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
           </div>
