@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronRight, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -43,6 +43,8 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const openRequestRef = useRef(0);
   // Chats already opened this session, so going back to one is instant.
   const conversationCacheRef = useRef(new Map<string, Conversation>());
+  // Whether History shows the archived chats under the main list.
+  const [archivedOpen, setArchivedOpen] = useState(false);
   // History row whose "more" menu is open.
   const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   // The chat on screen right now, for replies that land after the user has moved on.
@@ -347,7 +349,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   }, [conversation]);
 
   const openId = selectedId ?? conversation?.id ?? null;
-  const anyUnread = summaries.some((item) => isUnread(item, seen, openId));
+  const anyUnread = summaries.some((item) => !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
@@ -687,6 +689,21 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [pendingDelete, deleting]);
 
+  // Archiving keeps the chat (and keeps it open if it is on screen); it just moves under Archived.
+  async function setArchived(id: string, archived: boolean) {
+    const response = await apiFetch(`/api/agent/conversations/${id}/archive`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived })
+    });
+    if (!response.ok) {
+      setError(await apiErrorMessage(response, archived ? "Could not archive this chat." : "Could not unarchive this chat."));
+      return;
+    }
+    const { archived_at: archivedAt } = (await response.json()) as { archived_at: string | null };
+    setSummaries((rows) => rows.map((row) => (row.id === id ? { ...row, archived_at: archivedAt } : row)));
+  }
+
   async function deleteConversation(id: string) {
     setDeleting(true);
     const response = await apiFetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
@@ -744,19 +761,36 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
 
   // Typing in the composer re-renders this page on every key; the message list and History only
   // rebuild when what they show changes, so long chats stay smooth to type in.
-  const historyRows = useMemo(() => summaries.map((item) => (
-                <div className={`history-item ${item.id === openId ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""} ${rowMenuId === item.id ? "menu-open" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
-                  <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
-                  <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                    <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
-                    {rowMenuId === item.id ? (
-                      <div className="history-menu" role="menu">
-                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setRowMenuId(null); setPendingDelete(item); }}><Trash2 aria-hidden="true" />Delete</button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )), [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId]);
+  const historyRows = useMemo(() => {
+    const renderRow = (item: ConversationSummary) => (
+      <div className={`history-item ${item.id === openId ? "active" : ""} ${isUnread(item, seen, openId) ? "is-unread" : ""} ${rowMenuId === item.id ? "menu-open" : ""} ${item.archived_at ? "is-archived" : ""}`} role="button" tabIndex={0} key={item.id} onClick={() => void openConversation(item.id)} onKeyDown={(event) => event.key === "Enter" && void openConversation(item.id)}>
+        <div className="history-item-copy"><div className="history-item-line"><strong>{item.agent_name || "Omiryn"}</strong><small>{historyTimeLabel(item.updated_at)}</small></div><div className="history-item-line">{sendingIds.has(item.id) || typingConversationId === item.id ? <span className="history-typing" aria-label="Omi is typing"><span className="typing-dots"><span /><span /><span /></span>typing</span> : <span>{item.message_count || 0} messages</span>}{isUnread(item, seen, openId) ? <span className="history-new-pill">New</span> : null}</div></div>
+        <div className="history-row-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === item.id} aria-label={`More options for ${item.agent_name || "Omiryn"}`} onClick={() => setRowMenuId(rowMenuId === item.id ? null : item.id)}><MoreHorizontal aria-hidden="true" /></button>
+          {rowMenuId === item.id ? (
+            <div className="history-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setRowMenuId(null); void setArchived(item.id, !item.archived_at); }}>{item.archived_at ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}{item.archived_at ? "Unarchive" : "Archive"}</button>
+              <button type="button" role="menuitem" className="is-danger" onClick={() => { setRowMenuId(null); setPendingDelete(item); }}><Trash2 aria-hidden="true" />Delete</button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+    const archived = summaries.filter((item) => item.archived_at);
+    return (
+      <>
+        {summaries.filter((item) => !item.archived_at).map(renderRow)}
+        {archived.length ? (
+          <>
+            <button type="button" className="history-archived-toggle" aria-expanded={archivedOpen} onClick={() => setArchivedOpen(!archivedOpen)}>
+              <ChevronRight aria-hidden="true" />Archived ({archived.length})
+            </button>
+            {archivedOpen ? archived.map(renderRow) : null}
+          </>
+        ) : null}
+      </>
+    );
+  }, [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId, archivedOpen]);
   const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);

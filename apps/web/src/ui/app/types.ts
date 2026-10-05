@@ -22,6 +22,7 @@ export type ConversationSummary = {
   message_count?: number;
   context_source_count?: number;
   updated_at?: string | null;
+  archived_at?: string | null;
 };
 export type AuthUser = { email?: string | null; display_name?: string | null; avatar_url?: string | null };
 export type Profile = {
