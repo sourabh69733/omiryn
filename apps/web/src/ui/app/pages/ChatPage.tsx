@@ -770,7 +770,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
               ))}
             </div>
             <button className="secondary-button primary-wide" type="button" onClick={() => void createConversation()}>New conversation</button>
-            <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p>
+            {/* <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p> */}
           </section>
           {canShowUsage ? (
             <section className={`side-panel ${sidePanel === "usage" ? "active" : ""}`} hidden={sidePanel !== "usage"}>
