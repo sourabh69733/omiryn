@@ -9,6 +9,7 @@ from agent.context_engine.assembly.snapshot import build_context_snapshot, build
 from agent.context_engine.conversation_engine.planning import (
     apply_question_cooldown,
     build_conversation_plan,
+    hold_old_topics_while_a_question_is_open,
 )
 from agent.context_engine.conversation_engine.understanding import interpret_turn
 from agent.context_engine.conversation_engine.understanding.rules import (
@@ -103,6 +104,9 @@ def build_model_context_package(
             listener_first=listener_first,
         )
         conversation_plan = apply_question_cooldown(conversation_plan, planning_messages[:-1])
+        conversation_plan = hold_old_topics_while_a_question_is_open(
+            conversation_plan, planning_messages
+        )
         question_limit = 0 if conversation_plan.question_purpose == "none" else 1
         if "story_or_long_reply" in query_intent.labels:
             question_limit = 1  # room for the "want more?" check-in at the end of a story

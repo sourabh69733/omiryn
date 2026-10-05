@@ -88,6 +88,28 @@ def apply_question_cooldown(
     return replace(plan, question_purpose="none")
 
 
+def hold_old_topics_while_a_question_is_open(
+    plan: ConversationPlan,
+    messages: list[dict[str, Any]],
+) -> ConversationPlan:
+    """Never switch to an older subject while the user asked something or is answering Omi.
+
+    A short reply is not boredom when it carries a question ("hain??") or answers the question
+    Omi just asked; the reply has to deal with that first. messages ends with the user's message.
+    """
+    if plan.thread_action != "offer_open" or not messages:
+        return plan
+    user_asked = "?" in str(messages[-1].get("content") or "")
+    previous = next(
+        (message for message in reversed(messages[:-1]) if message.get("role") == "assistant"),
+        None,
+    )
+    answering_omi = previous is not None and "?" in str(previous.get("content") or "")
+    if not (user_asked or answering_omi):
+        return plan
+    return replace(plan, **_thread_fields("follow_user"))
+
+
 def recent_question_streak(messages: list[dict[str, Any]]) -> int:
     """How many of the latest agent replies in a row contained a question.
 
