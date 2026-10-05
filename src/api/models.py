@@ -203,6 +203,11 @@ class AgentConversationSummary(BaseModel):
     context_source_count: int = 0
     created_at: str | None = None
     updated_at: str | None = None
+    archived_at: str | None = None
+
+
+class AgentConversationArchive(BaseModel):
+    archived: bool
 
 
 class UserMessage(BaseModel):

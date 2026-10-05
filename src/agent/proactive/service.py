@@ -178,7 +178,8 @@ def _open_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | N
     if not proactive_messaging_enabled() or not get_proactive_enabled(user_id):
         return None
     conversation = get_conversation(conversation_id, user_id)
-    if not conversation or conversation.get("status") != "active":
+    # The user put an archived chat away; Omi does not greet or nudge there.
+    if not conversation or conversation.get("status") != "active" or conversation.get("archived_at"):
         return None
     return conversation
 

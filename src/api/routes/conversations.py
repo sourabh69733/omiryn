@@ -36,6 +36,7 @@ from storage import (
     save_agent_message_feedback,
     save_conversation,
     save_draft,
+    set_conversation_archived,
 )
 
 from ..helpers import (
@@ -56,6 +57,7 @@ from ..helpers import (
 )
 from ..models import (
     AgentConversation,
+    AgentConversationArchive,
     AgentConversationCreate,
     AgentConversationSettings,
     AgentConversationSummary,
@@ -197,6 +199,7 @@ async def list_agent_conversations(
                 context_source_count=len(_attached_context_sources(context_sources, reusable_source_ids)),
                 created_at=conversation["created_at"],
                 updated_at=conversation["updated_at"],
+                archived_at=conversation.get("archived_at"),
             ).model_dump()
         )
     return {"count": len(summaries), "conversations": summaries}
@@ -261,6 +264,19 @@ async def delete_agent_conversation(
     return {"conversation_id": conversation_id, "status": "deleted"}
 
 
+@router.patch("/api/agent/conversations/{conversation_id}/archive")
+def archive_agent_conversation(
+    conversation_id: str,
+    payload: AgentConversationArchive,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Archive or unarchive a chat. It keeps its messages; History lists it under Archived."""
+    found, archived_at = set_conversation_archived(conversation_id, _user_id(user), payload.archived)
+    if not found:
+        raise HTTPException(status_code=404, detail="Agent conversation not found.")
+    return {"conversation_id": conversation_id, "archived_at": archived_at}
+
+
 @router.patch("/api/agent/conversations/{conversation_id}/settings")
 def update_agent_conversation_settings(
     conversation_id: str,
@@ -321,6 +337,8 @@ async def send_agent_message(
     # Saved before the model runs, so a failed reply never loses what the user wrote.
     conversation.messages = [*prior_messages, pending]
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    # Writing in an archived chat brings it back to the main list.
+    set_conversation_archived(conversation_id, _user_id(user), False)
     return await _reply_to_pending(conversation, user, prior_messages, pending, background_tasks)
 
 
