@@ -11,6 +11,7 @@ from agent.context_engine.conversation_engine.planning import (
     build_conversation_plan,
     hold_old_topics_while_a_question_is_open,
 )
+from agent.context_engine.conversation_engine.planning.planner import recent_question_streak
 from agent.context_engine.conversation_engine.understanding import interpret_turn
 from agent.context_engine.conversation_engine.understanding.rules import (
     context_query_intent,
@@ -22,6 +23,10 @@ from agent.context_engine.contracts.models import ModelContextPackage
 from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     build_companion_system_prompt_v2,
+)
+from agent.context_engine.prompt_engine.blocks import (
+    build_companion_system_prompt_v4,
+    turn_facts,
 )
 from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
 from agent.context_engine.assembly.sources import build_reply_context
@@ -47,10 +52,11 @@ def build_model_context_package(
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
     user_profile = _with_conversation_time(conversation_id, user_id, user_profile)
-    listener_first = prompt_version.version_id in {"v3", "v3-1"}
+    blocks_prompt = prompt_version.version_id == "v4"
+    listener_first = prompt_version.version_id in {"v3", "v3-1", "v4"}
     matching_understanding = (
         build_matching_understanding(user_id=user_id, user_profile=user_profile)
-        if prompt_version.version_id == "v3-1"
+        if prompt_version.version_id in {"v3-1", "v4"}
         else None
     )
     reply_context = build_reply_context(
@@ -62,7 +68,7 @@ def build_model_context_package(
         strict_intent=listener_first,
         memory_query_embedding=memory_query_embedding,
     )
-    if prompt_version.version_id in {"v2", "v3", "v3-1"}:
+    if prompt_version.version_id in {"v2", "v3", "v3-1", "v4"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
         turn_understanding = None
@@ -108,20 +114,44 @@ def build_model_context_package(
             conversation_plan, planning_messages
         )
         question_limit = 0 if conversation_plan.question_purpose == "none" else 1
+        if blocks_prompt:
+            # v4 gets facts, not the keyword plan's move; only a streak or the user's own
+            # request removes the question.
+            facts = turn_facts(
+                planning_messages,
+                question_streak=recent_question_streak(planning_messages[:-1]),
+                constraints=conversational_stance.constraints if conversational_stance else (),
+                active_topic=conversation_plan.active_topic,
+            )
+            question_limit = (
+                0 if facts.question_streak >= 2 or "no_questions" in facts.constraints else 1
+            )
         if "story_or_long_reply" in query_intent.labels:
             question_limit = 1  # room for the "want more?" check-in at the end of a story
-        system_prompt = build_companion_system_prompt_v2(
-            context_sources=reply_context.context_sources,
-            user_profile=reply_context.user_profile,
-            agent_tone=agent_tone,
-            agent_name=agent_name,
-            prompt_version=prompt_version,
-            query_intent=query_intent,
-            emotion_state=emotion_state,
-            conversation_plan=conversation_plan,
-            matching_understanding=matching_understanding,
-            agent_voice=_conversation_voice(conversation_id, user_id),
-        )
+        if blocks_prompt:
+            system_prompt = build_companion_system_prompt_v4(
+                context_sources=reply_context.context_sources,
+                user_profile=reply_context.user_profile,
+                agent_tone=agent_tone,
+                agent_name=agent_name,
+                prompt_version=prompt_version,
+                matching_understanding=matching_understanding,
+                facts=facts,
+                agent_voice=_conversation_voice(conversation_id, user_id),
+            )
+        else:
+            system_prompt = build_companion_system_prompt_v2(
+                context_sources=reply_context.context_sources,
+                user_profile=reply_context.user_profile,
+                agent_tone=agent_tone,
+                agent_name=agent_name,
+                prompt_version=prompt_version,
+                query_intent=query_intent,
+                emotion_state=emotion_state,
+                conversation_plan=conversation_plan,
+                matching_understanding=matching_understanding,
+                agent_voice=_conversation_voice(conversation_id, user_id),
+            )
         snapshot = build_context_snapshot_v2(
             reply_context.context_sources,
             conversation_id=conversation_id,
@@ -134,7 +164,9 @@ def build_model_context_package(
             prompt_version=prompt_version.version_id,
             prompt_version_name=prompt_version.name,
             engine_version=(
-                "context_v3_1"
+                "context_v4"
+                if blocks_prompt
+                else "context_v3_1"
                 if prompt_version.version_id == "v3-1"
                 else "context_v3"
                 if listener_first
