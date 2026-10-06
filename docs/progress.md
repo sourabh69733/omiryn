@@ -129,7 +129,7 @@ After each deploy: check `GET /health` shows v3, then run `scripts/backfill_vibe
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Reply quality | Replies still sound robotic. Give Omi a character goal, drop the keyword plan, then run the companion evals on Mistral. |
+| 1 | Reply quality (prompt v4) | Replies still sound robotic. Give Omi a character goal; code passes facts (time gap, unanswered question, recent questions, what might fit) and the model picks the move; keep only hard rules. Lay the prompt out in tagged blocks, stable first and this turn last: `<omi>`, `<rules>`, `<about_user>`, `<memories>` (date, kind), `<recent_chats>`, `<this_chat>`, `<this_turn>`, `<goal>`, each with a size limit (Letta-style). Keep v3 for rollback; replay old vs new turns with technical checks, and the user reads ~20 pairs. |
 | 2 | Memory recall eval | No accuracy number today. Ask real questions across chats and days: who is my wife, when is our anniversary, what do I do today, a changed fact, how to talk to me. |
 | 3 | Attention | Memory only comes up when the message matches it. Search with recent context, add a short "might fit" list (upcoming events, own topics, unused important memories), track what was used. |
 | 4 | Date-aware recall | "Today / this week" should fetch memories by date; support repeating events (birthdays, anniversaries, weekly gym). Code computes the dates. |
