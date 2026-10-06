@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.context_engine.conversation_engine.state import evaluate_thread_operation_shadow
 from agent.memory_engine.processing.models import MemoryBatch
+from agent.memory_engine.memories.open_questions import OpenQuestionChanges, validate_open_questions
 from agent.memory_engine.memories.self_notes import SelfNoteChanges, validate_self_notes
 from agent.memory_engine.memories.user_card import validate_user_card
 from agent.memory_engine.memories.vibe import validate_vibe_updates
@@ -24,6 +25,7 @@ def interpret_background_cognition(
     thread_candidates: list[dict[str, object]],
     memory_version: int = 2,
     active_self_note_ids: set[str] | None = None,
+    open_question_ids: set[str] | None = None,
 ) -> BackgroundCognitionAnalysis:
     """Delegate each portion of one model response to its owning domain."""
     errors: list[str] = []
@@ -32,7 +34,16 @@ def interpret_background_cognition(
         errors.append("background cognition analysis must be an object")
     unsupported = unknown_fields(
         raw,
-        {"decision", "operations", "thread_operation", "handoff", "user_card", "vibe", "self_notes"},
+        {
+            "decision",
+            "operations",
+            "thread_operation",
+            "handoff",
+            "user_card",
+            "vibe",
+            "self_notes",
+            "open_questions",
+        },
     )
     if unsupported:
         errors.append(f"unsupported top-level fields: {', '.join(unsupported)}")
@@ -110,6 +121,16 @@ def interpret_background_cognition(
             )
             if memory_version == 3
             else SelfNoteChanges()
+        ),
+        open_questions=(
+            validate_open_questions(
+                raw.get("open_questions"),
+                batch=batch,
+                open_question_ids=open_question_ids or set(),
+                memory_ids=existing_memory_ids,
+            )
+            if memory_version == 3
+            else OpenQuestionChanges()
         ),
     )
 

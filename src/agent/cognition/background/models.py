@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent.memory_engine.memories.operations import MemoryAnalysisV3
+from agent.memory_engine.memories.open_questions import OpenQuestionChanges
 from agent.memory_engine.memories.self_notes import SelfNoteChanges
 from agent.memory_engine.processing.validation import MemoryAnalysis
 
@@ -25,6 +26,7 @@ class BackgroundCognitionAnalysis:
     self_notes: SelfNoteChanges = SelfNoteChanges()
     # Vibe area lines the model rewrote; empty keeps the stored card.
     vibe: dict[str, dict[str, Any]] = field(default_factory=dict)
+    open_questions: OpenQuestionChanges = OpenQuestionChanges()
 
 
 __all__ = ["BackgroundCognitionAnalysis"]

@@ -78,6 +78,7 @@ def background_cognition_prompt(
     self_notes: list[dict[str, Any]] | None = None,
     vibe: dict[str, str] | None = None,
     rejected_vibe: dict[str, str] | None = None,
+    open_questions: list[dict[str, Any]] | None = None,
 ) -> str:
     """Serialize one shared batch for memory and thread analysis."""
     payload = json.loads(memory_batch_prompt(batch, existing_memories, timezone_name))
@@ -91,6 +92,8 @@ def background_cognition_prompt(
         payload["current_vibe"] = vibe
         if rejected_vibe:
             payload["rejected_vibe"] = rejected_vibe
+    if open_questions is not None:
+        payload["open_questions"] = open_questions
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
