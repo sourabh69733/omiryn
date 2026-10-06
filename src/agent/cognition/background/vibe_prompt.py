@@ -36,16 +36,19 @@ For each line you get the area's meaning, the line, and only the user's messages
 
 
 # Writes the line Omi will use to introduce the user to a match; only non-private lines go in.
-VIBE_INTRO_SYSTEM_PROMPT = """You write how Omiryn's companion would introduce a user to someone they
-might become friends with. Return one JSON object and no surrounding prose:
+VIBE_INTRO_SYSTEM_PROMPT = """You write the short "who you are" line on a user's own profile page, as
+Omiryn's companion sees them. Return one JSON object and no surrounding prose:
 {"intro": "<one sentence>", "chips": ["<1 to 3 words>", ...]}
 
 You get the user's first name and their vibe lines (what they said about themselves in chat).
-- intro: one warm, specific sentence in the third person, under 140 characters, without the name.
+- intro: one warm, specific sentence spoken to the user in the second person ("You ..."), under 140
+  characters, without the name.
   Use only what the lines say. Show what they are like through concrete things, not labels: not
   "funny and kind", but what makes them laugh or what they do. No cliches, no hype words.
-- chips: 3 to 5 short tags a new friend would find useful (interests, humor, how they socialise),
-  each 1 to 3 words, taken from the lines.
+- chips: 3 to 5 short tags about them (interests, humor, how they socialise), each 1 to 3 words,
+  taken from the lines.
+- user_wording, when given, is how the user described themselves earlier. Keep its spirit and never
+  contradict it; build on it with what the lines add.
 - Never add anything the lines do not say, and never mention health, sexual or financial details."""
 
 

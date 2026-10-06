@@ -4,6 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from agent.memory_engine.memories.vibe import (
     PRIVATE_AREA_IDS,
@@ -34,6 +35,8 @@ INTRO_MIN_LINES = 2
 INTRO_MAX_CHARS = 200
 INTRO_MAX_CHIPS = 5
 CHIP_MAX_CHARS = 30
+# Bumped when the intro's voice or rules change, so saved intros are written again.
+INTRO_STYLE = "2"
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -59,50 +62,113 @@ async def delete_vibe_area(area_id: str, user: CurrentUser = Depends(require_use
     return _vibe_payload(update_vibe_card(user.id, {}, reject=(area_id,)), user.id)
 
 
+class IntroEdit(BaseModel):
+    intro: str = Field(min_length=1, max_length=INTRO_MAX_CHARS)
+    chips: list[str] = Field(default_factory=list, max_length=INTRO_MAX_CHIPS)
+
+
 @router.get("/api/me/intro")
 async def get_intro(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
-    """How Omi would introduce the user to a match, written from their non-private vibe lines.
+    """The "who you are" line on the user's profile, written from their non-private vibe lines.
 
-    Rewritten only when those lines change; if writing fails, the last intro is kept.
+    An intro the user wrote themselves is never replaced. Omi's own intro is rewritten only when
+    the lines change; if writing fails, the last one is kept.
     """
     if not user:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     card = get_vibe_card(user.id)
-    public = {
-        area_id: line_text(card["areas"].get(area_id))
-        for area_id, _, _ in VIBE_AREAS
-        if area_id not in PRIVATE_AREA_IDS and line_text(card["areas"].get(area_id))
-    }
-    if len(public) < INTRO_MIN_LINES:
-        return {"intro": None, "chips": [], "ready": False}
-    source = json.dumps(public, ensure_ascii=False, sort_keys=True)
     saved = card.get("intro") or {}
+    if saved.get("edited") and saved.get("text"):
+        return _intro_payload(saved)
+    public = _public_lines(card)
+    if len(public) < INTRO_MIN_LINES:
+        return {"intro": None, "chips": [], "ready": False, "edited": False}
+    source = json.dumps({"style": INTRO_STYLE, "lines": public}, ensure_ascii=False, sort_keys=True)
     if saved.get("source") == source and saved.get("text"):
-        return {"intro": saved["text"], "chips": saved.get("chips") or [], "ready": True}
+        return _intro_payload(saved)
     conversation_ids = sorted(list_conversation_ids(user.id))
+    user_wording = saved.get("user_wording")
     try:
         if not conversation_ids:
             raise ValueError("no chat to record usage against")
         raw = await write_vibe_intro(
-            json.dumps({"first_name": (user.display_name or "").split(" ")[0], "vibe_lines": public}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "first_name": (user.display_name or "").split(" ")[0],
+                    "vibe_lines": public,
+                    **({"user_wording": user_wording} if user_wording else {}),
+                },
+                ensure_ascii=False,
+            ),
             conversation_id=conversation_ids[0],
             timeout_seconds=25,
         )
-        intro = " ".join(str(raw.get("intro") or "").split())[:INTRO_MAX_CHARS]
-        chips = [
-            " ".join(str(chip).split())[:CHIP_MAX_CHARS]
-            for chip in (raw.get("chips") if isinstance(raw.get("chips"), list) else [])
-            if str(chip).strip()
-        ][:INTRO_MAX_CHIPS]
+        intro = _clean(raw.get("intro"), INTRO_MAX_CHARS)
+        chips = _clean_chips(raw.get("chips") if isinstance(raw.get("chips"), list) else [])
         if not intro:
             raise ValueError("empty intro")
     except Exception as error:  # the page still works; it just keeps the last intro
         logger.warning("agent.vibe.intro_failed user_id=%s error=%s", user.id, type(error).__name__)
         if saved.get("text"):
-            return {"intro": saved["text"], "chips": saved.get("chips") or [], "ready": True}
-        return {"intro": None, "chips": [], "ready": False}
-    set_vibe_intro(user.id, {"text": intro, "chips": chips, "source": source})
-    return {"intro": intro, "chips": chips, "ready": True}
+            return _intro_payload(saved)
+        return {"intro": None, "chips": [], "ready": False, "edited": False}
+    written = {"text": intro, "chips": chips, "source": source, **({"user_wording": user_wording} if user_wording else {})}
+    set_vibe_intro(user.id, written)
+    return _intro_payload(written)
+
+
+@router.put("/api/me/intro")
+async def edit_intro(payload: IntroEdit, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """The user's own words for their intro and tags. Kept as written, and shared with the companion."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    intro = _clean(payload.intro, INTRO_MAX_CHARS)
+    if not intro:
+        raise HTTPException(status_code=422, detail="Write a line about yourself.")
+    edited = {"text": intro, "chips": _clean_chips(payload.chips), "edited": True}
+    set_vibe_intro(user.id, edited)
+    return _intro_payload(edited)
+
+
+@router.delete("/api/me/intro")
+async def reset_intro(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """Let Omi write the intro again; the user's last wording guides it."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    saved = get_vibe_card(user.id).get("intro") or {}
+    wording = (
+        {"intro": saved.get("text"), "chips": saved.get("chips") or []}
+        if saved.get("edited")
+        else saved.get("user_wording")
+    )
+    set_vibe_intro(user.id, {"user_wording": wording} if wording else {"reset": True})
+    return await get_intro(user)
+
+
+def _public_lines(card: dict[str, object]) -> dict[str, str]:
+    areas = card["areas"]
+    return {
+        area_id: line_text(areas.get(area_id))
+        for area_id, _, _ in VIBE_AREAS
+        if area_id not in PRIVATE_AREA_IDS and line_text(areas.get(area_id))
+    }
+
+
+def _intro_payload(saved: dict[str, object]) -> dict[str, object]:
+    return {"intro": saved["text"], "chips": saved.get("chips") or [], "ready": True, "edited": bool(saved.get("edited"))}
+
+
+def _clean(value: object, limit: int) -> str:
+    return " ".join(str(value or "").split())[:limit]
+
+
+def _clean_chips(values: list[object]) -> list[str]:
+    chips: list[str] = []
+    for value in values:
+        chip = _clean(value, CHIP_MAX_CHARS)
+        if chip and chip.lower() not in {existing.lower() for existing in chips}:
+            chips.append(chip)
+    return chips[:INTRO_MAX_CHIPS]
 
 
 def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:

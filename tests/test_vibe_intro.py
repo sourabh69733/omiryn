@@ -41,7 +41,7 @@ class VibeIntroApiTest(unittest.TestCase):
 
         body = self._get(writer)
 
-        self.assertEqual(body, {"intro": None, "chips": [], "ready": False})
+        self.assertEqual(body, {"intro": None, "chips": [], "ready": False, "edited": False})
         writer.assert_not_called()
 
     def test_written_from_non_private_lines_only_and_cached(self) -> None:
@@ -54,7 +54,7 @@ class VibeIntroApiTest(unittest.TestCase):
         first = self._get(writer)
         second = self._get(writer)
 
-        self.assertEqual(first, {"intro": "Builds at 2 am and laughs at puns.", "chips": ["Hackathons", "Puns"], "ready": True})
+        self.assertEqual(first, {"intro": "Builds at 2 am and laughs at puns.", "chips": ["Hackathons", "Puns"], "ready": True, "edited": False})
         self.assertEqual(second, first)
         writer.assert_awaited_once()
         sent = json.loads(writer.await_args.args[0])
@@ -79,6 +79,38 @@ class VibeIntroApiTest(unittest.TestCase):
         update_vibe_card(USER_ID, {}, reject=("humor",))
 
         self.assertEqual(get_vibe_card(USER_ID)["intro"]["text"], "Saved intro.")
+
+    def test_user_edit_is_kept_and_never_rewritten(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Laughs at puns."), "interests": line("Builds at hackathons.")})
+        self._get(AsyncMock(return_value={"intro": "Omi's version.", "chips": []}))
+
+        edited = self.client.put("/api/me/intro", json={"intro": "  I build   robots for fun. ", "chips": ["Robots", "robots", " ", "Chai"]})
+        self.assertEqual(edited.json(), {"intro": "I build robots for fun.", "chips": ["Robots", "Chai"], "ready": True, "edited": True})
+
+        update_vibe_card(USER_ID, {"daily_life": line("Codes late at night.")})
+        writer = AsyncMock()
+        self.assertEqual(self._get(writer)["intro"], "I build robots for fun.")
+        writer.assert_not_called()
+
+    def test_let_omi_rewrite_uses_the_users_wording(self) -> None:
+        update_vibe_card(USER_ID, {"humor": line("Laughs at puns."), "interests": line("Builds at hackathons.")})
+        self.client.put("/api/me/intro", json={"intro": "I build robots for fun.", "chips": ["Robots"]})
+        writer = AsyncMock(return_value={"intro": "You build robots and laugh at puns.", "chips": ["Robots", "Puns"]})
+
+        with patch("api.routes.vibe.write_vibe_intro", writer):
+            body = self.client.delete("/api/me/intro").json()
+
+        self.assertEqual(body["intro"], "You build robots and laugh at puns.")
+        self.assertFalse(body["edited"])
+        sent = json.loads(writer.await_args.args[0])
+        self.assertEqual(sent["user_wording"], {"intro": "I build robots for fun.", "chips": ["Robots"]})
+
+    def test_companion_sees_the_users_own_words(self) -> None:
+        from agent.context_engine.assembly.sources import _self_description
+
+        self.assertEqual(_self_description(USER_ID), "")
+        self.client.put("/api/me/intro", json={"intro": "I build robots for fun.", "chips": ["Robots", "Chai"]})
+        self.assertEqual(_self_description(USER_ID), "I build robots for fun. (tags: Robots, Chai)")
 
 
 if __name__ == "__main__":
