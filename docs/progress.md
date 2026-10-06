@@ -125,14 +125,22 @@ Done in this round: "Not right" now stays gone (the rejection is stored; that ar
 
 ## 6. Next
 
+After each deploy: check `GET /health` shows v3, then run `scripts/backfill_vibe_cards.py --recheck --apply` and `scripts/reprocess_memories.py --apply`.
+
 | # | Item | Why |
 |---|---|---|
-| 0 | Check the Cloud Run setting | Code and scripts now default to v3; confirm the live service with `GET /health`. |
-| 1 | Backfill `--reset` | `--force` merges into old cards, so padded lines from before the proof check stay. |
-| 2 | Friends-first memories | Memory rules and evals still treat partner preferences as matching data. |
-| 3 | Empty user card and self-notes | Check `GET /health` first (v2 writes neither); then the debug record, with the owner's OK. |
-| 4 | Embedding per vibe line | Lets matching shortlist people quickly. |
-| 5 | Run the companion vibe evals and the full memory evals | Confirms the recent changes with the real model. |
+| 1 | Reply quality | Replies still sound robotic. Give Omi a character goal, drop the keyword plan, then run the companion evals on Mistral. |
+| 2 | Memory recall eval | No accuracy number today. Ask real questions across chats and days: who is my wife, when is our anniversary, what do I do today, a changed fact, how to talk to me. |
+| 3 | Attention | Memory only comes up when the message matches it. Search with recent context, add a short "might fit" list (upcoming events, own topics, unused important memories), track what was used. |
+| 4 | Date-aware recall | "Today / this week" should fetch memories by date; support repeating events (birthdays, anniversaries, weekly gym). Code computes the dates. |
+| 5 | Recent chats note | Chat B doesn't know what was discussed in chat A, only the saved facts. Share one line per recent session across chats. |
+| 6 | Memory graph | Dots (people, things, events, feelings) and links with proof and time, in Postgres. Recall walks the links (like human association). Ideas from Zep/Graphiti and A-MEM. |
+| 7 | Daily reflection | Once a day per user (runs on next visit): "how you are" traits with proof, "What Omi noticed" insights, open questions for curiosity. Ideas from Generative Agents and Letta sleep-time. |
+| 8 | Deep matching | Match on patterns and chemistry between two people, not just shared interests. Our edge over interview-based apps (RealRoots, Known): weeks of real chat. |
+| 9 | Friends-first memories | Memory rules and evals still treat partner preferences as matching data. |
+| 10 | Embedding per vibe line | Lets matching shortlist people quickly. |
+
+Open decision: memory evals grade purposes exactly, or only required-present / forbidden-absent.
 
 ## 7. Parked
 
