@@ -12,6 +12,8 @@ const memoryReviewReasons = [
   { value: "not_about_me", label: "Not about me" }
 ];
 
+type OpenQuestion = { id: string; text: string; about_memory_ids?: string[]; created_at?: string };
+
 export function MemoriesPage() {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [canonicalMemories, setCanonicalMemories] = useState<CanonicalMemory[]>([]);
@@ -34,6 +36,7 @@ export function MemoriesPage() {
   const [privacyForMatching, setPrivacyForMatching] = useState(false);
   const [visibleSectionCounts, setVisibleSectionCounts] = useState<Record<string, number>>({});
   const [evidenceItem, setEvidenceItem] = useState<ProfileFact | CanonicalMemory | null>(null);
+  const [openQuestions, setOpenQuestions] = useState<OpenQuestion[]>([]);
 
   async function load() {
     const [profileResponse, memoryResponse] = await Promise.all([
@@ -46,6 +49,15 @@ export function MemoriesPage() {
     setData(await profileResponse.json());
     setCanonicalMemories(memoryData.memories || []);
     setLoaded(true);
+    // Optional: the page works without it.
+    apiFetch("/api/me/open-questions")
+      .then((response) => (response.ok ? response.json() : { questions: [] }))
+      .then((body: { questions?: OpenQuestion[] }) => setOpenQuestions(body.questions || []))
+      .catch(() => setOpenQuestions([]));
+  }
+  async function dismissQuestion(id: string) {
+    const response = await apiFetch(`/api/me/open-questions/${id}/dismiss`, { method: "POST" });
+    if (response.ok) setOpenQuestions((current) => current.filter((question) => question.id !== id));
   }
   function firstLoad() { setLoadError(""); load().catch((caught) => setLoadError(caught.message)); }
   useEffect(firstLoad, []);
@@ -299,6 +311,22 @@ export function MemoriesPage() {
             <span className="profile-fact-total">{canonicalMemories.length} memories</span>
           </div>
           <div className="profile-fact-groups">
+            {openQuestions.length ? (
+              <section className="profile-fact-group signal-section signal-section-unsure">
+                <div className="profile-fact-group-heading"><div><h3>Omi isn't sure about</h3><p>Omi kept what it knew and will ask when it fits. Answer it in chat any time, or dismiss it.</p></div><span>{openQuestions.length}</span></div>
+                <div className="profile-fact-list">
+                  {openQuestions.map((question) => (
+                    <article className="profile-fact-card signal-review-card" key={question.id}>
+                      <p className="profile-fact-values">{question.text}</p>
+                      <div className="signal-card-actions">
+                        <a className="secondary-button" href="/">Answer in chat</a>
+                        <button className="secondary-button" type="button" onClick={() => void dismissQuestion(question.id)}>Not relevant</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
             {canonicalMemoryGroups.old.length ? (
               <div className="signal-archive-toggle-row">

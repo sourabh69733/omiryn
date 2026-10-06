@@ -9,6 +9,8 @@ from storage import (
     delete_agent_memory,
     latest_agent_memory_reviews,
     list_agent_memories,
+    list_open_questions,
+    resolve_open_questions,
     review_agent_memory,
     update_agent_memory_allowed_uses,
 )
@@ -117,6 +119,28 @@ async def review_me_memory(
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found.")
     return _user_memory_payload(memory)
+
+
+@router.get("/api/me/open-questions")
+async def get_me_open_questions(
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """What Omi is unsure about; the user answers in chat or dismisses it here."""
+    questions = [
+        {key: question[key] for key in ("id", "text", "about_memory_ids", "created_at")}
+        for question in list_open_questions(user.id)
+    ]
+    return {"questions": questions}
+
+
+@router.post("/api/me/open-questions/{question_id}/dismiss")
+async def dismiss_me_open_question(
+    question_id: str,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, str]:
+    if not resolve_open_questions(user.id, [(question_id, "dropped")]):
+        raise HTTPException(status_code=404, detail="Question not found.")
+    return {"question_id": question_id, "status": "dropped"}
 
 
 @router.delete("/api/me/memories/{memory_id}")
