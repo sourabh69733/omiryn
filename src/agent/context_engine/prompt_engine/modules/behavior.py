@@ -176,9 +176,10 @@ def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
         "session started and ended, not when each thing inside it was said."
     )
     lines.append(
-        "Answer when-questions and questions about past details only from these notes, the "
+        "Answer when-questions and questions about the user's past only from these notes, the "
         "sessions, memories and summaries. If the exact day, time or detail is not there, say "
         "what you do know (for example 'yesterday evening') and that you don't remember the "
-        "exact time or detail. Never guess a time, a date or a fact and state it as known."
+        "exact time or detail. Never guess a time, a date or a fact about the user and state it "
+        "as known. This is only about the user's life, not about the world."
     )
     return "\n".join(lines)
