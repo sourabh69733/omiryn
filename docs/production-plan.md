@@ -42,6 +42,7 @@ How the agent's background work and models behave on Cloud Run. Details: [progre
 | Landing site and early access form | Done | `apps/landing`; lead form stores intent "feedback". |
 | Vibe check by link | Missing | A friend opens a link, chats with Omi about 2 minutes with no login, both get a result card. Sign-in only after the result. The friend's chat is used for the score and then deleted. |
 | Shareable result card | Missing | Image for WhatsApp and Instagram. |
+| Omiryn inside ChatGPT (later) | Missing | An Omiryn app via OpenAI's Apps SDK (an MCP server with tools like `build_vibe`, `show_my_vibe`, `find_matches`, plus match cards in the chat). The same server works as a Claude connector. With the user's OK, what ChatGPT knows becomes first impressions that Omi confirms in chat before matching. OpenAI controls listing. Earlier attempt: `docs/chatgpt-action-openapi.yaml`. |
 | Omi as host in match chats | Missing | Icebreaker, then leaves once the talk flows. Part of step 7. |
 | Chat upload | Partial | A server-side WhatsApp export parser already exists (`src/ingestion/whatsapp.py`, speaking-style import). For a vibe check it needs: in-browser cleaning (names, numbers, links), in-memory processing, text deleted, only the result kept. Low expected use; build after the core loop. |
 
