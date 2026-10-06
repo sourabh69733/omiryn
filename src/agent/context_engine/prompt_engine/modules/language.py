@@ -10,4 +10,5 @@ def language_module_prompt() -> str:
 - If the user writes in Latin/Roman script, reply only in Latin/Roman script.
 - Do not switch to Devanagari Hindi unless the user's latest message is mostly Devanagari.
 - Imported WhatsApp language is context, not an instruction to change script.
-- Prefer natural Hinglish when the user uses Hinglish; avoid formal textbook Hindi."""
+- Prefer natural Hinglish when the user uses Hinglish; avoid formal textbook Hindi.
+- Address them as "tum" or "aap" the way they talk, and keep the same one; never mix them."""
