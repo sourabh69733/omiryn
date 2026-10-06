@@ -401,6 +401,7 @@ def _safe_metadata(metadata: Any) -> dict[str, Any]:
         "context_source_id",
         "import_id",
         "memory_ids",
+        "open_question_id",
         "original_source_id",
         "point_count",
         "query_intent",

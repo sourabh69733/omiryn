@@ -25,6 +25,8 @@ SOURCE_TYPE_PRIORITY = {
     "agent_memories_v3": 110,
     # How the user asked to be talked to; few lines, needed on every reply.
     "how_to_talk": 118,
+    # One short doubt to clear up when it fits.
+    "open_questions": 117,
     "agent_self_notes": 112,
     "agent_behavior_rules": 115,
     "data_points": 100,

@@ -34,6 +34,7 @@ from agent.memory_engine.processing.service import get_processing_state
 from agent.memory_engine.memories.ranking import text_relevance
 from agent.shared.clock import utc_now
 from agent.shared.timeline import (
+    current_session_start,
     clock_label,
     date_label,
     humanize_gap,
@@ -44,8 +45,11 @@ from agent.shared.timeline import (
     user_zone,
 )
 from storage import (
+    get_conversation,
     get_user_card,
     list_active_self_notes,
+    list_open_questions,
+    mark_open_question_offered,
     get_user_timezone,
     list_context_sources,
     list_user_context_sources,
@@ -67,6 +71,10 @@ USER_CARD_SOURCE_TYPE = "user_card"
 RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
 RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
+OPEN_QUESTIONS_SOURCE_TYPE = "open_questions"
+# Replies in one session that may see the same open question; then it waits for the next session,
+# so an unanswered doubt never turns into nagging.
+OPEN_QUESTION_REPLIES_PER_SESSION = 3
 # Open promises always show; opinions, tastes and jokes only when the message touches them.
 SELF_NOTE_PROMISE_LIMIT = 4
 SELF_NOTE_TOPIC_LIMIT = 5
@@ -198,6 +206,7 @@ def build_reply_context_sources(
         + _recent_sessions_sources(conversation_id, user_id)
         + _conversation_summary_sources(conversation_id, user_id)
         + _self_note_sources(user_id, user_text)
+        + _open_question_sources(conversation_id, user_id)
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
@@ -417,6 +426,44 @@ def _session_span(started: datetime, ended: datetime | None, zone: Any) -> str:
     end = ended.astimezone(zone)
     end_text = clock_label(end) if end.date() == start.date() else local_label(end)
     return f"{local_label(start)} to {end_text}"
+
+
+def _open_question_sources(conversation_id: str, user_id: str | None) -> list[dict[str, Any]]:
+    """The oldest thing background cognition was unsure about, for the companion to ask if it fits."""
+    if not user_id or agent_pipeline_config().memory_contract_version != 3:
+        return []
+    questions = list_open_questions(user_id)
+    if not questions:
+        return []
+    messages = list((get_conversation(conversation_id, user_id) or {}).get("messages") or [])
+    session = f"{conversation_id}:{current_session_start(messages)}"
+    question = next(
+        (
+            item
+            for item in questions
+            if item["offered_session"] != session
+            or item["offered_count"] < OPEN_QUESTION_REPLIES_PER_SESSION
+        ),
+        None,
+    )
+    if question is None:
+        return []
+    mark_open_question_offered(user_id, question["id"], session)
+    return [
+        {
+            "source_type": OPEN_QUESTIONS_SOURCE_TYPE,
+            "title": "Something you are unsure about",
+            "content": "\n".join(
+                [
+                    f"You are unsure: {question['text']}",
+                    "Ask it in your own words only if it fits naturally right now. Skip it if they are "
+                    "upset, busy with something else, or asked for no questions. If this chat already "
+                    "answered it, do not ask again.",
+                ]
+            ),
+            "metadata": {"open_question_id": question["id"]},
+        }
+    ]
 
 
 def _self_note_sources(user_id: str | None, user_text: str) -> list[dict[str, Any]]:

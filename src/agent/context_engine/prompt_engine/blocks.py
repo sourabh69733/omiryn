@@ -33,6 +33,7 @@ _SOURCE_BLOCKS = {
     "user_card": "about_user",
     "agent_memories_v3": "memories",
     "how_to_talk": "how_to_talk",
+    "open_questions": "open_questions",
     "data_points": "memories",
     "agent_self_notes": "your_notes",
     "conversation_summary": "this_chat",
@@ -49,6 +50,7 @@ BLOCK_CHAR_LIMITS = {
     "your_notes": 1400,
     "this_chat": 3600,
     "attached": 4000,
+    "open_questions": 700,
     "how_to_talk": 1200,
     "this_turn": 2000,
     "goal": 1200,
@@ -152,6 +154,7 @@ def build_companion_system_prompt_v4(
             if attached
             else []
         )),
+        ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
         ("this_turn", [time_facts, _turn_lines(facts)]),
         ("goal", [V4_GOAL]),
