@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import replace
+from datetime import datetime
 from uuid import NAMESPACE_URL, uuid5
 from typing import Any
 
 from agent.config import agent_pipeline_config
+from agent.shared.timeline import date_label, user_zone
 from agent.observability.usage import BACKGROUND_COGNITION, MEMORY_SHADOW_EXTRACT
 from agent.context_engine.conversation_engine.state import (
     apply_validated_thread_proposal,
@@ -653,6 +655,33 @@ def _apply_self_notes(batch: MemoryBatch, changes: SelfNoteChanges) -> None:
     resolve_self_notes(batch.user_id, [(item.note_id, item.status) for item in changes.resolves])
 
 
+# Latest user words shown per existing memory, so the model can tell "lives in" from "visiting".
+_HISTORY_QUOTES = 2
+_HISTORY_QUOTE_CHARS = 120
+
+
+def memory_history(memory: dict[str, Any], zone: Any) -> dict[str, Any]:
+    """How often and when the user said what backs this memory, and their latest words."""
+    said = sorted(
+        (item for item in memory.get("evidence") or [] if item.get("observed_at")),
+        key=lambda item: str(item["observed_at"]),
+    )
+    days = [
+        datetime.fromisoformat(str(item["observed_at"]).replace("Z", "+00:00")).astimezone(zone)
+        for item in said
+    ]
+    return {
+        "said_times": len(said),
+        "said_on_days": len({day.date() for day in days}),
+        "first_said": date_label(days[0]) if days else None,
+        "last_said": date_label(days[-1]) if days else None,
+        "latest_words": [
+            str(item.get("exact_quote") or "")[:_HISTORY_QUOTE_CHARS]
+            for item in said[-_HISTORY_QUOTES:]
+        ],
+    }
+
+
 def _existing_memory_context(
     user_id: str,
     memory_version: int,
@@ -680,6 +709,7 @@ def _existing_memory_context(
                 for embedding in stored_embeddings
             },
         )
+        zone = user_zone(get_user_timezone(user_id))
         return [
             {
                 "id": memory["id"],
@@ -694,6 +724,8 @@ def _existing_memory_context(
                 "targetable": memory["status"] == MemoryStatus.ACTIVE.value,
                 "supersedes_memory_id": memory.get("supersedes_memory_id"),
                 "updated_at": memory["updated_at"],
+                "statement": memory.get("statement"),
+                "history": memory_history(memory, zone),
             }
             for memory in memories
         ]

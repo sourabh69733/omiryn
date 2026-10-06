@@ -61,7 +61,13 @@ V3 memory rules:
   behavior into a current personality trait, or a desired partner quality into the user's own trait.
 - Return no memory for uncertainty, incidental mentions, generic knowledge, or unsupported inference.
 - When an active memory already expresses the same meaning, reinforce it; never add a duplicate.
-- When new evidence corrects an active memory, supersede it with a complete corrected replacement.
+- Each existing memory carries its history: how many times and on how many days the user said it,
+  when, and their latest words. Weigh a new message against that history before changing a memory.
+- Supersede only when the new evidence clearly replaces the old meaning: the user says it changed or
+  corrects it. A short-term state (somewhere or something only for a while) does not replace a
+  settled fact: add it as its own memory with occurred_at and valid_until, and keep the old one active.
+- When it is unclear whether the old meaning still holds, keep the established memory and add only
+  what the new message clearly says.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.
 - existing_memories with targetable=false are rejected or superseded history. Never target their IDs.
   Do not recreate their meaning from an incidental repeat. Add a fresh memory only when new eligible user
