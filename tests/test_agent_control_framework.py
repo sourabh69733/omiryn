@@ -181,7 +181,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
     def test_prompt_versions_are_independently_selectable(self) -> None:
         versions = {version.version_id: version for version in available_prompt_versions()}
 
-        self.assertEqual(set(versions), {"v3", "v3-1"})
+        self.assertEqual(set(versions), {"v3", "v3-1", "v4"})
         # v1 and v2 are archived; asking for them gets the default.
         self.assertEqual(get_prompt_behavior_version("v1").version_id, "v3-1")
         self.assertEqual(get_prompt_behavior_version("v2").version_id, "v3-1")
