@@ -1,15 +1,17 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Camera, ChevronRight, MapPin, Plus, X } from "lucide-react";
+import { Camera, ChevronRight, MapPin, Pencil, Plus, X } from "lucide-react";
 import { apiErrorMessage, apiFetch, signOut } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { Notice, StateView } from "../StateView";
 import type { DataRequest, Profile, ProfileResponse } from "../types";
 import { blobPath } from "../vibeRing";
 
-type Intro = { intro: string | null; chips: string[]; ready: boolean };
+type Intro = { intro: string | null; chips: string[]; ready: boolean; edited?: boolean };
+const INTRO_MAX = 200;
+const MAX_CHIPS = 5;
 
 // Your profile: photos, basics and what Omi has picked up about you, with account actions below.
-export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
+export function ProfilePage({ onVibe, fallbackAvatar, onProfileChange }: { onVibe?: () => void; fallbackAvatar?: string | null; onProfileChange?: (profile: Profile | null) => void }) {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<Profile>({});
   const [status, setStatus] = useState("");
@@ -25,7 +27,10 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
   const [editing, setEditing] = useState(false);
   // undefined while loading; the page never waits on it.
   const [intro, setIntro] = useState<Intro | undefined>(undefined);
-  async function load() { const response = await apiFetch("/api/me/profile"); if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load profile.")); const next = await response.json() as ProfileResponse; setData(next); setForm(next.profile || {}); setStatus(""); const requestResponse = await apiFetch("/api/me/data-requests"); if (requestResponse.ok) setDataRequests(((await requestResponse.json()).requests || []) as DataRequest[]); }
+  // Editing the intro: the user's own words, which Omi keeps and learns from.
+  const [introDraft, setIntroDraft] = useState<{ text: string; chips: string[]; chipInput: string } | null>(null);
+  const [introStatus, setIntroStatus] = useState("");
+  async function load() { const response = await apiFetch("/api/me/profile"); if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load profile.")); const next = await response.json() as ProfileResponse; setData(next); setForm(next.profile || {}); onProfileChange?.(next.profile || null); setStatus(""); const requestResponse = await apiFetch("/api/me/data-requests"); if (requestResponse.ok) setDataRequests(((await requestResponse.json()).requests || []) as DataRequest[]); }
   function firstLoad() { setLoadError(""); load().catch((caught) => setLoadError(caught.message)); }
   useEffect(firstLoad, []);
   useEffect(() => {
@@ -97,13 +102,38 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
       setUploadingPhotoSlot(null);
     }
   }
+  async function saveIntro() {
+    if (!introDraft) return;
+    const text = introDraft.text.trim();
+    if (!text) { setIntroStatus("Write a line about yourself."); return; }
+    const chips = introDraft.chipInput.trim() ? [...introDraft.chips, introDraft.chipInput.trim()] : introDraft.chips;
+    const response = await apiFetch("/api/me/intro", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intro: text, chips: chips.slice(0, MAX_CHIPS) }) });
+    if (!response.ok) { setIntroStatus(await apiErrorMessage(response, "Could not save your intro.")); return; }
+    setIntro((await response.json()) as Intro);
+    setIntroDraft(null);
+    setIntroStatus("");
+  }
+  async function letOmiRewrite() {
+    setIntro(undefined);
+    const response = await apiFetch("/api/me/intro", { method: "DELETE" });
+    setIntro(response.ok ? ((await response.json()) as Intro) : { intro: null, chips: [], ready: false });
+  }
+  function addChip() {
+    setIntroDraft((draft) => {
+      const chip = draft?.chipInput.trim();
+      if (!draft || !chip || draft.chips.length >= MAX_CHIPS || draft.chips.some((item) => item.toLowerCase() === chip.toLowerCase())) return draft ? { ...draft, chipInput: "" } : draft;
+      return { ...draft, chips: [...draft.chips, chip], chipInput: "" };
+    });
+  }
   const photos = form.profile_photo_urls?.length ? form.profile_photo_urls : form.profile_photo_url ? [form.profile_photo_url] : [];
   const maxPhotoCount = Math.max(1, Math.min(4, data?.profile_photo_max_count || 4));
   const photoSlots = Array.from({ length: maxPhotoCount }, (_, index) => index);
   const isPhotoStatusError = /could not|limit|quota|up to|try again/i.test(photoStatus);
   if (!data) return <section className="screen profile-screen">{loadError ? <StateView kind="error" title="Couldn't load your profile" detail={loadError} onRetry={firstLoad} /> : <StateView kind="loading" title="Loading your profile…" />}</section>;
   const seed = data.user?.email || form.display_name || "omiryn";
-  const firstName = (form.display_name || "").split(" ")[0] || "You";
+  const fullName = form.display_name?.trim() || "You";
+  const portrait = photos[0] || fallbackAvatar || null;
+  const startIntroEdit = () => { setIntroStatus(""); setIntroDraft({ text: intro?.intro || "", chips: intro?.chips || [], chipInput: "" }); };
   const genderLabel = { woman: "Woman", man: "Man", non_binary: "Non-binary" }[form.gender || ""] || "Prefer not to say";
   const pickPhoto = (slot: number) => { setPhotoSlot(slot); setPhotoStatus(""); photoInput.current?.click(); };
   return (
@@ -115,22 +145,47 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
             <path d={blobPath(`${seed}:outer`, 80, 74, 0.1)} className="pf-ring-outer" />
             <path d={blobPath(`${seed}:inner`, 80, 66, 0.12, 6)} className="pf-ring-inner" />
           </svg>
-          {photos[0] ? <img src={photos[0]} alt="" /> : <span className="pf-initial">{firstName.slice(0, 1)}</span>}
+          {portrait ? <img src={portrait} alt="" referrerPolicy="no-referrer" /> : <span className="pf-initial">{fullName.slice(0, 1)}</span>}
           {uploadingPhotoSlot === 0 ? <span className="pf-busy"><span className="state-view-spinner" /></span> : <span className="pf-portrait-edit"><Camera aria-hidden="true" /></span>}
         </button>
-        <h1>{firstName}{form.age ? `, ${form.age}` : ""}</h1>
+        <h1>{fullName}{form.age ? `, ${form.age}` : ""}</h1>
         {form.city ? <p className="pf-place"><MapPin aria-hidden="true" />{form.city}</p> : null}
-        {intro === undefined ? (
-          <p className="pf-intro is-loading" aria-live="polite">Omi is writing your intro…</p>
+        {introDraft ? (
+          <div className="pf-intro-edit">
+            <label className="sr-only" htmlFor="pf-intro-text">About you</label>
+            <textarea id="pf-intro-text" value={introDraft.text} maxLength={INTRO_MAX} rows={3} placeholder="You build things at 2 am and laugh at terrible puns." onChange={(event) => setIntroDraft({ ...introDraft, text: event.target.value })} />
+            <div className="pf-chip-edit">
+              {introDraft.chips.map((chip) => (
+                <span className="pf-chip" key={chip}>{chip}<button type="button" aria-label={`Remove ${chip}`} onClick={() => setIntroDraft({ ...introDraft, chips: introDraft.chips.filter((item) => item !== chip) })}><X aria-hidden="true" /></button></span>
+              ))}
+              {introDraft.chips.length < MAX_CHIPS ? (
+                <input value={introDraft.chipInput} maxLength={30} placeholder="Add a tag" aria-label="Add a tag" onChange={(event) => setIntroDraft({ ...introDraft, chipInput: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addChip(); } }} onBlur={addChip} />
+              ) : null}
+            </div>
+            {introStatus ? <Notice tone="error">{introStatus}</Notice> : null}
+            <div className="pf-intro-edit-actions">
+              <button type="button" className="secondary-button" onClick={() => setIntroDraft(null)}>Cancel</button>
+              <button type="button" onClick={() => void saveIntro()}>Save</button>
+            </div>
+          </div>
+        ) : intro === undefined ? (
+          <p className="pf-intro is-loading" aria-live="polite">Omi is writing about you…</p>
         ) : intro.ready ? (
           <>
             <blockquote className="pf-intro">“{intro.intro}”</blockquote>
-            <p className="pf-intro-note">Written by Omi from your chats</p>
+            <p className="pf-intro-note">
+              {intro.edited ? "In your words" : "Written by Omi from your chats"}
+              <button type="button" className="pf-link" onClick={startIntroEdit}><Pencil aria-hidden="true" />Edit</button>
+              {intro.edited ? <button type="button" className="pf-link" onClick={() => void letOmiRewrite()}>Let Omi rewrite</button> : null}
+            </p>
+            {intro.chips.length ? <ul className="pf-chips">{intro.chips.map((chip) => <li key={chip}>{chip}</li>)}</ul> : null}
           </>
         ) : (
-          <p className="pf-intro is-empty">Omi is still getting to know you. Keep chatting, and your intro writes itself.</p>
+          <>
+            <p className="pf-intro is-empty">Omi is still getting to know you. Keep chatting, and this fills in.</p>
+            <button type="button" className="pf-link" onClick={startIntroEdit}><Pencil aria-hidden="true" />Write it yourself</button>
+          </>
         )}
-        {intro?.chips.length ? <ul className="pf-chips">{intro.chips.map((chip) => <li key={chip}>{chip}</li>)}</ul> : null}
         <div className="pf-photos">
           {photoSlots.map((slot) => (
             <div className={`pf-photo ${photos[slot] ? "has-photo" : ""}`} key={slot}>
@@ -144,7 +199,7 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
         </div>
         {photoStatus ? <Notice tone={isPhotoStatusError ? "error" : "success"}>{photoStatus}</Notice> : null}
         <div className="pf-card-actions">
-          {onVibe && intro?.ready ? <button type="button" className="secondary-button" onClick={onVibe}>Not quite me</button> : null}
+          {onVibe && intro?.ready && !intro.edited ? <button type="button" className="secondary-button" onClick={onVibe}>Not quite me</button> : null}
           <button type="button" className="secondary-button" onClick={() => { setEditing(!editing); setStatus(""); }}>{editing ? "Close" : "Edit details"}</button>
         </div>
       </article>

@@ -45,7 +45,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     setAccountOpen(false);
   }
 
-  const displayName = user?.display_name || user?.email || "Account";
+  // The profile is the source of truth; Google's name and photo are only the fallback.
+  const displayName = profile?.display_name || user?.display_name || user?.email || "Account";
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
   const profileAvatar = profile?.profile_photo_urls?.find(Boolean) || profile?.profile_photo_url || user?.avatar_url || null;
 
@@ -91,7 +92,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         {page === "vibe" ? <VibePage onChat={() => navigate("chat")} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
-        {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} /> : null}
+        {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
       </main>
     </div>

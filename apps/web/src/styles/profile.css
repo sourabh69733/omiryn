@@ -425,3 +425,123 @@ button.pf-row.is-danger:hover {
   background: #faf8ff;
   color: var(--brand-violet);
 }
+
+/* "Edit" and "Let Omi rewrite" are quiet text links under the intro. */
+button.pf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-violet);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+button.pf-link:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+button.pf-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+.pf-intro.is-empty + button.pf-link {
+  margin-left: 0;
+}
+
+.pf-intro-edit {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.pf-intro-edit textarea {
+  width: 100%;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.35;
+}
+
+.pf-chip-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.pf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #5b21b6;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pf-chip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  min-height: 0;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.pf-chip button:hover {
+  background: rgba(91, 33, 182, 0.12);
+}
+
+.pf-chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.pf-chip-edit input {
+  flex: 1;
+  min-width: 110px;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.pf-intro-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pf-intro-edit-actions button {
+  min-height: 38px;
+  border-radius: 999px;
+}
