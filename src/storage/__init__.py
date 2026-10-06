@@ -12,6 +12,7 @@ from .user_settings import *
 from .user_cards import *
 from .vibe_cards import *
 from .self_notes import *
+from .open_questions import *
 from .agent_jobs import *
 from .context_sources import *
 from .public import *

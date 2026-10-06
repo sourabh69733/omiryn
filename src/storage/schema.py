@@ -669,6 +669,26 @@ agent_self_notes = Table(
 )
 Index("ix_agent_self_notes_user_status", agent_self_notes.c.user_id, agent_self_notes.c.status)
 
+# Things background cognition was unsure about (did a memory change?), for the companion to ask
+# when it fits. offered_session/offered_count cap how often one session's replies see it.
+agent_open_questions = Table(
+    "agent_open_questions",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("message_index", Integer, nullable=False),
+    Column("text", String, nullable=False),
+    Column("about_memory_ids", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("offered_session", String, nullable=True),
+    Column("offered_count", Integer, nullable=False, default=0),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+Index("ix_agent_open_questions_user_status", agent_open_questions.c.user_id, agent_open_questions.c.status)
+
 profile_facts = Table(
     "profile_facts",
     metadata,
