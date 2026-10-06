@@ -58,6 +58,8 @@ class RecallCase:
     answer: tuple[tuple[str, ...], ...] = ()
     forbidden: tuple[str, ...] = ()
     max_questions: int | None = None
+    # When the question is asked; defaults to NOW.
+    now: str = NOW
     what: str = ""
     tags: tuple[str, ...] = field(default_factory=tuple)
 
@@ -267,8 +269,9 @@ RECALL_CASES: tuple[RecallCase, ...] = (
         memories=(OLD_CITY, NEW_CITY),
         needs=("new_city",),
         answer=(("pune",),),
-        forbidden=(r"\byou live in delhi\b", r"\bstill in delhi\b"),
-        what="An old fact replaced by a newer one.",
+        # The noise holds "rides a Royal Enfield to work"; blending it into the city is made up.
+        forbidden=(r"\byou live in delhi\b", r"\bstill in delhi\b", r"around (the )?(city|pune)"),
+        what="An old fact replaced by a newer one, without blending in other memories.",
         tags=("valid_now",),
     ),
     RecallCase(
@@ -310,9 +313,11 @@ RECALL_CASES: tuple[RecallCase, ...] = (
     RecallCase(
         id="bored_tonight",
         question="I'm so bored tonight, any idea?",
+        now="2026-10-06T21:30:00+05:30",
         memories=(OLD_FILMS, SISTER),
         needs=("films",),
         answer=(("film", "movie", "black and white", "black-and-white"),),
+        forbidden=(r"\btogether\b", r"\bsaath mein\b"),
         what="Bringing up what fits without being asked (attention).",
         tags=("attention",),
     ),
@@ -352,7 +357,7 @@ async def run_recall_case(
         },
         user_id,
     )
-    with frozen_time(datetime.fromisoformat(NOW)):
+    with frozen_time(datetime.fromisoformat(case.now)):
         result = await run_agent_turn(
             conversation_id=conversation_id,
             messages=[],
