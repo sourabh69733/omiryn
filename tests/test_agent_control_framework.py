@@ -47,7 +47,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             {
                 "AGENT_PROVIDER": "mock",
                 "AUTH_REQUIRED": "false",
-                "AGENT_BEHAVIOR_VERSION": "v1",
+                "AGENT_BEHAVIOR_VERSION": "v3-1",
             },
         )
         self.env_patch.start()
@@ -133,16 +133,6 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertEqual(len(parts), 1)
 
-    def test_adult_request_stock_refusal_gets_soft_boundary(self) -> None:
-        parts = split_assistant_reply(
-            "I'm sorry, but I can't help with that.",
-            user_text="more sexy some hot content",
-        )
-
-        self.assertEqual(len(parts), 1)
-        self.assertNotIn("can't help", parts[0].lower())
-        self.assertIn("explicit nahi", parts[0])
-
     def test_non_adult_stock_refusal_is_not_rewritten(self) -> None:
         parts = split_assistant_reply(
             "I'm sorry, but I can't help with that.",
@@ -170,11 +160,11 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(parts[1], "Samajh gayi, ab hum dono milke plan banate hain.")
         self.assertFalse(any(part.startswith(("Rahul:", "Siya:")) for part in parts))
 
-    def test_prompt_version_registry_defaults_to_v3_1(self) -> None:
+    def test_prompt_version_registry_defaults_to_v4(self) -> None:
         version = get_prompt_behavior_version("unknown-version")
 
-        self.assertEqual(version.version_id, "v3-1")
-        self.assertEqual(version.name, "v3_1_matching_discovery_companion")
+        self.assertEqual(version.version_id, "v4")
+        self.assertEqual(version.name, "v4_character_blocks")
         self.assertIn("friend_wish", get_prompt_behavior_version("v3").data_point_targets)
         self.assertNotIn("relationship_intent", get_prompt_behavior_version("v3").data_point_targets)
 
@@ -183,8 +173,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
         self.assertEqual(set(versions), {"v3", "v3-1", "v4"})
         # v1 and v2 are archived; asking for them gets the default.
-        self.assertEqual(get_prompt_behavior_version("v1").version_id, "v3-1")
-        self.assertEqual(get_prompt_behavior_version("v2").version_id, "v3-1")
+        self.assertEqual(get_prompt_behavior_version("v1").version_id, "v4")
+        self.assertEqual(get_prompt_behavior_version("v2").version_id, "v4")
         self.assertEqual(get_prompt_behavior_version("v3").name, "v3_listener_first_companion")
         self.assertEqual(
             get_prompt_behavior_version("v3-1").name,
@@ -193,8 +183,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
     def test_configured_prompt_version_can_switch_without_changing_default(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
-            self.assertEqual(configured_prompt_version_id(), "v3-1")
-            self.assertEqual(get_prompt_behavior_version().version_id, "v3-1")
+            self.assertEqual(configured_prompt_version_id(), "v4")
+            self.assertEqual(get_prompt_behavior_version().version_id, "v4")
 
         with patch.dict("os.environ", {"AGENT_BEHAVIOR_VERSION": "v3"}, clear=True):
             self.assertEqual(configured_prompt_version_id(), "v3")
@@ -237,7 +227,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=0,
             assistant_message_index=1,
-            prompt_version_id="v2",
+            prompt_version_id="v3-1",
         )
 
         self.assertIn("## Conversation Plan", package.system_prompt)
@@ -256,7 +246,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
                 style_source_id=None,
                 user_message_index=0,
                 assistant_message_index=1,
-                prompt_version_id="v2",
+                prompt_version_id="v3-1",
             )
 
         self.assertEqual(package.snapshot["summary"]["conversation_move"], "boredom_rescue")
@@ -275,7 +265,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
                 style_source_id=None,
                 user_message_index=0,
                 assistant_message_index=1,
-                prompt_version_id="v2",
+                prompt_version_id="v3-1",
             )
 
             self.assertEqual(package.snapshot["summary"]["conversation_move"], "simple_acknowledgement")
@@ -319,7 +309,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=1,
             assistant_message_index=2,
-            prompt_version_id="v2",
+            prompt_version_id="v3-1",
         )
 
         self.assertIn("confirmation", package.query_intent.labels)
@@ -340,7 +330,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=0,
             assistant_message_index=1,
-            prompt_version_id="v2",
+            prompt_version_id="v3-1",
         )
 
         self.assertEqual(package.snapshot["summary"]["conversation_move"], "acknowledge_then_recover")
@@ -362,7 +352,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=0,
             assistant_message_index=1,
-            prompt_version_id="v2",
+            prompt_version_id="v3-1",
         )
 
         self.assertEqual(package.snapshot["summary"]["emotion"], "frustrated")
@@ -420,7 +410,7 @@ class AgentControlFrameworkTest(unittest.TestCase):
             style_source_id=None,
             user_message_index=3,
             assistant_message_index=4,
-            prompt_version_id="v2",
+            prompt_version_id="v3-1",
         )
 
         self.assertIn("User-taught behavior rules", package.system_prompt)

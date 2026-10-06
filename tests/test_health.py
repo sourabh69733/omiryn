@@ -26,7 +26,7 @@ class HealthTest(unittest.TestCase):
             body = self.client.get("/health").json()
 
         self.assertEqual(body["pipeline"]["version"], "v2")
-        self.assertEqual(body["prompt_version"], "v3-1")
+        self.assertEqual(body["prompt_version"], "v4")
 
     def test_a_bad_setting_is_reported_not_crashed(self) -> None:
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v9"}):

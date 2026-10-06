@@ -34,7 +34,7 @@ class VoicePromptTest(unittest.TestCase):
         prompt = _prompt()
         self.assertIn("Voice: gender-neutral", prompt)
         self.assertIn("mujhe lagta hai", prompt)
-        self.assertIn("gender-neutral AI companion", prompt)
+        self.assertIn("Never call yourself a girl or a boy", prompt)
 
     def test_chosen_voice_changes_grammar_not_identity(self) -> None:
         save_conversation({"id": "c", "status": "active", "messages": [], "agent_voice": "female"}, USER_ID)
