@@ -41,6 +41,7 @@ from .extraction.service import (
     analyze_vibe_verification,
     analyze_memory_batch,
     extract_deep_profile_facts,
+    write_vibe_intro,
     extract_llm_data_point_candidates,
     extract_profile,
     review_llm_data_point_candidates,
@@ -113,4 +114,5 @@ __all__ = [
     "generate_agent_reply",
     "provider_chat",
     "review_llm_data_point_candidates",
+    "write_vibe_intro",
 ]

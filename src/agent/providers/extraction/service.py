@@ -17,6 +17,7 @@ from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
 from agent.cognition.background.vibe_prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
+    VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,
 )
 from agent.outputs.profile_draft.models import normalize_extracted_profile
@@ -29,6 +30,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
     VIBE_BACKFILL,
+    VIBE_INTRO,
     VIBE_VERIFY,
 )
 
@@ -137,6 +139,41 @@ _DEFAULT_VIBE_VERIFY_MODELS = {"deepinfra": "deepseek-ai/DeepSeek-V3.2"}
 def vibe_verify_model(provider: str) -> str | None:
     """VIBE_VERIFY_MODEL, else a strong default for the provider, else the provider's default."""
     return os.getenv("VIBE_VERIFY_MODEL", "").strip() or _DEFAULT_VIBE_VERIFY_MODELS.get(provider)
+
+
+async def write_vibe_intro(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    """The line Omi uses to introduce the user, from their non-private vibe; {"intro", "chips"}."""
+    provider = _provider_name()
+    if provider == "mock":
+        _record_usage_event(
+            conversation_id=conversation_id,
+            request_kind=VIBE_INTRO,
+            provider=provider,
+            model=model or "mock",
+            success=True,
+            latency_ms=0,
+        )
+        payload = json.loads(text)
+        lines = list(payload.get("vibe_lines", {}).values())
+        return {"intro": lines[0] if lines else "", "chips": []}
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=VIBE_INTRO_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": text}],
+        temperature=0.4,
+        conversation_id=conversation_id,
+        request_kind=VIBE_INTRO,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
 
 
 async def analyze_vibe_verification(
