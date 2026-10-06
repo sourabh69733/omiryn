@@ -13,6 +13,7 @@ from .schema import (
     agent_memory_embeddings,
     agent_memory_reviews,
     agent_self_notes,
+    agent_open_questions,
     agent_context_snapshots,
     agent_jobs,
     agent_conversations,
@@ -290,6 +291,12 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_jobs.delete().where(
                 agent_jobs.c.conversation_id == conversation_id,
                 agent_jobs.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            agent_open_questions.delete().where(
+                agent_open_questions.c.conversation_id == conversation_id,
+                agent_open_questions.c.user_id == owner_id,
             )
         )
         connection.execute(

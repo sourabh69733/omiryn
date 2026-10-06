@@ -37,6 +37,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "whatsapp_style_profiles",
     "data_point_extraction_debug",
     "agent_message_feedback",
+    "agent_open_questions",
 )
 
 
