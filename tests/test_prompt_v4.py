@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from agent.context_engine.engine import build_model_context_package
 from agent.context_engine.prompt_engine.blocks import BLOCK_CHAR_LIMITS, turn_facts
-from storage import create_agent_memory, reset_db, save_conversation, set_user_card
+from storage import add_open_questions, create_agent_memory, reset_db, save_conversation, set_user_card
 
 USER_ID = "v4-user"
 CONVERSATION_ID = "v4-chat"
@@ -118,6 +118,15 @@ class PromptV4Test(unittest.TestCase):
         self.assertIn("wants no questions", block)
         self.assertLess(prompt.index("<how_to_talk>"), prompt.index("<this_turn>"))
         self.assertNotIn("wants no questions", prompt.split("<memories>")[1].split("</memories>")[0] if "<memories>" in prompt else "")
+
+    def test_an_open_question_sits_in_its_own_block(self) -> None:
+        save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
+        add_open_questions(USER_ID, CONVERSATION_ID, [{"id": "q", "text": "Moved, or only visiting?", "message_index": 0}])
+
+        prompt = self._package([], "hey").system_prompt
+
+        self.assertIn("You are unsure: Moved, or only visiting?", prompt.split("<open_questions>")[1].split("</open_questions>")[0])
+        self.assertLess(prompt.index("<open_questions>"), prompt.index("<this_turn>"))
 
     def test_memory_lines_keep_their_line_breaks(self) -> None:
         set_user_card(USER_ID, "Line one.\nLine two.")
