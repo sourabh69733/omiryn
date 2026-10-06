@@ -400,6 +400,7 @@ def _safe_metadata(metadata: Any) -> dict[str, Any]:
     allowed_keys = {
         "context_source_id",
         "import_id",
+        "memory_ids",
         "original_source_id",
         "point_count",
         "query_intent",
