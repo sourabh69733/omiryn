@@ -35,6 +35,7 @@ $$('a[href^="#"]').forEach((link) => {
     const target = $(href);
     if (!target) return;
     event.preventDefault();
+    flushBelowFold();
     target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   });
 });
@@ -52,15 +53,17 @@ const REASONS = [
   "same taste in bad movies",
   "both believe in second chances",
 ];
-$$(".o-marquee-row").forEach((row, rowIndex) => {
-  const list = rowIndex ? [...REASONS].reverse() : REASONS;
-  const chips = list
-    .map((text, i) => `<span class="o-chip-m"><span class="pair"><span data-avatar="${i}"></span><span data-avatar="${i + 3}"></span></span><small>matched because</small> ${text}</span>`)
-    .join("");
-  // Two copies so the CSS loop is seamless.
-  row.innerHTML = `<div class="o-marquee-track">${chips}</div><div class="o-marquee-track" aria-hidden="true">${chips}</div>`;
-  paintAvatars(row);
-});
+function setupMarquee() {
+  $$(".o-marquee-row").forEach((row, rowIndex) => {
+    const list = rowIndex ? [...REASONS].reverse() : REASONS;
+    const chips = list
+      .map((text, i) => `<span class="o-chip-m"><span class="pair"><span data-avatar="${i}"></span><span data-avatar="${i + 3}"></span></span><small>matched because</small> ${text}</span>`)
+      .join("");
+    // Two copies so the CSS loop is seamless.
+    row.innerHTML = `<div class="o-marquee-track">${chips}</div><div class="o-marquee-track" aria-hidden="true">${chips}</div>`;
+    paintAvatars(row);
+  });
+}
 
 /* ─────────── Card stack ─────────── */
 const MATCHES = [
@@ -70,19 +73,21 @@ const MATCHES = [
   { a: 7, name: "Dev", reasons: ["Chai loyalists", "Both want to build something of your own"], starter: "Dream side project?" },
 ];
 const stack = $("#o-stack");
-stack.innerHTML = MATCHES.map((m) => `
-  <article class="o-card">
-    <div class="o-card-top">
-      <div class="pair"><span data-avatar="0"></span><span data-avatar="${m.a}"></span></div>
-      <div><small>New match</small><strong>You &amp; ${m.name}</strong></div>
-    </div>
-    <p class="o-card-label">You matched because</p>
-    <ul>${m.reasons.map((r) => `<li>${r}</li>`).join("")}</ul>
-    <p class="o-card-label">Start with</p>
-    <span class="o-card-starter">${m.starter}</span>
-    <span class="o-card-cta">Say hi</span>
-  </article>`).join("");
-paintAvatars(stack);
+function renderCards() {
+  stack.innerHTML = MATCHES.map((m) => `
+    <article class="o-card">
+      <div class="o-card-top">
+        <div class="pair"><span data-avatar="0"></span><span data-avatar="${m.a}"></span></div>
+        <div><small>New match</small><strong>You &amp; ${m.name}</strong></div>
+      </div>
+      <p class="o-card-label">You matched because</p>
+      <ul>${m.reasons.map((r) => `<li>${r}</li>`).join("")}</ul>
+      <p class="o-card-label">Start with</p>
+      <span class="o-card-starter">${m.starter}</span>
+      <span class="o-card-cta">Say hi</span>
+    </article>`).join("");
+  paintAvatars(stack);
+}
 
 const cards = () => $$(".o-card", stack);
 function layoutStack(animate = true) {
@@ -116,34 +121,38 @@ function sendTopToBack(direction = 1) {
     onComplete: finish,
   });
 }
-layoutStack(false);
-$("#o-stack-next").addEventListener("click", () => sendTopToBack(1));
 
-// Pointer drag on the top card: flick past the threshold to send it back.
-let drag = null;
-stack.addEventListener("pointerdown", (event) => {
-  const top = cards()[0];
-  if (!top || !top.contains(event.target)) return;
-  drag = { card: top, startX: event.clientX, startY: event.clientY };
-  top.setPointerCapture(event.pointerId);
-  top.classList.add("is-dragging");
-});
-stack.addEventListener("pointermove", (event) => {
-  if (!drag) return;
-  const dx = event.clientX - drag.startX;
-  const dy = event.clientY - drag.startY;
-  gsap.set(drag.card, { x: dx, y: dy * 0.3, rotation: dx / 14 });
-});
-const endDrag = (event) => {
-  if (!drag) return;
-  const dx = event.clientX - drag.startX;
-  drag.card.classList.remove("is-dragging");
-  if (Math.abs(dx) > 90) sendTopToBack(Math.sign(dx));
-  else layoutStack();
-  drag = null;
-};
-stack.addEventListener("pointerup", endDrag);
-stack.addEventListener("pointercancel", endDrag);
+function setupCards() {
+  renderCards();
+  layoutStack(false);
+  $("#o-stack-next").addEventListener("click", () => sendTopToBack(1));
+
+  // Pointer drag on the top card: flick past the threshold to send it back.
+  let drag = null;
+  stack.addEventListener("pointerdown", (event) => {
+    const top = cards()[0];
+    if (!top || !top.contains(event.target)) return;
+    drag = { card: top, startX: event.clientX, startY: event.clientY };
+    top.setPointerCapture(event.pointerId);
+    top.classList.add("is-dragging");
+  });
+  stack.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    gsap.set(drag.card, { x: dx, y: dy * 0.3, rotation: dx / 14 });
+  });
+  const endDrag = (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.startX;
+    drag.card.classList.remove("is-dragging");
+    if (Math.abs(dx) > 90) sendTopToBack(Math.sign(dx));
+    else layoutStack();
+    drag = null;
+  };
+  stack.addEventListener("pointerup", endDrag);
+  stack.addEventListener("pointercancel", endDrag);
+}
 
 /* ─────────── Vibe fingerprints ─────────── */
 // Each .blob gets an SVG shape that slowly wobbles like a lava lamp. Shapes are
@@ -234,6 +243,14 @@ const them = blobs.find((b) => b.el.id === "blob-them");
 const vsGlow = $("#vs-glow");
 const vsReason = $("#vs-reason");
 let partnerIndex = 0;
+let heroLoop = null;
+let heroVisible = true;
+
+// Pause the meet loop while the hero is off screen; it resumes where it left off.
+new IntersectionObserver(([entry]) => {
+  heroVisible = entry.isIntersecting;
+  if (heroLoop) heroVisible ? heroLoop.resume() : heroLoop.pause();
+}).observe($("#hero"));
 
 function loadPartner(partner) {
   $(".blob-face", them.el).src = photo(partner.face - 1);
@@ -260,7 +277,8 @@ function meetCycle() {
   const theirChips = $$(".blob-chip", them.el);
   const sharedChips = [$(".blob-chip.is-shared", you.el), $(".blob-chip.is-shared", them.el)];
 
-  return gsap.timeline({ onComplete: meetCycle })
+  heroLoop = gsap.timeline({ paused: !heroVisible, onComplete: meetCycle });
+  return heroLoop
     .call(() => loadPartner(partner))
     .set(them.el, { left: "112%", autoAlpha: 0, scale: 0.6 })
     .set([vsGlow, vsReason], { autoAlpha: 0, scale: 0.6 })
@@ -386,12 +404,33 @@ function buildStory() {
 }
 
 /* ─────────── Start ─────────── */
-if (reduce) {
-  showMerged();
-  storyStatic();
-} else {
-  buildStory();
+// Hero runs now. Everything below the fold is set up in small steps once the
+// browser is idle, or right away on the first scroll or anchor click. The
+// motion is the same, it just stops competing with the first paint.
+if (reduce) showMerged();
+
+const belowFold = [
+  setupMarquee,
+  setupCards,
+  () => (reduce ? storyStatic() : buildStory()),
+  () => !reduce && setupScrollMotion(),
+  () => ScrollTrigger.refresh(),
+];
+const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 200));
+
+function runNextStep() {
+  belowFold.shift()?.();
+  if (belowFold.length) idle(runNextStep, { timeout: 1000 });
 }
+function flushBelowFold() {
+  while (belowFold.length) belowFold.shift()();
+}
+["scroll", "wheel", "touchmove", "keydown"].forEach((type) =>
+  window.addEventListener(type, flushBelowFold, { once: true, passive: true })
+);
+// Opened on a #section link or mid-page (reload, back): set up everything now.
+if (location.hash || window.scrollY > 0) flushBelowFold();
+else window.addEventListener("load", () => idle(runNextStep, { timeout: 1000 }), { once: true });
 
 if (!reduce) {
   // Hero intro: words rise, then subtext and button, then your vibe appears.
@@ -416,7 +455,10 @@ if (!reduce) {
       ease: "sine.inOut",
     });
   });
+}
 
+// Below-the-fold scroll motion, set up from the queue above.
+function setupScrollMotion() {
   // Section reveals.
   gsap.set("[data-rv]", { y: 50, autoAlpha: 0 });
   ScrollTrigger.batch("[data-rv]", {
@@ -441,33 +483,32 @@ if (!reduce) {
 
   // Big final headline scales up with scroll.
   gsap.fromTo(".o-final-title", { scale: 0.85 }, { scale: 1, scrollTrigger: { trigger: ".o-final", start: "top bottom", end: "center center", scrub: true } });
-
-  if (finePointer) {
-    // Soft glow follows the cursor.
-    const glow = $(".o-cursor");
-    const gx = gsap.quickTo(glow, "x", { duration: 0.6, ease: "power3" });
-    const gy = gsap.quickTo(glow, "y", { duration: 0.6, ease: "power3" });
-    window.addEventListener("pointermove", (e) => { gx(e.clientX); gy(e.clientY); glow.classList.add("on"); });
-
-    // Magnetic buttons.
-    $$(".magnetic").forEach((btn) => {
-      const mx = gsap.quickTo(btn, "x", { duration: 0.4, ease: "power3" });
-      const my = gsap.quickTo(btn, "y", { duration: 0.4, ease: "power3" });
-      btn.addEventListener("pointermove", (e) => {
-        const r = btn.getBoundingClientRect();
-        mx((e.clientX - r.left - r.width / 2) * 0.25);
-        my((e.clientY - r.top - r.height / 2) * 0.35);
-      });
-      btn.addEventListener("pointerleave", () => { mx(0); my(0); });
-    });
-
-    // The fingerprints lean toward the cursor a little.
-    const vx = gsap.quickTo(vs, "x", { duration: 1.2, ease: "power3" });
-    const vy = gsap.quickTo(vs, "y", { duration: 1.2, ease: "power3" });
-    $("#hero").addEventListener("pointermove", (e) => {
-      vx((e.clientX / window.innerWidth - 0.5) * 24);
-      vy((e.clientY / window.innerHeight - 0.5) * 16);
-    });
-  }
 }
 
+if (!reduce && finePointer) {
+  // Soft glow follows the cursor.
+  const glow = $(".o-cursor");
+  const gx = gsap.quickTo(glow, "x", { duration: 0.6, ease: "power3" });
+  const gy = gsap.quickTo(glow, "y", { duration: 0.6, ease: "power3" });
+  window.addEventListener("pointermove", (e) => { gx(e.clientX); gy(e.clientY); glow.classList.add("on"); });
+
+  // Magnetic buttons.
+  $$(".magnetic").forEach((btn) => {
+    const mx = gsap.quickTo(btn, "x", { duration: 0.4, ease: "power3" });
+    const my = gsap.quickTo(btn, "y", { duration: 0.4, ease: "power3" });
+    btn.addEventListener("pointermove", (e) => {
+      const r = btn.getBoundingClientRect();
+      mx((e.clientX - r.left - r.width / 2) * 0.25);
+      my((e.clientY - r.top - r.height / 2) * 0.35);
+    });
+    btn.addEventListener("pointerleave", () => { mx(0); my(0); });
+  });
+
+  // The fingerprints lean toward the cursor a little.
+  const vx = gsap.quickTo(vs, "x", { duration: 1.2, ease: "power3" });
+  const vy = gsap.quickTo(vs, "y", { duration: 1.2, ease: "power3" });
+  $("#hero").addEventListener("pointermove", (e) => {
+    vx((e.clientX / window.innerWidth - 0.5) * 24);
+    vy((e.clientY / window.innerHeight - 0.5) * 16);
+  });
+}
