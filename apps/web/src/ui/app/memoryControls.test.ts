@@ -19,6 +19,7 @@ test("separates rejected memories from active memory sections", () => {
   const partition = (presentation as unknown as {
     partitionCanonicalMemories?: (memories: Array<{ id: string; status?: string }>) => {
       active: Array<{ id: string }>;
+      old: Array<{ id: string }>;
       rejected: Array<{ id: string }>;
     };
   }).partitionCanonicalMemories;
@@ -28,6 +29,7 @@ test("separates rejected memories from active memory sections", () => {
     { id: "rejected", status: "retracted" }
   ]), {
     active: [{ id: "active", status: "active" }],
+    old: [],
     rejected: [{ id: "rejected", status: "retracted" }]
   });
 });

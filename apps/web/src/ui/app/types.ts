@@ -86,6 +86,8 @@ export type CanonicalMemory = {
   importance?: number;
   occurred_at?: string | null;
   valid_until?: string | null;
+  supersedes_memory_id?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
   feedback?: {
     rating?: "agree" | "disagree";

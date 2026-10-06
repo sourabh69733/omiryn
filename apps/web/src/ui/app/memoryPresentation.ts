@@ -60,14 +60,43 @@ export function canonicalMemoryEvidenceHref(
 }
 
 
-export function partitionCanonicalMemories(memories: CanonicalMemory[]): {
+// Current: what Omi uses now. Old: replaced by a newer memory, or past its end date; kept as
+// history. Rejected: marked not true by the user.
+export function partitionCanonicalMemories(
+  memories: CanonicalMemory[],
+  now: Date = new Date()
+): {
   active: CanonicalMemory[];
+  old: CanonicalMemory[];
   rejected: CanonicalMemory[];
 } {
+  const isOld = (memory: CanonicalMemory) =>
+    memory.status === "superseded" || (memory.status !== "retracted" && hasEnded(memory, now));
   return {
-    active: memories.filter((memory) => memory.status !== "retracted"),
+    active: memories.filter((memory) => memory.status !== "retracted" && !isOld(memory)),
+    old: memories.filter(isOld),
     rejected: memories.filter((memory) => memory.status === "retracted")
   };
+}
+
+function hasEnded(memory: CanonicalMemory, now: Date): boolean {
+  if (!memory.valid_until) return false;
+  const ends = new Date(memory.valid_until);
+  return !Number.isNaN(ends.getTime()) && ends <= now;
+}
+
+// "Replaced by Jaipur on 3 Oct" or "Ended on 5 Oct", for a memory in the old section.
+export function oldMemoryNote(memory: CanonicalMemory, all: CanonicalMemory[]): string {
+  const day = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
+  const newer = all.find((item) => item.supersedes_memory_id === memory.id);
+  if (memory.status === "superseded") {
+    const value = newer ? canonicalMemoryValueText(newer.value) : "";
+    const when = day(newer?.created_at || memory.updated_at);
+    return ["Replaced", value ? `by ${value}` : "", when ? `on ${when}` : ""].filter(Boolean).join(" ");
+  }
+  const ended = day(memory.valid_until);
+  return ended ? `Ended on ${ended}` : "No longer current";
 }
 
 export function toggleCanonicalMemoryReviewReason(selected: string[], reason: string): string[] {
