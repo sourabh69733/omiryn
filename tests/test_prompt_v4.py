@@ -98,7 +98,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v3_1_stays_the_default(self) -> None:
+    def test_v4_is_the_default(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -114,7 +114,7 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v3-1")
+        self.assertEqual(package.prompt_version, "v4")
 
 
 class TurnFactsTest(unittest.TestCase):

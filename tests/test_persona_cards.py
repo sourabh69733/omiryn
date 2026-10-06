@@ -49,6 +49,7 @@ class PersonaPromptTest(unittest.TestCase):
     def _prompt(self, cards: str = "false") -> str:
         env = {
             "AGENT_PIPELINE_VERSION": "v3",
+            "AGENT_BEHAVIOR_VERSION": "v3-1",
             "MEMORY_EMBEDDING_MODEL": "off",
             "AGENT_PERSONA_CARDS_ENABLED": cards,
         }

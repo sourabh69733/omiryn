@@ -50,7 +50,7 @@ class QuestionPolicyPromptTest(unittest.TestCase):
 
     def _prompt(self, messages: list[dict], user_text: str) -> str:
         save_conversation({"id": "c", "status": "active", "messages": messages}, "u")
-        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
+        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "AGENT_BEHAVIOR_VERSION": "v3-1", "MEMORY_EMBEDDING_MODEL": "off"}):
             return build_model_context_package(
                 conversation_id="c",
                 user_text=user_text,
@@ -77,7 +77,7 @@ class QuestionPolicyPromptTest(unittest.TestCase):
         save_conversation(
             {"id": "c", "status": "active", "messages": _chat("which one?", "why though?")}, "u"
         )
-        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
+        with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "AGENT_BEHAVIOR_VERSION": "v3-1", "MEMORY_EMBEDDING_MODEL": "off"}):
             package = build_model_context_package(
                 conversation_id="c",
                 user_text="tell me a story about a chai stall owner in Mumbai",
