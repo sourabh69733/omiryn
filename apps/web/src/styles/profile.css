@@ -1,4 +1,4 @@
-/* Profile: the card Omi introduces you with, then a quiet private list. One centered column on every screen. */
+/* Profile: your card (photos, basics, Omi's take on you), then account actions. One centered column on every screen. */
 .pf {
   display: flex;
   flex-direction: column;

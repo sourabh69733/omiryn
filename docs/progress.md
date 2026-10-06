@@ -88,7 +88,7 @@ The core of the product: what Omi understands about who the user would get along
 | Vibe | Milestone path, each area's line with a chip (Still learning or Confirmed, colored by confidence). Tap the chip for the user's own messages, each with "Open in chat". "Not right" removes a line and it stays gone until the user says something new about that area. |
 | Memories | Renamed from Style ("What Omiryn remembers"); `/style` redirects. Legacy signals hidden (data kept for export and deletion). |
 | Matches | Coming soon, plus how close the user is ("Matches need Ready to match") and a link to Vibe. |
-| Profile | The card Omi will introduce you with: photo inside a vibe ring (a blob shape seeded per person), name, age and place, an intro sentence and chips written by the model from non-private vibe lines (`GET /api/me/intro`, cached in the vibe card until those lines change, last intro kept if writing fails), photos, "Not quite me" (opens Vibe) and "Edit details". Below, "Only you see this": email, gender, export, sign out, delete. One column, works on phones. Contact lives in the account menu. |
+| Profile | Personal profile card (what a match sees is a separate flow, decided with matching): photo inside a vibe ring (a blob shape seeded per person), name, age and place, an intro sentence and chips written by the model from non-private vibe lines (`GET /api/me/intro`, cached in the vibe card until those lines change, last intro kept if writing fails), photos, "Not quite me" (opens Vibe) and "Edit details". Below, "Account": email, gender, export, sign out, delete. One column, works on phones. Contact lives in the account menu. |
 
 Navigation: Chat, Vibe, Memories, Matches. Contact and Profile live in the account menu.
 

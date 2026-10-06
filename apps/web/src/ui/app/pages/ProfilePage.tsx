@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Camera, ChevronRight, Lock, MapPin, Plus, X } from "lucide-react";
+import { Camera, ChevronRight, MapPin, Plus, X } from "lucide-react";
 import { apiErrorMessage, apiFetch, signOut } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { Notice, StateView } from "../StateView";
@@ -8,7 +8,7 @@ import { blobPath } from "../vibeRing";
 
 type Intro = { intro: string | null; chips: string[]; ready: boolean };
 
-// The profile is the card Omi will use to introduce you, with private details kept below it.
+// Your profile: photos, basics and what Omi has picked up about you, with account actions below.
 export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<Profile>({});
@@ -109,7 +109,6 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
   return (
     <section className="screen profile-screen pf">
       <input ref={photoInput} className="profile-photo-input" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} />
-      <p className="pf-kicker">How Omi will introduce you</p>
       <article className="pf-card">
         <button type="button" className="pf-portrait" onClick={() => pickPhoto(0)} disabled={uploadingPhotoSlot !== null} aria-label={photos[0] ? "Change main photo" : "Add main photo"}>
           <svg className="pf-ring" viewBox="0 0 160 160" aria-hidden="true">
@@ -162,7 +161,7 @@ export function ProfilePage({ onVibe }: { onVibe?: () => void }) {
       ) : null}
       {status ? <Notice tone={status === "Profile saved." ? "success" : status === "Saving profile…" ? "info" : "error"}>{status}</Notice> : null}
 
-      <p className="pf-kicker pf-private"><Lock aria-hidden="true" />Only you see this</p>
+      <p className="pf-kicker pf-private">Account</p>
       <div className="pf-panel pf-rows">
         <div className="pf-row"><span>Email</span><span className="pf-muted">{data.user?.email || "Signed in"}</span></div>
         <div className="pf-row"><span>Gender</span><span className="pf-muted">{genderLabel}</span></div>
