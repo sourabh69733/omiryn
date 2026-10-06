@@ -346,7 +346,10 @@ def _apply_add_operation(connection, user_id: str, operation: dict[str, Any]):
     if conflict is not None:
         before = _memory_from_row(connection, conflict)
         if not _same_memory_content(conflict, memory):
-            raise ValueError("active memory with this kind and key requires supersede")
+            # A second active value for the same key must come as a supersede. Skip just this
+            # operation (recorded, not written) instead of failing the batch's other memories.
+            logger.info("agent.memory_add_conflict_skipped user_id=%s key=%s", user_id, memory.get("key"))
+            return "add_conflict_skipped_v3", "skipped", before, None
         after = _reinforce_memory(
             connection,
             conflict,

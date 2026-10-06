@@ -290,7 +290,7 @@ def test_retry_is_idempotent_for_lifecycle_operation() -> None:
     assert len(storage.get_agent_memory(str(existing["id"]), USER_ID)["evidence"]) == 2
 
 
-def test_conflicting_adds_roll_back_the_complete_batch() -> None:
+def test_a_conflicting_add_is_skipped_and_the_rest_of_the_batch_is_kept() -> None:
     storage.save_conversation(
         {
             "id": CONVERSATION_ID,
@@ -334,11 +334,11 @@ def test_conflicting_adds_roll_back_the_complete_batch() -> None:
     analysis = validate_memory_analysis_v3(raw, batch=batch)
     assert analysis.valid, analysis.errors
 
-    with pytest.raises(ValueError, match="requires supersede"):
-        apply_validated_memory_analysis_v3(
-            batch,
-            analysis,
-            extractor_model="test-model",
-        )
+    result = apply_validated_memory_analysis_v3(
+        batch,
+        analysis,
+        extractor_model="test-model",
+    )
 
-    assert storage.list_agent_memories(USER_ID) == []
+    assert result.applied_count == 1
+    assert [memory["value"] for memory in storage.list_agent_memories(USER_ID)] == ["Pune"]
