@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import fs from "node:fs";
 import path from "node:path";
 
 const landingRoot = path.resolve("apps/landing");
@@ -37,10 +38,31 @@ function landingRoutesPlugin() {
   };
 }
 
+// Build only: inline our small stylesheets and load Google Fonts without
+// blocking first paint. Both were render-blocking on mobile Lighthouse.
+function landingCriticalCssPlugin() {
+  return {
+    name: "omiryn-landing-critical-css",
+    apply: "build",
+    transformIndexHtml(html) {
+      return html
+        .replace(/<link rel="stylesheet" href="\/static\/([\w-]+\.css)(?:\?[^"]*)?">/g, (_tag, file) => {
+          const css = fs.readFileSync(path.join(landingRoot, "public/static", file), "utf8");
+          return `<style>${css}</style>`;
+        })
+        .replace(/<link href="(https:\/\/fonts\.googleapis\.com\/css2[^"]*)" rel="stylesheet">/g, (_tag, href) =>
+          `<link rel="preload" as="style" href="${href}">` +
+          `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">` +
+          `<noscript><link rel="stylesheet" href="${href}"></noscript>`
+        );
+    }
+  };
+}
+
 export default defineConfig({
   root: landingRoot,
   publicDir: "public",
-  plugins: [landingRoutesPlugin()],
+  plugins: [landingRoutesPlugin(), landingCriticalCssPlugin()],
   // Own dep cache: the web app's dev server shares node_modules/.vite and would
   // otherwise invalidate our pre-bundled GSAP ("504 Outdated Optimize Dep").
   cacheDir: path.resolve("node_modules/.vite-landing"),
