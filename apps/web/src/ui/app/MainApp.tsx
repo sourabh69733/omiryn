@@ -91,7 +91,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         {page === "vibe" ? <VibePage onChat={() => navigate("chat")} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
-        {page === "profile" ? <ProfilePage /> : null}
+        {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
       </main>
     </div>

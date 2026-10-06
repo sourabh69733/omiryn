@@ -8,6 +8,7 @@ import "./styles/onboarding.css";
 import "./styles/vibe.css";
 import "./styles/brand-theme.css";
 import "./styles/states.css";
+import "./styles/profile.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>

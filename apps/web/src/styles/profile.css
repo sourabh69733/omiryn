@@ -1,0 +1,427 @@
+/* Profile: the card Omi introduces you with, then a quiet private list. One centered column on every screen. */
+.pf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.pf-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.pf-kicker svg {
+  width: 13px;
+  height: 13px;
+}
+
+.pf-private {
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+
+.pf-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #ffffff;
+  text-align: center;
+}
+
+button.pf-portrait {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 148px;
+  height: 148px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.pf-portrait:hover {
+  background: transparent;
+}
+
+.pf-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pf-ring-outer {
+  fill: #f1ecff;
+  stroke: var(--brand-violet);
+  stroke-width: 1.4;
+  opacity: 0.9;
+}
+
+.pf-ring-inner {
+  fill: none;
+  stroke: var(--brand-pink);
+  stroke-width: 1.1;
+  opacity: 0.55;
+}
+
+.pf-portrait img,
+.pf-initial {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+.pf-initial {
+  display: grid;
+  place-items: center;
+  background: var(--brand-gradient);
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 600;
+}
+
+.pf-portrait-edit {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.pf-portrait-edit svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pf-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.pf-card h1 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.pf-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pf-place svg {
+  width: 13px;
+  height: 13px;
+}
+
+.pf-intro {
+  max-width: 420px;
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 21px;
+  font-style: italic;
+  line-height: 1.35;
+}
+
+.pf-intro.is-loading,
+.pf-intro.is-empty {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-style: normal;
+}
+
+.pf-intro.is-loading {
+  animation: pf-pulse 1.4s ease-in-out infinite;
+}
+
+.pf-intro-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.pf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-chips li {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #5b21b6;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pf-chips li:nth-child(even) {
+  background: #fdeef5;
+  color: #9d174d;
+}
+
+.pf-photos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.pf-photo {
+  position: relative;
+}
+
+.pf-photo > button:first-child {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 14px;
+  background: #faf8ff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pf-photo.has-photo > button:first-child {
+  border-style: solid;
+  border-color: var(--line);
+}
+
+.pf-photo > button:first-child:hover {
+  background: #f1ecff;
+}
+
+.pf-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-photo > button:first-child svg {
+  width: 20px;
+  height: 20px;
+}
+
+button.pf-photo-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  min-height: 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(24, 24, 27, 0.65);
+  color: #ffffff;
+}
+
+.pf-photo-remove svg {
+  width: 13px;
+  height: 13px;
+}
+
+.pf-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pf-panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.pf-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.pf-edit label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.pf-edit input,
+.pf-edit select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.pf-edit button[type="submit"] {
+  grid-column: 1 / -1;
+}
+
+.pf-rows {
+  display: grid;
+  padding: 2px 16px;
+}
+
+.pf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.pf-row:last-child {
+  border-bottom: 0;
+}
+
+button.pf-row {
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.pf-row:hover {
+  background: transparent;
+  color: var(--brand-violet);
+}
+
+button.pf-row.is-danger,
+button.pf-row.is-danger:hover {
+  color: #b42318;
+}
+
+.pf-row svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.pf-muted {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-requests {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@keyframes pf-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (max-width: 480px) {
+  .pf {
+    padding: 16px 12px 40px;
+  }
+
+  .pf-card {
+    padding: 22px 14px 16px;
+  }
+
+  .pf-intro {
+    font-size: 19px;
+  }
+
+  .pf-photos {
+    gap: 6px;
+  }
+
+  .pf-edit {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-intro.is-loading {
+    animation: none;
+  }
+}
+
+.pf-card-actions button.secondary-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 550;
+}
+
+.pf-card-actions button.secondary-button:hover {
+  border-color: var(--brand-violet);
+  background: #faf8ff;
+  color: var(--brand-violet);
+}
