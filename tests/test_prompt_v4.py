@@ -82,6 +82,16 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertEqual(package.question_limit, 1)
 
+    def test_a_no_questions_request_still_holds_a_turn_later(self) -> None:
+        package = self._package(
+            _chat(("Bas suno, sawal mat puchna.", "Okay, I'm listening.")),
+            "I'm still upset about work.",
+        )
+        this_turn = package.system_prompt.split("<this_turn>")[1].split("</this_turn>")[0]
+
+        self.assertIn("A few messages ago: they asked you not to ask questions.", this_turn)
+        self.assertEqual(package.question_limit, 0)
+
     def test_memory_lines_keep_their_line_breaks(self) -> None:
         set_user_card(USER_ID, "Line one.\nLine two.")
         prompt = self._package([], "hey").system_prompt

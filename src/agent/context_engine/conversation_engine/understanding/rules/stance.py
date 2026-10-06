@@ -221,6 +221,11 @@ def analyze_conversational_stance(
     return ConversationalStance()
 
 
+def explicit_constraints(text: str) -> tuple[str, ...]:
+    """The reply requests in one message: no_advice, no_questions, listen_only, give_space."""
+    return _explicit_constraints(normalized_memory_text(text))
+
+
 def _explicit_constraints(normalized: str) -> tuple[str, ...]:
     constraints: list[str] = []
     if _contains_any(normalized, NO_ADVICE_PHRASES):

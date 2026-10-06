@@ -13,6 +13,7 @@ from agent.context_engine.conversation_engine.planning import (
 )
 from agent.context_engine.conversation_engine.planning.planner import recent_question_streak
 from agent.context_engine.conversation_engine.understanding import interpret_turn
+from agent.context_engine.conversation_engine.understanding.rules.stance import explicit_constraints
 from agent.context_engine.conversation_engine.understanding.rules import (
     context_query_intent,
     continues_story,
@@ -121,11 +122,10 @@ def build_model_context_package(
                 planning_messages,
                 question_streak=recent_question_streak(planning_messages[:-1]),
                 constraints=conversational_stance.constraints if conversational_stance else (),
+                earlier_constraints=_earlier_constraints(planning_messages[:-1]),
                 active_topic=conversation_plan.active_topic,
             )
-            question_limit = (
-                0 if facts.question_streak >= 2 or "no_questions" in facts.constraints else 1
-            )
+            question_limit = 0 if facts.no_questions else 1
         if "story_or_long_reply" in query_intent.labels:
             question_limit = 1  # room for the "want more?" check-in at the end of a story
         if blocks_prompt:
@@ -233,6 +233,20 @@ def _conversation_voice(conversation_id: str, user_id: str | None) -> str:
     """How the companion speaks about itself in this chat: neutral, female or male."""
     conversation = get_conversation(conversation_id, user_id) if user_id else None
     return str((conversation or {}).get("agent_voice") or "neutral")
+
+
+# A "no questions" or "just listen" request lasts a few messages, not only the turn it was said.
+_CONSTRAINT_LOOKBACK_USER_MESSAGES = 3
+
+
+def _earlier_constraints(history: list[dict[str, Any]]) -> tuple[str, ...]:
+    user_messages = [m for m in history if m.get("role") == "user"][-_CONSTRAINT_LOOKBACK_USER_MESSAGES:]
+    found: list[str] = []
+    for message in user_messages:
+        for item in explicit_constraints(str(message.get("content") or "")):
+            if item not in found:
+                found.append(item)
+    return tuple(found)
 
 
 def _planning_messages(

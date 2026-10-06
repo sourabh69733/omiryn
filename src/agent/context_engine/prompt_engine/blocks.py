@@ -68,7 +68,15 @@ class TurnFacts:
     omi_last_asked: bool = False
     question_streak: int = 0
     constraints: tuple[str, ...] = ()
+    earlier_constraints: tuple[str, ...] = ()
     active_topic: str | None = None
+
+    @property
+    def no_questions(self) -> bool:
+        return self.question_streak >= 2 or "no_questions" in (
+            *self.constraints,
+            *self.earlier_constraints,
+        )
 
 
 def turn_facts(
@@ -76,6 +84,7 @@ def turn_facts(
     *,
     question_streak: int,
     constraints: tuple[str, ...] = (),
+    earlier_constraints: tuple[str, ...] = (),
     active_topic: str | None = None,
 ) -> TurnFacts:
     """messages ends with the user's latest message."""
@@ -90,6 +99,7 @@ def turn_facts(
         omi_last_asked=previous is not None and "?" in str(previous.get("content") or ""),
         question_streak=question_streak,
         constraints=constraints,
+        earlier_constraints=tuple(item for item in earlier_constraints if item not in constraints),
         active_topic=active_topic,
     )
 
@@ -217,6 +227,12 @@ def _turn_lines(facts: TurnFacts) -> str:
             f"Your last {facts.question_streak} replies all asked questions: do not ask one now."
         )
     lines.extend(_CONSTRAINT_FACTS[item] for item in facts.constraints if item in _CONSTRAINT_FACTS)
+    lines.extend(
+        f"A few messages ago: {_CONSTRAINT_FACTS[item][0].lower()}{_CONSTRAINT_FACTS[item][1:]} "
+        "This still holds unless they changed it."
+        for item in facts.earlier_constraints
+        if item in _CONSTRAINT_FACTS
+    )
     if facts.active_topic:
         lines.append(f"Current topic in this chat: {facts.active_topic}.")
     return "\n".join(lines)
