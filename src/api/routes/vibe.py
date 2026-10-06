@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from agent.memory_engine.memories.vibe import (
@@ -11,12 +14,14 @@ from agent.memory_engine.memories.vibe import (
     line_text,
     vibe_progress,
 )
+from agent.providers import write_vibe_intro
 from security.auth import CurrentUser, require_user
 from storage import (
     get_conversation,
     get_vibe_card,
     list_conversation_ids,
     prune_vibe_proof_from_missing_chats,
+    set_vibe_intro,
     update_vibe_card,
 )
 
@@ -24,7 +29,14 @@ from storage import (
 MAX_QUOTES = 5
 QUOTE_CHARS = 200
 
+# The intro needs this many non-private lines before Omi writes one.
+INTRO_MIN_LINES = 2
+INTRO_MAX_CHARS = 200
+INTRO_MAX_CHIPS = 5
+CHIP_MAX_CHARS = 30
+
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/me/vibe")
@@ -45,6 +57,52 @@ async def delete_vibe_area(area_id: str, user: CurrentUser = Depends(require_use
     if area_id not in {item_id for item_id, _, _ in VIBE_AREAS}:
         raise HTTPException(status_code=404, detail="Unknown vibe area.")
     return _vibe_payload(update_vibe_card(user.id, {}, reject=(area_id,)), user.id)
+
+
+@router.get("/api/me/intro")
+async def get_intro(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """How Omi would introduce the user to a match, written from their non-private vibe lines.
+
+    Rewritten only when those lines change; if writing fails, the last intro is kept.
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    card = get_vibe_card(user.id)
+    public = {
+        area_id: line_text(card["areas"].get(area_id))
+        for area_id, _, _ in VIBE_AREAS
+        if area_id not in PRIVATE_AREA_IDS and line_text(card["areas"].get(area_id))
+    }
+    if len(public) < INTRO_MIN_LINES:
+        return {"intro": None, "chips": [], "ready": False}
+    source = json.dumps(public, ensure_ascii=False, sort_keys=True)
+    saved = card.get("intro") or {}
+    if saved.get("source") == source and saved.get("text"):
+        return {"intro": saved["text"], "chips": saved.get("chips") or [], "ready": True}
+    conversation_ids = sorted(list_conversation_ids(user.id))
+    try:
+        if not conversation_ids:
+            raise ValueError("no chat to record usage against")
+        raw = await write_vibe_intro(
+            json.dumps({"first_name": (user.display_name or "").split(" ")[0], "vibe_lines": public}, ensure_ascii=False),
+            conversation_id=conversation_ids[0],
+            timeout_seconds=25,
+        )
+        intro = " ".join(str(raw.get("intro") or "").split())[:INTRO_MAX_CHARS]
+        chips = [
+            " ".join(str(chip).split())[:CHIP_MAX_CHARS]
+            for chip in (raw.get("chips") if isinstance(raw.get("chips"), list) else [])
+            if str(chip).strip()
+        ][:INTRO_MAX_CHIPS]
+        if not intro:
+            raise ValueError("empty intro")
+    except Exception as error:  # the page still works; it just keeps the last intro
+        logger.warning("agent.vibe.intro_failed user_id=%s error=%s", user.id, type(error).__name__)
+        if saved.get("text"):
+            return {"intro": saved["text"], "chips": saved.get("chips") or [], "ready": True}
+        return {"intro": None, "chips": [], "ready": False}
+    set_vibe_intro(user.id, {"text": intro, "chips": chips, "source": source})
+    return {"intro": intro, "chips": chips, "ready": True}
 
 
 def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:

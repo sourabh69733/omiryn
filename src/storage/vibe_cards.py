@@ -21,11 +21,13 @@ WRITE_ATTEMPTS = 5
 
 # Stored next to the area lines: lines the user marked wrong, with when and the proof behind them.
 REJECTED_KEY = "_rejected"
+# The intro Omi wrote from the non-private lines: {"text", "chips", "source"} (source = the lines it used).
+INTRO_KEY = "_intro"
 
 
 def get_vibe_card(user_id: str) -> dict[str, Any]:
     """{"areas": {area_id: {"text", "evidence"}}, "rejected": {area_id: {"text", "evidence", "at"}},
-    "milestone": id, "milestone_reached_at": datetime | None}."""
+    "intro": {"text", "chips", "source"} | None, "milestone": id, "milestone_reached_at": datetime | None}."""
     return _read(_require_user_id(user_id, "agent vibe card"))[0]
 
 
@@ -36,11 +38,13 @@ def _read(owner_id: str) -> tuple[dict[str, Any], str | None]:
             select(agent_vibe_cards).where(agent_vibe_cards.c.user_id == owner_id)
         ).mappings().first()
     if not row:
-        return {"areas": {}, "rejected": {}, "milestone": "starting", "milestone_reached_at": None}, None
+        return {"areas": {}, "rejected": {}, "intro": None, "milestone": "starting", "milestone_reached_at": None}, None
     stored = _stored(owner_id, row["card"])
+    intro = stored.get(INTRO_KEY)
     return {
         "areas": merge_vibe(stored, {}),
         "rejected": _rejected(stored),
+        "intro": intro if isinstance(intro, dict) else None,
         "milestone": row["milestone"],
         "milestone_reached_at": row["milestone_reached_at"],
     }, row["card"]
@@ -102,9 +106,7 @@ def _write(
         else now or utc_now()
     )
     values = {
-        "card": _protect_text(
-            owner_id, json.dumps({**areas, **({REJECTED_KEY: rejected} if rejected else {})}, ensure_ascii=False)
-        ),
+        "card": _card_text(owner_id, areas, rejected, current.get("intro")),
         "milestone": milestone,
         "milestone_reached_at": reached_at,
     }
@@ -180,6 +182,41 @@ def prune_vibe_proof_from_missing_chats(user_id: str, existing_conversation_ids:
     return bool(missing)
 
 
+def set_vibe_intro(user_id: str, intro: dict[str, Any]) -> None:
+    """Save the intro; the lines and milestone stay as they are. Skipped if the card keeps changing."""
+    owner_id = _require_user_id(user_id, "agent vibe card")
+    for _ in range(WRITE_ATTEMPTS):
+        current, version = _read(owner_id)
+        card = _card_text(owner_id, current["areas"], current["rejected"], intro)
+        try:
+            with ENGINE.begin() as connection:
+                if version is None:
+                    connection.execute(
+                        agent_vibe_cards.insert().values(
+                            user_id=owner_id, card=card, milestone="starting", milestone_reached_at=utc_now()
+                        )
+                    )
+                    return
+                if connection.execute(
+                    agent_vibe_cards.update()
+                    .where(agent_vibe_cards.c.user_id == owner_id, agent_vibe_cards.c.card == version)
+                    .values(card=card)
+                ).rowcount:
+                    return
+        except IntegrityError:
+            continue
+
+
+def _card_text(
+    owner_id: str,
+    areas: dict[str, Any],
+    rejected: dict[str, Any],
+    intro: dict[str, Any] | None,
+) -> str:
+    extra = {**({REJECTED_KEY: rejected} if rejected else {}), **({INTRO_KEY: intro} if intro else {})}
+    return _protect_text(owner_id, json.dumps({**areas, **extra}, ensure_ascii=False))
+
+
 def _stored(owner_id: str, stored: str) -> dict[str, Any]:
     try:
         value = json.loads(_unprotect_text(owner_id, stored) or "{}")
@@ -201,6 +238,7 @@ __all__ = [
     "drop_vibe_proof_from_conversation",
     "get_vibe_card",
     "prune_vibe_proof_from_missing_chats",
+    "set_vibe_intro",
     "update_vibe_card",
     "vibe_deletion_impact",
 ]
