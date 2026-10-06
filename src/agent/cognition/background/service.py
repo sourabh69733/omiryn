@@ -31,6 +31,7 @@ from storage import (
     record_memory_batch_failure,
 )
 from storage.profile_facts import save_data_point_extraction_debug
+from storage.open_questions import add_open_questions, list_open_questions, resolve_open_questions
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card, update_vibe_card
@@ -47,6 +48,7 @@ from agent.memory_engine.memories.embeddings import (
 )
 from agent.memory_engine.memories.models import MemoryStatus
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
+from agent.memory_engine.memories.open_questions import OpenQuestionChanges
 from agent.memory_engine.memories.self_notes import SelfNoteChanges
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
@@ -292,6 +294,7 @@ async def _run_claimed_background_cognition(
     )
     user_card = (get_user_card(user_id) or "") if memory_version == 3 else None
     self_notes = _self_note_context(user_id) if memory_version == 3 else None
+    open_questions = _open_question_context(user_id) if memory_version == 3 else None
     vibe_card = get_vibe_card(user_id) if memory_version == 3 else None
     vibe_verified: dict[str, Any] | None = None
     application_result = None
@@ -313,6 +316,7 @@ async def _run_claimed_background_cognition(
                 self_notes,
                 vibe_texts(vibe_card["areas"]) if vibe_card is not None else None,
                 rejected_texts(vibe_card.get("rejected")) if vibe_card is not None else None,
+                open_questions,
             ),
             conversation_id=conversation_id,
             model=os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or model,
@@ -331,6 +335,7 @@ async def _run_claimed_background_cognition(
             thread_candidates=thread_candidates,
             memory_version=memory_version,
             active_self_note_ids={str(note["id"]) for note in self_notes or []},
+            open_question_ids={str(question["id"]) for question in open_questions or []},
         )
         analysis = cognition.memory
         if memory_version == 3 and not analysis.valid:
@@ -435,6 +440,12 @@ async def _run_claimed_background_cognition(
             _apply_self_notes(batch, cognition.self_notes)
         if (
             analysis.valid
+            and not cognition.open_questions.empty
+            and (config.live_memory_writes or config.live_v3_memory_writes)
+        ):
+            _apply_open_questions(batch, cognition.open_questions)
+        if (
+            analysis.valid
             and cognition.vibe
             and vibe_card is not None
             and (config.live_memory_writes or config.live_v3_memory_writes)
@@ -475,6 +486,7 @@ async def _run_claimed_background_cognition(
                 # After the proof check; None when nothing was checked.
                 "vibe_verified": vibe_verified,
                 "self_notes": raw.get("self_notes"),
+                "open_questions": raw.get("open_questions"),
             },
             review={
                 "valid": analysis.valid,
@@ -593,6 +605,33 @@ def _count_failure_or_skip(batch: MemoryBatch, result: dict[str, Any]) -> dict[s
         "errors": result.get("errors") or [],
         "processed_through_message_index": saved.processed_through_message_index,
     }
+
+
+def _open_question_context(user_id: str) -> list[dict[str, Any]]:
+    return [
+        {key: question[key] for key in ("id", "text", "about_memory_ids", "created_at")}
+        for question in list_open_questions(user_id)
+    ]
+
+
+def _apply_open_questions(batch: MemoryBatch, changes: OpenQuestionChanges) -> None:
+    # IDs derive from the batch, so a retried batch cannot add the same question twice.
+    add_open_questions(
+        batch.user_id,
+        batch.conversation_id,
+        [
+            {
+                "id": str(uuid5(NAMESPACE_URL, f"open-question:{batch.batch_key}:{position}")),
+                "text": question.text,
+                "message_index": question.message_index,
+                "about_memory_ids": list(question.about_memory_ids),
+            }
+            for position, question in enumerate(changes.adds)
+        ],
+    )
+    resolve_open_questions(
+        batch.user_id, [(item.question_id, item.status) for item in changes.resolves]
+    )
 
 
 def _self_note_context(user_id: str) -> list[dict[str, Any]]:

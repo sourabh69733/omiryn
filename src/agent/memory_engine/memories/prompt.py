@@ -66,6 +66,7 @@ V3 memory rules:
 - Supersede only when the new evidence clearly replaces the old meaning: the user says it changed or
   corrects it. A short-term state (somewhere or something only for a while) does not replace a
   settled fact: add it as its own memory with occurred_at and valid_until, and keep the old one active.
+  The end date belongs only to the short-term memory; a settled fact you keep or restore gets none.
 - When it is unclear whether the old meaning still holds, keep the established memory and add only
   what the new message clearly says.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.

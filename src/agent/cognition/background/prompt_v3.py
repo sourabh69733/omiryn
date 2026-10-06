@@ -14,7 +14,8 @@ Grounding comes first:
 - Examples in these instructions use <placeholders> to show format only; they are never facts about
   this user, and their subjects must not appear in your output unless the user raised them.
 - When the new messages carry little (greetings, "ok", "yeah", emojis), return no memory operations,
-  thread_operation none, conversation_summary null, user_card null, vibe {} and self_notes [].
+  thread_operation none, conversation_summary null, user_card null, vibe {}, self_notes [] and
+  open_questions [].
 
 Output shape:
 {
@@ -48,6 +49,10 @@ Output shape:
     {"operation": "add", "kind": "opinion | preference | joke | promise", "text": "...",
      "message_index": 0, "due_at": "timezone-aware ISO-8601 timestamp or null"},
     {"operation": "resolve", "target_note_id": "supplied ID", "status": "done | dropped"}
+  ],
+  "open_questions": [
+    {"operation": "add", "text": "...", "message_index": 0, "about_memory_ids": ["supplied ID"]},
+    {"operation": "resolve", "target_question_id": "supplied ID", "status": "answered | dropped"}
   ]
 }
 
@@ -97,6 +102,17 @@ Self-note rules (what the companion said itself, so it stays consistent across c
   was kept in the new messages, or dropped when the companion clearly changed its mind (then add the
   new opinion).
 - At most 6 self_notes changes per batch.
+
+Open question rules (when you are unsure, ask instead of guessing):
+- When new user messages make it unclear whether an existing memory still holds, keep the memory
+  unchanged and add one open question for the companion to ask later. This is the case when one new
+  message points away from a memory the user said on several days, but never says it changed. text is the question in plain
+  words, from the companion's side ("Did they move to <place>, or are they only there for now?").
+  message_index is the new user message that raised the doubt; about_memory_ids are the memories it
+  concerns. Usually there is none; return []. At most one new question per batch.
+- Skip it when open_questions already covers the same doubt, or when the messages already answer it.
+- When the new user messages answer an open question, apply the answer through memory operations as
+  usual and resolve the question as answered. Resolve it as dropped when it no longer matters.
 
 Session log rules:
 - sessions lists the chat sessions in this batch; code splits them at long silences and each
