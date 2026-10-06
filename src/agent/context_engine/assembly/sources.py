@@ -59,6 +59,9 @@ WHATSAPP_STRUCTURED_RETRIEVAL_LIMIT = 2
 WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
 AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
+# Procedural memories (how the user wants to be talked to) get their own source, kept apart
+# from facts so the reply prompt can place them where they are followed.
+HOW_TO_TALK_SOURCE_TYPE = "how_to_talk"
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 USER_CARD_SOURCE_TYPE = "user_card"
 RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
@@ -483,6 +486,31 @@ def _agent_memory_v3_context_sources(
     )
     if not memories:
         return []
+    style = [memory for memory in memories if memory.get("kind") == "procedural"]
+    facts = [memory for memory in memories if memory.get("kind") != "procedural"]
+    return _how_to_talk_sources(style) + (_memory_facts_sources(user_id, facts) if facts else [])
+
+
+def _how_to_talk_sources(memories: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not memories:
+        return []
+    lines = ["How the user asked you to talk to them, in earlier chats. Follow it unless they change it."]
+    lines.extend(f"- {memory_sentence(memory)}" for memory in memories)
+    return [
+        {
+            "source_type": HOW_TO_TALK_SOURCE_TYPE,
+            "title": "How to talk to the user",
+            "content": "\n".join(lines),
+            "metadata": {
+                "memory_count": len(memories),
+                "memory_ids": [memory.get("id") for memory in memories],
+                "memory_kinds": [memory.get("kind") for memory in memories],
+            },
+        }
+    ]
+
+
+def _memory_facts_sources(user_id: str, memories: list[dict[str, Any]]) -> list[dict[str, Any]]:
     zone = user_zone(get_user_timezone(user_id))
     lines = [
         "Relevant durable memories about the user.",

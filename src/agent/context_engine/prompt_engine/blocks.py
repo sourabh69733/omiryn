@@ -32,6 +32,7 @@ from agent.context_engine.prompt_engine.versions.v4 import V4_GOAL
 _SOURCE_BLOCKS = {
     "user_card": "about_user",
     "agent_memories_v3": "memories",
+    "how_to_talk": "how_to_talk",
     "data_points": "memories",
     "agent_self_notes": "your_notes",
     "conversation_summary": "this_chat",
@@ -48,6 +49,7 @@ BLOCK_CHAR_LIMITS = {
     "your_notes": 1400,
     "this_chat": 3600,
     "attached": 4000,
+    "how_to_talk": 1200,
     "this_turn": 2000,
     "goal": 1200,
 }
@@ -150,6 +152,7 @@ def build_companion_system_prompt_v4(
             if attached
             else []
         )),
+        ("how_to_talk", grouped.get("how_to_talk", [])),
         ("this_turn", [time_facts, _turn_lines(facts)]),
         ("goal", [V4_GOAL]),
     ]

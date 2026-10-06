@@ -23,6 +23,8 @@ SOURCE_TYPE_PRIORITY = {
     # Keep this above optional memories until thread classification is decoupled.
     "conversation_threads": 120,
     "agent_memories_v3": 110,
+    # How the user asked to be talked to; few lines, needed on every reply.
+    "how_to_talk": 118,
     "agent_self_notes": 112,
     "agent_behavior_rules": 115,
     "data_points": 100,

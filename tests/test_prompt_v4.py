@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from agent.context_engine.engine import build_model_context_package
 from agent.context_engine.prompt_engine.blocks import BLOCK_CHAR_LIMITS, turn_facts
-from storage import reset_db, save_conversation, set_user_card
+from storage import create_agent_memory, reset_db, save_conversation, set_user_card
 
 USER_ID = "v4-user"
 CONVERSATION_ID = "v4-chat"
@@ -91,6 +91,33 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("A few messages ago: they asked you not to ask questions.", this_turn)
         self.assertEqual(package.question_limit, 0)
+
+    def test_how_to_talk_memories_sit_in_their_own_block_before_this_turn(self) -> None:
+        save_conversation(
+            {"id": "source", "status": "completed", "messages": [{"role": "user", "content": "No questions please."}]},
+            USER_ID,
+        )
+        create_agent_memory(
+            {
+                "user_id": USER_ID,
+                "kind": "procedural",
+                "purposes": ["personalization"],
+                "key": "reply_style",
+                "value": "no questions",
+                "statement": "The user wants no questions from the companion.",
+                "confidence": 0.9,
+                "importance": 0.9,
+                "evidence": [
+                    {"conversation_id": "source", "message_index": 0, "exact_quote": "No questions please.", "observed_at": "2026-10-01T10:00:00+00:00"}
+                ],
+            }
+        )
+        prompt = self._package([], "tell me about space").system_prompt
+
+        block = prompt.split("<how_to_talk>")[1].split("</how_to_talk>")[0]
+        self.assertIn("wants no questions", block)
+        self.assertLess(prompt.index("<how_to_talk>"), prompt.index("<this_turn>"))
+        self.assertNotIn("wants no questions", prompt.split("<memories>")[1].split("</memories>")[0] if "<memories>" in prompt else "")
 
     def test_memory_lines_keep_their_line_breaks(self) -> None:
         set_user_card(USER_ID, "Line one.\nLine two.")
