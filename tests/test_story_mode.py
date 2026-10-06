@@ -37,6 +37,8 @@ class StoryPolicyTest(unittest.TestCase):
 
         self.assertEqual(strip_story_marker("<story>Once upon a time"), ("Once upon a time", True))
         self.assertEqual(strip_story_marker("[STORY] Once"), ("Once", True))
+        self.assertEqual(strip_story_marker("<story>Once.</story>"), ("Once.", True))
+        self.assertEqual(strip_story_marker("Diamonds rain on Neptune! </story>"), ("Diamonds rain on Neptune!", False))
         self.assertEqual(strip_story_marker("The end. <story_end>"), ("The end. <story_end>", False))
 
     def test_marker_is_removed_in_any_spelling(self) -> None:

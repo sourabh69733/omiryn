@@ -45,10 +45,15 @@ def has_story_marker(text: str) -> bool:
     return bool(_STORY_MARKER_VARIANTS.search(text))
 
 
+# Models used to XML-style tags sometimes close the marker; the closing tag is hidden too.
+_STORY_CLOSING_TAG = re.compile(r"[<\[]\s*/\s*story\s*[>\]]", re.IGNORECASE)
+
+
 def strip_story_marker(text: str) -> tuple[str, bool]:
     """Remove the story marker; report whether the model marked the reply as a story."""
     cleaned, count = _STORY_MARKER_VARIANTS.subn("", text)
-    return cleaned.strip(), count > 0
+    # A stray closing tag alone does not mark a story.
+    return _STORY_CLOSING_TAG.sub("", cleaned).strip(), count > 0
 
 
 # Written by the model when the user asks it to talk like a girl, a boy or neutrally again.
