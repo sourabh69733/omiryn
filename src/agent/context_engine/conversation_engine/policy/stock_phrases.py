@@ -16,6 +16,11 @@ from typing import Any
 
 LEARNED_PATH = Path(__file__).with_name("stock_phrases.json")
 SEED_STOCK_PHRASES = (
+    # Stock refusals: the reply is rewritten in the model's own words, never swapped for a template.
+    "can't help with that",
+    "cannot help with that",
+    "can't assist with that",
+    "cannot assist with that",
     "what's on your mind",
     "whats on your mind",
     "sometimes just relaxing is nice",
