@@ -41,6 +41,16 @@ class StoryPolicyTest(unittest.TestCase):
         self.assertEqual(strip_story_marker("Diamonds rain on Neptune! </story>"), ("Diamonds rain on Neptune!", False))
         self.assertEqual(strip_story_marker("The end. <story_end>"), ("The end. <story_end>", False))
 
+    def test_a_copied_time_note_is_hidden_but_a_time_in_the_text_stays(self) -> None:
+        from agent.context_engine.conversation_engine.policy import split_assistant_reply
+
+        self.assertEqual(split_assistant_reply("(9:00 am) Chalo, gym today?"), ["Chalo, gym today?"])
+        self.assertEqual(
+            split_assistant_reply("hi<next_message>(Mon 5 Oct, 7:30 pm, 2 days later) back!"),
+            ["hi", "back!"],
+        )
+        self.assertEqual(split_assistant_reply("Meeting at (9:00 am) went ok?"), ["Meeting at (9:00 am) went ok?"])
+
     def test_marker_is_removed_in_any_spelling(self) -> None:
         for text in ("The end. <story_end>", "The end. [story_end]", "The end.</story end>"):
             with self.subTest(text=text):

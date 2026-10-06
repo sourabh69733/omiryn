@@ -138,8 +138,21 @@ def _strip_wrapping_quotes(text: str) -> str:
 
 
 def _normalize_chat_bubble(text: str) -> str:
-    cleaned = _strip_speaker_label(text)
+    cleaned = _strip_speaker_label(_strip_time_note(text))
     return _strip_wrapping_quotes(cleaned)
+
+
+# The history marks when the user wrote, e.g. "(Mon 5 Oct, 7:30 pm)" or "(9:30 pm, 1 hour
+# later)" (see agent.shared.timeline.day_notes). A model copying one into its own bubble leaks it.
+_TIME_NOTE = re.compile(
+    r"^\(\s*(?:[A-Z][a-z]{2}\s+\d{1,2}\s+[A-Z][a-z]{2},\s*)?\d{1,2}:\d{2}\s*[ap]m"
+    r"(?:,\s*[^)]*later)?\s*\)\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_time_note(text: str) -> str:
+    return _TIME_NOTE.sub("", text.strip(), count=1)
 
 
 def _strip_speaker_label(text: str) -> str:
