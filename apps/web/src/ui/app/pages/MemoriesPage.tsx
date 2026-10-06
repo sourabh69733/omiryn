@@ -3,7 +3,7 @@ import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { Notice, StateView } from "../StateView";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
 
 const memoryReviewReasons = [
   { value: "incorrect", label: "Incorrect" },
@@ -54,6 +54,8 @@ export function MemoriesPage() {
   const canonicalMemoryGroups = partitionCanonicalMemories(canonicalMemories);
   const canonicalSections = groupCanonicalMemories(canonicalMemoryGroups.active);
   const showRejectedCanonical = visibleSectionCounts["rejected-canonical"] !== undefined;
+  const showOldCanonical = visibleSectionCounts["old-canonical"] !== undefined;
+  const oldIds = new Set(canonicalMemoryGroups.old.map((memory) => memory.id));
   async function importContext(event: FormEvent) {
     event.preventDefault();
     if (content.trim().length < 20) return;
@@ -212,20 +214,22 @@ export function MemoriesPage() {
     const evidenceControl = controls.find((control) => control.id === "evidence");
     const reviewControl = controls.find((control) => control.id === "review");
     const usageControl = controls.find((control) => control.id === "usage");
-    const active = !memory.status || memory.status === "active";
+    const isOld = oldIds.has(memory.id);
+    const active = !isOld && (!memory.status || memory.status === "active");
     const isSaving = savingFactId === memory.id;
-    const cardTone = canonicalMemoryCardTone(memory);
+    const cardTone = isOld ? "is-old" : canonicalMemoryCardTone(memory);
     return (
       <article className={`profile-fact-card signal-review-card ${cardTone}`} key={memory.id}>
         <div className="profile-fact-card-top">
           <div>
             <strong>{humanizeLabel(memory.key)}</strong>
             {value ? <p className="profile-fact-values">{value}</p> : null}
+            {isOld ? <p className="memory-old-note">{oldMemoryNote(memory, canonicalMemories)}</p> : null}
             <div className="profile-fact-meta">
-              <span className={"confidence-pill " + confidenceLevel(memory.confidence)}>{confidenceLabel(memory.confidence)} · {confidence}%</span>
+              {isOld ? null : <span className={"confidence-pill " + confidenceLevel(memory.confidence)}>{confidenceLabel(memory.confidence)} · {confidence}%</span>}
               <span className="fact-tag fact-tag-type">{humanizeLabel(memory.kind)}</span>
               {(memory.purposes || []).map((purpose) => <span className="fact-tag fact-tag-key" key={purpose}>{humanizeLabel(purpose)}</span>)}
-              {memory.status && memory.status !== "active" ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.status)}</span> : null}
+              {memory.status && memory.status !== "active" && !isOld ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.status)}</span> : null}
               {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.sensitivity)}</span> : null}
               {evidenceControl ? (
                 <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceItem(memory)}>
@@ -273,9 +277,9 @@ export function MemoriesPage() {
           <small>Things Omi remembers about you</small>
         </div>
         <div className="style-snapshot-card">
-          <span>Active</span>
-          <strong>{canonicalMemories.filter((memory) => memory.status === "active").length}</strong>
-          <small>Available under their usage permissions</small>
+          <span>Current</span>
+          <strong>{canonicalMemoryGroups.active.length}</strong>
+          <small>What Omi uses now</small>
         </div>
         <div className="style-snapshot-card">
           <span>Matching use</span>
@@ -296,6 +300,28 @@ export function MemoriesPage() {
           </div>
           <div className="profile-fact-groups">
             {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
+            {canonicalMemoryGroups.old.length ? (
+              <div className="signal-archive-toggle-row">
+                <button
+                  className="secondary-button signal-show-more"
+                  type="button"
+                  onClick={() => setVisibleSectionCounts((current) => {
+                    const next = { ...current };
+                    if (showOldCanonical) delete next["old-canonical"];
+                    else next["old-canonical"] = 1;
+                    return next;
+                  })}
+                >
+                  {showOldCanonical ? "Hide old memories" : `Show old memories (${canonicalMemoryGroups.old.length})`}
+                </button>
+              </div>
+            ) : null}
+            {showOldCanonical ? (
+              <section className="profile-fact-group signal-section signal-section-old">
+                <div className="profile-fact-group-heading"><div><h3>Old memories</h3><p>Replaced by something newer, or past their end date. Omi keeps them as history and doesn't use them.</p></div><span>{canonicalMemoryGroups.old.length}</span></div>
+                <div className="profile-fact-list">{canonicalMemoryGroups.old.map(renderCanonicalMemory)}</div>
+              </section>
+            ) : null}
             {canonicalMemoryGroups.rejected.length ? (
               <div className="signal-archive-toggle-row">
                 <button

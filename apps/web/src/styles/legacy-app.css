@@ -7096,6 +7096,19 @@ button.history-archived-toggle:hover {
   background: #fff8f8;
 }
 
+/* Replaced or ended: kept as history, visibly not current. */
+.signal-review-card.is-old {
+  opacity: 0.62;
+  background: transparent;
+  border-style: dashed;
+}
+
+.memory-old-note {
+  margin: 4px 0 0;
+  color: var(--muted, #6b7280);
+  font-size: 13px;
+}
+
 .profile-fact-card-top {
   display: flex;
   align-items: flex-start;
