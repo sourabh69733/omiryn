@@ -4,6 +4,7 @@ import { apiErrorMessage, apiFetch, signOut } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { Notice, StateView } from "../StateView";
 import type { DataRequest, Profile, ProfileResponse } from "../types";
+import { mainPhoto } from "../profilePhoto";
 import { blobPath } from "../vibeRing";
 
 type Intro = { intro: string | null; chips: string[]; ready: boolean; edited?: boolean };
@@ -132,7 +133,7 @@ export function ProfilePage({ onVibe, fallbackAvatar, onProfileChange }: { onVib
   if (!data) return <section className="screen profile-screen">{loadError ? <StateView kind="error" title="Couldn't load your profile" detail={loadError} onRetry={firstLoad} /> : <StateView kind="loading" title="Loading your profile…" />}</section>;
   const seed = data.user?.email || form.display_name || "omiryn";
   const fullName = form.display_name?.trim() || "You";
-  const portrait = photos[0] || fallbackAvatar || null;
+  const portrait = mainPhoto(form, fallbackAvatar);
   const startIntroEdit = () => { setIntroStatus(""); setIntroDraft({ text: intro?.intro || "", chips: intro?.chips || [], chipInput: "" }); };
   const genderLabel = { woman: "Woman", man: "Man", non_binary: "Non-binary" }[form.gender || ""] || "Prefer not to say";
   const pickPhoto = (slot: number) => { setPhotoSlot(slot); setPhotoStatus(""); photoInput.current?.click(); };

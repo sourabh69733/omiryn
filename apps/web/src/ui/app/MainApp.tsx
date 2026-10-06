@@ -8,6 +8,7 @@ import { MemoriesPage } from "./pages/MemoriesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { VibePage } from "./pages/VibePage";
 import { AvatarImage } from "./AvatarImage";
+import { mainPhoto } from "./profilePhoto";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import type { AuthUser, Page, Profile, ProfileResponse } from "./types";
 
@@ -48,7 +49,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   // The profile is the source of truth; Google's name and photo are only the fallback.
   const displayName = profile?.display_name || user?.display_name || user?.email || "Account";
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
-  const profileAvatar = profile?.profile_photo_urls?.find(Boolean) || profile?.profile_photo_url || user?.avatar_url || null;
+  const profileAvatar = mainPhoto(profile, user?.avatar_url);
 
   return (
     <div className="app-shell legacy-react-shell">
