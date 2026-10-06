@@ -69,7 +69,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prompt-version",
         default="v3",
-        choices=("v1", "v2", "v3", "v3-1"),
+        choices=("v1", "v2", "v3", "v3-1", "v4"),
         help="Companion prompt version.",
     )
     parser.add_argument(
