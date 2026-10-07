@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from agent.shared.clock import utc_now
@@ -199,4 +199,54 @@ def _meets_relevance_threshold(
     )
 
 
-__all__ = ["DEFAULT_REPLY_MEMORY_LIMIT", "retrieve_agent_memories_for_reply"]
+MIGHT_FIT_LIMIT = 3
+# Events this close count as coming up; a friend would remember them now.
+UPCOMING_WINDOW = timedelta(days=7)
+
+
+def might_fit_memories(
+    user_id: str,
+    *,
+    exclude_ids: set[str],
+    recently_offered: set[str],
+    limit: int = MIGHT_FIT_LIMIT,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """A few things worth having in mind even when the message does not touch them.
+
+    Code only ranks: events coming up soon first, then important and confident memories. Ones
+    offered in the last few replies wait, so the list rotates. The model decides whether any fits.
+    """
+    if limit <= 0:
+        return []
+    from storage.memories import list_agent_memories
+
+    current_time = now or utc_now()
+    candidates = [
+        memory
+        for memory in list_agent_memories(user_id)
+        if _reply_eligible(memory, current_time)
+        and memory.get("kind") != MemoryKind.PROCEDURAL.value  # these are in how-to-talk
+        and str(memory.get("id")) not in exclude_ids
+    ]
+
+    def score(memory: dict[str, Any]) -> float:
+        occurred = aware_datetime(memory.get("occurred_at"))
+        upcoming = occurred is not None and current_time <= occurred <= current_time + UPCOMING_WINDOW
+        value = (
+            (1.0 if upcoming else 0.0)
+            + bounded_score(memory.get("importance")) * 0.6
+            + bounded_score(memory.get("confidence")) * 0.2
+        )
+        return value - (1.5 if str(memory.get("id")) in recently_offered else 0.0)
+
+    ranked = sorted(candidates, key=lambda memory: (-score(memory), str(memory.get("id") or "")))
+    return ranked[:limit]
+
+
+__all__ = [
+    "DEFAULT_REPLY_MEMORY_LIMIT",
+    "MIGHT_FIT_LIMIT",
+    "might_fit_memories",
+    "retrieve_agent_memories_for_reply",
+]

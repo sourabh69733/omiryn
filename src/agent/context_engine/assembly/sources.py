@@ -22,6 +22,7 @@ from agent.memory_engine.memories import (
     BROAD_RECALL_MEMORY_LIMIT,
     retrieve_agent_memories_for_reply,
 )
+from agent.memory_engine.memories.retrieval import might_fit_memories
 from agent.memory_engine.behavior.retrieval import retrieve_agent_behavior_rules_for_context
 from agent.memory_engine.data_points.retrieval.profile_facts import (
     retrieve_profile_facts_for_context,
@@ -51,6 +52,7 @@ from storage import (
     list_open_questions,
     mark_open_question_offered,
     get_user_timezone,
+    list_agent_context_snapshots,
     list_context_sources,
     list_user_context_sources,
 )
@@ -72,6 +74,9 @@ RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
 RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
 OPEN_QUESTIONS_SOURCE_TYPE = "open_questions"
+MIGHT_FIT_SOURCE_TYPE = "might_fit"
+# A memory offered as "might fit" waits this many replies before it is offered again.
+MIGHT_FIT_ROTATION_REPLIES = 5
 # Replies in one session that may see the same open question; then it waits for the next session,
 # so an unanswered doubt never turns into nagging.
 OPEN_QUESTION_REPLIES_PER_SESSION = 3
@@ -191,6 +196,7 @@ def build_reply_context_sources(
             memory_query_embedding,
             broad="profile_recall" in query_intent.labels,
         )
+        durable_memory_sources += _might_fit_sources(conversation_id, user_id, durable_memory_sources)
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
     structured_whatsapp_sources = _structured_whatsapp_context_sources(
@@ -426,6 +432,53 @@ def _session_span(started: datetime, ended: datetime | None, zone: Any) -> str:
     end = ended.astimezone(zone)
     end_text = clock_label(end) if end.date() == start.date() else local_label(end)
     return f"{local_label(start)} to {end_text}"
+
+
+def _might_fit_sources(
+    conversation_id: str,
+    user_id: str | None,
+    memory_sources: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Things Omi knows that the message does not touch but the moment might suit."""
+    if not user_id:
+        return []
+    shown = {
+        str(memory_id)
+        for source in memory_sources
+        for memory_id in (source.get("metadata") or {}).get("memory_ids") or []
+    }
+    memories = might_fit_memories(
+        user_id,
+        exclude_ids=shown,
+        recently_offered=_recently_offered(conversation_id, user_id),
+    )
+    if not memories:
+        return []
+    zone = user_zone(get_user_timezone(user_id))
+    lines = [
+        "Things you know about them that this message does not touch. Use at most one, only if it "
+        "fits the moment naturally (a quiet or open turn); their message comes first. Never list them.",
+        *(f"- {memory_sentence(memory)}{_memory_time_note(memory, zone)}" for memory in memories),
+    ]
+    return [
+        {
+            "source_type": MIGHT_FIT_SOURCE_TYPE,
+            "title": "Might fit",
+            "content": "\n".join(lines),
+            "metadata": {"memory_ids": [memory.get("id") for memory in memories]},
+        }
+    ]
+
+
+def _recently_offered(conversation_id: str, user_id: str) -> set[str]:
+    offered: set[str] = set()
+    for snapshot in list_agent_context_snapshots(
+        conversation_id, user_id, limit=MIGHT_FIT_ROTATION_REPLIES
+    ):
+        for source in (snapshot.get("context") or {}).get("sources") or []:
+            if source.get("source_type") == MIGHT_FIT_SOURCE_TYPE:
+                offered.update(str(item) for item in (source.get("metadata") or {}).get("memory_ids") or [])
+    return offered
 
 
 def _open_question_sources(conversation_id: str, user_id: str | None) -> list[dict[str, Any]]:

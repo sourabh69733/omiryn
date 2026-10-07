@@ -25,6 +25,8 @@ SOURCE_TYPE_PRIORITY = {
     "agent_memories_v3": 110,
     # How the user asked to be talked to; few lines, needed on every reply.
     "how_to_talk": 118,
+    # A few memories the message does not touch; below the ones it does.
+    "might_fit": 105,
     # One short doubt to clear up when it fits.
     "open_questions": 117,
     "agent_self_notes": 112,
@@ -45,6 +47,9 @@ SOURCE_TYPE_CHAR_LIMIT = {
     # Up to 12 one-line memories with their dates on a "what do you know about me" turn.
     "agent_memories_v3": 2800,
     "agent_self_notes": 1000,
+    "how_to_talk": 800,
+    "open_questions": 600,
+    "might_fit": 800,
     "agent_behavior_rules": 1400,
     "data_points": 1200,
     "friend_style": STYLE_CONTEXT_CHAR_LIMIT,
