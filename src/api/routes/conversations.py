@@ -18,6 +18,7 @@ from agent.cognition.background.service import (
     should_schedule_background_cognition,
     should_schedule_idle_background_cognition,
 )
+from agent.context_engine.conversation_engine.understanding.rules.stance import explicit_constraints
 from agent.runtime.orchestrator import run_agent_turn
 from agent.shared.clock import utc_now, utc_now_iso
 from agent.shared.timeline import parse_time
@@ -455,6 +456,10 @@ async def _reply_to_pending(
         # Durable idle flush; after a threshold run it is a backstop that finds nothing
         # pending unless that run was lost to a crash or restart.
         schedule_idle_flush(conversation.id, _user_id(user))
+        if not run_cognition_now and explicit_constraints(str(user_message.get("content") or "")):
+            # "No questions", "just listen": save how they want to be talked to now, so their
+            # other chats know it without waiting for the idle flush.
+            request_flush_now(conversation.id, _user_id(user))
     return conversation
 
 
