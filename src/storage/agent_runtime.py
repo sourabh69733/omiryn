@@ -421,13 +421,18 @@ def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 def list_agent_context_snapshots(
     conversation_id: str | None = None,
     user_id: str | None = None,
+    *,
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
+    """Newest first."""
     owner_id = _require_user_id(user_id, "agent context snapshot list")
     statement = select(agent_context_snapshots).order_by(
         agent_context_snapshots.c.created_at.desc()
     ).where(agent_context_snapshots.c.user_id == owner_id)
     if conversation_id:
         statement = statement.where(agent_context_snapshots.c.conversation_id == conversation_id)
+    if limit is not None:
+        statement = statement.limit(limit)
 
     with ENGINE.begin() as connection:
         rows = connection.execute(statement).mappings().all()
