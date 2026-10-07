@@ -168,3 +168,14 @@ class TurnFactsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AddressRuleTest(unittest.TestCase):
+    def test_gender_is_only_assumed_when_the_user_chose_one(self) -> None:
+        from agent.context_engine.prompt_engine.blocks import _address_rule
+
+        self.assertIn("masculine", _address_rule({"gender": "man"}))
+        self.assertIn("feminine", _address_rule({"gender": "woman"}))
+        for gender in (None, "non_binary", "prefer_not_to_say"):
+            with self.subTest(gender=gender):
+                self.assertIn("not known", _address_rule({"gender": gender}))

@@ -144,7 +144,7 @@ def build_companion_system_prompt_v4(
             safety_module_prompt(allow_mild_adult_humor=behavior.allow_mild_adult_humor),
         ]),
         ("format", [output_format_prompt()]),
-        ("about_user", [_user_basics(user_profile), *grouped.get("about_user", [])]),
+        ("about_user", [_user_basics(user_profile), _address_rule(user_profile), *grouped.get("about_user", [])]),
         ("friend_vibe", [
             matching_understanding_prompt(matching_understanding) if matching_understanding else "",
         ]),
@@ -206,6 +206,19 @@ def _split_time_prompt(text: str) -> tuple[str, str]:
 
 
 _TIME_RULE_STARTS = ("Notes like", "Answer when-questions")
+
+
+def _address_rule(user_profile: dict[str, Any] | None) -> str:
+    """How to address them in gendered Hindi/Hinglish, from what they chose at signup."""
+    gender = str((user_profile or {}).get("gender") or "").lower()
+    if gender in {"man", "male"}:
+        return "In Hindi or Hinglish, use masculine forms for them (karte ho, wale ho)."
+    if gender in {"woman", "female"}:
+        return "In Hindi or Hinglish, use feminine forms for them (karti ho, wali ho)."
+    return (
+        "Their gender is not known: in Hindi or Hinglish, use forms that do not assume it "
+        "(\"kya plan hai?\", \"tumne kya socha?\") instead of \"karne wale/wali ho\"."
+    )
 
 
 def _user_basics(user_profile: dict[str, Any] | None) -> str:
