@@ -24,6 +24,10 @@ SEED_STOCK_PHRASES = (
     "what's on your mind",
     "whats on your mind",
     "sometimes just relaxing is nice",
+    # Praising "nothing" after a dry reply ("kuch nhi"), seen in real chats on several models.
+    "kabhi kabhi 'kuch nahi'",
+    "kabhi kabhi kuch nahi",
+    "silent nights can be nice",
     "that sounds like fun",
     "that sounds amazing",
     "that sounds interesting",
