@@ -33,6 +33,7 @@ _SOURCE_BLOCKS = {
     "user_card": "about_user",
     "agent_memories_v3": "memories",
     "how_to_talk": "how_to_talk",
+    "reply_feedback": "how_to_talk",
     "open_questions": "open_questions",
     "might_fit": "might_fit",
     "data_points": "memories",
@@ -53,7 +54,7 @@ BLOCK_CHAR_LIMITS = {
     "attached": 4000,
     "might_fit": 800,
     "open_questions": 700,
-    "how_to_talk": 1200,
+    "how_to_talk": 2000,
     "this_turn": 2000,
     "goal": 1200,
 }

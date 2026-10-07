@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from agent.config import agent_pipeline_config
@@ -53,6 +53,7 @@ from storage import (
     mark_open_question_offered,
     get_user_timezone,
     list_agent_context_snapshots,
+    list_agent_message_feedback,
     list_context_sources,
     list_user_context_sources,
 )
@@ -75,6 +76,19 @@ RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
 OPEN_QUESTIONS_SOURCE_TYPE = "open_questions"
 MIGHT_FIT_SOURCE_TYPE = "might_fit"
+REPLY_FEEDBACK_SOURCE_TYPE = "reply_feedback"
+# Recent ratings shown on every reply, newest first; older ones have done their job.
+REPLY_FEEDBACK_WINDOW_DAYS = 30
+REPLY_FEEDBACK_DISLIKED = 3
+REPLY_FEEDBACK_LIKED = 2
+_FEEDBACK_REASON_WORDS = {
+    "too_much": "too much",
+    "bad_tone": "the tone felt off",
+    "not_me": "not like them",
+    "wrong_memory": "got something about them wrong",
+    "not_helpful": "not helpful",
+    "unsafe": "felt unsafe",
+}
 # A memory offered as "might fit" waits this many replies before it is offered again.
 MIGHT_FIT_ROTATION_REPLIES = 5
 # Replies in one session that may see the same open question; then it waits for the next session,
@@ -213,6 +227,7 @@ def build_reply_context_sources(
         + _conversation_summary_sources(conversation_id, user_id)
         + _self_note_sources(user_id, user_text)
         + _open_question_sources(conversation_id, user_id)
+        + _reply_feedback_sources(user_id)
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
@@ -479,6 +494,54 @@ def _recently_offered(conversation_id: str, user_id: str) -> set[str]:
             if source.get("source_type") == MIGHT_FIT_SOURCE_TYPE:
                 offered.update(str(item) for item in (source.get("metadata") or {}).get("memory_ids") or [])
     return offered
+
+
+def _reply_feedback_sources(user_id: str | None) -> list[dict[str, Any]]:
+    """Replies the user rated, so the next reply learns from them right away."""
+    if not user_id:
+        return []
+    cutoff = utc_now() - timedelta(days=REPLY_FEEDBACK_WINDOW_DAYS)
+    disliked: list[str] = []
+    liked: list[str] = []
+    chats: dict[str, list[dict[str, Any]]] = {}
+    for item in list_agent_message_feedback(user_id=user_id):  # newest first
+        created = parse_time(item.get("created_at"))
+        if created is not None and created < cutoff:
+            break
+        bucket = liked if item["rating"] == "good" else disliked
+        if len(bucket) >= (REPLY_FEEDBACK_LIKED if bucket is liked else REPLY_FEEDBACK_DISLIKED):
+            continue
+        conversation_id = str(item["conversation_id"])
+        if conversation_id not in chats:
+            chats[conversation_id] = list((get_conversation(conversation_id, user_id) or {}).get("messages") or [])
+        messages = chats[conversation_id]
+        index = int(item["message_index"])
+        reply = str(messages[index].get("content") or "") if 0 <= index < len(messages) else ""
+        if not reply.strip():
+            continue
+        reasons = [
+            _FEEDBACK_REASON_WORDS[reason]
+            for reason in (item.get("metadata") or {}).get("reasons") or []
+            if reason in _FEEDBACK_REASON_WORDS
+        ]
+        note = "; ".join(filter(None, [", ".join(reasons), str(item.get("comment") or "").strip()[:160]]))
+        quoted = " ".join(reply.replace("<next_message>", " ").split())[:160]
+        bucket.append(f"- \"{quoted}\"" + (f" ({note})" if note and bucket is disliked else ""))
+    if not disliked and not liked:
+        return []
+    lines = ["Replies of yours they rated. Learn the pattern; never repeat these lines or mention the ratings."]
+    if disliked:
+        lines += ["They disliked:", *disliked]
+    if liked:
+        lines += ["They liked:", *liked]
+    return [
+        {
+            "source_type": REPLY_FEEDBACK_SOURCE_TYPE,
+            "title": "Replies they rated",
+            "content": "\n".join(lines),
+            "metadata": {"disliked": len(disliked), "liked": len(liked)},
+        }
+    ]
 
 
 def _open_question_sources(conversation_id: str, user_id: str | None) -> list[dict[str, Any]]:

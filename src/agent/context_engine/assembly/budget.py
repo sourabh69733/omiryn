@@ -25,6 +25,8 @@ SOURCE_TYPE_PRIORITY = {
     "agent_memories_v3": 110,
     # How the user asked to be talked to; few lines, needed on every reply.
     "how_to_talk": 118,
+    # The user's own ratings of recent replies; they shape how to talk.
+    "reply_feedback": 117,
     # A few memories the message does not touch; below the ones it does.
     "might_fit": 105,
     # One short doubt to clear up when it fits.
@@ -48,6 +50,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "agent_memories_v3": 2800,
     "agent_self_notes": 1000,
     "how_to_talk": 800,
+    "reply_feedback": 1000,
     "open_questions": 600,
     "might_fit": 800,
     "agent_behavior_rules": 1400,
