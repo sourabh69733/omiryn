@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -58,8 +58,12 @@ class RecallCase:
     answer: tuple[tuple[str, ...], ...] = ()
     forbidden: tuple[str, ...] = ()
     max_questions: int | None = None
+    # A reply shorter than this gave the user nothing (dry-reply cases).
+    min_words: int = 0
     # When the question is asked; defaults to NOW.
     now: str = NOW
+    # Earlier turns of the new chat, as (role, text), sent a minute apart before the question.
+    history: tuple[tuple[str, str], ...] = ()
     what: str = ""
     tags: tuple[str, ...] = field(default_factory=tuple)
 
@@ -219,6 +223,22 @@ NOISE: tuple[SeedMemory, ...] = (
 
 RECALL_CASES: tuple[RecallCase, ...] = (
     RecallCase(
+        id="nothing_much",
+        question="kuch nhi",
+        history=(("user", "hey"), ("assistant", "Heyy! Aaj kya plan hai?")),
+        memories=(OLD_FILMS, BIRTHDAY),
+        needs=(),
+        # Any idea of its own counts; what fails is praising "nothing" or only mirroring it.
+        forbidden=(
+            r"kuch na?hi?n?\W{0,3}[^.?!]{0,40}\b(best|accha|theek|sahi)\b",
+            r"^\W*(kuch (bhi )?na?hi?n?|nothing)\W*$",
+        ),
+        min_words=4,
+        now="2026-10-06T21:30:00+05:30",
+        what="A dry reply: bring something of your own, don't echo their words back.",
+        tags=("attention", "dry_reply"),
+    ),
+    RecallCase(
         id="who_is_my_wife",
         question="who is my wife?",
         memories=(WIFE, MOVIE),
@@ -346,6 +366,11 @@ async def run_recall_case(
     ids_by_tag, records = _seed_memories(user_id, case.memories + (NOISE if noise else ()))
     await index_agent_memories(records)  # embeddings, as background cognition makes them
     conversation_id = f"recall-chat-{uuid4().hex}"
+    start = datetime.fromisoformat(case.now) - timedelta(minutes=len(case.history) + 1)
+    history = [
+        {"role": role, "content": text, "created_at": (start + timedelta(minutes=index)).isoformat()}
+        for index, (role, text) in enumerate(case.history)
+    ]
     save_conversation(
         {
             "id": conversation_id,
@@ -353,14 +378,14 @@ async def run_recall_case(
             "status": "active",
             "agent_provider": provider,
             "agent_model": model,
-            "messages": [],
+            "messages": history,
         },
         user_id,
     )
     with frozen_time(datetime.fromisoformat(case.now)):
         result = await run_agent_turn(
             conversation_id=conversation_id,
-            messages=[],
+            messages=history,
             user_text=case.question,
             user_id=user_id,
             user_profile={"user_id": user_id, "display_name": "Eval User"},
@@ -372,7 +397,7 @@ async def run_recall_case(
         )
     reply = " ".join(
         str(message.get("content") or "")
-        for message in result.messages
+        for message in result.messages[len(history) :]
         if message.get("role") == "assistant"
     ).strip()
     in_prompt = _memory_ids_in_prompt(conversation_id, user_id)
@@ -465,6 +490,8 @@ def _answer_problems(case: RecallCase, reply: str) -> tuple[str, ...]:
         if not any(re.search(pattern, text) for pattern in group)
     ]
     problems.extend(f"says: {pattern}" for pattern in case.forbidden if re.search(pattern, text))
+    if len(reply.split()) < case.min_words:
+        problems.append(f"only {len(reply.split())} words")
     if case.max_questions is not None and reply.count("?") > case.max_questions:
         problems.append(f"asked {reply.count('?')} question(s)")
     return tuple(problems)
