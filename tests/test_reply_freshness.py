@@ -47,13 +47,19 @@ class StaleReplyTest(unittest.TestCase):
 
     def test_trim_questions_drops_extra_questions_but_never_empties(self) -> None:
         separator = "<next_message>"
-        self.assertEqual(trim_questions(f"which one?{separator}was it any good?", 1), "which one?")
+        self.assertEqual(trim_questions(f"which one?{separator}was it any good?", 1), "was it any good?")
         self.assertEqual(
             trim_questions(f"boring movies can be a drag.{separator}what did you expect?", 0),
             "boring movies can be a drag.",
         )
-        self.assertEqual(trim_questions(f"which one?{separator}was it good?", 0), "which one?")
+        self.assertEqual(trim_questions(f"which one?{separator}was it good?", 0), "was it good?")
         self.assertEqual(trim_questions("Raju made chai. Want more?", 1), "Raju made chai. Want more?")
+        # A bare echo goes first, and a lead-in does not hang once its question is dropped.
+        self.assertEqual(
+            trim_questions("Kuch bhi? Chalo, maine socha... ek purani film dekhein aaj?", 1),
+            "Chalo, maine socha... ek purani film dekhein aaj?",
+        )
+        self.assertEqual(trim_questions("Nice. Maine socha... film dekhein?", 0), "Nice.")
 
     def test_turn_notes(self) -> None:
         self.assertEqual(_turn_notes(1), [])
@@ -131,7 +137,7 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
                 generation_arguments={"system_prompt": "SYSTEM"},
                 question_limit=1,
             )
-        self.assertEqual(reply, "which one?")
+        self.assertEqual(reply, "was it any good?")
         self.assertTrue(freshness["questions_trimmed"])
         self.assertFalse(freshness["still_stale"])
 

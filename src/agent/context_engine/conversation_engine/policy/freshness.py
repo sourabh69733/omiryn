@@ -59,27 +59,32 @@ def question_rule_reason(reply: str, question_limit: int) -> str | None:
 def trim_questions(reply: str, question_limit: int) -> str:
     """Last resort when a rewrite still breaks the limit: drop question sentences past it.
 
-    Works on whole sentences and bubbles, so nothing is cut mid-sentence. A reply is never
-    emptied: if only questions remain, the first question is kept.
+    Works on whole sentences and bubbles, so nothing is cut mid-sentence. The questions that say
+    the most are kept. A reply is never emptied: if only questions remain, the longest is kept.
     """
+    bubbles = [
+        [sentence for sentence in re.split(r"(?<=[.!?\u0964])\s+", bubble.strip()) if sentence]
+        for bubble in reply.split(REPLY_PART_SEPARATOR)
+    ]
+    questions = [sentence for bubble in bubbles for sentence in bubble if "?" in sentence]
+    # Keep the questions that carry the most; a bare echo ("Kuch bhi?") goes first.
+    keep = set(sorted(questions, key=lambda sentence: -len(sentence.split()))[:question_limit])
     kept_bubbles: list[str] = []
-    questions_kept = 0
-    first_question: str | None = None
-    for bubble in reply.split(REPLY_PART_SEPARATOR):
-        kept_sentences = []
-        for sentence in re.split(r"(?<=[.!?\u0964])\s+", bubble.strip()):
-            if not sentence:
+    for bubble in bubbles:
+        kept: list[str] = []
+        for index, sentence in enumerate(bubble):
+            if "?" in sentence and sentence not in keep:
                 continue
-            if "?" in sentence:
-                first_question = first_question or sentence
-                if questions_kept >= question_limit:
-                    continue
-                questions_kept += 1
-            kept_sentences.append(sentence)
-        if kept_sentences:
-            kept_bubbles.append(" ".join(kept_sentences))
+            following = bubble[index + 1] if index + 1 < len(bubble) else None
+            dropped_next = following is not None and "?" in following and following not in keep
+            # A lead-in ("maine socha...") whose follow-up was dropped would hang unfinished.
+            if dropped_next and sentence.rstrip().endswith(("...", "\u2026", ":")):
+                continue
+            kept.append(sentence)
+        if kept:
+            kept_bubbles.append(" ".join(kept))
     if not kept_bubbles:
-        return first_question or reply
+        return max(questions, key=lambda sentence: len(sentence.split())) if questions else reply
     return REPLY_PART_SEPARATOR.join(kept_bubbles)
 
 
