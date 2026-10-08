@@ -637,3 +637,41 @@ button.omi-drawer-close:hover {
   background: transparent;
   color: var(--ink);
 }
+
+/* Chat header: back arrow, then Omi's avatar and name right beside it, and the menu at the far
+   right (like any messaging app), instead of a centred name floating between them. */
+.omi-main .agentic-chat .card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.omi-main .chat-title-lockup {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  column-gap: 10px;
+}
+
+.omi-main .chat-title-lockup > div {
+  min-width: 0;
+}
+
+.omi-main .agentic-chat .agent-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omi-main .omi-chat-menu {
+  flex: none;
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  .omi-main .agentic-chat .card-heading {
+    min-height: 56px;
+    padding: 8px 8px 8px 4px;
+  }
+}
