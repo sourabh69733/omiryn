@@ -33,6 +33,15 @@ const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 24);
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
+// One "Start talking" at a time: the nav button shows only when the page's own buttons are off screen.
+const pageCtas = $$('[data-track="hero_start_talking"], #cta [data-app-link]');
+const ctaInView = new Set();
+const ctaWatch = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => (entry.isIntersecting ? ctaInView.add(entry.target) : ctaInView.delete(entry.target)));
+  nav.classList.toggle("show-cta", ctaInView.size === 0);
+});
+pageCtas.forEach((cta) => ctaWatch.observe(cta));
+
 $$('a[href^="#"]').forEach((link) => {
   link.addEventListener("click", (event) => {
     const href = link.getAttribute("href");

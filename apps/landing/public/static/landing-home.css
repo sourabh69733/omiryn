@@ -185,6 +185,9 @@
   box-shadow: none;
 }
 .home .nav-cta:hover { background: var(--accent) !important; box-shadow: none; transform: none; }
+.home .nav:not(.show-cta) .nav-cta { display: none; }
+.home .nav.show-cta .nav-cta { animation: nav-cta-in 0.25s ease-out; }
+@keyframes nav-cta-in { from { opacity: 0; transform: translateY(-4px); } }
 
 .home .nav-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
 .o-mark {
@@ -403,9 +406,11 @@
 
 /* Phones: steps as a list, one full-size chat, then the match card (no pinning, no overlap). */
 .o-story.is-compact { min-height: 0; }
-.o-story.is-compact .o-story-steps { display: grid; gap: 22px; min-height: 0; }
+.o-story.is-compact .o-story-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; min-height: 0; }
 .o-story.is-compact .st { position: static; }
-.o-story.is-compact .o-h2 { font-size: 28px; }
+.o-story.is-compact .st-num { margin-bottom: 6px; }
+.o-story.is-compact .o-h2 { font-size: 17px; line-height: 1.2; }
+.o-story.is-compact .o-sub { display: none; }
 .o-story.is-compact .o-story-bar,
 .o-story.is-compact .blob,
 .o-story.is-compact .s-tags { display: none; }
