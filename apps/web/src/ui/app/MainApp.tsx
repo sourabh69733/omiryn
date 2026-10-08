@@ -22,7 +22,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const [accountOpen, setAccountOpen] = useState(false);
   // Phones show the contacts list first and the chat full screen; web shows both side by side.
   const isMobile = useIsMobile();
-  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  // Phones open straight into the Omi chat; the back arrow shows the contacts list.
+  const [mobileChatOpen, setMobileChatOpen] = useState(true);
   const [omiStatus, setOmiStatus] = useState<OmiStatus>({ typing: false, preview: "", viewingEarlier: false });
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const omiRow = (
     <button type="button" className={`omi-contact ${page === "chat" && !showContactsHome && !omiStatus.viewingEarlier ? "is-active" : ""}`} onClick={openOmi}>
       <span className="omi-contact-avatar"><AgentOrb state={omiStatus.typing ? "thinking" : "idle"} /></span>
-      <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : <small>{omiStatus.preview || "AI companion"}</small>}</span>
+      <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : <small>{omiStatus.preview || "Finds your people"}</small>}</span>
     </button>
   );
 
