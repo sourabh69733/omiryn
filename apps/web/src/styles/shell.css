@@ -823,3 +823,68 @@ button.omi-drawer-close:hover {
   width: 15px;
   height: 15px;
 }
+
+/* Desktop: a faint circle beside a message starts selecting. Phones hold the message instead. */
+.message-select-hint {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .message-select-hint {
+    display: inline-block;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 18px;
+    height: 18px;
+    margin: 0 6px;
+    padding: 0;
+    border: 1.5px solid var(--line);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .message-row:hover .message-select-hint,
+  .message-select-hint:focus-visible {
+    opacity: 1;
+  }
+}
+
+.message-row.user .message-select-hint,
+.message-row.user .message-select-mark {
+  order: -1;
+}
+
+.clear-everything-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #f1c4c4;
+  border-radius: 12px;
+  background: #fff7f7;
+  font-size: 13.5px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.clear-everything-option input {
+  margin-top: 3px;
+}
+
+.clear-everything-confirm {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+
+.clear-everything-confirm input {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}

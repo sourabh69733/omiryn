@@ -84,6 +84,9 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const [messageImpact, setMessageImpact] = useState<MessageDeletionImpact | null>(null);
   const [confirmingMessages, setConfirmingMessages] = useState(false);
   const [deletingMessages, setDeletingMessages] = useState(false);
+  const [clearEverything, setClearEverything] = useState(false);
+  const [clearWord, setClearWord] = useState("");
+  const longPressRef = useRef<number | null>(null);
   useEffect(() => {
     // A selection belongs to one chat.
     setSelecting(false);
@@ -794,6 +797,46 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     setSelected([]);
     setConfirmingMessages(false);
     setMessageImpact(null);
+    setClearEverything(false);
+    setClearWord("");
+  }
+
+  function startSelecting(index: number) {
+    setSelecting(true);
+    setSelected([index]);
+  }
+
+  // Phones: hold a message to start selecting.
+  function holdToSelect(index: number) {
+    cancelHold();
+    longPressRef.current = window.setTimeout(() => {
+      longPressRef.current = null;
+      startSelecting(index);
+    }, 500);
+  }
+
+  function cancelHold() {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }
+
+  async function clearAllOfOmi() {
+    setDeletingMessages(true);
+    try {
+      const response = await apiFetch("/api/me/omi/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: clearWord }),
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Couldn't clear Omi's chats and memories."));
+      // Every chat and memory is gone; start fresh.
+      window.location.reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Couldn't clear Omi's chats and memories.");
+      setDeletingMessages(false);
+    }
   }
 
   async function reviewMessageDeletion() {
@@ -922,6 +965,11 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     () => (conversation ? notedLinesByMessage(vibeAreas, conversation.id, visibleMessages) : new Map<number, NotedLine[]>()),
     [vibeAreas, conversation, shownCount],
   );
+  const selectableIndexes = useMemo(
+    () => (conversation ? conversation.messages.flatMap((message, index) => (isDeletedMessage(message) ? [] : [index])) : []),
+    [conversation],
+  );
+  const allSelected = selectableIndexes.length > 0 && selected.length === selectableIndexes.length;
   const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
               if (isDeletedMessage(message)) return null;
               const agent = message.role === "assistant";
@@ -945,9 +993,11 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                     className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""}`}
                     id={`message-${index}`}
                     data-message-index={index}
-                    {...(selecting ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => setSelected((current) => toggleSelected(current, index)), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setSelected((current) => toggleSelected(current, index)); } } } : {})}
+                    {...(selecting
+                      ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => setSelected((current) => toggleSelected(current, index)), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setSelected((current) => toggleSelected(current, index)); } } }
+                      : { onTouchStart: () => holdToSelect(index), onTouchEnd: cancelHold, onTouchMove: cancelHold, onContextMenu: (event: React.MouseEvent) => { if (longPressRef.current === null && "ontouchstart" in window) event.preventDefault(); } })}
                   >
-                    {selecting ? <span className="message-select-mark" aria-hidden="true">{isSelected ? <Check /> : null}</span> : null}
+                    {selecting ? <span className="message-select-mark" aria-hidden="true">{isSelected ? <Check /> : null}</span> : <button type="button" className="message-select-hint" aria-label="Select this message" title="Select" onClick={() => startSelecting(index)} />}
                     {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
@@ -1007,6 +1057,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           {selecting ? (
             <div className="message-select-bar" role="toolbar" aria-label="Selected messages">
               <span>{selected.length ? `${selected.length} selected` : "Tap messages to select"}</span>
+              <button type="button" className="secondary-button" onClick={() => setSelected(allSelected ? [] : selectableIndexes)}>{allSelected ? "Clear selection" : "Select all"}</button>
               <button type="button" className="secondary-button" onClick={stopSelecting}>Cancel</button>
               <button type="button" className="danger-button" disabled={!selected.length} onClick={() => void reviewMessageDeletion()}><Trash2 aria-hidden="true" />Delete</button>
             </div>
@@ -1114,14 +1165,31 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-messages-title">
             <div className="confirm-icon" aria-hidden="true"><Trash2 /></div>
             <div className="confirm-copy">
-              <p className="eyebrow">Delete messages</p>
-              <h2 id="delete-messages-title">Delete {selected.length} {selected.length === 1 ? "message" : "messages"}?</h2>
-              <p>They're gone for good, for you and for Omi.</p>
-              {messageImpact ? <ul className="delete-impact">{messageDeletionImpactLines(messageImpact).map((line) => <li key={line}>{line}</li>)}</ul> : <p className="confirm-session">Checking what goes with them…</p>}
+              <p className="eyebrow">{clearEverything ? "Clear Omi" : "Delete messages"}</p>
+              <h2 id="delete-messages-title">{clearEverything ? "Clear everything Omi knows about you?" : `Delete ${selected.length} ${selected.length === 1 ? "message" : "messages"}?`}</h2>
+              <p>{clearEverything ? "Every chat with Omi and everything it learned will be deleted. Omi starts fresh with you." : "They're gone for good, for you and for Omi."}</p>
+              {messageImpact && !clearEverything ? <ul className="delete-impact">{messageDeletionImpactLines(messageImpact).map((line) => <li key={line}>{line}</li>)}</ul> : null}
+              {!messageImpact && !clearEverything ? <p className="confirm-session">Checking what goes with them…</p> : null}
+              {allSelected ? (
+                <label className="clear-everything-option">
+                  <input type="checkbox" checked={clearEverything} onChange={(event) => { setClearEverything(event.target.checked); setClearWord(""); }} />
+                  <span>Also clear everything Omi knows about me: all memories, your vibe, earlier chats and uploads. Your account and profile stay.</span>
+                </label>
+              ) : null}
+              {clearEverything ? (
+                <label className="clear-everything-confirm">
+                  This can't be undone. Type <strong>clear</strong> to confirm.
+                  <input type="text" value={clearWord} onChange={(event) => setClearWord(event.target.value)} autoComplete="off" autoFocus aria-label='Type "clear" to confirm' />
+                </label>
+              ) : null}
             </div>
             <div className="confirm-actions">
               <button className="secondary-button" type="button" onClick={() => setConfirmingMessages(false)} disabled={deletingMessages}>Cancel</button>
-              <button className="danger-button" type="button" onClick={() => void deleteSelectedMessages()} disabled={deletingMessages || !messageImpact}>{deletingMessages ? "Deleting…" : "Delete"}</button>
+              {clearEverything ? (
+                <button className="danger-button" type="button" onClick={() => void clearAllOfOmi()} disabled={deletingMessages || clearWord.trim().toLowerCase() !== "clear"}>{deletingMessages ? "Clearing…" : "Clear everything"}</button>
+              ) : (
+                <button className="danger-button" type="button" onClick={() => void deleteSelectedMessages()} disabled={deletingMessages || !messageImpact}>{deletingMessages ? "Deleting…" : "Delete"}</button>
+              )}
             </div>
           </section>
         </div>
