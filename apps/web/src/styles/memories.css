@@ -1,0 +1,167 @@
+/* Memories: a calm list in one readable column, like the Profile page. */
+.mem {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.mem-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.mem-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.mem-group {
+  display: grid;
+  gap: 8px;
+}
+
+.mem-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mem-group h2 span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mem-group-note {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mem-list {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.mem-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mem-row:last-child {
+  border-bottom: 0;
+}
+
+.mem-row.menu-open {
+  z-index: 5;
+}
+
+.mem-row-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mem-row-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mem-row-copy p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.mem-row.is-old .mem-row-copy p {
+  color: var(--muted);
+}
+
+.mem-row-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mem-flag {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.mem-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: none;
+}
+
+.mem-row-menu .history-menu {
+  min-width: 220px;
+}
+
+a.mem-link,
+button.mem-link {
+  justify-self: start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-violet);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+button.mem-link:hover,
+a.mem-link:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.mem-link.is-muted {
+  color: var(--muted);
+}
+
+.mem-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (max-width: 480px) {
+  .mem-row {
+    align-items: flex-start;
+  }
+
+  .mem-row-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+}

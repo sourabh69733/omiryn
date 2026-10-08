@@ -290,6 +290,11 @@ button.omi-account-button:hover {
   margin-inline: auto;
 }
 
+/* Pages next to the rail get even side margins (the chat and profile set their own). */
+.omi-main > .screen:not(.interview-screen):not(.pf) {
+  padding: 36px clamp(16px, 4vw, 48px) 56px;
+}
+
 button.omi-back {
   display: grid;
   place-items: center;
