@@ -86,6 +86,17 @@ def summarized_through(context_sources: list[dict[str, Any]] | None) -> int | No
     return None
 
 
+def _reply_quote_note(message: dict[str, Any]) -> str:
+    """Which earlier message the user is replying to, so the model knows what "this" means."""
+    reply_to = message.get("reply_to")
+    if message.get("role") != "user" or not isinstance(reply_to, dict):
+        return ""
+    if reply_to.get("deleted") or not reply_to.get("text"):
+        return "[Replying to a message they later deleted]"
+    whose = "your message" if reply_to.get("role") == "assistant" else "their own earlier message"
+    return f'[Replying to {whose}: "{reply_to["text"]}"]'
+
+
 def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     provider_messages = []
     # reply_window() already computed notes in the user's timezone; otherwise use the default.
@@ -100,6 +111,9 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         if role not in {"assistant", "user", "system"} or content is None or message.get("deleted"):
             continue
         text = str(content)
+        quote = _reply_quote_note(message)
+        if quote:
+            text = f"{quote} {text}"
         if note:
             text = f"{note} {text}"
         provider_messages.append({"role": role, "content": text})

@@ -65,6 +65,12 @@ def delete_conversation_messages(user_id: str, conversation_id: str, message_ind
     conversation = get_conversation(conversation_id, owner_id) or {}
     messages = list(conversation.get("messages") or [])
     deleted_at = utc_now_iso()
+    chosen = set(indexes)
+    for position, message in enumerate(messages):
+        # A reply keeps pointing at the deleted message, but no longer quotes it.
+        reply_to = message.get("reply_to")
+        if isinstance(reply_to, dict) and reply_to.get("index") in chosen:
+            messages[position] = {**message, "reply_to": {"index": reply_to["index"], "deleted": True}}
     for index in indexes:
         original = messages[index]
         messages[index] = {
