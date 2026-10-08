@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from security.auth import CurrentUser, require_user
 from storage import (
+    clear_omi_data,
     delete_agent_memory,
     latest_agent_memory_reviews,
     list_agent_memories,
@@ -15,7 +16,7 @@ from storage import (
     update_agent_memory_allowed_uses,
 )
 
-from ..models import MemoryPermissionsPatch, MemoryReviewCreate
+from ..models import ClearOmiRequest, MemoryPermissionsPatch, MemoryReviewCreate
 
 
 router = APIRouter()
@@ -119,6 +120,18 @@ async def review_me_memory(
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found.")
     return _user_memory_payload(memory)
+
+
+@router.post("/api/me/omi/clear")
+async def clear_me_omi(
+    payload: ClearOmiRequest,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Delete every chat with Omi and everything Omi learned. The account and profile stay."""
+    if payload.confirm.strip().lower() != "clear":
+        raise HTTPException(status_code=400, detail='Type "clear" to confirm.')
+    deleted = clear_omi_data(user.id)
+    return {"status": "cleared", "conversations": deleted.get("agent_conversations", 0), "memories": deleted.get("agent_memories", 0)}
 
 
 @router.get("/api/me/open-questions")

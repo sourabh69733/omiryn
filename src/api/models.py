@@ -172,6 +172,11 @@ class AgentConversation(BaseModel):
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ClearOmiRequest(BaseModel):
+    # The word the user typed; must be "clear".
+    confirm: str = Field(max_length=20)
+
+
 class MessageSelection(BaseModel):
     message_indexes: list[int] = Field(min_length=1, max_length=500)
 

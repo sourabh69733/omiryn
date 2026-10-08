@@ -112,6 +112,54 @@ def delete_user_private_data(user_id: str, email: str | None = None) -> dict[str
     return summary
 
 
+# Everything Omi has about the user: chats and what it learned from them. Not the account,
+# profile, settings, usage limits or requests to us.
+_OMI_TABLES = (
+    data_point_feedback,
+    profile_facts,
+    agent_behavior_rules,
+    data_point_extraction_debug,
+    whatsapp_style_profiles,
+    whatsapp_people,
+    whatsapp_chunks,
+    whatsapp_messages,
+    whatsapp_imports,
+    conversation_context_sources,
+    conversation_states,
+    agent_memory_reviews,
+    agent_memory_evidence,
+    agent_memory_embeddings,
+    agent_memories,
+    memory_operation_applications,
+    memory_batch_failures,
+    memory_processing_leases,
+    memory_processing_states,
+    thread_operation_applications,
+    conversation_threads,
+    agent_message_feedback,
+    agent_context_snapshots,
+    agent_trace_steps,
+    agent_traces,
+    agent_usage_events,
+    agent_conversations,
+    agent_user_cards,
+    agent_vibe_cards,
+    agent_self_notes,
+    agent_open_questions,
+    agent_jobs,
+)
+
+
+def clear_omi_data(user_id: str) -> dict[str, int]:
+    """Delete all of Omi's chats and everything it learned; the account and profile stay."""
+    deleted: dict[str, int] = {}
+    with ENGINE.begin() as connection:
+        for table in _OMI_TABLES:
+            result = connection.execute(table.delete().where(table.c.user_id == user_id))
+            deleted[table.name] = int(result.rowcount or 0)
+    return deleted
+
+
 def _profile_photo_file_names(profile: Any) -> list[str]:
     if not profile:
         return []
