@@ -34,8 +34,9 @@ export function PrivacyPage({ onProfile, onMemories, onContact }: PrivacyPagePro
         </section>
         <section aria-labelledby="privacy-access-title">
           <h2 id="privacy-access-title">Who can read a chat?</h2>
-          <p>Only you, and Omi so it can reply. We never read your messages. Our team only sees what you send us yourself, like feedback or a support request.</p>
-          <p>We are building new technology to give you even more privacy.</p>
+          <p>You, and Omi so it can reply. Your messages are encrypted, but Omi has to read them to reply, so they are not end-to-end encrypted. This means the few people who run Omiryn's servers could technically access them.</p>
+          <p>We don't. Reading your chats is not part of anyone's job here, and access to our servers is limited. Our team only sees what you send us yourself, like feedback or a support request.</p>
+          <p>We are building technology so that one day even we can't access your messages.</p>
         </section>
         <section aria-labelledby="privacy-control-title">
           <h2 id="privacy-control-title">What can you control?</h2>
