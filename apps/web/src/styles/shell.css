@@ -754,3 +754,72 @@ button.omi-drawer-close:hover {
     padding: 8px 8px 8px 4px;
   }
 }
+
+/* Select mode: tap messages to pick them for deletion. */
+.message-row.is-selectable {
+  cursor: pointer;
+  border-radius: 14px;
+  transition: background 0.15s ease;
+}
+
+.message-row.is-selectable:hover,
+.message-row.is-selectable:focus-visible {
+  background: rgba(124, 58, 237, 0.05);
+  outline: none;
+}
+
+.message-row.is-selected {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.message-select-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  margin: 0 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  color: #fff;
+}
+
+.message-row.is-selected .message-select-mark {
+  border-color: #7c3aed;
+  background: #7c3aed;
+}
+
+.message-select-mark svg {
+  width: 13px;
+  height: 13px;
+}
+
+.message-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf8ff;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.message-select-bar span {
+  flex: 1;
+}
+
+.message-select-bar .danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-select-bar .danger-button svg {
+  width: 15px;
+  height: 15px;
+}

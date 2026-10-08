@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, History, Lock, Menu, MoreHorizontal, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, History, ListChecks, Lock, Menu, MoreHorizontal, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -11,6 +11,7 @@ import { notedLinesByMessage, type NotedLine } from "../notedLines";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
+import { isDeletedMessage, markDeleted, messageDeletionImpactLines, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { canShowUsage, pathForPage } from "../appUtils";
 import { type DeletionImpact, type Vibe, type VibeArea, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
@@ -77,6 +78,18 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   // What deleting the pending chat also removes; null while loading or unknown.
   const [deleteImpact, setDeleteImpact] = useState<DeletionImpact | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Select mode: pick messages to delete, see what goes with them, then confirm.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [messageImpact, setMessageImpact] = useState<MessageDeletionImpact | null>(null);
+  const [confirmingMessages, setConfirmingMessages] = useState(false);
+  const [deletingMessages, setDeletingMessages] = useState(false);
+  useEffect(() => {
+    // A selection belongs to one chat.
+    setSelecting(false);
+    setSelected([]);
+    setConfirmingMessages(false);
+  }, [conversation?.id]);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState<EmojiQuery | null>(null);
   const [emojiSuggestions, setEmojiSuggestions] = useState<EmojiSuggestion[]>([]);
@@ -776,6 +789,47 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     setSummaries((rows) => rows.map((row) => (row.id === id ? { ...row, archived_at: archivedAt } : row)));
   }
 
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected([]);
+    setConfirmingMessages(false);
+    setMessageImpact(null);
+  }
+
+  async function reviewMessageDeletion() {
+    if (!conversation || !selected.length) return;
+    setConfirmingMessages(true);
+    setMessageImpact(null);
+    const response = await apiFetch(`/api/agent/conversations/${conversation.id}/messages/deletion-impact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_indexes: selected }),
+    }).catch(() => null);
+    if (response?.ok) setMessageImpact(await response.json() as MessageDeletionImpact);
+  }
+
+  async function deleteSelectedMessages() {
+    if (!conversation || !selected.length) return;
+    const target = conversation.id;
+    setDeletingMessages(true);
+    try {
+      const response = await apiFetch(`/api/agent/conversations/${target}/messages/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_indexes: selected }),
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Couldn't delete those messages."));
+      const indexes = selected;
+      updateIfOpen(target, (current) => ({ ...current, messages: markDeleted(current.messages, indexes) }));
+      stopSelecting();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Couldn't delete those messages.");
+      setConfirmingMessages(false);
+    } finally {
+      setDeletingMessages(false);
+    }
+  }
+
   async function deleteConversation(id: string) {
     setDeleting(true);
     const response = await apiFetch(`/api/agent/conversations/${id}`, { method: "DELETE" });
@@ -869,7 +923,9 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     [vibeAreas, conversation, shownCount],
   );
   const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
+              if (isDeletedMessage(message)) return null;
               const agent = message.role === "assistant";
+              const isSelected = selected.includes(index);
               const currentDate = messageDateKey(message, index);
               const previous = index > 0 ? visibleMessages[index - 1] : null;
               const next = index < visibleMessages.length - 1 ? visibleMessages[index + 1] : null;
@@ -885,7 +941,13 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
               return (
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
-                  <div className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""}`} id={`message-${index}`} data-message-index={index}>
+                  <div
+                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""}`}
+                    id={`message-${index}`}
+                    data-message-index={index}
+                    {...(selecting ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => setSelected((current) => toggleSelected(current, index)), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setSelected((current) => toggleSelected(current, index)); } } } : {})}
+                  >
+                    {selecting ? <span className="message-select-mark" aria-hidden="true">{isSelected ? <Check /> : null}</span> : null}
                     {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                     <div className={`message ${agent ? "agent" : "user"}`}>
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
@@ -902,7 +964,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                   {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, noted, rejectingArea]);
+            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, noted, rejectingArea, selecting, selected]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
@@ -918,6 +980,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
               {chatMenuOpen ? (
                 <div className="history-menu omi-chat-menu-list" role="menu">
                   <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("earlier"); }}><History aria-hidden="true" />Earlier chats{earlierUnread ? <span className="history-new-pill">New</span> : null}</button>
+                  {conversation && !viewingEarlier ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setSelecting(true); setSelected([]); }}><ListChecks aria-hidden="true" />Select messages</button> : null}
                   {canShowUsage ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}><BarChart3 aria-hidden="true" />Usage (dev)</button> : null}
                 </div>
               ) : null}
@@ -941,7 +1004,13 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
               <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss vibe update"><X aria-hidden="true" /></button>
             </div>
           ) : null}
-          {viewingEarlier ? (
+          {selecting ? (
+            <div className="message-select-bar" role="toolbar" aria-label="Selected messages">
+              <span>{selected.length ? `${selected.length} selected` : "Tap messages to select"}</span>
+              <button type="button" className="secondary-button" onClick={stopSelecting}>Cancel</button>
+              <button type="button" className="danger-button" disabled={!selected.length} onClick={() => void reviewMessageDeletion()}><Trash2 aria-hidden="true" />Delete</button>
+            </div>
+          ) : viewingEarlier ? (
             <div className="omi-readonly-bar" role="status">
               <span>This is an earlier chat. New messages go to Omi's main chat.</span>
               <button type="button" onClick={() => omiId && void openConversation(omiId)}>Back to Omi</button>
@@ -1040,6 +1109,23 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           </>
         ) : null}
       </div>
+      {confirmingMessages ? (
+        <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deletingMessages) setConfirmingMessages(false); }}>
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-messages-title">
+            <div className="confirm-icon" aria-hidden="true"><Trash2 /></div>
+            <div className="confirm-copy">
+              <p className="eyebrow">Delete messages</p>
+              <h2 id="delete-messages-title">Delete {selected.length} {selected.length === 1 ? "message" : "messages"}?</h2>
+              <p>They're gone for good, for you and for Omi.</p>
+              {messageImpact ? <ul className="delete-impact">{messageDeletionImpactLines(messageImpact).map((line) => <li key={line}>{line}</li>)}</ul> : <p className="confirm-session">Checking what goes with them…</p>}
+            </div>
+            <div className="confirm-actions">
+              <button className="secondary-button" type="button" onClick={() => setConfirmingMessages(false)} disabled={deletingMessages}>Cancel</button>
+              <button className="danger-button" type="button" onClick={() => void deleteSelectedMessages()} disabled={deletingMessages || !messageImpact}>{deletingMessages ? "Deleting…" : "Delete"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Delete this chat?</h2><p id="delete-conversation-copy">It's gone for good, along with what Omi learned only from it.</p>{deleteImpact && deletionImpactLines(deleteImpact).length ? <ul className="delete-impact">{deletionImpactLines(deleteImpact).map((line) => <li key={line}>{line}</li>)}</ul> : null}<p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} {pendingDelete.message_count === 1 ? "message" : "messages"}</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete chat"}</button></div></section></div> : null}
     </section>
   );
