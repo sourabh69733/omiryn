@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -117,7 +118,10 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
                 .values(**_owned_update_values(payload, "user_id"), updated_at=func.now())
             )
         else:
-            connection.execute(agent_conversations.insert().values(**payload))
+            # Set once at creation; a chat never becomes temporary or stops being one.
+            connection.execute(
+                agent_conversations.insert().values(**payload, temporary=bool(conversation.get("temporary")))
+            )
 
 
 # Chats from before the voice setting were named for a voice; keep it so nothing changes for them.
@@ -151,6 +155,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_voice": _stored_voice(row),
         "agent_style_source_id": row.get("agent_style_source_id"),
         "archived_at": _isoformat_utc(row.get("archived_at")),
+        "temporary": bool(row.get("temporary")),
         "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
 
@@ -225,6 +230,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_voice": _stored_voice(row),
             "agent_style_source_id": row.get("agent_style_source_id"),
             "archived_at": _isoformat_utc(row.get("archived_at")),
+            "temporary": bool(row.get("temporary")),
             "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),
             "updated_at": _isoformat_utc(row["updated_at"]),
@@ -371,3 +377,35 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
 
     drop_vibe_proof_from_conversation(owner_id, conversation_id)
     return True
+
+
+# A temporary chat left open (tab closed, never ended) is deleted after this long without a message.
+TEMPORARY_CHAT_HOURS = 24
+
+
+def is_temporary_conversation(conversation_id: str, user_id: str) -> bool:
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        return bool(
+            connection.execute(
+                select(agent_conversations.c.temporary).where(
+                    agent_conversations.c.id == conversation_id,
+                    agent_conversations.c.user_id == owner_id,
+                )
+            ).scalar()
+        )
+
+
+def delete_stale_temporary_conversations(user_id: str, hours: float = TEMPORARY_CHAT_HOURS) -> int:
+    """Delete this user's temporary chats with no activity for `hours`; returns how many."""
+    owner_id = _require_user_id(user_id, "conversation")
+    cutoff = utc_now() - timedelta(hours=hours)
+    with ENGINE.begin() as connection:
+        stale_ids = connection.execute(
+            select(agent_conversations.c.id).where(
+                agent_conversations.c.user_id == owner_id,
+                agent_conversations.c.temporary.is_(True),
+                agent_conversations.c.updated_at < cutoff,
+            )
+        ).scalars().all()
+    return sum(1 for conversation_id in stale_ids if delete_conversation(conversation_id, owner_id))

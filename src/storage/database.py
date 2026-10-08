@@ -140,6 +140,9 @@ def _reset_db_allowed(url: str) -> bool:
     return "test" in (parsed.database or "").lower()
 
 
+_BOOLEAN_COLUMNS = {"used_for_chat_context", "temporary"}
+
+
 def _ensure_runtime_columns() -> None:
     required_columns = {
         "user_profiles": (
@@ -175,6 +178,7 @@ def _ensure_runtime_columns() -> None:
             "agent_voice",
             "agent_style_source_id",
             "archived_at",
+            "temporary",
         ),
     }
     with ENGINE.begin() as connection:
@@ -182,14 +186,14 @@ def _ensure_runtime_columns() -> None:
             existing_columns = {column["name"] for column in inspect(ENGINE).get_columns(table_name)}
             for column_name in column_names:
                 if column_name not in existing_columns:
-                    column_type = "BOOLEAN" if column_name == "used_for_chat_context" else "VARCHAR"
+                    column_type = "BOOLEAN" if column_name in _BOOLEAN_COLUMNS else "VARCHAR"
                     if column_name == "age":
                         column_type = "INTEGER"
                     if column_name.endswith("_at"):
                         column_type = "TIMESTAMP WITH TIME ZONE"
                     if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons"}:
                         column_type = "JSON"
-                    default = " DEFAULT FALSE" if column_name == "used_for_chat_context" else ""
+                    default = " DEFAULT FALSE" if column_name in _BOOLEAN_COLUMNS else ""
                     if column_name == "fact_type":
                         default = " DEFAULT 'matching_fact'"
                     if column_name == "confidence_state":
