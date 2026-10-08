@@ -170,6 +170,8 @@
   -webkit-backdrop-filter: blur(10px);
 }
 .home .nav::before { content: none; }
+/* Same height with or without the Start talking button, so the bar never looks thin. */
+.home .nav { min-height: 60px; align-items: center; }
 .home .nav.is-scrolled { top: 10px; background: rgba(255, 255, 255, 0.88); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
 .home .nav-links { gap: 2px; }
 .home .nav-links a { padding: 9px 14px; color: var(--fg-2); font-size: 14px; font-weight: 500; }
@@ -205,6 +207,7 @@
 .o-hero-grid { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 32px; }
 .o-hero-copy { position: relative; z-index: 2; }
 .o-hero .o-h1 { max-width: 10ch; }
+.o-hero .o-h1 + [data-intro] { margin-top: 40px; }
 .o-hero .o-lead { margin-top: 24px; max-width: 30ch; }
 .o-hero .o-btn { margin-top: 36px; }
 
