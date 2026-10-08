@@ -10,6 +10,7 @@ import "./styles/brand-theme.css";
 import "./styles/states.css";
 import "./styles/profile.css";
 import "./styles/memories.css";
+import "./styles/dialogs.css";
 import "./styles/shell.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
