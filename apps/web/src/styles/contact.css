@@ -1,0 +1,115 @@
+/* Contact is a simple message form, not a dashboard. */
+.omi-main .contact-screen {
+  padding-top: clamp(28px, 5vw, 52px);
+}
+
+.contact-shell {
+  width: min(760px, 100%);
+}
+
+.contact-title {
+  margin-bottom: 24px;
+}
+
+.contact-title h1 {
+  font-size: clamp(34px, 5vw, 46px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+}
+
+.contact-feedback-panel,
+.contact-connect-panel {
+  border: 1px solid var(--brand-line);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(24, 24, 27, 0.04);
+}
+
+.contact-feedback-panel {
+  gap: 20px;
+  padding: clamp(20px, 4vw, 32px);
+}
+
+.contact-connect-panel {
+  margin-top: 18px;
+  padding: clamp(20px, 4vw, 28px);
+}
+
+.contact-panel-icon {
+  border-color: var(--brand-line);
+  border-radius: 14px;
+  background: #f4f0ff;
+}
+
+.contact-category-row label {
+  position: relative;
+  border-color: var(--brand-line);
+  background: #fff;
+  color: var(--brand-muted);
+}
+
+.contact-category-row input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.contact-category-row label.active {
+  border-color: var(--brand-violet);
+  background: #f4f0ff;
+  color: var(--brand-violet-hover);
+  box-shadow: none;
+}
+
+.contact-message-field textarea {
+  border-color: var(--brand-line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.contact-message-field small {
+  color: var(--brand-muted);
+}
+
+.contact-send-button {
+  border-radius: 12px;
+  background: var(--brand-violet);
+  box-shadow: none;
+}
+
+.contact-connect-list {
+  border-color: var(--brand-line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.contact-connect-row {
+  border-color: var(--brand-line);
+}
+
+.contact-connect-row em,
+.connect-icon {
+  border-radius: 10px;
+}
+
+.contact-category-row label:focus-within,
+.contact-message-field textarea:focus-visible,
+.contact-send-button:focus-visible,
+.contact-connect-row:focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .contact-category-row {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .contact-category-row label {
+    flex: none;
+  }
+}

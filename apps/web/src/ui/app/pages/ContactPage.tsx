@@ -94,7 +94,13 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
           <div className="contact-category-row" role="radiogroup" aria-label="Feedback category">
             {contactCategories.map((item) => {
               const Icon = item.icon;
-              return <button className={category === item.id ? "active" : ""} type="button" role="radio" aria-checked={category === item.id} key={item.id} onClick={() => setCategory(item.id)}><Icon size={17} /><span>{item.label}</span></button>;
+              return (
+                <label className={category === item.id ? "active" : ""} key={item.id}>
+                  <input type="radio" name="contact-category" value={item.id} checked={category === item.id} onChange={() => setCategory(item.id)} />
+                  <Icon size={17} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </label>
+              );
             })}
           </div>
           <label className="contact-message-field">
@@ -127,4 +133,3 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
     </section>
   );
 }
-
