@@ -12,7 +12,7 @@ const INTRO_MAX = 200;
 const MAX_CHIPS = 5;
 
 // Your profile: photos, basics and what Omi has picked up about you, with account actions below.
-export function ProfilePage({ onVibe, fallbackAvatar, onProfileChange }: { onVibe?: () => void; fallbackAvatar?: string | null; onProfileChange?: (profile: Profile | null) => void }) {
+export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange }: { onVibe?: () => void; onPrivacy?: () => void; fallbackAvatar?: string | null; onProfileChange?: (profile: Profile | null) => void }) {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<Profile>({});
   const [status, setStatus] = useState("");
@@ -139,6 +139,7 @@ export function ProfilePage({ onVibe, fallbackAvatar, onProfileChange }: { onVib
   const pickPhoto = (slot: number) => { setPhotoSlot(slot); setPhotoStatus(""); photoInput.current?.click(); };
   return (
     <section className="screen profile-screen pf">
+      <nav className="pf-tabs" aria-label="Profile sections"><span aria-current="page">Profile</span><button type="button" onClick={onPrivacy}>Privacy</button></nav>
       <input ref={photoInput} className="profile-photo-input" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} />
       <article className="pf-card">
         <button type="button" className="pf-portrait" onClick={() => pickPhoto(0)} disabled={uploadingPhotoSlot !== null} aria-label={photos[0] ? "Change main photo" : "Add main photo"}>
@@ -222,6 +223,7 @@ export function ProfilePage({ onVibe, fallbackAvatar, onProfileChange }: { onVib
         <div className="pf-row"><span>Email</span><span className="pf-muted">{data.user?.email || "Signed in"}</span></div>
         <div className="pf-row"><span>Gender</span><span className="pf-muted">{genderLabel}</span></div>
         {form.phone ? <div className="pf-row"><span>Mobile</span><span className="pf-muted">{form.phone}</span></div> : null}
+        <button type="button" className="pf-row is-action" onClick={onPrivacy}><span>How Omi uses your data</span><ChevronRight aria-hidden="true" /></button>
         <button type="button" className="pf-row is-action" onClick={() => setPendingDataRequest("export")} disabled={sendingRequest}><span>Export my data</span><ChevronRight aria-hidden="true" /></button>
         <button type="button" className="pf-row is-action" onClick={() => void signOut()}><span>Sign out</span><ChevronRight aria-hidden="true" /></button>
         <button type="button" className="pf-row is-action is-danger" onClick={() => setPendingDataRequest("deletion")} disabled={sendingRequest}><span>Delete account and data</span><ChevronRight aria-hidden="true" /></button>
