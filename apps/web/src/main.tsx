@@ -14,6 +14,7 @@ import "./styles/dialogs.css";
 import "./styles/shell.css";
 import "./styles/auth-polish.css";
 import "./styles/contact.css";
+import "./styles/readability.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
