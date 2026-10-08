@@ -407,8 +407,8 @@ def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "user_id": user_id,
         "conversation_id": snapshot["conversation_id"],
         "message_index": snapshot["message_index"],
-        "summary_json": maybe_encrypt_json(user_id, snapshot.get("summary") or {}),
-        "context_json": maybe_encrypt_json(user_id, snapshot.get("context") or {}),
+        "summary_json": maybe_encrypt_json(user_id, _snapshot_metrics(snapshot.get("summary"))),
+        "context_json": maybe_encrypt_json(user_id, _snapshot_memory_pointers(snapshot.get("context"))),
     }
     with ENGINE.begin() as connection:
         connection.execute(agent_context_snapshots.insert().values(**payload))
@@ -416,6 +416,39 @@ def save_agent_context_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             select(agent_context_snapshots).where(agent_context_snapshots.c.id == payload["id"])
         ).mappings().first()
     return _agent_context_snapshot_from_row(row)
+
+
+def _snapshot_metrics(value: Any) -> dict[str, Any]:
+    """Persist counts and fixed diagnostics, never message or prompt text."""
+    if not isinstance(value, dict):
+        return {}
+    keys = {
+        "engine_version", "model", "prompt_version", "prompt_version_name",
+        "source_count", "included_source_count", "skipped_source_count",
+        "context_chars", "rough_context_tokens", "source_type_counts",
+        "used_data_points", "used_agent_behavior_rules", "used_structured_whatsapp",
+        "used_style_context", "used_style_guide", "used_whatsapp_chunks",
+    }
+    return {key: value[key] for key in keys if key in value}
+
+
+def _snapshot_memory_pointers(value: Any) -> dict[str, Any]:
+    """Memory rotation needs IDs from recent replies, not the text that was sent."""
+    if not isinstance(value, dict):
+        return {"sources": []}
+    sources = value.get("sources") or []
+    return {
+        "sources": [
+            {
+                "source_type": source.get("source_type"),
+                "metadata": {
+                    "memory_ids": [str(item) for item in (source.get("metadata") or {}).get("memory_ids") or []]
+                },
+            }
+            for source in sources
+            if isinstance(source, dict)
+        ]
+    }
 
 
 def list_agent_context_snapshots(

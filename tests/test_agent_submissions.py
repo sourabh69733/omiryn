@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from types import SimpleNamespace
 from io import BytesIO
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from api.config import PROFILE_UPLOAD_DIR
-from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user
+from api.main import _agent_user_context, _smart_reply_context_sources, app, current_user, request_monitoring_middleware
 from api.routes.public import _reset_public_rate_limits
 from agent.memory_engine.engine import (
     pending_data_point_messages,
@@ -34,6 +35,7 @@ from agent.providers import (
     agent_runtime_status,
 )
 from agent.runtime.orchestrator import AgentTurnResult
+from agent.providers.shared.usage_events import _record_usage_event
 from agent.context_engine.conversation_engine.policy import split_assistant_reply
 from agent.observability.usage import PROFILE_SIGNAL_BACKFILL
 from security.auth import CurrentUser
@@ -2611,7 +2613,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["recent_conversations"][0]["id"], conversation_id)
         self.assertEqual(data["recent_usage_events"][0]["provider"], "groq")
 
-    def test_agent_reply_context_snapshot_is_visible_in_admin_detail(self) -> None:
+    def test_admin_detail_shows_diagnostics_without_chat_text(self) -> None:
         async def signed_in_user() -> CurrentUser:
             return CurrentUser(id="user-a", email="a@example.com")
 
@@ -2637,6 +2639,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(snapshots[0]["message_index"], 2)
         self.assertGreaterEqual(snapshots[0]["summary"]["included_source_count"], 1)
         self.assertTrue(snapshots[0]["summary"]["used_structured_whatsapp"])
+        self.assertNotIn("what topics were in my uploaded whatsapp chat?", str(snapshots[0]))
+        self.assertNotIn("prompt", snapshots[0]["context"])
         traces = list_agent_traces(conversation_id, "user-a")
         self.assertEqual(len(traces), 1)
         self.assertEqual(traces[0]["status"], "completed")
@@ -2670,22 +2674,38 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(detail["context_snapshot_summary"]["total"], 1)
         self.assertEqual(detail["context_snapshots"][0]["conversation_id"], conversation_id)
         snapshot_detail = detail["context_snapshots"][0]
-        self.assertEqual(
-            snapshot_detail["messages"]["user"]["content"],
-            "what topics were in my uploaded whatsapp chat?",
-        )
-        self.assertTrue(snapshot_detail["messages"]["assistant"]["content"])
-        self.assertIn("system_prompt", snapshot_detail["messages"])
-        self.assertIn("provider", snapshot_detail["messages"])
-        # The user's message is the last turn; only per-turn system notes may follow it.
-        roles = [message["role"] for message in snapshot_detail["messages"]["provider"]]
-        last_user = len(roles) - 1 - roles[::-1].index("user")
-        self.assertTrue(all(role == "system" for role in roles[last_user + 1 :]))
-        self.assertIn("prompt_debug", snapshot_detail["messages"])
+        self.assertNotIn("messages", snapshot_detail)
+        self.assertNotIn("context", snapshot_detail)
+        self.assertNotIn("what topics were in my uploaded whatsapp chat?", str(detail))
         self.assertTrue(detail["conversations"][0]["latest_context_snapshot"])
         self.assertEqual(detail["agent_trace_summary"]["total"], 1)
         self.assertEqual(detail["agent_traces"][0]["steps"][4]["step_name"], "model_call")
         self.assertTrue(detail["conversations"][0]["latest_agent_trace"])
+
+    def test_usage_event_does_not_store_message_text_from_provider_error(self) -> None:
+        _record_usage_event(
+            conversation_id=None,
+            request_kind="chat_reply",
+            provider="mock",
+            model="mock",
+            success=False,
+            latency_ms=1,
+            error="provider rejected: secret user message",
+            user_id="user-a",
+        )
+        event = list_agent_usage_events(user_id="user-a")[0]
+        self.assertNotIn("secret user message", str(event))
+
+    def test_unhandled_error_log_omits_exception_message(self) -> None:
+        request = SimpleNamespace(headers={}, method="POST", url=SimpleNamespace(path="/api/agent/messages"))
+
+        async def fail(_request):
+            raise RuntimeError("secret user message")
+
+        with self.assertLogs("api.main", level="ERROR") as captured:
+            response = asyncio.run(request_monitoring_middleware(request, fail))
+        self.assertEqual(response.status_code, 500)
+        self.assertNotIn("secret user message", "\n".join(captured.output))
 
     def test_admin_usage_dashboard_response_matches_usage_contract(self) -> None:
         save_agent_usage_event(
@@ -2975,10 +2995,9 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertEqual(data["data_point_review_summary"]["approve"], 1)
         self.assertEqual(data["data_point_reviews"][0]["user_id"], "user-a")
         self.assertEqual(data["data_point_reviews"][0]["decision"], "approve")
-        self.assertEqual(
-            data["data_point_reviews"][0]["review"]["what_we_learned"],
-            "The chat has repeated music hooks.",
-        )
+        self.assertNotIn("candidate", data["data_point_reviews"][0])
+        self.assertNotIn("review", data["data_point_reviews"][0])
+        self.assertNotIn("Aarav: send me that song", str(data))
 
     def test_backend_does_not_serve_frontend_pages(self) -> None:
         for path in (

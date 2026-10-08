@@ -35,7 +35,6 @@ from agent.shared.clock import utc_now_iso
 from agent.providers import (
     AgentProviderError,
     AgentProviderTruncationError,
-    _prompt_debug,
     _provider_messages,
     assess_user_message_quality,
     generate_agent_reply,
@@ -225,12 +224,6 @@ async def run_agent_turn(
         context_package.query_intent.labels if context_package.query_intent else (),
     )
     provider_messages = _provider_messages(reply_messages)
-    if context_snapshot:
-        context_snapshot.setdefault("context", {})["prompt"] = {
-            "system_prompt": system_prompt,
-            "provider_messages": provider_messages,
-            "prompt_debug": _prompt_debug(system_prompt, provider_messages),
-        }
     save_agent_trace_step(
         {
             "trace_id": trace_id,
@@ -239,7 +232,10 @@ async def run_agent_turn(
             "step_index": 3,
             "step_name": "context_pack",
             "status": "ok",
-            "metadata": context_snapshot.get("summary") or {},
+            "metadata": {
+                "included_source_count": (context_snapshot.get("summary") or {}).get("included_source_count"),
+                "rough_context_tokens": (context_snapshot.get("summary") or {}).get("rough_context_tokens"),
+            },
         }
     )
     try:
@@ -304,7 +300,6 @@ async def run_agent_turn(
                 "status": "failed",
                 "metadata": {
                     "error_type": type(error).__name__,
-                    "error": str(error)[:240],
                 },
             }
         )
@@ -359,10 +354,6 @@ async def run_agent_turn(
     ):
         # The user is listening; the next part follows on its own unless they write first.
         schedule_story_part(user_id, conversation_id)
-    if context_snapshot:
-        context_snapshot.setdefault("context", {}).setdefault("prompt", {})["assistant_reply"] = (
-            reply
-        )
     save_agent_context_snapshot(context_snapshot)
     save_agent_trace_step(
         {

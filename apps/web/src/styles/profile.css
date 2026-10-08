@@ -8,6 +8,80 @@
   padding: 24px 16px 48px;
 }
 
+.pf-tabs {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.pf-tabs button,
+.pf-tabs span {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 17px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.pf-tabs button { background: transparent; color: var(--muted); cursor: pointer; }
+.pf-tabs button:hover { color: var(--brand-violet); background: #f5f1ff; }
+.pf-tabs span { background: #eee8ff; color: #5d42a6; }
+
+/* Same centered column as Profile so the tabs stay put when switching. */
+.privacy-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+}
+
+.privacy-intro { margin: 20px 0 8px; }
+.privacy-intro h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 36px); letter-spacing: -0.04em; line-height: 1.15; }
+.privacy-intro > p:last-child { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
+
+.privacy-path {
+  padding: 22px 24px;
+  border: 1px solid #ded5f6;
+  border-radius: 20px;
+  background: #f8f5ff;
+}
+.privacy-path h2,
+.privacy-details h2 { margin: 0; color: var(--ink); font-size: 17px; letter-spacing: -0.02em; }
+.privacy-path ol { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.privacy-path li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid #e6def7; border-radius: 14px; background: #fff; }
+.privacy-path li > svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: #7256c7; }
+.privacy-path li div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.privacy-path li strong { color: var(--ink); font-size: 14px; line-height: 1.4; }
+.privacy-path li span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+.privacy-details { display: grid; gap: 12px; }
+.privacy-details section { padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.privacy-details p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.privacy-action { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 999px; background: #eee8ff; color: #5d42a6; font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; cursor: pointer; }
+.privacy-action:hover { background: #e4d9ff; }
+.privacy-action svg { width: 15px; height: 15px; }
+.privacy-footer { padding: 6px 4px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.privacy-footer p { margin: 0; }
+.privacy-footer a,
+.privacy-footer button { color: #5d42a6; text-decoration: underline; text-underline-offset: 3px; }
+.privacy-footer button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+
+@media (max-width: 650px) {
+  .privacy-path,
+  .privacy-details section { padding: 18px; }
+}
+
 .pf-kicker {
   display: flex;
   align-items: center;
@@ -382,7 +456,8 @@ button.pf-row.is-danger:hover {
 }
 
 @media (max-width: 480px) {
-  .pf {
+  .pf,
+  .privacy-screen {
     padding: 16px 12px 40px;
   }
 

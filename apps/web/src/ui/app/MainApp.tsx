@@ -7,6 +7,7 @@ import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { VibePage } from "./pages/VibePage";
 import { AgentOrb } from "./AgentOrb";
 import { AvatarImage } from "./AvatarImage";
@@ -163,7 +164,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
-        {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}
+        {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} onPrivacy={() => navigate("privacy")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}
+        {page === "privacy" ? <PrivacyPage onProfile={() => navigate("profile")} onMemories={() => navigate("memories")} onContact={() => navigate("contact")} /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
       </main>
       {isMobile && mobileNavOpen ? (

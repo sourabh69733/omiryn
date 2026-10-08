@@ -657,8 +657,8 @@ async def _apply_vibe(
             conversation_id=conversation_id,
         )
     except Exception as error:  # an unchecked line is never saved
-        logger.warning("agent.vibe.verify_failed conversation_id=%s error=%s", conversation_id, error)
-        return {"error": f"{type(error).__name__}: {str(error)[:200]}"}
+        logger.warning("agent.vibe.verify_failed conversation_id=%s error_type=%s", conversation_id, type(error).__name__)
+        return {"error": type(error).__name__}
     if not verified:
         return {}
     saved = update_vibe_card(user_id, verified, replace_evidence=True)

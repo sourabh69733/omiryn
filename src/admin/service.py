@@ -9,7 +9,6 @@ from sqlalchemy import select
 from security.encryption import decrypt_json
 from storage import (
     ENGINE,
-    _unprotect_messages,
     agent_conversations,
     agent_context_snapshots,
     agent_trace_steps,
@@ -319,12 +318,12 @@ def admin_user_detail(user_id: str, limit: int = 100) -> dict[str, Any] | None:
         event for event in usage_events if event.get("user_id") == user_id
     ]
     feedback = [
-        _feedback_detail(row, snapshot["conversation_rows"])
+        _feedback_detail(row)
         for row in snapshot["feedback_rows"]
         if row["user_id"] == user_id
     ]
     context_snapshots = [
-        _context_snapshot_detail(row, snapshot["conversation_rows"])
+        _context_snapshot_detail(row)
         for row in snapshot["context_snapshot_rows"]
         if row["user_id"] == user_id
     ]
@@ -618,13 +617,6 @@ def _user_summary(
         "extracted_conversation_count": sum(
             1 for row in conversations if row["status"] == "extracted"
         ),
-        "message_count": sum(len(_conversation_messages(row)) for row in conversations),
-        "user_message_count": sum(
-            1
-            for row in conversations
-            for message in _conversation_messages(row)
-            if message.get("role") == "user"
-        ),
         "context_source_count": len(sources),
         "draft_count": len(drafts),
         "approved_draft_count": sum(1 for row in drafts if row["status"] == "approved"),
@@ -689,7 +681,6 @@ def _conversation_summary(
     context_rows: list[Any],
     usage_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    messages = _conversation_messages(row)
     conversation_id = row["id"]
     events = [event for event in usage_events if event.get("conversation_id") == conversation_id]
     return {
@@ -699,8 +690,6 @@ def _conversation_summary(
         "agent_provider": row["agent_provider"],
         "agent_model": row["agent_model"],
         "agent_mode": row["agent_mode"] or "know_me",
-        "message_count": len(messages),
-        "user_message_count": sum(1 for message in messages if message.get("role") == "user"),
         "context_source_count": sum(
             1 for source in context_rows if source["conversation_id"] == conversation_id
         ),
@@ -721,7 +710,7 @@ def _conversation_context_snapshot_summary(
     latest = snapshots[0] if snapshots else None
     return {
         "context_snapshot_count": len(snapshots),
-        "latest_context_snapshot": _context_snapshot_detail(latest, [row]) if latest else None,
+        "latest_context_snapshot": _context_snapshot_detail(latest) if latest else None,
     }
 
 
@@ -743,76 +732,25 @@ def _conversation_trace_summary(
     }
 
 
-def _context_snapshot_detail(
-    row: Any | None,
-    conversation_rows: list[Any] | None = None,
-) -> dict[str, Any] | None:
+def _context_snapshot_detail(row: Any | None) -> dict[str, Any] | None:
     if not row:
         return None
     summary = decrypt_json(row["user_id"], row["summary_json"])
-    context = decrypt_json(row["user_id"], row["context_json"])
-    messages = _snapshot_messages(row, summary, context, conversation_rows or [])
+    safe_keys = {
+        "engine_version", "model", "prompt_version", "prompt_version_name",
+        "source_count", "included_source_count", "skipped_source_count",
+        "context_chars", "rough_context_tokens", "source_type_counts",
+        "used_data_points", "used_agent_behavior_rules", "used_structured_whatsapp",
+        "used_style_context", "used_style_guide", "used_whatsapp_chunks",
+    }
     return {
         "id": row["id"],
         "user_id": row["user_id"],
         "conversation_id": row["conversation_id"],
         "message_index": row["message_index"],
-        "summary": summary,
-        "context": context,
-        "messages": messages,
+        "summary": {key: summary[key] for key in safe_keys if key in summary},
         "created_at": _isoformat_utc(row["created_at"]),
     }
-
-
-def _snapshot_messages(
-    row: Any,
-    summary: dict[str, Any],
-    context: dict[str, Any],
-    conversation_rows: list[Any],
-) -> dict[str, Any]:
-    conversation = next(
-        (
-            candidate
-            for candidate in conversation_rows
-            if candidate["id"] == row["conversation_id"]
-        ),
-        None,
-    )
-    messages = _conversation_messages(conversation) if conversation else []
-    user_index = _int_or_none(summary.get("user_message_index"))
-    assistant_index = _int_or_none(summary.get("assistant_message_index"))
-    if assistant_index is None:
-        assistant_index = row["message_index"]
-    prompt = context.get("prompt") if isinstance(context, dict) else {}
-    if not isinstance(prompt, dict):
-        prompt = {}
-    return {
-        "user": _message_at(messages, user_index),
-        "assistant": _message_at(messages, assistant_index),
-        "provider": prompt.get("provider_messages") or [],
-        "assistant_reply": prompt.get("assistant_reply"),
-        "system_prompt": prompt.get("system_prompt"),
-        "prompt_debug": prompt.get("prompt_debug") or {},
-    }
-
-
-def _message_at(messages: list[dict[str, Any]], index: int | None) -> dict[str, Any] | None:
-    if index is None or index < 0 or index >= len(messages):
-        return None
-    message = messages[index]
-    return {
-        "index": index,
-        "role": message.get("role"),
-        "content": message.get("content"),
-        "quality": message.get("quality"),
-    }
-
-
-def _int_or_none(value: Any) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _trace_detail(row: Any | None, steps: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -829,7 +767,11 @@ def _trace_detail(row: Any | None, steps: list[dict[str, Any]]) -> dict[str, Any
         "agent_tone": row["agent_tone"],
         "model": row["model"],
         "status": row["status"],
-        "summary": decrypt_json(row["user_id"], row["summary_json"]),
+        "summary": {
+            key: value
+            for key, value in (decrypt_json(row["user_id"], row["summary_json"]) or {}).items()
+            if key in {"ending_message_count", "quality_valid", "reply_chars", "reply_part_count", "error_type"}
+        },
         "steps": trace_steps,
         "created_at": _isoformat_utc(row["created_at"]),
         "completed_at": _isoformat_utc(row["completed_at"]) if row["completed_at"] else None,
@@ -845,7 +787,6 @@ def _trace_step_detail(row: Any) -> dict[str, Any]:
         "step_index": row["step_index"],
         "step_name": row["step_name"],
         "status": row["status"],
-        "metadata": decrypt_json(row["user_id"], row["metadata_json"]),
         "created_at": _isoformat_utc(row["created_at"]),
     }
 
@@ -939,18 +880,14 @@ def _summarize_context_snapshots(snapshots: list[dict[str, Any]]) -> dict[str, A
 
 
 def _data_point_review_detail(row: Any) -> dict[str, Any]:
-    user_id = row["user_id"]
     return {
         "id": row["id"],
-        "user_id": user_id,
+        "user_id": row["user_id"],
         "source_kind": row["source_kind"],
         "source_id": row["source_id"],
         "import_id": row["import_id"],
         "candidate_key": row["candidate_key"],
         "decision": row["decision"],
-        "candidate": decrypt_json(user_id, row["candidate_json"]),
-        "review": decrypt_json(user_id, row["review_json"]),
-        "metadata": decrypt_json(user_id, row["metadata_json"]),
         "created_at": _isoformat_utc(row["created_at"]),
     }
 
@@ -1000,11 +937,7 @@ def _draft_summary(row: Any) -> dict[str, Any]:
     }
 
 
-def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
-    conversation = next(
-        (candidate for candidate in conversation_rows if candidate["id"] == row["conversation_id"]),
-        None,
-    )
+def _feedback_detail(row: Any) -> dict[str, Any]:
     metadata = row["metadata_json"] or {}
     reasons = metadata.get("reasons") if isinstance(metadata, dict) else []
     if not isinstance(reasons, list):
@@ -1019,22 +952,8 @@ def _feedback_detail(row: Any, conversation_rows: list[Any]) -> dict[str, Any]:
         "reasons": reasons,
         "comment": row["comment"],
         "metadata": metadata,
-        "message_preview": _feedback_message_preview(conversation, row["message_index"]),
         "created_at": _isoformat_utc(row["created_at"]),
     }
-
-
-def _feedback_message_preview(conversation: Any | None, message_index: int) -> str | None:
-    if not conversation:
-        return None
-    messages = _conversation_messages(conversation)
-    if message_index < 0 or message_index >= len(messages):
-        return None
-    message = messages[message_index]
-    content = str(message.get("content") or "").strip()
-    if not content:
-        return None
-    return content[:180] + ("..." if len(content) > 180 else "")
 
 
 def _feedback_submission_detail(row: Any) -> dict[str, Any]:
@@ -1119,10 +1038,6 @@ def _clip_text(value: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3].rstrip() + "..."
-
-
-def _conversation_messages(row: Any) -> list[dict[str, Any]]:
-    return _unprotect_messages(row["user_id"], row["messages_json"] or [])
 
 
 def _summarize_feedback(feedback: list[Any]) -> dict[str, int]:
@@ -1211,6 +1126,13 @@ def _average_int(total: int, count: int) -> int:
     if count <= 0:
         return 0
     return round(total / count)
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _usage_token_value(

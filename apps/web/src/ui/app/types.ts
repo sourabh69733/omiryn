@@ -1,4 +1,4 @@
-export type Page = "chat" | "vibe" | "memories" | "matches" | "profile" | "contact";
+export type Page = "chat" | "vibe" | "memories" | "matches" | "profile" | "privacy" | "contact";
 export type Message = { role?: string; content?: string; quality?: string; created_at?: string; delivery_status?: string };
 export type Conversation = {
   id: string;

@@ -41,7 +41,8 @@ def _record_usage_event(
         "total_tokens": total_tokens,
         "latency_ms": latency_ms,
         "estimated_cost_usd": _estimated_cost_usd(provider, prompt_tokens, completion_tokens),
-        "error": error[:500] if error else None,
+        # Provider exception strings can echo prompts or user messages.
+        "error": "provider_error" if error else None,
         "raw_usage": raw_usage or {},
     }
     logger.info(
@@ -59,8 +60,8 @@ def _record_usage_event(
     )
     try:
         save_agent_usage_event(event)
-    except Exception:
-        logger.exception("agent.usage.persist_failed")
+    except Exception as error:
+        logger.error("agent.usage.persist_failed error_type=%s", type(error).__name__)
 
 def _prompt_debug(
     system_prompt: str,
