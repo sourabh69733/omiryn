@@ -111,15 +111,21 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 ### UI next
 
+Branch `ui/contacts-layout`, PR #2 (open): try it with a real account, then merge. It was checked only with sample data.
+
 | # | Item | Why |
 |---|---|---|
-| 1 | Consent for private areas | Values, stories and deal-breakers are marked private (`PRIVATE_AREA_IDS`, "Private" on the Vibe page). Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
-| 2 | Finish the design system | Chat and Vibe use the landing tokens and fonts; Memories, Matches and Profile still need a visual pass. |
-| 3 | Mobile pass on the rest | Chat and Vibe reflow on narrow screens; Memories, Matches, Profile and the history panel are not checked. |
+| 1 | Signup and onboarding screens | First thing a new user sees; still the old style. |
+| 2 | Contact page | Last page still in the old style (big title, old form). |
+| 3 | Milestone note above the composer | "Omi knows what you want in friends · See your vibe" still has the old look. |
+| 4 | Accessibility pass | Keyboard use of the rail, menus and drawer; focus rings; contrast of the grey text; screen-reader labels. |
+| 5 | Phone extras | "Add to home screen" icon and name; iPhone notch and home-bar spacing; composer stays above the keyboard. |
+| 6 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
+| 7 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
 
-Done: shared loading, empty and error states (`StateView`) and one-line notices (`Notice`) on Chat, Vibe, Profile and Memories; Memories no longer shows "no memories" while loading, and "V3" jargon is gone from its copy.
+Done on the branch, after a UI review: phones open straight into the Omi chat; the chat header reads "Omi · Finds your people", with the name beside the back arrow on phones; a known vibe line said once shows "Said once" instead of "Still learning"; memories read as plain labels ("Study topic (current)") and one line per part instead of "likes: ... · favorite parts: ..."; Matches shows a clearly marked example introduction and three steps (talk with Omi, Omi finds someone, you both say yes).
 
-Done in this round: "Not right" now stays gone (the rejection is stored; that area takes a new line only with proof sent afterwards, and the models see the rejected line); the chat header says "typing…" or "AI companion" instead of the tone value; limit messages are short and neutral; profile gender is optional ("helps Omi address you correctly in Hindi") with a one-line privacy note.
+Done before: shared loading, empty and error states (`StateView`) and notices (`Notice`); the design system across Chat, Vibe, Memories, Matches and Profile; a mobile pass on those screens; "Not right" stays gone; short neutral limit messages; optional profile gender.
 
 ## 5. Quality and checks
 
