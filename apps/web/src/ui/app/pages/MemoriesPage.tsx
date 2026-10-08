@@ -335,7 +335,7 @@ export function MemoriesPage() {
           <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title">
             <div className="confirm-copy">
               <p className="eyebrow">{reviewMode === "feedback" ? "Review signal" : "Usage control"}</p>
-              <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omiryn use this?"}</h2>
+              <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omi use this?"}</h2>
               <p>{reviewItemTitle(reviewItem)}</p>
             </div>
             {reviewMode === "feedback" ? (
@@ -343,16 +343,16 @@ export function MemoriesPage() {
                 <div className="signal-feedback-options" role="radiogroup" aria-label="Signal feedback">
                   <label className={feedbackRating === "agree" ? "selected" : ""}>
                     <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => { setFeedbackRating("agree"); setFeedbackReasons([]); }} />
-                    <span><strong>Feels right</strong><small>Omiryn can trust this more.</small></span>
+                    <span><strong>Feels right</strong><small>Omi will trust this more.</small></span>
                   </label>
                   <label className={feedbackRating === "disagree" ? "selected" : ""}>
                     <input type="radio" name="signal-feedback" value="disagree" checked={feedbackRating === "disagree"} onChange={() => setFeedbackRating("disagree")} />
-                    <span><strong>Not true</strong><small>Omiryn should stop using this.</small></span>
+                    <span><strong>Not true</strong><small>Omi will stop using this.</small></span>
                   </label>
                 </div>
                 {feedbackRating === "disagree" ? (
                   <div>
-                    <p className="privacy-note">What needs correcting? Choose a tag if helpful.</p>
+                    <p className="privacy-note">What's off? Pick one if it helps.</p>
                     <div className="signal-review-reasons" aria-label="Correction reason">
                       {memoryReviewReasons.map((reason) => (
                         <button
@@ -368,28 +368,28 @@ export function MemoriesPage() {
                   </div>
                 ) : null}
                 <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder="Add context or a correction (optional)" />
-                {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">This moves the memory to the hidden rejected section without deleting its evidence.</p> : null}
+                {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">It moves to "Memories you rejected". You can bring it back later.</p> : null}
                 {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
-                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
+                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving…" : "Save"}</button>
                 </div>
               </form>
             ) : (
               <form className="signal-review-form" onSubmit={(event) => void submitPrivacyFlow(event)}>
-                <p className="privacy-note">This controls where the saved signal may be used. Turning both off keeps it stored but prevents Omiryn from using it.</p>
+                <p className="privacy-note">Turning both off keeps the memory but stops Omi from using it.</p>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForChat} onChange={(event) => setPrivacyForChat(event.target.checked)} />
-                  <span><strong>Use for personalization</strong><small>Lets Omiryn use this signal to make replies more relevant.</small></span>
+                  <span><strong>In chats</strong><small>Omi can use this to make replies more personal.</small></span>
                 </label>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForMatching} onChange={(event) => setPrivacyForMatching(event.target.checked)} />
-                  <span><strong>Use for matching</strong><small>Lets this signal affect compatible people later.</small></span>
+                  <span><strong>For matching</strong><small>This can help find people you'd get along with.</small></span>
                 </label>
                 {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
-                  <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save privacy"}</button>
+                  <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving…" : "Save"}</button>
                 </div>
               </form>
             )}
@@ -403,7 +403,7 @@ export function MemoriesPage() {
               <div>
                 <p className="eyebrow">Evidence</p>
                 <h2 id="evidence-title">{reviewItemTitle(evidenceItem)}</h2>
-                <p>These are the messages or source snippets Omiryn used for this signal.</p>
+                <p>What you said that Omi learned this from.</p>
               </div>
               <button className="evidence-close" type="button" onClick={() => setEvidenceItem(null)} aria-label="Close evidence"><span /></button>
             </div>
@@ -421,7 +421,7 @@ export function MemoriesPage() {
                       <blockquote>{evidenceText(item)}</blockquote>
                       <p>
                         {evidenceSourceLabel(evidenceItem, item)}
-                        {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open source</a></> : null}
+                        {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open in chat</a></> : null}
                       </p>
                     </div>
                   </article>
@@ -521,7 +521,7 @@ function isCanonicalMemory(item: ProfileFact | CanonicalMemory): item is Canonic
 }
 
 function reviewItemTitle(item: ProfileFact | CanonicalMemory) {
-  return isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key;
+  return sentenceCase(isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key || "");
 }
 
 function evidenceText(item: unknown) {
@@ -535,7 +535,7 @@ function evidenceSourceLabel(fact: ProfileFact | CanonicalMemory, item: unknown)
   const sourceKind = isCanonicalMemory(fact) ? "" : fact.source_kind || "";
   if (!item || typeof item !== "object") return isCanonicalMemory(fact) ? "Source" : humanizeLabel(sourceKind || "source");
   const row = item as Record<string, unknown>;
-  if (row.conversation_id || sourceKind === "agent_chat") return "User message";
+  if (row.conversation_id || sourceKind === "agent_chat") return "You said";
   if (sourceKind === "whatsapp_import") return "WhatsApp import";
   if (row.context_source_id) return "Saved memory";
   if (sourceKind === "agent_deep_memory") return "Conversation memory";
