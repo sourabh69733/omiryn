@@ -7,14 +7,13 @@ import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
 import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
-import { notedLinesByMessage, type NotedLine } from "../notedLines";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { canShowUsage, pathForPage } from "../appUtils";
-import { type DeletionImpact, type Vibe, type VibeArea, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
+import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, ReplyQuote, UsageEvent, UsageSummary } from "../types";
 import { cognitionResultLabel } from "../usagePresentation";
@@ -69,9 +68,6 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   // The temporary chat on screen, deleted once the user leaves it.
   const temporaryIdRef = useRef<string | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
-  // Vibe lines, to show "Noted: ..." under the reply where Omi learned each one.
-  const [vibeAreas, setVibeAreas] = useState<VibeArea[]>([]);
-  const [rejectingArea, setRejectingArea] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -460,40 +456,6 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [drawer]);
-
-  // Vibe lines are written in the background a little after a reply, so refresh a few seconds
-  // after the chat changes, and when the user comes back to the tab.
-  const messageCount = conversation?.messages.length ?? 0;
-  useEffect(() => {
-    if (!conversation) return;
-    const timer = window.setTimeout(() => void loadVibeAreas(), messageCount ? 4000 : 0);
-    return () => window.clearTimeout(timer);
-  }, [conversation?.id, messageCount]);
-
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void loadVibeAreas(); };
-    document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
-  }, []);
-
-  async function loadVibeAreas() {
-    try {
-      const response = await apiFetch("/api/me/vibe");
-      if (response.ok) setVibeAreas(((await response.json()) as Vibe).areas || []);
-    } catch {
-      // Optional: the chat works without the notes.
-    }
-  }
-
-  async function rejectNoted(areaId: string) {
-    setRejectingArea(areaId);
-    try {
-      const response = await apiFetch(`/api/me/vibe/${areaId}`, { method: "DELETE" });
-      if (response.ok) setVibeAreas(((await response.json()) as Vibe).areas || []);
-    } finally {
-      setRejectingArea(null);
-    }
-  }
 
   const openId = selectedId ?? conversation?.id ?? null;
   const omiId = omiThreadId(summaries);
@@ -1073,10 +1035,6 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
       </>
     );
   }, [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId, archivedOpen, omiId]);
-  const noted = useMemo(
-    () => (conversation ? notedLinesByMessage(vibeAreas, conversation.id, visibleMessages) : new Map<number, NotedLine[]>()),
-    [vibeAreas, conversation, shownCount],
-  );
   const selectableIndexes = useMemo(
     () => (conversation ? conversation.messages.flatMap((message, index) => (isDeletedMessage(message) ? [] : [index])) : []),
     [conversation],
@@ -1135,17 +1093,10 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                     ) : null}
                     {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
-                  {noted.get(index)?.map((line) => (
-                    <p className={`noted-line ${agent ? "is-agent" : "is-user"}`} key={line.areaId}>
-                      <Check aria-hidden="true" />
-                      <span>Noted: {lowerFirst(line.text)}{line.private ? <Lock aria-label="Private" /> : null}</span>
-                      <button type="button" onClick={() => void rejectNoted(line.areaId)} disabled={rejectingArea === line.areaId}>{rejectingArea === line.areaId ? "Removing…" : "Not right?"}</button>
-                    </p>
-                  ))}
                   {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, noted, rejectingArea, selecting, selected, menuFor, menuUp]);
+            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
@@ -1430,11 +1381,6 @@ function formatLimitCountdown(totalSeconds: number) {
 }
 
 // History row time: "7:30 pm" today, "Yesterday", then "2 Oct" (with the year when it differs).
-// "Wants friends who show up." -> "wants friends who show up." (reads as part of "Noted: ...").
-function lowerFirst(text: string) {
-  return text && /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
-}
-
 // Omi's ongoing chat: the newest chat the user has not archived (older ones are "Earlier chats").
 function omiThreadId(rows: ConversationSummary[]): string | null {
   const open = rows.filter((row) => !row.archived_at);
