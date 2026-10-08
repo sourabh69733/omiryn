@@ -8,6 +8,11 @@ gsap.registerPlugin(ScrollTrigger);
 
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = window.matchMedia("(pointer: fine)").matches;
+// Dark text on the yellow highlight, so a highlighted word stays readable inside a dark bubble.
+const MARK_INK = "#18181b";
+// Phones and tablets get the story as a simple list plus one readable chat; the pinned scroll story
+// needs the side-by-side room of a wide screen.
+const compact = window.matchMedia("(max-width: 1024px)").matches;
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -27,6 +32,15 @@ const nav = $("#nav-main");
 const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 24);
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
+
+// One "Start talking" at a time: the nav button shows only when the page's own buttons are off screen.
+const pageCtas = $$('[data-track="hero_start_talking"], #cta [data-app-link]');
+const ctaInView = new Set();
+const ctaWatch = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => (entry.isIntersecting ? ctaInView.add(entry.target) : ctaInView.delete(entry.target)));
+  nav.classList.toggle("show-cta", ctaInView.size === 0);
+});
+pageCtas.forEach((cta) => ctaWatch.observe(cta));
 
 $$('a[href^="#"]').forEach((link) => {
   link.addEventListener("click", (event) => {
@@ -348,7 +362,21 @@ window.addEventListener("resize", fitStage);
 
 function storyStatic() {
   story.classList.add("is-static");
-  gsap.set(marks, { backgroundSize: "100% 100%" });
+  gsap.set(marks, { backgroundSize: "100% 100%", color: MARK_INK });
+}
+
+// Phones: steps as a list, the chat at full size, then the match. The chat is always visible (a
+// fast flick must never show an empty phone); only the highlights and the match card animate in.
+function storyCompact() {
+  story.classList.add("is-static", "is-compact");
+  if (reduce) {
+    gsap.set(marks, { backgroundSize: "100% 100%", color: MARK_INK });
+    return;
+  }
+  marks.forEach((mark) => {
+    gsap.to(mark, { backgroundSize: "100% 100%", color: MARK_INK, duration: 0.6, ease: "power2.out", scrollTrigger: { trigger: mark, start: "top 80%", once: true } });
+  });
+  gsap.from(matchPop, { autoAlpha: 0, y: 30, scale: 0.94, duration: 0.6, ease: "back.out(1.6)", scrollTrigger: { trigger: matchPop, start: "top 90%", once: true } });
 }
 
 function buildStory() {
@@ -383,7 +411,7 @@ function buildStory() {
   marks.forEach((mark, i) => {
     const at = 1.05 + i * 0.22;
     const tag = flyTags[i];
-    tl.to(mark, { backgroundSize: "100% 100%", duration: 0.12 }, at)
+    tl.to(mark, { backgroundSize: "100% 100%", color: MARK_INK, duration: 0.12 }, at)
       .fromTo(tag,
         { x: () => stagePoint(mark).x, y: () => stagePoint(mark).y, autoAlpha: 0, scale: 0.8 },
         { autoAlpha: 1, scale: 1, duration: 0.08 }, at + 0.05)
@@ -412,7 +440,7 @@ if (reduce) showMerged();
 const belowFold = [
   setupMarquee,
   setupCards,
-  () => (reduce ? storyStatic() : buildStory()),
+  () => (compact ? storyCompact() : reduce ? storyStatic() : buildStory()),
   () => !reduce && setupScrollMotion(),
   () => ScrollTrigger.refresh(),
 ];

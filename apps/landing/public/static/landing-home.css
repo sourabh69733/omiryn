@@ -170,6 +170,8 @@
   -webkit-backdrop-filter: blur(10px);
 }
 .home .nav::before { content: none; }
+/* Same height with or without the Start talking button, so the bar never looks thin. */
+.home .nav { min-height: 60px; align-items: center; }
 .home .nav.is-scrolled { top: 10px; background: rgba(255, 255, 255, 0.88); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
 .home .nav-links { gap: 2px; }
 .home .nav-links a { padding: 9px 14px; color: var(--fg-2); font-size: 14px; font-weight: 500; }
@@ -185,6 +187,9 @@
   box-shadow: none;
 }
 .home .nav-cta:hover { background: var(--accent) !important; box-shadow: none; transform: none; }
+.home .nav:not(.show-cta) .nav-cta { display: none; }
+.home .nav.show-cta .nav-cta { animation: nav-cta-in 0.25s ease-out; }
+@keyframes nav-cta-in { from { opacity: 0; transform: translateY(-4px); } }
 
 .home .nav-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
 .o-mark {
@@ -202,6 +207,7 @@
 .o-hero-grid { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 32px; }
 .o-hero-copy { position: relative; z-index: 2; }
 .o-hero .o-h1 { max-width: 10ch; }
+.o-hero .o-h1 + [data-intro] { margin-top: 40px; }
 .o-hero .o-lead { margin-top: 24px; max-width: 30ch; }
 .o-hero .o-btn { margin-top: 36px; }
 
@@ -400,6 +406,23 @@
 .o-story.is-static .o-story-bar { display: none; }
 .o-story.is-static .o-phone { opacity: 0.35; }
 .o-story.is-static .s-you { left: 45%; top: 38%; }
+
+/* Phones: steps as a list, one full-size chat, then the match card (no pinning, no overlap). */
+.o-story.is-compact { min-height: 0; }
+.o-story.is-compact .o-story-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; min-height: 0; }
+.o-story.is-compact .st { position: static; }
+.o-story.is-compact .st-num { margin-bottom: 6px; }
+.o-story.is-compact .o-h2 { font-size: 17px; line-height: 1.2; }
+.o-story.is-compact .o-sub { display: none; }
+.o-story.is-compact .o-story-bar,
+.o-story.is-compact .blob,
+.o-story.is-compact .s-tags { display: none; }
+.o-story.is-compact .o-story-view { --k: 1; height: auto; }
+.o-story.is-compact .o-story-stage { display: grid; justify-items: center; gap: 18px; width: 100%; height: auto; transform: none; }
+.o-story.is-compact .o-phone { position: static; width: 100%; max-width: 360px; opacity: 1; transform: none; }
+.o-story.is-compact .o-feed { height: auto; }
+.o-story.is-compact .o-msg { font-size: 14.5px; }
+.o-story.is-compact .o-matchpop { position: static; width: 100%; max-width: 320px; translate: none; transform: rotate(-2deg); }
 
 /* ─────────── MARQUEE ─────────── */
 .o-marquee { padding: 16px 0; overflow: hidden; }
