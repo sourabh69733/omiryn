@@ -801,6 +801,13 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     setClearWord("");
   }
 
+  // Unticking the last message ends select mode, like in WhatsApp.
+  function toggleMessage(index: number) {
+    const next = toggleSelected(selected, index);
+    if (next.length) setSelected(next);
+    else stopSelecting();
+  }
+
   function startSelecting(index: number) {
     setSelecting(true);
     setSelected([index]);
@@ -994,7 +1001,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                     id={`message-${index}`}
                     data-message-index={index}
                     {...(selecting
-                      ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => setSelected((current) => toggleSelected(current, index)), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); setSelected((current) => toggleSelected(current, index)); } } }
+                      ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => toggleMessage(index), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); toggleMessage(index); } } }
                       : { onTouchStart: () => holdToSelect(index), onTouchEnd: cancelHold, onTouchMove: cancelHold, onContextMenu: (event: React.MouseEvent) => { if (longPressRef.current === null && "ontouchstart" in window) event.preventDefault(); } })}
                   >
                     {selecting ? <span className="message-select-mark" aria-hidden="true">{isSelected ? <Check /> : null}</span> : <button type="button" className="message-select-hint" aria-label="Select this message" title="Select" onClick={() => startSelecting(index)} />}
