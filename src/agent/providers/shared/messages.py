@@ -97,7 +97,7 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     for message, note in zip(messages, notes, strict=True):
         role = message.get("role")
         content = message.get("content")
-        if role not in {"assistant", "user", "system"} or content is None:
+        if role not in {"assistant", "user", "system"} or content is None or message.get("deleted"):
             continue
         text = str(content)
         if note:
