@@ -123,6 +123,8 @@ Session log rules:
 - When previous_handoff.session_log has an entry for the same session, extend it.
 - A message with initiated_by_companion=true was sent first by the companion. If the user did not
   answer it, it was not what the session was about.
+- A message with replying_to answers that earlier message (its text is given), not the message
+  just before it.
 
 User card rules:
 - user_card is a short note about who the user is, read by the companion on every reply in every chat.
