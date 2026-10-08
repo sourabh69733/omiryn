@@ -221,6 +221,8 @@ class AgentConversationArchive(BaseModel):
 
 class UserMessage(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    # The earlier message this one replies to, by its position in the chat.
+    reply_to_index: int | None = Field(default=None, ge=0)
 
 
 class AgentMessageFeedbackCreate(BaseModel):

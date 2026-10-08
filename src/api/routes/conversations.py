@@ -369,6 +369,7 @@ async def send_agent_message(
         "content": payload.message,
         "created_at": utc_now_iso(),
         "delivery_status": "sending",
+        **({"reply_to": _reply_quote(prior_messages, payload.reply_to_index)} if payload.reply_to_index is not None else {}),
     }
     # Saved before the model runs, so a failed reply never loses what the user wrote.
     conversation.messages = [*prior_messages, pending]
@@ -407,6 +408,20 @@ async def retry_agent_message(
     )
 
 
+# Enough of the quoted message to show in the bubble and tell Omi what is meant.
+REPLY_QUOTE_CHARS = 300
+
+
+def _reply_quote(messages: list[dict[str, Any]], index: int) -> dict[str, Any]:
+    if index >= len(messages):
+        raise HTTPException(status_code=400, detail="The message you replied to was not found.")
+    quoted = messages[index]
+    text = " ".join(str(quoted.get("content") or "").replace("<next_message>", " ").split())
+    if quoted.get("deleted") or not text or quoted.get("role") not in {"user", "assistant"}:
+        raise HTTPException(status_code=400, detail="You can't reply to that message.")
+    return {"index": index, "role": quoted["role"], "text": text[:REPLY_QUOTE_CHARS]}
+
+
 async def _reply_to_pending(
     conversation: AgentConversation,
     user: CurrentUser,
@@ -428,6 +443,7 @@ async def _reply_to_pending(
             agent_tone=conversation.agent_tone,
             agent_name=conversation.agent_name,
             style_source_id=conversation.agent_style_source_id,
+            **({"reply_to": pending["reply_to"]} if pending.get("reply_to") else {}),
         )
     except (AgentProviderError, Exception) as error:
         logger.warning(
@@ -451,6 +467,8 @@ async def _reply_to_pending(
     user_message = conversation.messages[previous_message_count]
     # Keep when the user actually wrote it, even when this reply came from a retry.
     user_message["created_at"] = pending["created_at"]
+    if pending.get("reply_to"):
+        user_message["reply_to"] = pending["reply_to"]
     user_message["delivery_status"] = "read"
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))

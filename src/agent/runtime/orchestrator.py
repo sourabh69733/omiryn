@@ -70,6 +70,7 @@ async def run_agent_turn(
     agent_tone: str,
     style_source_id: str | None,
     agent_name: str | None = None,
+    reply_to: dict[str, Any] | None = None,
 ) -> AgentTurnResult:
     updated_messages = [dict(message) for message in messages]
     trace = save_agent_trace(
@@ -95,6 +96,7 @@ async def run_agent_turn(
         "role": "user",
         "content": user_text,
         "created_at": utc_now_iso(),
+        **({"reply_to": reply_to} if reply_to else {}),
     }
     quality = assess_user_message_quality(updated_messages + [user_message])
     quality_valid = bool(quality["valid"])
