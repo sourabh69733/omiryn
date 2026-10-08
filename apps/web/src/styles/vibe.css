@@ -349,22 +349,45 @@
   align-items: center;
   gap: 10px;
   margin: 0 0 8px;
-  border: 1px solid rgba(127, 103, 216, 0.25);
+  border: 1px solid var(--brand-line);
   border-radius: 14px;
-  background: var(--soft);
-  padding: 8px 10px 8px 14px;
+  background: #fff;
+  padding: 10px 12px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 12px;
+  box-shadow: 0 8px 24px rgba(24, 24, 27, 0.04);
+}
+
+.vibe-milestone-note .vibe-milestone-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--brand-violet);
 }
 
 .vibe-milestone-note span {
   flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.vibe-milestone-note span strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
 }
 
 .vibe-milestone-note a {
   color: var(--primary);
   font-weight: 650;
   text-decoration: none;
+  white-space: nowrap;
+}
+
+.vibe-milestone-note a:focus-visible,
+.vibe-milestone-note button:focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 2px;
 }
 
 .vibe-milestone-note button {

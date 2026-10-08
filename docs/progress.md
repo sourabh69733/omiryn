@@ -111,17 +111,18 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 ### UI next
 
-Branch `ui/contacts-layout`, PR #2 (open): try it with a real account, then merge. It was checked only with sample data.
+Branch `ui/contacts-layout`, PR #2 (open): UI changes below are local and uncommitted, awaiting review. Test the full flow with a real account before merging. The previous PR checks used sample data.
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Signup and onboarding screens | First thing a new user sees; still the old style. |
-| 2 | Contact page | Last page still in the old style (big title, old form). |
-| 3 | Milestone note above the composer | "Omi knows what you want in friends · See your vibe" still has the old look. |
-| 4 | Accessibility pass | Keyboard use of the rail, menus and drawer; focus rings; contrast of the grey text; screen-reader labels. |
-| 5 | Phone extras | "Add to home screen" icon and name; iPhone notch and home-bar spacing; composer stays above the keyboard. |
-| 6 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
-| 7 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
+| 1 | Signup and onboarding screens | Local visual refresh done; needs review and a new-account walkthrough. |
+| 2 | Contact page | Local visual refresh and native radio controls done; needs review and submission check. |
+| 3 | Milestone note above the composer | Local compact treatment done; needs a live milestone check. |
+| 4 | Accessibility pass | Mobile navigation and focus styles improved locally; full keyboard and contrast audit still needed. |
+| 5 | Phone extras | Local manifest, safe-area and visual-viewport work done; needs real iPhone keyboard and home-screen testing. |
+| 6 | Mobile chat flow | Local change removes the one-chat screen; menu opens navigation. Needs review. |
+| 7 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. |
+| 8 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
 
 Done on the branch, after a UI review: phones open straight into the Omi chat; the chat header reads "Omi · Finds your people", with the name beside the back arrow on phones; a known vibe line said once shows "Said once" instead of "Still learning"; memories read as plain labels ("Study topic (current)") and one line per part instead of "likes: ... · favorite parts: ..."; Matches shows a clearly marked example introduction and three steps (talk with Omi, Omi finds someone, you both say yes).
 
