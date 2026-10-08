@@ -131,17 +131,20 @@ def _write(
     }
 
 
-def drop_vibe_proof_from_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | None:
-    """A deleted chat takes its proof with it; a line left without proof goes too."""
+def drop_vibe_proof_from_conversation(
+    user_id: str, conversation_id: str, message_indexes: set[int] | None = None
+) -> dict[str, Any] | None:
+    """A deleted chat (or deleted messages) takes its proof with it; a line left without proof goes too."""
     owner_id = _require_user_id(user_id, "agent vibe card")
     current = get_vibe_card(owner_id)
+    gone = _proof_matcher(conversation_id, message_indexes)
     touched = {
         area_id: {
             "text": line_text(line),
-            "evidence": [item for item in line_evidence(line) if item["conversation_id"] != conversation_id],
+            "evidence": [item for item in line_evidence(line) if not gone(item)],
         }
         for area_id, line in current["areas"].items()
-        if any(item["conversation_id"] == conversation_id for item in line_evidence(line))
+        if any(gone(item) for item in line_evidence(line))
     }
     if not touched:
         return None
@@ -154,17 +157,29 @@ def drop_vibe_proof_from_conversation(user_id: str, conversation_id: str) -> dic
     )
 
 
-def vibe_deletion_impact(user_id: str, conversation_id: str) -> dict[str, list[str]]:
-    """Which vibe lines deleting this chat would remove, and which would only lose some proof."""
+def vibe_deletion_impact(
+    user_id: str, conversation_id: str, message_indexes: set[int] | None = None
+) -> dict[str, list[str]]:
+    """Which vibe lines deleting this chat (or these messages) would remove, and which would only lose proof."""
     removed: list[str] = []
     weakened: list[str] = []
+    gone = _proof_matcher(conversation_id, message_indexes)
     for area_id, line in get_vibe_card(user_id)["areas"].items():
         evidence = line_evidence(line)
-        from_chat = [item for item in evidence if item["conversation_id"] == conversation_id]
+        from_chat = [item for item in evidence if gone(item)]
         if not from_chat:
             continue
         (removed if len(from_chat) == len(evidence) else weakened).append(area_id)
     return {"removed": removed, "weakened": weakened}
+
+
+def _proof_matcher(conversation_id: str, message_indexes: set[int] | None):
+    def gone(item: dict[str, Any]) -> bool:
+        return item["conversation_id"] == conversation_id and (
+            message_indexes is None or item.get("message_index") in message_indexes
+        )
+
+    return gone
 
 
 def prune_vibe_proof_from_missing_chats(user_id: str, existing_conversation_ids: set[str]) -> bool:

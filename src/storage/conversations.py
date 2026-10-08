@@ -233,6 +233,46 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
     ]
 
 
+def forget_memory_evidence(
+    connection, owner_id: str, conversation_id: str, message_indexes: set[int] | None = None
+) -> int:
+    """Drop proof from this chat (or these messages of it); memories left without proof go too.
+
+    Returns how many memories were deleted. Their vectors and reviews go with them.
+    """
+    where = [
+        agent_memory_evidence.c.conversation_id == conversation_id,
+        agent_memory_evidence.c.user_id == owner_id,
+    ]
+    if message_indexes is not None:
+        where.append(agent_memory_evidence.c.message_index.in_(sorted(message_indexes)))
+    memory_ids = [row[0] for row in connection.execute(select(agent_memory_evidence.c.memory_id).where(*where)).all()]
+    connection.execute(agent_memory_evidence.delete().where(*where))
+    if not memory_ids:
+        return 0
+    orphan_ids = [
+        row[0]
+        for row in connection.execute(
+            select(agent_memories.c.id).where(
+                agent_memories.c.user_id == owner_id,
+                agent_memories.c.id.in_(memory_ids),
+                ~agent_memories.c.id.in_(
+                    select(agent_memory_evidence.c.memory_id).where(agent_memory_evidence.c.user_id == owner_id)
+                ),
+            )
+        ).all()
+    ]
+    if orphan_ids:
+        for table in (agent_memory_embeddings, agent_memory_reviews):
+            connection.execute(
+                table.delete().where(table.c.user_id == owner_id, table.c.memory_id.in_(orphan_ids))
+            )
+        connection.execute(
+            agent_memories.delete().where(agent_memories.c.user_id == owner_id, agent_memories.c.id.in_(orphan_ids))
+        )
+    return len(orphan_ids)
+
+
 def delete_conversation(conversation_id: str, user_id: str | None = None) -> bool:
     owner_id = _require_user_id(user_id, "conversation")
     statement = select(agent_conversations.c.id).where(
@@ -305,49 +345,7 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
                 agent_self_notes.c.user_id == owner_id,
             )
         )
-        memory_ids = [
-            row[0]
-            for row in connection.execute(
-                select(agent_memory_evidence.c.memory_id).where(
-                    agent_memory_evidence.c.conversation_id == conversation_id,
-                    agent_memory_evidence.c.user_id == owner_id,
-                )
-            ).all()
-        ]
-        connection.execute(
-            agent_memory_evidence.delete().where(
-                agent_memory_evidence.c.conversation_id == conversation_id,
-                agent_memory_evidence.c.user_id == owner_id,
-            )
-        )
-        if memory_ids:
-            # Memories left without any evidence go, with their vectors and reviews.
-            orphan_ids = [
-                row[0]
-                for row in connection.execute(
-                    select(agent_memories.c.id).where(
-                        agent_memories.c.user_id == owner_id,
-                        agent_memories.c.id.in_(memory_ids),
-                        ~agent_memories.c.id.in_(
-                            select(agent_memory_evidence.c.memory_id).where(
-                                agent_memory_evidence.c.user_id == owner_id
-                            )
-                        ),
-                    )
-                ).all()
-            ]
-            if orphan_ids:
-                for table in (agent_memory_embeddings, agent_memory_reviews):
-                    connection.execute(
-                        table.delete().where(
-                            table.c.user_id == owner_id, table.c.memory_id.in_(orphan_ids)
-                        )
-                    )
-                connection.execute(
-                    agent_memories.delete().where(
-                        agent_memories.c.user_id == owner_id, agent_memories.c.id.in_(orphan_ids)
-                    )
-                )
+        forget_memory_evidence(connection, owner_id, conversation_id)
         connection.execute(
             memory_operation_applications.delete().where(
                 memory_operation_applications.c.conversation_id == conversation_id,
