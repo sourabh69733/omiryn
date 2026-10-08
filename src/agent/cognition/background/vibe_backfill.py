@@ -40,7 +40,7 @@ async def backfill_user_vibe(
     current = get_vibe_card(user_id)
     if current["areas"] and not force:
         return {"status": "has_card", "areas": {}, "milestone": current["milestone"]}
-    conversations = list_conversations(user_id)
+    conversations = [c for c in list_conversations(user_id) if not c.get("temporary")]
     transcript, last_sent_at, refs = chat_transcript(conversations)
     if not transcript:
         return {"status": "no_messages", "areas": {}, "milestone": current["milestone"]}

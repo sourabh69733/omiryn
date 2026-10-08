@@ -29,6 +29,8 @@ def chats_needing_v3(user_id: str) -> list[dict[str, Any]]:
     }
     needing = []
     for conversation in list_conversations(user_id):
+        if conversation.get("temporary"):
+            continue
         state = get_processing_state(conversation["id"], user_id)
         if state and state.processed_through_message_index >= 0 and conversation["id"] not in v3_chats:
             needing.append(conversation)
