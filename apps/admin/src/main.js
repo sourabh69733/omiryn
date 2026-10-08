@@ -329,7 +329,7 @@ function renderUsers(users) {
       <td class="mono">${escapeHtml(user.user_id)}</td>
       <td>${escapeHtml(profileLabel(user))}</td>
       <td class="mono">${formatNumber(user.conversation_count || 0)}<small>${formatNumber(user.active_conversation_count || 0)} active</small></td>
-      <td class="mono">${formatNumber(user.message_count || 0)}<small>${formatNumber(user.user_message_count || 0)} user</small></td>
+      <td class="mono">Private<small>Not available to admins</small></td>
       <td class="mono">${formatNumber(user.draft_count || 0)}<small>${formatNumber(user.approved_draft_count || 0)} approved</small></td>
       <td class="mono">${formatNumber(user.learned_fact_count || 0)}<small>${formatNumber(user.context_source_count || 0)} context / ${formatNumber(user.feedback_count || 0)} fb / ${formatNumber(user.data_point_review_count || 0)} dp</small></td>
       <td class="mono">${formatNumber(user.usage?.total_tokens || 0)}<small>${escapeHtml(userUsageTokenLine(user.usage))}</small></td>
@@ -393,7 +393,7 @@ function renderUserReport(detail) {
       ${reportCard("Name", user.display_name || "-", user.display_name_source ? `Source: ${user.display_name_source}` : "")}
       ${reportCard("Gender", profile.gender || "-", profileSource)}
       ${reportCard("Interested in", profile.interested_in || "-", profileSource)}
-      ${reportCard("Conversations", formatNumber(user.conversation_count || 0), `${formatNumber(user.message_count || 0)} total messages`)}
+      ${reportCard("Conversations", formatNumber(user.conversation_count || 0), "Chat text is private")}
       ${reportCard("Usage", formatNumber(user.usage?.total_tokens || 0), userUsageTokenLine(user.usage))}
       ${reportCard("Context debug", formatNumber(contextSnapshotSummary.total || contextSnapshots.length || 0), `${formatNumber(contextSnapshotSummary.total_context_tokens || 0)} rough tokens`)}
       ${reportCard("DP reviews", formatNumber(dataPointReviewSummary.total || dataPointReviews.length || 0), dataPointReviewSummaryDetail(dataPointReviewSummary))}
@@ -515,12 +515,6 @@ function renderContextSnapshotSection(snapshots, summary = {}) {
 
 function renderContextSnapshotItem(snapshot) {
   const summary = snapshot.summary || {};
-  const context = snapshot.context || {};
-  const sources = context.sources || [];
-  const blocks = context.blocks || [];
-  const skippedBlocks = context.skipped_blocks || [];
-  const messages = snapshot.messages || {};
-  const promptDebug = messages.prompt_debug || {};
   const flags = [
     summary.used_data_points ? "data_points" : "",
     summary.used_structured_whatsapp ? "structured_whatsapp" : "",
@@ -531,52 +525,18 @@ function renderContextSnapshotItem(snapshot) {
   return `
     <article class="feedback-item">
       <div class="feedback-item-head">
-        <span class="status-pill">${formatNumber(summary.included_source_count || sources.length || 0)} sources</span>
+        <span class="status-pill">${formatNumber(summary.included_source_count || 0)} sources</span>
         <span class="mono">${formatDate(snapshot.created_at)}</span>
       </div>
       <strong>Reply message ${formatNumber((snapshot.message_index ?? 0) + 1)}</strong>
-      <p>${escapeHtml(contextSnapshotHeadline(summary, promptDebug))}</p>
+      <p>${escapeHtml(contextSnapshotHeadline(summary))}</p>
       <small>${escapeHtml(contextSnapshotSourceLine(summary))}</small>
-      ${renderContextSnapshotPlannerLine(summary, context)}
       ${flags.length ? `<small>${flags.map(escapeHtml).join(" · ")}</small>` : '<small>No context flags</small>'}
-      ${renderSnapshotTurnMessages(messages)}
-      ${renderSnapshotPromptPayload(messages)}
-      ${renderContextPlannerDebug(context)}
-      <details>
-        <summary>Sources sent</summary>
-        <div class="snapshot-source-list">
-          ${
-            sources.length
-              ? sources.map(renderContextSnapshotSource).join("")
-              : '<div class="table-empty">No sources included.</div>'
-          }
-        </div>
-      </details>
-      ${
-        blocks.length || skippedBlocks.length
-          ? `
-            <details>
-              <summary>Context blocks</summary>
-              <div class="snapshot-source-list">
-                ${blocks.length ? blocks.map(renderContextBlock).join("") : '<div class="table-empty">No selected blocks.</div>'}
-                ${skippedBlocks.length ? skippedBlocks.map(renderSkippedContextBlock).join("") : ""}
-              </div>
-            </details>
-          `
-          : ""
-      }
     </article>
   `;
 }
 
-function contextSnapshotHeadline(summary = {}, promptDebug = {}) {
-  if (promptDebug.total_chars || promptDebug.rough_tokens || promptDebug.provider_message_count) {
-    return [
-      `${formatNumber(promptDebug.total_chars || 0)} prompt chars`,
-      `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
-      `${formatNumber(promptDebug.provider_message_count || 0)} messages`
-    ].join(" · ");
-  }
+function contextSnapshotHeadline(summary = {}) {
   return [
     `${formatNumber(summary.context_chars || 0)} source chars`,
     `${formatNumber(summary.rough_context_tokens || 0)} estimated context tokens`,
@@ -590,146 +550,6 @@ function contextSnapshotSourceLine(summary = {}) {
     `${formatNumber(summary.rough_context_tokens || 0)} estimated source tokens`,
     `${formatNumber(summary.source_count || 0)} candidates`
   ].join(" · ");
-}
-
-function renderContextSnapshotPlannerLine(summary = {}, context = {}) {
-  const intent = context.intent || {};
-  const labels = Array.isArray(intent.labels) && intent.labels.length
-    ? intent.labels.join(", ")
-    : (summary.intent_labels || []).join(", ");
-  const details = [
-    summary.engine_version || "",
-    labels ? `intent: ${labels}` : "",
-    summary.conversation_move ? `move: ${summary.conversation_move}` : "",
-    summary.active_topic ? `topic: ${summary.active_topic}` : ""
-  ].filter(Boolean);
-  return details.length ? `<small>${escapeHtml(details.join(" · "))}</small>` : "";
-}
-
-function renderContextPlannerDebug(context = {}) {
-  const plan = context.conversation_plan || {};
-  const topicState = context.topic_state || [];
-  const intent = context.intent || {};
-  if (!Object.keys(plan).length && !topicState.length && !Object.keys(intent).length) return "";
-  return `
-    <details>
-      <summary>Planner debug</summary>
-      <pre class="debug-json">${escapeHtml(JSON.stringify({ intent, conversation_plan: plan, topic_state: topicState }, null, 2))}</pre>
-    </details>
-  `;
-}
-
-function renderContextBlock(block) {
-  return `
-    <article class="fact-item">
-      <strong>${escapeHtml(block.title || "Context block")}</strong>
-      <small>${escapeHtml(block.source || "context")} · priority ${formatNumber(block.priority || 0)} · ${escapeHtml(block.position || "middle")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
-      ${block.include_reason ? `<small>${escapeHtml(block.include_reason)}</small>` : ""}
-      ${block.preview ? `<blockquote>${escapeHtml(block.preview)}</blockquote>` : ""}
-    </article>
-  `;
-}
-
-function renderSkippedContextBlock(block) {
-  return `
-    <article class="fact-item">
-      <strong>${escapeHtml(block.title || "Skipped context")}</strong>
-      <small>Skipped · ${escapeHtml(block.source || "context")} · ${formatNumber(block.rough_tokens || 0)} estimated tokens</small>
-      ${block.skip_reason ? `<small>${escapeHtml(block.skip_reason)}</small>` : ""}
-    </article>
-  `;
-}
-
-function renderSnapshotTurnMessages(messages = {}) {
-  const user = messages.user;
-  const assistant = messages.assistant;
-  const assistantReply = messages.assistant_reply;
-  if (!user && !assistant && !assistantReply) return "";
-
-  return `
-    <details>
-      <summary>User message and reply</summary>
-      <div class="snapshot-source-list">
-        ${
-          user
-            ? renderSnapshotMessage("User message", user)
-            : '<div class="table-empty">User message was not found in the saved conversation.</div>'
-        }
-        ${
-          assistant
-            ? renderSnapshotMessage("Saved assistant reply", assistant)
-            : assistantReply
-              ? `<article class="fact-item"><strong>Assistant reply</strong><blockquote>${escapeHtml(assistantReply)}</blockquote></article>`
-              : '<div class="table-empty">Assistant reply was not found in the saved conversation.</div>'
-        }
-      </div>
-    </details>
-  `;
-}
-
-function renderSnapshotMessage(label, message) {
-  const meta = [
-    message.role || "message",
-    Number.isInteger(message.index) ? `#${formatNumber(message.index + 1)}` : "",
-    message.quality ? `quality: ${message.quality}` : ""
-  ].filter(Boolean).join(" · ");
-  return `
-    <article class="fact-item">
-      <strong>${escapeHtml(label)}</strong>
-      <small>${escapeHtml(meta)}</small>
-      ${message.content ? `<blockquote>${escapeHtml(message.content)}</blockquote>` : ""}
-    </article>
-  `;
-}
-
-function renderSnapshotPromptPayload(messages = {}) {
-  const systemPrompt = messages.system_prompt;
-  const providerMessages = Array.isArray(messages.provider) ? messages.provider : [];
-  const promptDebug = messages.prompt_debug || {};
-  if (!systemPrompt && !providerMessages.length) {
-    return `
-      <details>
-        <summary>Prompt sent to model</summary>
-        <div class="table-empty">Prompt payload was not stored for this older snapshot.</div>
-      </details>
-    `;
-  }
-
-  const payload = [
-    systemPrompt ? { role: "system", content: systemPrompt } : null,
-    ...providerMessages
-  ].filter(Boolean);
-
-  return `
-    <details>
-      <summary>Prompt sent to model</summary>
-      ${
-        Object.keys(promptDebug).length
-          ? `<small>${escapeHtml(promptDebugLabel(promptDebug))}</small>`
-          : ""
-      }
-      <pre class="debug-json">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
-    </details>
-  `;
-}
-
-function promptDebugLabel(promptDebug = {}) {
-  return [
-    `${formatNumber(promptDebug.total_chars || 0)} chars`,
-    `${formatNumber(promptDebug.rough_tokens || 0)} estimated prompt tokens`,
-    `${formatNumber(promptDebug.system_chars || 0)} system chars`,
-    `${formatNumber(promptDebug.provider_message_count || 0)} messages`
-  ].join(" · ");
-}
-
-function renderContextSnapshotSource(source) {
-  return `
-    <article class="fact-item">
-      <strong>${escapeHtml(source.title || "Untitled source")}</strong>
-      <small>${escapeHtml(source.source_type || "context")} · ${formatNumber(source.included_chars || 0)} chars · ${formatNumber(source.rough_tokens || 0)} estimated source tokens${source.truncated ? " · truncated" : ""}</small>
-      ${source.preview ? `<blockquote>${escapeHtml(source.preview)}</blockquote>` : ""}
-    </article>
-  `;
 }
 
 function renderFeedbackSection(feedback, summary = {}) {
@@ -771,7 +591,6 @@ function renderFeedbackSection(feedback, summary = {}) {
 function renderFeedbackItem(item) {
   const reasons = feedbackItemReasons(item);
   const comment = (item.comment || "").trim();
-  const preview = (item.message_preview || "").trim();
   return `
     <article class="feedback-item">
       <div class="feedback-item-head">
@@ -784,7 +603,6 @@ function renderFeedbackItem(item) {
           : `<strong>${escapeHtml("No reason")}</strong>`
       }
       ${comment ? `<p>${escapeHtml(comment)}</p>` : ""}
-      ${preview ? `<blockquote>${escapeHtml(preview)}</blockquote>` : ""}
       <small class="mono">${escapeHtml(item.conversation_id || "-")} · message ${formatNumber((item.message_index ?? 0) + 1)}</small>
     </article>
   `;
@@ -966,7 +784,7 @@ function renderConversationReportRow(conversation) {
     <tr>
       <td class="mono">${escapeHtml(conversation.id)}<small>${escapeHtml(conversation.agent_model || conversation.agent_provider || "-")}</small></td>
       <td>${statusPill(conversation.status)}</td>
-      <td class="mono">${formatNumber(conversation.message_count || 0)}<small>${formatNumber(conversation.user_message_count || 0)} user / ${formatNumber(conversation.context_source_count || 0)} context</small></td>
+      <td class="mono">Private<small>${formatNumber(conversation.context_source_count || 0)} context sources</small></td>
       <td class="mono">${formatNumber(conversation.usage?.total_tokens || 0)}<small>${formatNumber(conversation.usage?.prompt_tokens || 0)} in / ${formatNumber(conversation.usage?.completion_tokens || 0)} out</small></td>
       <td class="mono">${formatNumber(conversation.usage?.request_count || 0)}<small>${formatNumber(conversation.context_snapshot_count || 0)} ctx · ${formatNumber(latestSnapshot.rough_context_tokens || 0)} ctx tokens</small></td>
       <td>${formatDate(conversation.updated_at)}</td>
