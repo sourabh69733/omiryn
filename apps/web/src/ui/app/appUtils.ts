@@ -8,6 +8,7 @@ export const pageFromPath = (): Page => {
   // /style is the old name of Memories.
   if (/^\/(memories|style)/.test(window.location.pathname)) return "memories";
   if (window.location.pathname.startsWith("/matches")) return "matches";
+  if (window.location.pathname.startsWith("/profile/privacy")) return "privacy";
   if (window.location.pathname.startsWith("/profile")) return "profile";
   return "chat";
 };
@@ -18,6 +19,7 @@ export const pathForPage: Record<Page, string> = {
   memories: "/memories",
   matches: "/matches",
   profile: "/profile",
+  privacy: "/profile/privacy",
   contact: "/contact"
 };
 
