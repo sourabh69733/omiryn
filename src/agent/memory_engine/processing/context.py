@@ -115,7 +115,17 @@ def _memory_message(message: dict[str, object], *, scope: MemoryScope) -> Memory
         evidence_eligible=scope == "new" and role == "user" and bool(content.strip()),
         sent_at=message.get("created_at") if isinstance(message.get("created_at"), str) else None,
         initiated_by_companion=role == "assistant" and bool(message.get("proactive")),
+        replying_to=_replying_to(message),
     )
+
+
+def _replying_to(message: dict[str, object]) -> dict[str, object] | None:
+    reply_to = message.get("reply_to")
+    if message.get("role") != "user" or not isinstance(reply_to, dict):
+        return None
+    if reply_to.get("deleted") or not reply_to.get("text"):
+        return None
+    return {"message_index": reply_to.get("index"), "text": str(reply_to["text"])}
 
 
 def _is_meaningful_user_message(message: dict[str, object]) -> bool:

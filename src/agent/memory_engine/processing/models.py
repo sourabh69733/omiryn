@@ -21,6 +21,8 @@ class MemoryMessage:
     sent_at: str | None = None
     # Sent first by the companion (a nudge or greeting), not in answer to the user.
     initiated_by_companion: bool = False
+    # The earlier message the user picked to answer: {"message_index", "text"}.
+    replying_to: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

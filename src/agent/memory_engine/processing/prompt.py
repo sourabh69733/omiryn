@@ -88,6 +88,7 @@ def memory_batch_prompt(
                 **_sent_fields(message, zone),
                 **({"session": labels[message.message_index]} if message.message_index in labels else {}),
                 **({"initiated_by_companion": True} if message.initiated_by_companion else {}),
+                **({"replying_to": message.replying_to} if message.replying_to else {}),
             }
             for message in batch.messages
         ],
