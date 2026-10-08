@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { apiFetch, ensureAuthenticatedSession, signInWithGoogle } from "../lib/api";
 import { MainApp } from "./app/MainApp";
+import { AgentOrb } from "./app/AgentOrb";
 import { OmirynLogo } from "./brand/OmirynLogo";
 import { QuickSetup } from "./onboarding/QuickSetup";
 
@@ -84,7 +85,29 @@ export function App() {
   }
 
   if (authState === "signed_out") {
-    return <main className="auth-screen-page"><section className="auth-card"><OmirynLogo /><h1>Welcome to Omiryn</h1><p className="auth-copy">Sign in to meet Omiryn and start talking.</p><button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}><span className="google-mark">G</span>{isSigningIn ? "Opening Google..." : "Continue with Google"}</button>{authError ? <p className="auth-error">{authError}</p> : null}<small>By continuing, you agree to Omiryn's <a href="https://omiryn.com/terms">Terms</a> and <a href="https://omiryn.com/privacy">Privacy Policy</a>.</small></section></main>;
+    return (
+      <main className="auth-screen-page">
+        <div className="auth-layout">
+          <section className="auth-intro" aria-labelledby="auth-intro-title">
+            <OmirynLogo />
+            <div className="auth-intro-copy">
+              <span className="auth-intro-orb"><AgentOrb state="idle" /></span>
+              <h1 id="auth-intro-title">Talk first.<br /><em>Connect better.</em></h1>
+              <p>Omiryn gets to know you through conversation, then helps you find friends who feel like your kind of people.</p>
+            </div>
+          </section>
+          <section className="auth-card" aria-label="Sign in">
+            <h2>Sign in to Omiryn</h2>
+            <button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}>
+              <span className="google-mark" aria-hidden="true">G</span>
+              {isSigningIn ? "Opening Google..." : "Continue with Google"}
+            </button>
+            {authError ? <p className="auth-error" role="alert">{authError}</p> : null}
+            <small>By continuing, you agree to Omiryn's <a href="https://omiryn.com/terms">Terms</a> and <a href="https://omiryn.com/privacy">Privacy Policy</a>.</small>
+          </section>
+        </div>
+      </main>
+    );
   }
 
   if (profileState === "incomplete") return <QuickSetup />;

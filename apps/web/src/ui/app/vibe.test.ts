@@ -26,7 +26,7 @@ test("proof links open the chat at that message", () => {
 
 test("the chip says New or Confirmed; the panel has the count", () => {
   assert.equal(strengthLabel("clear"), "Confirmed");
-  assert.equal(strengthLabel("mentioned"), "Still learning");
+  assert.equal(strengthLabel("mentioned"), "Said once");
   assert.equal(proofSummary(1, 1), "From 1 of your messages");
   assert.equal(proofSummary(4, 2), "From 4 of your messages, on 2 different days");
 });

@@ -1,0 +1,94 @@
+/* Readability floor for the whole app, loaded last: secondary text at least 13px (timestamps
+   12px), a darker grey for muted text, no small uppercase labels, and normal letter spacing on big
+   headings. Keep new styles at or above these sizes instead of adding more overrides here. */
+:root {
+  --brand-muted: #55555f;
+  --muted: #55555f;
+}
+
+/* Section labels read as words, not decoration. */
+.omi-rail-label {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Big headings: tight but never touching. */
+.auth-intro h1 {
+  letter-spacing: -0.03em;
+}
+
+.auth-intro h1 em {
+  letter-spacing: -0.01em;
+}
+
+.auth-card h2,
+.contact-title h1 {
+  letter-spacing: -0.02em;
+}
+
+.auth-card h2 {
+  margin-bottom: 22px;
+}
+
+.contact-title h1 {
+  font-size: 26px;
+}
+
+/* Secondary text: 13px minimum. */
+.omi-contact-copy small,
+.omi-chat-notice,
+.noted-line,
+.noted-line button,
+.mem-row-copy small,
+.mem-row-note,
+.mem-flag,
+.mem-group-note,
+.vibe-open,
+.vibe-open-chip,
+.match-steps span,
+.match-example-person small,
+.match-example-why span,
+.match-example-tag,
+.pf-kicker,
+.pf-intro-note,
+.pf-place,
+.pf-requests,
+.pf-chips li,
+.pf-edit label,
+.auth-card > small,
+.quick-setup-hint,
+.quick-setup-optional,
+.vibe-private,
+.history-item-copy .history-item-line small,
+.history-item-copy span,
+.message-status-row,
+.omi-drawer-note,
+.omi-drawer-empty,
+.contact-message-field small,
+.omi-main .agentic-chat .agent-status {
+  font-size: 13px;
+}
+
+/* Vibe cards: titles, chips, "Not right" and the private note. */
+.vibe-screen .vibe-card h3,
+.vibe-strength,
+.vibe-remove,
+.vibe-card p.vibe-private {
+  font-size: 13px;
+}
+
+/* Timestamps can stay a step smaller, but darker. */
+.chat-day-separator span,
+.chat-time-separator span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* A disabled button still reads as a button. */
+.contact-send-button:disabled,
+.quick-setup-submit:disabled {
+  background: #e4e4e7;
+  color: #52525b;
+  opacity: 1;
+}

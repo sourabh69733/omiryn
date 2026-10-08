@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories } from "./memoryPresentation";
+import { canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories, memoryLabel, memoryValueLines, oldMemoryNote, partitionCanonicalMemories } from "./memoryPresentation";
 
 test("groups canonical memories by their actual cognitive kind", () => {
   const sections = groupCanonicalMemories([
@@ -74,4 +74,20 @@ test("an old memory says what replaced it, or when it ended", () => {
 
   assert.equal(oldMemoryNote(all[0], all), "Replaced by Jaipur on 3 Oct");
   assert.equal(oldMemoryNote(all[2], all), "Ended on 5 Oct");
+});
+
+test("memory keys read as plain labels", () => {
+  assert.equal(memoryLabel("study_topic_current"), "Study topic (current)");
+  assert.equal(memoryLabel("harry_potter_movies"), "Harry potter movies");
+  assert.equal(memoryLabel("location"), "Location");
+});
+
+test("structured memory values become one short line per part", () => {
+  assert.deepEqual(memoryValueLines({ likes: "Harry Potter movies", favorite_parts: "last two movies" }), [
+    "Likes: Harry Potter movies",
+    "Favorite parts: last two movies",
+  ]);
+  assert.deepEqual(memoryValueLines(["chai", "coffee"]), ["chai, coffee"]);
+  assert.deepEqual(memoryValueLines("Jaipur"), ["Jaipur"]);
+  assert.deepEqual(memoryValueLines(null), []);
 });

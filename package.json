@@ -16,7 +16,7 @@
     "web:preview": "vite preview --config apps/web/vite.config.js",
     "web:deploy": "npx wrangler deploy --config apps/web/wrangler.jsonc",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
-    "web:test": "tsx --test apps/web/src/ui/app/*.test.ts",
+    "web:test": "tsx --test apps/web/src/ui/app/*.test.ts apps/web/src/ui/app/*.test.tsx",
     "admin:dev": "vite --config apps/admin/vite.config.js",
     "admin:test": "node --test apps/admin/src/*.test.js",
     "admin:check": "node --check apps/admin/src/api.js && node --check apps/admin/src/auth.js && node --check apps/admin/src/main.js",

@@ -6004,7 +6004,7 @@ button.history-archived-toggle:hover {
   gap: 10px;
 }
 
-.contact-category-row button {
+.contact-category-row label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6022,14 +6022,14 @@ button.history-archived-toggle:hover {
   transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.contact-category-row button:hover,
-.contact-category-row button:focus-visible {
+.contact-category-row label:hover,
+.contact-category-row label:focus-within {
   border-color: rgba(127, 103, 216, 0.44);
   color: var(--ink);
   background: rgba(255, 255, 255, 0.88);
 }
 
-.contact-category-row button.active {
+.contact-category-row label.active {
   border-color: rgba(127, 103, 216, 0.58);
   color: var(--primary-dark);
   background: rgba(180, 154, 255, 0.15);
@@ -8464,7 +8464,7 @@ button.history-archived-toggle:hover {
     display: none;
   }
 
-  .contact-category-row button {
+  .contact-category-row label {
     flex: 0 0 auto;
     min-height: 44px;
     padding: 0 14px;

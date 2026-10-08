@@ -1,0 +1,281 @@
+/* Popups (confirm, review, usage, evidence) in the calm style: white, rounded, one clear title,
+   no eyebrow labels. On phones they rise from the bottom as sheets. */
+.legacy-react-shell .confirm-overlay {
+  z-index: 60;
+  padding: 16px;
+  background: rgba(24, 24, 27, 0.32);
+  backdrop-filter: blur(3px);
+}
+
+.legacy-react-shell .confirm-dialog,
+.legacy-react-shell .evidence-dialog {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(39, 33, 64, 0.18);
+}
+
+.legacy-react-shell .confirm-dialog {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 22px;
+}
+
+.legacy-react-shell .confirm-dialog .eyebrow,
+.legacy-react-shell .evidence-dialog .eyebrow {
+  display: none;
+}
+
+.legacy-react-shell .confirm-icon {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: #fef0ee;
+  color: #b42318;
+}
+
+.legacy-react-shell .confirm-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.legacy-react-shell .confirm-copy h2,
+.legacy-react-shell .signal-review-dialog .confirm-copy h2,
+.legacy-react-shell .evidence-dialog-header h2 {
+  margin: 0;
+  max-width: none;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.legacy-react-shell .confirm-copy p:not(.eyebrow),
+.legacy-react-shell .signal-review-dialog .confirm-copy p:not(.eyebrow),
+.legacy-react-shell .evidence-dialog-header p:not(.eyebrow) {
+  margin-top: 6px;
+  max-width: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.legacy-react-shell .confirm-session {
+  border: 0;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: var(--muted) !important;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px !important;
+  font-weight: 500;
+}
+
+.legacy-react-shell .delete-impact {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.legacy-react-shell .confirm-actions {
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.legacy-react-shell .confirm-actions button {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.legacy-react-shell .confirm-actions .secondary-button {
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.legacy-react-shell .confirm-actions .secondary-button:hover {
+  border-color: var(--line-strong);
+  background: #faf8ff;
+}
+
+.legacy-react-shell .confirm-actions .danger-button {
+  border: 0;
+  background: #d92d20;
+  color: #ffffff;
+}
+
+.legacy-react-shell .confirm-actions .danger-button:hover {
+  background: #b42318;
+}
+
+/* Review and usage popups: one column, a short title, choices as soft cards. */
+.legacy-react-shell .signal-review-dialog {
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: min(480px, 100%);
+  padding: 22px;
+}
+
+.legacy-react-shell .signal-feedback-options label,
+.legacy-react-shell .signal-toggle-row {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.legacy-react-shell .signal-feedback-options label.selected {
+  border-color: var(--brand-violet);
+  background: #faf8ff;
+}
+
+.legacy-react-shell .signal-feedback-options strong,
+.legacy-react-shell .signal-toggle-row strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.legacy-react-shell .signal-feedback-options small,
+.legacy-react-shell .signal-toggle-row small {
+  font-size: 12.5px;
+}
+
+.legacy-react-shell .signal-review-reasons button {
+  min-height: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.legacy-react-shell .signal-review-reasons button.selected {
+  border-color: #fda29b;
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.legacy-react-shell .signal-review-form textarea {
+  min-height: 96px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.legacy-react-shell .signal-review-form textarea:focus {
+  border-color: var(--brand-violet);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+.legacy-react-shell .signal-review-form .privacy-note {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Evidence: the user's own words as quotes, with a link back to the chat. */
+.legacy-react-shell .evidence-dialog {
+  width: min(560px, 100%);
+}
+
+.legacy-react-shell .evidence-dialog-header {
+  padding: 20px 20px 14px;
+}
+
+.legacy-react-shell .evidence-close {
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.legacy-react-shell .evidence-close:hover {
+  background: #f1ecff;
+}
+
+.legacy-react-shell .evidence-summary {
+  display: none;
+}
+
+.legacy-react-shell .evidence-list {
+  padding: 0 20px 20px;
+}
+
+.legacy-react-shell .evidence-item {
+  border: 0;
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 0 4px 14px;
+}
+
+.legacy-react-shell .evidence-item-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 4px;
+}
+
+.legacy-react-shell .evidence-item-index {
+  display: none;
+}
+
+.legacy-react-shell .evidence-item blockquote,
+.legacy-react-shell .evidence-item p {
+  grid-column: 1;
+}
+
+.legacy-react-shell .evidence-item blockquote {
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.legacy-react-shell .evidence-item p {
+  font-weight: 400;
+}
+
+.legacy-react-shell .evidence-chat-link {
+  color: var(--brand-violet);
+  font-weight: 550;
+}
+
+.legacy-react-shell .evidence-empty {
+  border-radius: 14px;
+  background: #faf8ff;
+}
+
+@media (max-width: 760px) {
+  .legacy-react-shell .confirm-overlay {
+    align-items: end;
+    padding: 0;
+  }
+
+  .legacy-react-shell .confirm-dialog,
+  .legacy-react-shell .evidence-dialog {
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: calc(22px + env(safe-area-inset-bottom));
+  }
+
+  .legacy-react-shell .signal-feedback-options {
+    grid-template-columns: 1fr;
+  }
+
+  .legacy-react-shell .confirm-actions button {
+    flex: 1;
+  }
+}

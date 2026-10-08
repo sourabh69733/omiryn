@@ -1,0 +1,756 @@
+/* App frame: a contacts rail on web, full-screen chat and navigation panel on phones. */
+.omi-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--brand-bg);
+}
+
+.omi-rail {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 16px 12px 12px;
+  border-right: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.omi-rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* On web the brand row lines up with the chat header: same height, one shared bottom line. */
+@media (min-width: 761px) {
+  .omi-rail {
+    padding-top: 0;
+  }
+
+  .omi-rail-top {
+    min-height: 60px;
+    margin: 0 -12px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+button.omi-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+button.omi-brand:hover {
+  background: transparent;
+}
+
+.omi-brand img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+/* Icon nav: phones only (the web rail lists the same links with labels). */
+.omi-rail-nav {
+  display: none;
+  gap: 2px;
+}
+
+.omi-rail-section {
+  display: grid;
+  gap: 2px;
+}
+
+.omi-rail-label {
+  margin: 0 0 4px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.omi-rail-links a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.omi-rail-links a:hover {
+  background: #faf8ff;
+}
+
+.omi-rail-links a.is-active {
+  background: #f1ecff;
+  color: var(--brand-violet);
+}
+
+.omi-rail-links svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.omi-rail-links a.is-active svg {
+  color: var(--brand-violet);
+}
+
+.omi-rail-nav a {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--muted);
+}
+
+.omi-rail-nav a:hover,
+.omi-rail-nav a.is-active {
+  background: #f1ecff;
+  color: var(--brand-violet);
+}
+
+.omi-rail-nav svg {
+  width: 17px;
+  height: 17px;
+}
+
+
+button.omi-contact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+button.omi-contact:hover {
+  background: #faf8ff;
+}
+
+button.omi-contact.is-active {
+  border-color: var(--line-strong);
+  background: #f4f0ff;
+}
+
+.omi-contact-avatar {
+  display: block;
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+.omi-contact-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.omi-contact-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.omi-contact-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omi-contact-copy small.is-typing {
+  color: var(--brand-violet);
+  font-weight: 550;
+}
+
+/* The privacy reminder at the top of the chat: one quiet line, not a box. */
+.omi-chat-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.omi-chat-notice svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.omi-account {
+  position: relative;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+button.omi-account-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+}
+
+button.omi-account-button:hover {
+  background: #faf8ff;
+}
+
+.omi-account-avatar {
+  display: block;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.omi-account-avatar img,
+.omi-account-avatar span {
+  width: 100%;
+  height: 100%;
+}
+
+.omi-account-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omi-account-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  top: auto;
+}
+
+.omi-main {
+  min-width: 0;
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+/* Chat fills the page edge to edge; its messages and composer sit in a readable centre column. */
+.omi-main .interview-screen {
+  height: 100dvh;
+  padding: 0;
+}
+
+.omi-main .chat-workspace {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.omi-main .chat-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--brand-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.omi-main .agentic-chat .card-heading {
+  min-height: 60px;
+  padding: 10px max(16px, calc((100% - 792px) / 2));
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.omi-main .agentic-chat .chat-log {
+  flex: 1;
+  padding-inline: max(16px, calc((100% - 760px) / 2));
+}
+
+.omi-main .agentic-chat .composer,
+.omi-main .omi-readonly-bar,
+.omi-main .chat-error-notice,
+.omi-main .composer-pause-note,
+.omi-main .vibe-milestone-note {
+  width: min(760px, calc(100% - 32px));
+  margin-inline: auto;
+}
+
+/* Pages next to the rail get even side margins (the chat and profile set their own). */
+.omi-main > .screen:not(.interview-screen):not(.pf) {
+  padding: 36px clamp(16px, 4vw, 48px) 56px;
+}
+
+button.omi-back {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 0;
+  height: 34px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+}
+
+button.omi-back:hover {
+  background: #f1ecff;
+}
+
+.omi-back svg {
+  width: 20px;
+  height: 20px;
+}
+
+.omi-chat-menu {
+  position: relative;
+}
+
+button.omi-menu-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 0;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+}
+
+button.omi-menu-button:hover,
+button.omi-menu-button[aria-expanded="true"] {
+  background: #f1ecff;
+}
+
+.omi-menu-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.omi-menu-button .history-unread-dot {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+}
+
+.omi-chat-menu-list {
+  min-width: 190px;
+}
+
+.omi-chat-menu-list .history-new-pill {
+  margin-left: auto;
+}
+
+.omi-readonly-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf8ff;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.omi-readonly-bar button {
+  min-height: 36px;
+  border-radius: 999px;
+}
+
+.omi-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(24, 24, 27, 0.18);
+  cursor: default;
+}
+
+button.omi-drawer-backdrop:hover {
+  background: rgba(24, 24, 27, 0.18);
+}
+
+.omi-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, 100%);
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: #ffffff;
+  box-shadow: -18px 0 50px rgba(39, 33, 64, 0.12);
+  animation: omi-drawer-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.omi-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+}
+
+button.omi-drawer-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+}
+
+button.omi-drawer-close:hover {
+  background: #f1ecff;
+  color: var(--ink);
+}
+
+.omi-drawer-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.omi-drawer-note,
+.omi-drawer-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.omi-drawer-usage {
+  display: grid;
+  gap: 12px;
+}
+
+.omi-mobile-navigation {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.omi-mobile-navigation-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(24, 24, 27, 0.32);
+}
+
+.omi-mobile-navigation-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(320px, 88vw);
+  padding: max(16px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: 18px 0 48px rgba(24, 24, 27, 0.12);
+}
+
+.omi-mobile-navigation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 0 8px;
+  font-size: 18px;
+}
+
+.omi-mobile-navigation-heading button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.omi-mobile-navigation-panel a,
+.omi-mobile-navigation-panel > button:not(.omi-mobile-navigation-backdrop) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.omi-mobile-navigation-panel a:hover,
+.omi-mobile-navigation-panel > button:hover {
+  background: #f4f0ff;
+}
+
+.omi-mobile-navigation-panel svg {
+  width: 19px;
+  height: 19px;
+}
+
+.omi-mobile-navigation-chat .agent-orb {
+  width: 24px;
+  height: 24px;
+}
+
+.omi-mobile-navigation-panel > button:last-child {
+  margin-top: auto;
+}
+
+.omi-mobile-navigation-panel :is(a, button):focus-visible,
+.omi-rail :is(a, button):focus-visible,
+.omi-main :is(a, button):focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 2px;
+}
+
+@keyframes omi-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omi-drawer {
+    animation: none;
+  }
+}
+
+/* Phones: the rail becomes a top bar; an open chat hides it and fills the screen. */
+@media (max-width: 760px) {
+  .omi-shell {
+    height: var(--omi-viewport-height, 100dvh);
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .omi-rail {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .omi-rail-top {
+    flex: 1;
+  }
+
+  .omi-rail .omi-rail-section {
+    display: none;
+  }
+
+  .omi-rail-nav {
+    display: flex;
+  }
+
+  .omi-account {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .omi-account-name {
+    display: none;
+  }
+
+  .omi-account-menu {
+    top: calc(100% + 6px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    width: 180px;
+  }
+
+  .omi-main,
+  .omi-main .interview-screen {
+    height: 100%;
+  }
+
+  main.omi-main {
+    padding-top: 0;
+  }
+
+  .omi-shell.is-chat-open {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .omi-shell.is-chat-open .omi-rail {
+    display: none;
+  }
+
+  .omi-main .interview-screen {
+    padding: 0;
+  }
+
+  .omi-main .interview-screen:not([hidden]) .chat-card {
+    position: static;
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .omi-main .interview-screen:not([hidden]) {
+    min-height: 0;
+  }
+
+  .omi-drawer {
+    width: 100%;
+  }
+
+  .omi-main .agentic-chat .composer {
+    margin-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+/* "Noted: ..." under the reply where Omi learned something; "Not right?" removes it. */
+.noted-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 2px 0 6px 40px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.noted-line.is-user {
+  justify-content: flex-end;
+  margin: 2px 40px 6px 0;
+}
+
+.noted-line > svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--brand-violet);
+}
+
+.noted-line span svg {
+  width: 11px;
+  height: 11px;
+  margin-left: 4px;
+  vertical-align: -1px;
+}
+
+.noted-line button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.noted-line button:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
+/* Chat header: back arrow, then Omi's avatar and name right beside it, and the menu at the far
+   right (like any messaging app), instead of a centred name floating between them. */
+.omi-main .agentic-chat .card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.omi-main .chat-title-lockup {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  column-gap: 10px;
+}
+
+.omi-main .chat-title-lockup > div {
+  min-width: 0;
+}
+
+.omi-main .agentic-chat .agent-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omi-main .omi-chat-menu {
+  flex: none;
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  .omi-main .agentic-chat .card-heading {
+    min-height: 56px;
+    padding: 8px 8px 8px 4px;
+  }
+}

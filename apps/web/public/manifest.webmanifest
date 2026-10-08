@@ -1,0 +1,17 @@
+{
+  "name": "Omiryn",
+  "short_name": "Omiryn",
+  "description": "Talk with Omi and find friends who feel like your kind of people.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fbfaf8",
+  "theme_color": "#fbfaf8",
+  "icons": [
+    {
+      "src": "/assets/omiryn-app-icon-light.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

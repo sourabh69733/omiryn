@@ -9,6 +9,12 @@ import "./styles/vibe.css";
 import "./styles/brand-theme.css";
 import "./styles/states.css";
 import "./styles/profile.css";
+import "./styles/memories.css";
+import "./styles/dialogs.css";
+import "./styles/shell.css";
+import "./styles/auth-polish.css";
+import "./styles/contact.css";
+import "./styles/readability.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>

@@ -1,0 +1,330 @@
+/* Memories: a calm list in one readable column, like the Profile page. */
+.mem {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.mem-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.mem-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.mem-group {
+  display: grid;
+  gap: 8px;
+}
+
+.mem-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mem-group h2 span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f1ecff;
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mem-group-note {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mem-list {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.mem-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mem-row:last-child {
+  border-bottom: 0;
+}
+
+.mem-row.menu-open {
+  z-index: 5;
+}
+
+.mem-row-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mem-row-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mem-row-copy p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.mem-row.is-old .mem-row-copy p {
+  color: var(--muted);
+}
+
+.mem-row-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mem-flag {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.mem-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: none;
+}
+
+.mem-row-menu .history-menu {
+  min-width: 220px;
+}
+
+a.mem-link,
+button.mem-link {
+  justify-self: start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-violet);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+button.mem-link:hover,
+a.mem-link:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.mem-link.is-muted {
+  color: var(--muted);
+}
+
+.mem-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (max-width: 480px) {
+  .mem-row {
+    align-items: flex-start;
+  }
+
+  .mem-row-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.matches-soon {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.matches-soon strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.matches-soon p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.matches-soon button.secondary-button {
+  min-height: 38px;
+  margin-top: 6px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.matches-soon button.secondary-button:hover {
+  border-color: var(--brand-violet);
+  color: var(--brand-violet);
+}
+
+/* Matches: a clearly marked example introduction and three steps, so the idea feels real. */
+.match-example {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.match-example-tag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.match-example-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-example-avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--brand-gradient);
+  filter: blur(1.5px);
+  opacity: 0.85;
+}
+
+.match-example-person strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.match-example-person small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.match-example-why {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.match-example-why span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.match-example-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.match-example-actions span {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.match-example-actions span.is-primary {
+  border-color: transparent;
+  background: #f1ecff;
+  color: var(--brand-violet);
+}
+
+.match-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.match-steps li {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #faf8ff;
+  counter-increment: step;
+}
+
+.match-steps li::before {
+  content: counter(step);
+  color: var(--brand-violet);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.match-steps strong {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.match-steps span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+@media (max-width: 560px) {
+  .match-steps {
+    grid-template-columns: 1fr;
+  }
+}

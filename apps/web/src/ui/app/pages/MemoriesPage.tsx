@@ -1,9 +1,10 @@
 import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
+import { CheckCircle2, MoreHorizontal, Quote, SlidersHorizontal } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { Notice, StateView } from "../StateView";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, memoryLabel, memoryValueLines, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
 
 const memoryReviewReasons = [
   { value: "incorrect", label: "Incorrect" },
@@ -37,6 +38,8 @@ export function MemoriesPage() {
   const [visibleSectionCounts, setVisibleSectionCounts] = useState<Record<string, number>>({});
   const [evidenceItem, setEvidenceItem] = useState<ProfileFact | CanonicalMemory | null>(null);
   const [openQuestions, setOpenQuestions] = useState<OpenQuestion[]>([]);
+  // Memory row whose "more" menu is open.
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
 
   async function load() {
     const [profileResponse, memoryResponse] = await Promise.all([
@@ -59,6 +62,18 @@ export function MemoriesPage() {
     const response = await apiFetch(`/api/me/open-questions/${id}/dismiss`, { method: "POST" });
     if (response.ok) setOpenQuestions((current) => current.filter((question) => question.id !== id));
   }
+  useEffect(() => {
+    if (!rowMenuId) return;
+    const close = (event: globalThis.MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target instanceof Element && event.target.closest(".mem-row-menu"))) setRowMenuId(null);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [rowMenuId]);
   function firstLoad() { setLoadError(""); load().catch((caught) => setLoadError(caught.message)); }
   useEffect(firstLoad, []);
 
@@ -219,41 +234,32 @@ export function MemoriesPage() {
     );
   }
 
+  // One memory as a quiet row: what it's about, what Omi remembers, and a menu for the rest.
   function renderCanonicalMemory(memory: CanonicalMemory) {
-    const confidence = Math.round((memory.confidence || 0) * 100);
-    const value = canonicalMemoryValueText(memory.value);
+    const valueLines = memoryValueLines(memory.value);
     const controls = canonicalMemoryControls(memory.evidence?.length || 0);
     const evidenceControl = controls.find((control) => control.id === "evidence");
-    const reviewControl = controls.find((control) => control.id === "review");
-    const usageControl = controls.find((control) => control.id === "usage");
     const isOld = oldIds.has(memory.id);
     const active = !isOld && (!memory.status || memory.status === "active");
     const isSaving = savingFactId === memory.id;
-    const cardTone = isOld ? "is-old" : canonicalMemoryCardTone(memory);
+    const label = memoryLabel(memory.key);
     return (
-      <article className={`profile-fact-card signal-review-card ${cardTone}`} key={memory.id}>
-        <div className="profile-fact-card-top">
-          <div>
-            <strong>{humanizeLabel(memory.key)}</strong>
-            {value ? <p className="profile-fact-values">{value}</p> : null}
-            {isOld ? <p className="memory-old-note">{oldMemoryNote(memory, canonicalMemories)}</p> : null}
-            <div className="profile-fact-meta">
-              {isOld ? null : <span className={"confidence-pill " + confidenceLevel(memory.confidence)}>{confidenceLabel(memory.confidence)} · {confidence}%</span>}
-              <span className="fact-tag fact-tag-type">{humanizeLabel(memory.kind)}</span>
-              {(memory.purposes || []).map((purpose) => <span className="fact-tag fact-tag-key" key={purpose}>{humanizeLabel(purpose)}</span>)}
-              {memory.status && memory.status !== "active" && !isOld ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.status)}</span> : null}
-              {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="fact-tag fact-tag-status">{humanizeLabel(memory.sensitivity)}</span> : null}
-              {evidenceControl ? (
-                <button className="fact-tag fact-evidence-trigger" type="button" onClick={() => setEvidenceItem(memory)}>
-                  {evidenceControl.label}
-                </button>
-              ) : null}
-            </div>
-          </div>
+      <article className={`mem-row ${isOld ? "is-old" : ""} ${rowMenuId === memory.id ? "menu-open" : ""}`} key={memory.id}>
+        <div className="mem-row-copy">
+          {valueLines.length ? <><small>{label}</small>{valueLines.map((line) => <p key={line}>{line}</p>)}</> : <p>{label}</p>}
+          {isOld ? <span className="mem-row-note">{oldMemoryNote(memory, canonicalMemories)}</span> : null}
+          {memory.status && memory.status !== "active" && !isOld ? <span className="mem-flag">Not in use</span> : null}
+          {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="mem-flag">{sentenceCase(humanizeLabel(memory.sensitivity))}</span> : null}
         </div>
-        <div className="signal-card-actions">
-          <button className="secondary-button feedback-signal-button" type="button" disabled={isSaving} onClick={() => openFeedbackFlow(memory)}>{reviewControl?.label}</button>
-          {active ? <button className="secondary-button" type="button" disabled={isSaving} onClick={() => openPrivacyFlow(memory)}>{usageControl?.label}</button> : null}
+        <div className="history-row-menu mem-row-menu">
+          <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={rowMenuId === memory.id} aria-label={`Options for ${label}`} disabled={isSaving} onClick={() => setRowMenuId(rowMenuId === memory.id ? null : memory.id)}><MoreHorizontal aria-hidden="true" /></button>
+          {rowMenuId === memory.id ? (
+            <div className="history-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setRowMenuId(null); openFeedbackFlow(memory); }}><CheckCircle2 aria-hidden="true" />Is this right?</button>
+              {active ? <button type="button" role="menuitem" onClick={() => { setRowMenuId(null); openPrivacyFlow(memory); }}><SlidersHorizontal aria-hidden="true" />Where Omi can use this</button> : null}
+              {evidenceControl ? <button type="button" role="menuitem" onClick={() => { setRowMenuId(null); setEvidenceItem(memory); }}><Quote aria-hidden="true" />See where Omi learned this</button> : null}
+            </div>
+          ) : null}
         </div>
       </article>
     );
@@ -264,161 +270,72 @@ export function MemoriesPage() {
     const visibleCount = visibleSectionCounts[sectionKey] || 5;
     const hasMore = visibleCount < section.memories.length;
     return (
-      <section className={`profile-fact-group signal-section signal-section-${section.id}`} key={section.id}>
-        <div className="profile-fact-group-heading"><div><h3>{section.title}</h3><p>{section.summary}</p></div><span>{section.memories.length}</span></div>
-        <div className="profile-fact-list">{section.memories.slice(0, visibleCount).map(renderCanonicalMemory)}</div>
-        {section.memories.length > 5 ? <button className="secondary-button signal-show-more" type="button" onClick={() => setVisibleSectionCounts((current) => ({ ...current, [sectionKey]: hasMore ? visibleCount + 5 : 5 }))}>{hasMore ? `Show ${Math.min(5, section.memories.length - visibleCount)} more` : "Show less"}</button> : null}
+      <section className="mem-group" key={section.id}>
+        <h2>{sentenceCase(section.title)} <span>{section.memories.length}</span></h2>
+        <div className="mem-list">{section.memories.slice(0, visibleCount).map(renderCanonicalMemory)}</div>
+        {section.memories.length > 5 ? <button className="mem-link" type="button" onClick={() => setVisibleSectionCounts((current) => ({ ...current, [sectionKey]: hasMore ? visibleCount + 5 : 5 }))}>{hasMore ? `Show ${Math.min(5, section.memories.length - visibleCount)} more` : "Show less"}</button> : null}
       </section>
     );
   }
 
   if (!loaded) return <section className="screen style-screen">{loadError ? <StateView kind="error" title="Couldn't load your memories" detail={loadError} onRetry={firstLoad} /> : <StateView kind="loading" title="Loading your memories…" />}</section>;
+  const toggleSection = (key: string, shown: boolean) => setVisibleSectionCounts((current) => {
+    const next = { ...current };
+    if (shown) delete next[key];
+    else next[key] = 1;
+    return next;
+  });
   return (
-    <section className="screen style-screen">
-      <div className="style-hero">
-        <div className="screen-copy compact">
-          <p className="eyebrow">Memories</p>
-          <h1>What Omiryn remembers.</h1>
-          <p>Review what Omiryn has learned, confirm what feels right, and control what it can use.</p>
-        </div>
-      </div>
-      <div className="style-snapshot-grid" aria-label="Memory summary">
-        <div className="style-snapshot-card">
-          <span>Memories</span>
-          <strong>{canonicalMemories.length}</strong>
-          <small>Things Omi remembers about you</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>Current</span>
-          <strong>{canonicalMemoryGroups.active.length}</strong>
-          <small>What Omi uses now</small>
-        </div>
-        <div className="style-snapshot-card">
-          <span>Matching use</span>
-          <strong>{canonicalMemories.filter((memory) => memory.allowed_uses?.includes("matching")).length}</strong>
-          <small>Allowed to support future matching</small>
-        </div>
-      </div>
-      <div className="style-layout">
-        <section className="profile-panel profile-panel-wide style-learning-panel">
-          <div className="panel-heading profile-facts-heading">
-            <div>
-              <p className="eyebrow">Memories</p>
-              <h2>What Omiryn remembers</h2>
-              <p>Things Omi picked up from your chats, grouped by type.</p>
-              <p className="privacy-note">Purpose describes why a memory matters. Allowed use controls where Omiryn may use it.</p>
-            </div>
-            <span className="profile-fact-total">{canonicalMemories.length} memories</span>
-          </div>
-          <div className="profile-fact-groups">
-            {openQuestions.length ? (
-              <section className="profile-fact-group signal-section signal-section-unsure">
-                <div className="profile-fact-group-heading"><div><h3>Omi isn't sure about</h3><p>Omi kept what it knew and will ask when it fits. Answer it in chat any time, or dismiss it.</p></div><span>{openQuestions.length}</span></div>
-                <div className="profile-fact-list">
-                  {openQuestions.map((question) => (
-                    <article className="profile-fact-card signal-review-card" key={question.id}>
-                      <p className="profile-fact-values">{question.text}</p>
-                      <div className="signal-card-actions">
-                        <a className="secondary-button" href="/">Answer in chat</a>
-                        <button className="secondary-button" type="button" onClick={() => void dismissQuestion(question.id)}>Not relevant</button>
-                      </div>
-                    </article>
-                  ))}
+    <section className="screen style-screen mem">
+      <header className="mem-head">
+        <h1>Memories</h1>
+        <p>What Omi remembers from your chats. If something's wrong, fix it here.</p>
+      </header>
+      {error && !reviewItem ? <Notice tone="error">{error}</Notice> : null}
+      {openQuestions.length ? (
+        <section className="mem-group">
+          <h2>Omi isn't sure about <span>{openQuestions.length}</span></h2>
+          <p className="mem-group-note">Omi will ask when it fits. Answer in chat any time, or dismiss it.</p>
+          <div className="mem-list">
+            {openQuestions.map((question) => (
+              <article className="mem-row" key={question.id}>
+                <div className="mem-row-copy"><p>{question.text}</p></div>
+                <div className="mem-row-actions">
+                  <a className="mem-link" href="/">Answer in chat</a>
+                  <button className="mem-link is-muted" type="button" onClick={() => void dismissQuestion(question.id)}>Not relevant</button>
                 </div>
-              </section>
-            ) : null}
-            {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
-            {canonicalMemoryGroups.old.length ? (
-              <div className="signal-archive-toggle-row">
-                <button
-                  className="secondary-button signal-show-more"
-                  type="button"
-                  onClick={() => setVisibleSectionCounts((current) => {
-                    const next = { ...current };
-                    if (showOldCanonical) delete next["old-canonical"];
-                    else next["old-canonical"] = 1;
-                    return next;
-                  })}
-                >
-                  {showOldCanonical ? "Hide old memories" : `Show old memories (${canonicalMemoryGroups.old.length})`}
-                </button>
-              </div>
-            ) : null}
-            {showOldCanonical ? (
-              <section className="profile-fact-group signal-section signal-section-old">
-                <div className="profile-fact-group-heading"><div><h3>Old memories</h3><p>Replaced by something newer, or past their end date. Omi keeps them as history and doesn't use them.</p></div><span>{canonicalMemoryGroups.old.length}</span></div>
-                <div className="profile-fact-list">{canonicalMemoryGroups.old.map(renderCanonicalMemory)}</div>
-              </section>
-            ) : null}
-            {canonicalMemoryGroups.rejected.length ? (
-              <div className="signal-archive-toggle-row">
-                <button
-                  className="secondary-button signal-show-more"
-                  type="button"
-                  onClick={() => setVisibleSectionCounts((current) => {
-                    const next = { ...current };
-                    if (showRejectedCanonical) delete next["rejected-canonical"];
-                    else next["rejected-canonical"] = 1;
-                    return next;
-                  })}
-                >
-                  {showRejectedCanonical ? "Hide rejected memories" : `Show rejected memories (${canonicalMemoryGroups.rejected.length})`}
-                </button>
-              </div>
-            ) : null}
-            {showRejectedCanonical ? (
-              <section className="profile-fact-group signal-section signal-section-not-used">
-                <div className="profile-fact-group-heading"><div><h3>Rejected memories</h3><p>Memories you marked as not true. Review one again to restore it.</p></div><span>{canonicalMemoryGroups.rejected.length}</span></div>
-                <div className="profile-fact-list">{canonicalMemoryGroups.rejected.map(renderCanonicalMemory)}</div>
-              </section>
-            ) : null}
+              </article>
+            ))}
           </div>
         </section>
-
-        {/* <section className="profile-panel profile-panel-wide style-context-panel">
-          <div className="style-section-heading">
-            <div>
-              <p className="eyebrow">Memories</p>
-              <h2>Saved context about you</h2>
-              <p>Add WhatsApp exports, profile notes, or any bigger context that should stay available across conversations.</p>
-              <p className="privacy-note">Only add content you have the right to share. Do not upload passwords, IDs, private third-party secrets, or sensitive details you want kept out of personalization.</p>
-            </div>
-            <span className="profile-fact-total">{sources.length} memories</span>
-          </div>
-          <div className="context-action-grid">
-            <button className="context-action-button" type="button" onClick={() => { setImportMode("whatsapp"); setTitle("My WhatsApp style"); setShowImport(true); }}>
-              <span className="context-card-icon">Aa</span>
-              <strong>Import WhatsApp</strong>
-              <small>Use a chat export to learn your natural tone.</small>
-            </button>
-            <button className="context-action-button" type="button" onClick={() => { setImportMode("memory"); setTitle("Imported context"); setShowImport(true); }}>
-              <span className="context-card-icon">+</span>
-              <strong>Add memory</strong>
-              <small>Paste a profile summary, notes, or important details.</small>
-            </button>
-          </div>
-          {showImport ? <form className="react-memory-form" onSubmit={importContext}><p className="privacy-note">{importMode === "whatsapp" ? "By importing a WhatsApp export, you confirm you have the right to upload it. Omiryn will not message people from the export." : "Saved memories can be used as long-term context in chat and future matching features."}</p><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Memory title" />{importMode === "whatsapp" ? <><input type="file" accept=".txt,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) void file.text().then(setContent); }} /><input value={userSender} onChange={(event) => setUserSender(event.target.value)} placeholder="Your sender name (optional)" /></> : null}<textarea value={content} onChange={(event) => setContent(event.target.value)} rows={7} placeholder={importMode === "whatsapp" ? "Choose a WhatsApp .txt export or paste it here..." : "Paste at least 20 characters..."} /><div><button className="secondary-button" type="button" onClick={() => setShowImport(false)}>Cancel</button><button type="submit" disabled={saving || content.trim().length < (importMode === "whatsapp" ? 50 : 20)}>{saving ? "Saving..." : importMode === "whatsapp" ? "Import chat" : "Save memory"}</button></div></form> : null}
-          <div className="context-source-list">
-            {sources.length ? sources.map((source) => (
-              <article className="profile-source-item" key={source.id}>
-                <div className="profile-source-body">
-                  <strong>{source.title || "Saved memory"}</strong>
-                  <span>{humanizeLabel(source.source_type || "memory")} · {(source.content_length || 0).toLocaleString()} chars</span>
-                  <p>{source.preview}</p>
-                </div>
-                <button className="secondary-button" type="button" onClick={() => void removeSource(source.id)}>Remove</button>
-              </article>
-            )) : <div className="table-empty">No saved memories yet.</div>}
-          </div>
-          {error ? <Notice tone="error">{error}</Notice> : null}
-        </section> */}
-      </div>
+      ) : null}
+      {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
+      {canonicalMemoryGroups.old.length || canonicalMemoryGroups.rejected.length ? (
+        <div className="mem-footer-links">
+          {canonicalMemoryGroups.old.length ? <button className="mem-link is-muted" type="button" onClick={() => toggleSection("old-canonical", showOldCanonical)}>{showOldCanonical ? "Hide old memories" : `Old memories (${canonicalMemoryGroups.old.length})`}</button> : null}
+          {canonicalMemoryGroups.rejected.length ? <button className="mem-link is-muted" type="button" onClick={() => toggleSection("rejected-canonical", showRejectedCanonical)}>{showRejectedCanonical ? "Hide memories you rejected" : `Memories you rejected (${canonicalMemoryGroups.rejected.length})`}</button> : null}
+        </div>
+      ) : null}
+      {showOldCanonical ? (
+        <section className="mem-group">
+          <h2>Old memories <span>{canonicalMemoryGroups.old.length}</span></h2>
+          <p className="mem-group-note">Replaced by something newer, or past their end date. Omi keeps them as history and doesn't use them.</p>
+          <div className="mem-list">{canonicalMemoryGroups.old.map(renderCanonicalMemory)}</div>
+        </section>
+      ) : null}
+      {showRejectedCanonical ? (
+        <section className="mem-group">
+          <h2>Memories you rejected <span>{canonicalMemoryGroups.rejected.length}</span></h2>
+          <p className="mem-group-note">You marked these as not true. Open one and choose "Feels right" to bring it back.</p>
+          <div className="mem-list">{canonicalMemoryGroups.rejected.map(renderCanonicalMemory)}</div>
+        </section>
+      ) : null}
       {reviewItem && reviewMode ? (
         <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewItem.id) { setReviewItem(null); setReviewMode(null); setError(""); } }}>
           <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title">
             <div className="confirm-copy">
               <p className="eyebrow">{reviewMode === "feedback" ? "Review signal" : "Usage control"}</p>
-              <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omiryn use this?"}</h2>
+              <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omi use this?"}</h2>
               <p>{reviewItemTitle(reviewItem)}</p>
             </div>
             {reviewMode === "feedback" ? (
@@ -426,16 +343,16 @@ export function MemoriesPage() {
                 <div className="signal-feedback-options" role="radiogroup" aria-label="Signal feedback">
                   <label className={feedbackRating === "agree" ? "selected" : ""}>
                     <input type="radio" name="signal-feedback" value="agree" checked={feedbackRating === "agree"} onChange={() => { setFeedbackRating("agree"); setFeedbackReasons([]); }} />
-                    <span><strong>Feels right</strong><small>Omiryn can trust this more.</small></span>
+                    <span><strong>Feels right</strong><small>Omi will trust this more.</small></span>
                   </label>
                   <label className={feedbackRating === "disagree" ? "selected" : ""}>
                     <input type="radio" name="signal-feedback" value="disagree" checked={feedbackRating === "disagree"} onChange={() => setFeedbackRating("disagree")} />
-                    <span><strong>Not true</strong><small>Omiryn should stop using this.</small></span>
+                    <span><strong>Not true</strong><small>Omi will stop using this.</small></span>
                   </label>
                 </div>
                 {feedbackRating === "disagree" ? (
                   <div>
-                    <p className="privacy-note">What needs correcting? Choose a tag if helpful.</p>
+                    <p className="privacy-note">What's off? Pick one if it helps.</p>
                     <div className="signal-review-reasons" aria-label="Correction reason">
                       {memoryReviewReasons.map((reason) => (
                         <button
@@ -451,28 +368,28 @@ export function MemoriesPage() {
                   </div>
                 ) : null}
                 <textarea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={4} placeholder="Add context or a correction (optional)" />
-                {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">This moves the memory to the hidden rejected section without deleting its evidence.</p> : null}
+                {isCanonicalMemory(reviewItem) && feedbackRating === "disagree" ? <p className="privacy-note">It moves to "Memories you rejected". You can bring it back later.</p> : null}
                 {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
-                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save feedback"}</button>
+                  <button className={feedbackRating === "disagree" ? "danger-button" : ""} type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving…" : "Save"}</button>
                 </div>
               </form>
             ) : (
               <form className="signal-review-form" onSubmit={(event) => void submitPrivacyFlow(event)}>
-                <p className="privacy-note">This controls where the saved signal may be used. Turning both off keeps it stored but prevents Omiryn from using it.</p>
+                <p className="privacy-note">Turning both off keeps the memory but stops Omi from using it.</p>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForChat} onChange={(event) => setPrivacyForChat(event.target.checked)} />
-                  <span><strong>Use for personalization</strong><small>Lets Omiryn use this signal to make replies more relevant.</small></span>
+                  <span><strong>In chats</strong><small>Omi can use this to make replies more personal.</small></span>
                 </label>
                 <label className="signal-toggle-row">
                   <input type="checkbox" checked={privacyForMatching} onChange={(event) => setPrivacyForMatching(event.target.checked)} />
-                  <span><strong>Use for matching</strong><small>Lets this signal affect compatible people later.</small></span>
+                  <span><strong>For matching</strong><small>This can help find people you'd get along with.</small></span>
                 </label>
                 {error ? <Notice tone="error">{error}</Notice> : null}
                 <div className="confirm-actions">
                   <button className="secondary-button" type="button" onClick={() => { setReviewItem(null); setReviewMode(null); setError(""); }} disabled={savingFactId === reviewItem.id}>Cancel</button>
-                  <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving..." : "Save privacy"}</button>
+                  <button type="submit" disabled={savingFactId === reviewItem.id}>{savingFactId === reviewItem.id ? "Saving…" : "Save"}</button>
                 </div>
               </form>
             )}
@@ -486,7 +403,7 @@ export function MemoriesPage() {
               <div>
                 <p className="eyebrow">Evidence</p>
                 <h2 id="evidence-title">{reviewItemTitle(evidenceItem)}</h2>
-                <p>These are the messages or source snippets Omiryn used for this signal.</p>
+                <p>What you said that Omi learned this from.</p>
               </div>
               <button className="evidence-close" type="button" onClick={() => setEvidenceItem(null)} aria-label="Close evidence"><span /></button>
             </div>
@@ -504,7 +421,7 @@ export function MemoriesPage() {
                       <blockquote>{evidenceText(item)}</blockquote>
                       <p>
                         {evidenceSourceLabel(evidenceItem, item)}
-                        {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open source</a></> : null}
+                        {href ? <> · <a className="evidence-chat-link" href={href} onClick={(event) => openEvidenceSource(event, href)}>Open in chat</a></> : null}
                       </p>
                     </div>
                   </article>
@@ -604,7 +521,7 @@ function isCanonicalMemory(item: ProfileFact | CanonicalMemory): item is Canonic
 }
 
 function reviewItemTitle(item: ProfileFact | CanonicalMemory) {
-  return isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key;
+  return isCanonicalMemory(item) ? memoryLabel(item.key) : sentenceCase(item.label || item.key || "");
 }
 
 function evidenceText(item: unknown) {
@@ -618,7 +535,7 @@ function evidenceSourceLabel(fact: ProfileFact | CanonicalMemory, item: unknown)
   const sourceKind = isCanonicalMemory(fact) ? "" : fact.source_kind || "";
   if (!item || typeof item !== "object") return isCanonicalMemory(fact) ? "Source" : humanizeLabel(sourceKind || "source");
   const row = item as Record<string, unknown>;
-  if (row.conversation_id || sourceKind === "agent_chat") return "User message";
+  if (row.conversation_id || sourceKind === "agent_chat") return "You said";
   if (sourceKind === "whatsapp_import") return "WhatsApp import";
   if (row.context_source_id) return "Saved memory";
   if (sourceKind === "agent_deep_memory") return "Conversation memory";
@@ -673,6 +590,11 @@ function humanizeDataPointType(value: string) {
   if (value === "needs_confirmation") return "Needs confirmation";
   if (value === "do_not_store") return "Do not store";
   return humanizeLabel(value || "Other");
+}
+
+function sentenceCase(value: string) {
+  const text = value.trim();
+  return text ? text[0].toUpperCase() + text.slice(1).toLowerCase() : text;
 }
 
 function humanizeLabel(value?: string) {

@@ -81,11 +81,10 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
   return (
     <section className="screen contact-screen">
       <div className="contact-shell">
-        <div className="screen-copy compact contact-title">
-          <p className="eyebrow">Contact</p>
-          <h1>Reach Omiryn.</h1>
-          <p>Share feedback, report an issue, ask for support, or request a community invite.</p>
-        </div>
+        <header className="mem-head contact-title">
+          <h1>Contact us</h1>
+          <p>Feedback, a problem, a privacy question, or anything else. We read every message.</p>
+        </header>
         <form className="contact-feedback-panel" onSubmit={submitContact}>
           <div className="contact-panel-heading">
             <span className="contact-panel-icon"><MessageCircle size={22} /></span>
@@ -94,7 +93,13 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
           <div className="contact-category-row" role="radiogroup" aria-label="Feedback category">
             {contactCategories.map((item) => {
               const Icon = item.icon;
-              return <button className={category === item.id ? "active" : ""} type="button" role="radio" aria-checked={category === item.id} key={item.id} onClick={() => setCategory(item.id)}><Icon size={17} /><span>{item.label}</span></button>;
+              return (
+                <label className={category === item.id ? "active" : ""} key={item.id}>
+                  <input type="radio" name="contact-category" value={item.id} checked={category === item.id} onChange={() => setCategory(item.id)} />
+                  <Icon size={17} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </label>
+              );
             })}
           </div>
           <label className="contact-message-field">
@@ -127,4 +132,3 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
     </section>
   );
 }
-
