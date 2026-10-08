@@ -56,6 +56,8 @@ def catch_up_pending(user_id: str) -> list[str]:
         return []
     queued: list[str] = []
     for conversation in list_conversations(user_id):
+        if conversation.get("temporary"):
+            continue
         messages = list(conversation.get("messages") or [])
         if has_pending_background_cognition(conversation["id"], user_id, messages):
             request_flush_now(conversation["id"], user_id)
@@ -77,6 +79,8 @@ async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
     conversation = get_conversation(conversation_id, user_id)
     if conversation is None:
         return {"status": "conversation_unavailable", "operation_count": 0}
+    if conversation.get("temporary"):
+        return {"status": "temporary_chat", "operation_count": 0}
     messages = list(conversation.get("messages") or [])
     if not has_pending_background_cognition(conversation_id, user_id, messages):
         return {"status": "no_pending_messages", "operation_count": 0}

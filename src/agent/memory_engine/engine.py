@@ -17,6 +17,7 @@ from agent.memory_engine.behavior.extraction import extract_agent_behavior_rules
 from agent.memory_engine.data_points import normalize_data_point
 from agent.shared.utils import conversation_extraction_window
 from agent.providers import extract_deep_profile_facts
+from storage.conversations import is_temporary_conversation
 from storage import (
     list_data_point_extraction_debug,
     save_data_point_extraction_debug,
@@ -145,7 +146,7 @@ async def capture_deep_profile_facts_from_conversation(
 ) -> None:
     try:
         policy = data_point_capture_policy()
-        if policy.background_mode is None:
+        if policy.background_mode is None or is_temporary_conversation(conversation_id, user_id):
             return
         pending_messages = pending_data_point_messages(
             conversation_id=conversation_id,

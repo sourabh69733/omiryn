@@ -30,6 +30,7 @@ from storage import (
     list_profile_facts,
     record_memory_batch_failure,
 )
+from storage.conversations import is_temporary_conversation
 from storage.profile_facts import save_data_point_extraction_debug
 from storage.open_questions import add_open_questions, list_open_questions, resolve_open_questions
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
@@ -174,6 +175,9 @@ async def run_background_cognition(
     model: str | None = None,
 ) -> dict[str, Any]:
     """Claim and analyze one batch without duplicating its model call."""
+    if is_temporary_conversation(conversation_id, user_id):
+        # Temporary Chat: nothing is learned from it.
+        return {"status": "temporary_chat", "operation_count": 0}
     state = get_processing_state(conversation_id, user_id)
     batch = _pending_background_cognition_batch(
         conversation_id,
