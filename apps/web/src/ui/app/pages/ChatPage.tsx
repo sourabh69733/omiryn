@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, ChevronRight, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, ChevronLeft, ChevronRight, History, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -20,7 +20,8 @@ import { cognitionResultLabel } from "../usagePresentation";
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
 
-export function ChatPage({ initialConversationId, userAvatar }: { initialConversationId?: string | null; userAvatar?: string | null }) {
+// One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
+export function ChatPage({ initialConversationId, userAvatar, onBack }: { initialConversationId?: string | null; userAvatar?: string | null; onBack?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -56,8 +57,10 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   const [error, setError] = useState("");
   const [composerLimit, setComposerLimit] = useState<{ until?: number; message: string; kind: "burst" | "monthly" } | null>(null);
   const [pauseNow, setPauseNow] = useState(() => Date.now());
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [sidePanel, setSidePanel] = useState<"history" | "usage">("history");
+  // Right-side drawer: earlier chats, or usage (dev only). The chat stays open beside it.
+  const [drawer, setDrawer] = useState<"earlier" | "usage" | null>(null);
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -142,7 +145,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     const isLatest = () => openRequestRef.current === request;
     setSelectedId(id);
     setError("");
-    setHistoryOpen(false);
+    setDrawer(null);
     const targetHash = window.location.hash.startsWith("#message-") ? window.location.hash : "";
     shouldStickToBottomRef.current = !targetHash;
     setUsage(null);
@@ -238,13 +241,13 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     ]).then(([status, rows]) => {
       setRuntime(status);
       const urlConversationId = new URLSearchParams(window.location.search).get("conversation_id");
-      const saved = window.localStorage.getItem("omiryn.activeConversationId");
       const availableIds = new Set(rows.map((row) => row.id));
-      const preferred = urlConversationId || [saved, initialConversationId, rows[0]?.id].find((id) => id && availableIds.has(id));
+      // A link to a message (Vibe proof) may open an earlier chat; otherwise it is always Omi's thread.
+      const linked = [urlConversationId, initialConversationId].find((id) => id && availableIds.has(id));
+      const preferred = linked || omiThreadId(rows);
       if (preferred) return openConversation(preferred);
       window.localStorage.removeItem("omiryn.activeConversationId");
-      setConversation(null);
-      setLoading(false);
+      return createConversation();
     }).catch((caught) => {
       setError(caught instanceof Error ? caught.message : "Could not open chat.");
       setLoading(false);
@@ -349,8 +352,30 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
     if (conversation) conversationCacheRef.current.set(conversation.id, conversation);
   }, [conversation]);
 
+  useEffect(() => {
+    if (!chatMenuOpen) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target instanceof Node && chatMenuRef.current?.contains(event.target))) setChatMenuOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [chatMenuOpen]);
+
+  useEffect(() => {
+    if (!drawer) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawer(null); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [drawer]);
+
   const openId = selectedId ?? conversation?.id ?? null;
-  const anyUnread = summaries.some((item) => !item.archived_at && isUnread(item, seen, openId));
+  const omiId = omiThreadId(summaries);
+  const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId);
+  const earlierUnread = summaries.some((item) => item.id !== omiId && !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
@@ -727,8 +752,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         setContextSources([]);
         setUsage(null);
         setUsageError("");
-        setSidePanel("history");
-        setLoading(false);
+        await createConversation();
       }
     }
     setPendingDelete(null);
@@ -777,10 +801,12 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         </div>
       </div>
     );
-    const archived = summaries.filter((item) => item.archived_at);
+    const earlier = summaries.filter((item) => item.id !== omiId);
+    const archived = earlier.filter((item) => item.archived_at);
+    if (!earlier.length) return <p className="omi-drawer-empty">No earlier chats. Everything with Omi stays in one chat.</p>;
     return (
       <>
-        {summaries.filter((item) => !item.archived_at).map(renderRow)}
+        {earlier.filter((item) => !item.archived_at).map(renderRow)}
         {archived.length ? (
           <>
             <button type="button" className="history-archived-toggle" aria-expanded={archivedOpen} onClick={() => setArchivedOpen(!archivedOpen)}>
@@ -791,7 +817,7 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
         ) : null}
       </>
     );
-  }, [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId, archivedOpen]);
+  }, [summaries, seen, openId, sendingIds, typingConversationId, rowMenuId, archivedOpen, omiId]);
   const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
               const agent = message.role === "assistant";
               const currentDate = messageDateKey(message, index);
@@ -824,25 +850,109 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
   return (
     <section className="screen interview-screen legacy-chat-screen">
       <div className="chat-workspace">
-        {historyOpen ? <button className="mobile-sheet-backdrop" type="button" onClick={() => setHistoryOpen(false)} aria-label="Close history" /> : null}
-        <aside className={`chat-sidebar ${historyOpen ? "is-open" : ""}`}>
-          <div className="mobile-sheet-heading"><div><p className="eyebrow">Chat</p><h2>History</h2></div><button className="sheet-close-button" type="button" onClick={() => setHistoryOpen(false)}>Close</button></div>
-          <div className="side-tabs" role="tablist" aria-label="Chat details">
-            <button className={sidePanel === "history" ? "active" : ""} type="button" onClick={() => setSidePanel("history")}>History</button>
-            {canShowUsage ? <button className={sidePanel === "usage" ? "active" : ""} type="button" onClick={() => { setSidePanel("usage"); if (conversation) void loadConversationUsage(conversation.id); }}>Usage</button> : null}
-          </div>
-          <section className={`side-panel ${sidePanel === "history" ? "active" : ""}`} hidden={sidePanel !== "history"}>
-            <p className="eyebrow">Chat History</p><h2>Conversations</h2>
-            <div className="history-list">
-              {historyRows}
+        <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
+          <div className="card-heading">
+            {onBack ? <button type="button" className="omi-back" onClick={onBack} aria-label="Back to chats"><ChevronLeft aria-hidden="true" /></button> : null}
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "AI companion"}</p></div></div>
+            <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
+              <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
+                <MoreHorizontal aria-hidden="true" />{earlierUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in an earlier chat" /> : null}
+              </button>
+              {chatMenuOpen ? (
+                <div className="history-menu omi-chat-menu-list" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("earlier"); }}><History aria-hidden="true" />Earlier chats{earlierUnread ? <span className="history-new-pill">New</span> : null}</button>
+                  {canShowUsage ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}><BarChart3 aria-hidden="true" />Usage (dev)</button> : null}
+                </div>
+              ) : null}
             </div>
-            <button className="secondary-button primary-wide" type="button" onClick={() => void createConversation()}>New conversation</button>
-            {/* <p className="quiet-note">{conversation ? `Conversation ${conversation.id.slice(0, 8)}` : "No conversation selected."}</p> */}
-          </section>
-          {canShowUsage ? (
-            <section className={`side-panel ${sidePanel === "usage" ? "active" : ""}`} hidden={sidePanel !== "usage"}>
-              <p className="eyebrow">Agent Usage</p><h2>Runtime cost</h2>
-              <div className="usage-summary">
+          </div>
+          <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
+            {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
+            {!loading && !conversation ? <StateView kind="empty" title="Say hi to Omi" detail="Your chat with Omi will appear here."><button type="button" onClick={() => void createConversation()}>Start chatting</button></StateView> : null}
+            {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
+            {messageRows}
+            {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
+            {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
+          </div>
+          {error ? <div className="chat-error-notice"><Notice tone="error">{error}</Notice></div> : null}
+          {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
+          {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
+            <div className="vibe-milestone-note" role="status">
+              <span>{vibeStepNote(vibeNote.milestone)}</span>
+              <a href={pathForPage.vibe} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.vibe); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
+              <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss"><X aria-hidden="true" /></button>
+            </div>
+          ) : null}
+          {viewingEarlier ? (
+            <div className="omi-readonly-bar" role="status">
+              <span>This is an earlier chat. New messages go to Omi's main chat.</span>
+              <button type="button" onClick={() => omiId && void openConversation(omiId)}>Back to Omi</button>
+            </div>
+          ) : (
+            <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
+              {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
+              {emojiSuggestions.length ? (
+                <div className="emoji-shortcode-menu" id="emoji-shortcode-menu" role="listbox" aria-label="Emoji suggestions">
+                  {emojiSuggestions.map((suggestion, index) => (
+                    <button
+                      className="emoji-shortcode-option"
+                      id={`emoji-shortcode-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={index === selectedEmojiSuggestion}
+                      key={`${suggestion.unicode}-${suggestion.shortcode}`}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onClick={() => chooseEmojiSuggestion(index)}
+                    >
+                      <span className="emoji-shortcode-glyph" aria-hidden="true">{suggestion.unicode}</span>
+                      <span className="emoji-shortcode-copy"><strong>:{suggestion.shortcode}</strong><small>{suggestion.label}</small></span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="emoji-picker-anchor" ref={emojiPickerRef}>
+                <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => { closeEmojiShortcodeSuggestions(); setEmojiPickerOpen((value) => !value); }}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
+                {emojiPickerOpen ? (
+                  <div className="emoji-picker-popover">
+                    <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
+                      <EmojiPicker
+                        height={360}
+                        emojiStyle={"native" as EmojiStyle}
+                        lazyLoadEmojis
+                        previewConfig={{ showPreview: false }}
+                        searchPlaceHolder="Search emoji"
+                        skinTonesDisabled
+                        theme={"light" as Theme}
+                        width="100%"
+                        onEmojiClick={insertEmoji}
+                      />
+                    </Suspense>
+                  </div>
+                ) : null}
+              </div>
+              <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)} onSelect={(event) => void refreshEmojiShortcodeSuggestions(draft, event.currentTarget.selectionStart)} onKeyDown={handleComposerKeyDown} onBlur={closeEmojiShortcodeSuggestions} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} role="combobox" aria-autocomplete="list" aria-expanded={Boolean(emojiSuggestions.length)} aria-controls={emojiSuggestions.length ? "emoji-shortcode-menu" : undefined} aria-activedescendant={emojiSuggestions.length ? `emoji-shortcode-option-${selectedEmojiSuggestion}` : undefined} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
+              {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
+              <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
+            </form>
+          )}
+        </section>
+        {drawer ? (
+          <>
+            <button className="omi-drawer-backdrop" type="button" onClick={() => setDrawer(null)} aria-label="Close panel" />
+            <aside className="omi-drawer" aria-label={drawer === "earlier" ? "Earlier chats" : "Usage"}>
+              <div className="omi-drawer-head">
+                <strong>{drawer === "earlier" ? "Earlier chats" : "Usage"}</strong>
+                <button type="button" className="omi-drawer-close" onClick={() => setDrawer(null)} aria-label="Close"><X aria-hidden="true" /></button>
+              </div>
+              {drawer === "earlier" ? (
+                <>
+                  <p className="omi-drawer-note">Read-only. Everything new happens in Omi's main chat.</p>
+                  <div className="history-list">{historyRows}</div>
+                </>
+              ) : (
+                <div className="omi-drawer-usage">
+                  {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
+                  <div className="usage-summary">
                 {!conversation ? "Usage will appear after you select a conversation." : null}
                 {conversation && usageLoading ? "Loading usage..." : null}
                 {conversation && !usageLoading && usageError ? usageError : null}
@@ -866,82 +976,11 @@ export function ChatPage({ initialConversationId, userAvatar }: { initialConvers
                   return <div className={`sidebar-usage-item ${event.success ? "ok" : "failed"}`} key={`${event.created_at || "event"}-${index}`}><div><strong>#{usageEvents.length - index} {usageRequestKindLabel(event.request_kind)}</strong><span>{createdAt} · {event.model || event.provider || "-"}</span>{resultLabel ? <span>{resultLabel}</span> : null}</div><div className="sidebar-usage-tokens"><strong>{totalText}</strong><span>{tokenText}</span></div></div>;
                 })}
               </div>
-            </section>
-          ) : null}
-        </aside>
-        <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
-          <div className="card-heading">
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "AI companion"}</p></div></div>
-            <div className="chat-controls">
-              <button className="secondary-button mobile-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>History{anyUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in another chat" /> : null}</button>
-              {/* Commented for now, as it will conversation confusion and increase user expectation from agent which it might not be able to support. */}
-              {/* {conversation ? <label className="model-picker voice-picker"><span>Talks like</span><select value={conversation.agent_voice || "neutral"} onChange={(event) => void updateSettings({ agent_voice: event.target.value })}><option value="neutral">Neutral</option><option value="female">A girl</option><option value="male">A boy</option></select></label> : null} */}
-              {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
-            </div>
-          </div>
-          <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
-            {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
-            {!loading && !conversation ? <StateView kind="empty" title="No chat open" detail="Pick a chat from History, or start a new one with Omi."><button className="secondary-button mobile-empty-history-button" type="button" onClick={() => { setSidePanel("history"); setHistoryOpen(true); }}>Open history</button><button type="button" onClick={() => void createConversation()}>New conversation</button></StateView> : null}
-            {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
-            {messageRows}
-            {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
-            {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
-          </div>
-          {error ? <div className="chat-error-notice"><Notice tone="error">{error}</Notice></div> : null}
-          {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
-          {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
-            <div className="vibe-milestone-note" role="status">
-              <span>{vibeStepNote(vibeNote.milestone)}</span>
-              <a href={pathForPage.vibe} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.vibe); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
-              <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss"><X aria-hidden="true" /></button>
-            </div>
-          ) : null}
-          <form className={`composer ${composerBlocked ? "is-paused" : ""} ${characterCount(draft) >= 80 ? "is-near-limit" : ""}`} onSubmit={sendMessage}>
-            {limitNoticeVersion ? <div className="chat-limit-notice" role="status">Your message is too long</div> : null}
-            {emojiSuggestions.length ? (
-              <div className="emoji-shortcode-menu" id="emoji-shortcode-menu" role="listbox" aria-label="Emoji suggestions">
-                {emojiSuggestions.map((suggestion, index) => (
-                  <button
-                    className="emoji-shortcode-option"
-                    id={`emoji-shortcode-option-${index}`}
-                    type="button"
-                    role="option"
-                    aria-selected={index === selectedEmojiSuggestion}
-                    key={`${suggestion.unicode}-${suggestion.shortcode}`}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => chooseEmojiSuggestion(index)}
-                  >
-                    <span className="emoji-shortcode-glyph" aria-hidden="true">{suggestion.unicode}</span>
-                    <span className="emoji-shortcode-copy"><strong>:{suggestion.shortcode}</strong><small>{suggestion.label}</small></span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <div className="emoji-picker-anchor" ref={emojiPickerRef}>
-              <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => { closeEmojiShortcodeSuggestions(); setEmojiPickerOpen((value) => !value); }}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
-              {emojiPickerOpen ? (
-                <div className="emoji-picker-popover">
-                  <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
-                    <EmojiPicker
-                      height={360}
-                      emojiStyle={"native" as EmojiStyle}
-                      lazyLoadEmojis
-                      previewConfig={{ showPreview: false }}
-                      searchPlaceHolder="Search emoji"
-                      skinTonesDisabled
-                      theme={"light" as Theme}
-                      width="100%"
-                      onEmojiClick={insertEmoji}
-                    />
-                  </Suspense>
                 </div>
-              ) : null}
-            </div>
-            <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)} onSelect={(event) => void refreshEmojiShortcodeSuggestions(draft, event.currentTarget.selectionStart)} onKeyDown={handleComposerKeyDown} onBlur={closeEmojiShortcodeSuggestions} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} role="combobox" aria-autocomplete="list" aria-expanded={Boolean(emojiSuggestions.length)} aria-controls={emojiSuggestions.length ? "emoji-shortcode-menu" : undefined} aria-activedescendant={emojiSuggestions.length ? `emoji-shortcode-option-${selectedEmojiSuggestion}` : undefined} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
-            {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
-            <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
-          </form>
-        </section>
+              )}
+            </aside>
+          </>
+        ) : null}
       </div>
       {pendingDelete ? <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) setPendingDelete(null); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" aria-describedby="delete-conversation-copy"><div className="confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" /><path d="M6 9h12l-.8 11H6.8L6 9Zm4 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" /></svg></div><div className="confirm-copy"><p className="eyebrow">Delete Conversation</p><h2 id="delete-conversation-title">Remove this chat history?</h2><p id="delete-conversation-copy">This permanently removes the chat, its attached context and usage log, and what Omi learned only from it.</p>{deleteImpact && deletionImpactLines(deleteImpact).length ? <ul className="delete-impact">{deletionImpactLines(deleteImpact).map((line) => <li key={line}>{line}</li>)}</ul> : null}<p className="confirm-session">{pendingDelete.agent_name || "Omiryn"} · {pendingDelete.message_count || 0} messages</p></div><div className="confirm-actions"><button ref={cancelDeleteRef} className="secondary-button" type="button" onClick={() => setPendingDelete(null)} disabled={deleting}>Cancel</button><button className="danger-button" type="button" onClick={() => void deleteConversation(pendingDelete.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete conversation"}</button></div></section></div> : null}
     </section>
@@ -1030,6 +1069,13 @@ function formatLimitCountdown(totalSeconds: number) {
 }
 
 // History row time: "7:30 pm" today, "Yesterday", then "2 Oct" (with the year when it differs).
+// Omi's ongoing chat: the newest chat the user has not archived (older ones are "Earlier chats").
+function omiThreadId(rows: ConversationSummary[]): string | null {
+  const open = rows.filter((row) => !row.archived_at);
+  const newest = [...(open.length ? open : rows)].sort((left, right) => String(right.created_at || right.updated_at || "").localeCompare(String(left.created_at || left.updated_at || "")))[0];
+  return newest?.id ?? null;
+}
+
 function historyTimeLabel(value?: string | null) {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return "New";

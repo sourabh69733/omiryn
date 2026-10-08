@@ -21,6 +21,7 @@ export type ConversationSummary = {
   agent_name?: string | null;
   message_count?: number;
   context_source_count?: number;
+  created_at?: string | null;
   updated_at?: string | null;
   archived_at?: string | null;
 };
