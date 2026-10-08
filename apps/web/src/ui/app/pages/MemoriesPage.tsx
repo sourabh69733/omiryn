@@ -4,7 +4,7 @@ import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { Notice, StateView } from "../StateView";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryCardTone, canonicalMemoryControls, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, memoryLabel, memoryValueLines, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
 
 const memoryReviewReasons = [
   { value: "incorrect", label: "Incorrect" },
@@ -236,17 +236,17 @@ export function MemoriesPage() {
 
   // One memory as a quiet row: what it's about, what Omi remembers, and a menu for the rest.
   function renderCanonicalMemory(memory: CanonicalMemory) {
-    const value = canonicalMemoryValueText(memory.value);
+    const valueLines = memoryValueLines(memory.value);
     const controls = canonicalMemoryControls(memory.evidence?.length || 0);
     const evidenceControl = controls.find((control) => control.id === "evidence");
     const isOld = oldIds.has(memory.id);
     const active = !isOld && (!memory.status || memory.status === "active");
     const isSaving = savingFactId === memory.id;
-    const label = sentenceCase(humanizeLabel(memory.key));
+    const label = memoryLabel(memory.key);
     return (
       <article className={`mem-row ${isOld ? "is-old" : ""} ${rowMenuId === memory.id ? "menu-open" : ""}`} key={memory.id}>
         <div className="mem-row-copy">
-          {value ? <><small>{label}</small><p>{value}</p></> : <p>{label}</p>}
+          {valueLines.length ? <><small>{label}</small>{valueLines.map((line) => <p key={line}>{line}</p>)}</> : <p>{label}</p>}
           {isOld ? <span className="mem-row-note">{oldMemoryNote(memory, canonicalMemories)}</span> : null}
           {memory.status && memory.status !== "active" && !isOld ? <span className="mem-flag">Not in use</span> : null}
           {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="mem-flag">{sentenceCase(humanizeLabel(memory.sensitivity))}</span> : null}
@@ -521,7 +521,7 @@ function isCanonicalMemory(item: ProfileFact | CanonicalMemory): item is Canonic
 }
 
 function reviewItemTitle(item: ProfileFact | CanonicalMemory) {
-  return sentenceCase(isCanonicalMemory(item) ? humanizeLabel(item.key) : item.label || item.key || "");
+  return isCanonicalMemory(item) ? memoryLabel(item.key) : sentenceCase(item.label || item.key || "");
 }
 
 function evidenceText(item: unknown) {

@@ -23,6 +23,37 @@ export function groupCanonicalMemories(memories: CanonicalMemory[]): CanonicalMe
     .filter((section) => section.memories.length > 0);
 }
 
+// A memory's key as a plain label: "study_topic_current" -> "Study topic (current)".
+const KEY_QUALIFIERS = new Set(["current", "previous", "past", "old", "new", "recent", "planned", "future"]);
+export function memoryLabel(key: string): string {
+  const words = key.replaceAll("_", " ").replaceAll("-", " ").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1];
+  const qualifier = words.length > 1 && KEY_QUALIFIERS.has(last) ? words.pop() : "";
+  const text = words.join(" ");
+  const label = text ? text[0].toUpperCase() + text.slice(1) : "";
+  return qualifier ? `${label} (${qualifier})` : label;
+}
+
+// What Omi remembers, as readable lines: a plain value stays one line; a structured value becomes
+// one short "Label: value" line per part instead of "likes: x · favorite parts: y".
+export function memoryValueLines(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    const text = value.map(canonicalMemoryValueText).filter(Boolean).join(", ");
+    return text ? [text] : [];
+  }
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => {
+        const text = canonicalMemoryValueText(item);
+        return text ? `${memoryLabel(key)}: ${text}` : "";
+      })
+      .filter(Boolean);
+  }
+  const text = String(value).trim();
+  return text ? [text] : [];
+}
+
 export function canonicalMemoryValueText(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (Array.isArray(value)) return value.map(canonicalMemoryValueText).filter(Boolean).join(" · ");
