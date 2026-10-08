@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
@@ -21,6 +21,8 @@ import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
+// Four menu items plus padding, in pixels.
+const MESSAGE_MENU_HEIGHT = 190;
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
@@ -89,6 +91,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const longPressRef = useRef<number | null>(null);
   // The ⋯ menu open on one message, and the message the next send replies to.
   const [menuFor, setMenuFor] = useState<number | null>(null);
+  const [menuUp, setMenuUp] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
   useEffect(() => {
     // A selection, an open menu and a reply belong to one chat.
@@ -835,12 +838,19 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     setSelected([index]);
   }
 
+  // The menu opens upward when there is no room for it below the message.
+  function openMenu(index: number, anchor: Element) {
+    const bottom = logRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+    setMenuUp(bottom - anchor.getBoundingClientRect().bottom < MESSAGE_MENU_HEIGHT);
+    setMenuFor(index);
+  }
+
   // Phones: hold a message to open its menu.
-  function holdForMenu(index: number) {
+  function holdForMenu(index: number, row: Element) {
     cancelHold();
     longPressRef.current = window.setTimeout(() => {
       longPressRef.current = null;
-      setMenuFor(index);
+      openMenu(index, row.querySelector(".message") ?? row);
     }, 500);
   }
 
@@ -1052,7 +1062,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                     data-message-index={index}
                     {...(selecting
                       ? { role: "checkbox", "aria-checked": isSelected, tabIndex: 0, onClick: () => toggleMessage(index), onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); toggleMessage(index); } } }
-                      : { onTouchStart: () => holdForMenu(index), onTouchEnd: cancelHold, onTouchMove: cancelHold })}
+                      : { onTouchStart: (event: ReactTouchEvent) => holdForMenu(index, event.currentTarget), onTouchEnd: cancelHold, onTouchMove: cancelHold })}
                   >
                     {selecting ? <span className="message-select-mark" aria-hidden="true">{isSelected ? <Check /> : null}</span> : null}
                     {agent ? showAvatar ? <span className="chat-avatar agent"><AgentOrb /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
@@ -1067,9 +1077,9 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                     </div>
                     {!selecting && !isFailedMessage(message) && message.delivery_status !== "sending" ? (
                       <div className="message-menu">
-                        <button type="button" className={`message-menu-trigger ${menuFor === index ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index} onClick={() => setMenuFor((current) => (current === index ? null : index))}><MoreHorizontal aria-hidden="true" /></button>
+                        <button type="button" className={`message-menu-trigger ${menuFor === index ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index} onClick={(event) => { if (menuFor === index) setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
                         {menuFor === index ? (
-                          <div className="message-menu-list" role="menu">
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu">
                             <button type="button" role="menuitem" onClick={() => replyToMessage(index)}><Reply aria-hidden="true" />Reply</button>
                             <button type="button" role="menuitem" onClick={() => copyMessage(index)}><Copy aria-hidden="true" />Copy</button>
                             <button type="button" role="menuitem" onClick={() => { setMenuFor(null); startSelecting(index); }}><ListChecks aria-hidden="true" />Select</button>
@@ -1090,7 +1100,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                   {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, noted, rejectingArea, selecting, selected, menuFor]);
+            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, noted, rejectingArea, selecting, selected, menuFor, menuUp]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen">

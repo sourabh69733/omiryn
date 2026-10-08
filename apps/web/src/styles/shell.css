@@ -923,6 +923,11 @@ button.omi-drawer-close:hover {
   box-shadow: 0 12px 28px rgba(38, 53, 59, 0.14);
 }
 
+.message-menu-list.opens-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .message-row.user .message-menu-list {
   right: 0;
   left: auto;
