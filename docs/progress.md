@@ -145,7 +145,7 @@ Next, in this order (privacy first, set by the user 2026-10-08):
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Privacy: old debug snapshots | Clean up historical debug snapshots that may still contain message text. |
+| 1 | Privacy: old debug snapshots (script built) | `scripts/data_ops/scrub_debug_text.py` (dry run by default, `--apply` to rewrite) removes free text from old context snapshots, trace steps and background debug rows older than 7 days; counts, IDs and labels stay. Local dry run: 309 snapshots, 618 trace steps, 99 background debug rows. Still to do: run it on prod after a backup; background debug rows are still written with memory text (cap by retention in item 5). |
 | 2 | Privacy: delete single messages | Multi-select deletion of individual user and Omi messages, including what happens to memories, vibe proof and topics linked to them (show the impact before confirming, like chat delete). |
 | 3 | Privacy: clear Omi's chats and memories | A separate control to clear all of Omi's chats and memories, with strong confirmation. Different from account-data deletion, which already exists. |
 | 4 | Privacy: Temporary Chat | A chat that saves nothing: no chat history, no memories, no vibe or topics. |
