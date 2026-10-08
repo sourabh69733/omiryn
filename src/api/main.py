@@ -55,12 +55,13 @@ async def request_monitoring_middleware(request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid4())
     try:
         response = await call_next(request)
-    except Exception:
-        logger.exception(
-            "api.unhandled_error request_id=%s method=%s path=%s",
+    except Exception as error:
+        logger.error(
+            "api.unhandled_error request_id=%s method=%s path=%s error_type=%s",
             request_id,
             request.method,
             request.url.path,
+            type(error).__name__,
         )
         response = JSONResponse(
             status_code=500,
