@@ -117,7 +117,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const omiRow = (
     <button type="button" className={`omi-contact ${page === "chat" && !omiStatus.viewingEarlier ? "is-active" : ""}`} onClick={openOmi}>
       <span className="omi-contact-avatar"><AgentOrb state={omiStatus.typing ? "thinking" : "idle"} /></span>
-      <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : <small>{omiStatus.preview || "Finds your people"}</small>}</span>
+      <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : omiStatus.preview ? <small>{omiStatus.preview}</small> : null}</span>
     </button>
   );
 

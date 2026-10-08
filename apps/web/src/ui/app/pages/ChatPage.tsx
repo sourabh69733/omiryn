@@ -1106,7 +1106,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           ) : (
           <div className="card-heading">
             {onOpenNavigation ? <button type="button" className="omi-back" onClick={onOpenNavigation} aria-label="Open navigation"><Menu aria-hidden="true" /></button> : null}
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "Finds your people"}</p></div></div>
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div></div>
             <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
               <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
                 <MoreHorizontal aria-hidden="true" />{earlierUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in an earlier chat" /> : null}
