@@ -88,10 +88,11 @@ export function QuickSetup() {
         <OmirynLogo />
       </header>
       <form className="quick-setup-card" onSubmit={start} noValidate>
-        <h1>Welcome to Omiryn</h1>
-        <p className="quick-setup-intro">Talk with Omi, and it finds friends you'd actually get along with.</p>
+        <p className="quick-setup-kicker">Just one quick step</p>
+        <h1>What should Omi call you?</h1>
+        <p className="quick-setup-intro">Then you can start talking. Omi will get to know you as you go.</p>
 
-        <label className="quick-setup-label" htmlFor="display-name">What should we call you?</label>
+        <label className="quick-setup-label" htmlFor="display-name">Your name</label>
         <input
           id="display-name"
           className="quick-setup-input"
