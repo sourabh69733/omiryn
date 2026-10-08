@@ -169,6 +169,8 @@ class AgentConversation(BaseModel):
     agent_name: str | None = Field(default=None, max_length=40)
     agent_voice: AgentVoice = "neutral"
     agent_style_source_id: str | None = None
+    # Temporary Chat: Omi learns nothing from it, and it is deleted when ended.
+    temporary: bool = False
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -187,6 +189,7 @@ class AgentConversationCreate(BaseModel):
     agent_tone: AgentTone = "auto"
     agent_name: str | None = Field(default=None, max_length=40)
     agent_style_source_id: str | None = None
+    temporary: bool = False
 
 
 class AgentConversationSettings(BaseModel):

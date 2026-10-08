@@ -135,6 +135,7 @@ async def create_agent_conversation(
         agent_tone=payload.agent_tone if payload else "auto",
         agent_name=agent_name,
         agent_style_source_id=payload.agent_style_source_id if payload else None,
+        temporary=bool(payload and payload.temporary),
         messages=[
             {
                 "role": "assistant",
@@ -186,6 +187,9 @@ async def list_agent_conversations(
         for source in _reusable_context_sources(list_user_context_sources(_user_id(user)))
     }
     for conversation in conversations:
+        if conversation.get("temporary"):
+            # A temporary chat lives only in the screen that opened it, never in History.
+            continue
         messages = conversation["messages"]
         context_sources = list_context_sources(conversation["id"], _user_id(user))
         summaries.append(
@@ -473,6 +477,9 @@ async def _reply_to_pending(
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     await _publish_new_messages(conversation, previous_message_count)
+    if conversation.temporary:
+        # Temporary Chat: no memories, vibe, notes, topics or profile facts from it.
+        return conversation
     if should_run_conversation_data_point_extraction(
         conversation.id,
         _user_id(user),
@@ -528,6 +535,9 @@ async def create_agent_message_feedback(
         raise HTTPException(status_code=404, detail="Conversation message not found.")
     if conversation.messages[message_index].get("role") != "assistant":
         raise HTTPException(status_code=400, detail="Feedback can only be added to agent messages.")
+    if conversation.temporary:
+        # Ratings teach Omi how to talk, and a temporary chat teaches nothing.
+        raise HTTPException(status_code=400, detail="Temporary chats can't be rated.")
 
     feedback = normalize_message_feedback(
         {
@@ -564,6 +574,8 @@ async def extract_agent_conversation(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     conversation = _get_existing_conversation(conversation_id, user)
+    if conversation.temporary:
+        raise HTTPException(status_code=400, detail="Temporary chats are not used for your profile.")
     try:
         raw_profile = await extract_profile(
             conversation.messages,
