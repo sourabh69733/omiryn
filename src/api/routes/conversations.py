@@ -26,7 +26,10 @@ from agent.providers import AgentProviderError, agent_runtime_status, extract_pr
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
+    MessageDeletionError,
     count_memories_only_from_conversation,
+    delete_conversation_messages,
+    message_deletion_impact,
     threads_only_from_conversation,
     vibe_deletion_impact,
     delete_conversation as storage_delete_conversation,
@@ -65,6 +68,7 @@ from ..models import (
     AgentMessageFeedbackCreate,
     AgentProfileSubmission,
     DraftProfile,
+    MessageSelection,
     UserMessage,
 )
 from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
@@ -233,6 +237,37 @@ async def list_agent_messages_after_sequence(
         "latest_sequence": len(conversation.messages) - 1,
         "messages": messages,
     }
+
+
+@router.post("/api/agent/conversations/{conversation_id}/messages/deletion-impact")
+async def agent_messages_deletion_impact(
+    conversation_id: str,
+    payload: MessageSelection,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """What deleting these messages also removes, shown before the user confirms."""
+    _get_existing_conversation(conversation_id, user)
+    try:
+        return message_deletion_impact(_user_id(user), conversation_id, payload.message_indexes)
+    except MessageDeletionError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/api/agent/conversations/{conversation_id}/messages/delete")
+async def delete_agent_messages(
+    conversation_id: str,
+    payload: MessageSelection,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Blank the chosen messages and forget what came only from them; the chat summary rebuilds."""
+    _get_existing_conversation(conversation_id, user)
+    try:
+        result = delete_conversation_messages(_user_id(user), conversation_id, payload.message_indexes)
+    except MessageDeletionError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    # Rebuild the chat summary, session log and topics from what is left.
+    request_flush_now(conversation_id, _user_id(user))
+    return result
 
 
 @router.get("/api/agent/conversations/{conversation_id}/deletion-impact")

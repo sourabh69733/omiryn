@@ -172,6 +172,10 @@ class AgentConversation(BaseModel):
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class MessageSelection(BaseModel):
+    message_indexes: list[int] = Field(min_length=1, max_length=500)
+
+
 class AgentConversationCreate(BaseModel):
     agent_model: str | None = None
     agent_mode: AgentMode = "know_me"
