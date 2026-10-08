@@ -2,7 +2,7 @@
    and a full-screen chat (phones). Loaded last so it wins over the old header layout. */
 .omi-shell {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   height: 100dvh;
   overflow: hidden;
   background: var(--brand-bg);
@@ -13,9 +13,9 @@
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   min-width: 0;
-  padding: 14px 12px;
+  padding: 16px 12px 12px;
   border-right: 1px solid var(--line);
   background: #ffffff;
 }
@@ -27,12 +27,26 @@
   gap: 8px;
 }
 
+/* On web the brand row lines up with the chat header: same height, one shared bottom line. */
+@media (min-width: 761px) {
+  .omi-rail {
+    padding-top: 0;
+  }
+
+  .omi-rail-top {
+    min-height: 60px;
+    margin: 0 -12px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
 button.omi-brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
-  padding: 4px;
+  padding: 0 8px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -51,9 +65,56 @@ button.omi-brand:hover {
   object-fit: contain;
 }
 
+/* Icon nav: phones only (the web rail lists the same links with labels). */
 .omi-rail-nav {
-  display: flex;
+  display: none;
   gap: 2px;
+}
+
+.omi-rail-section {
+  display: grid;
+  gap: 2px;
+}
+
+.omi-rail-label {
+  margin: 0 0 4px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.omi-rail-links a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.omi-rail-links a:hover {
+  background: #faf8ff;
+}
+
+.omi-rail-links a.is-active {
+  background: #f1ecff;
+  color: var(--brand-violet);
+}
+
+.omi-rail-links svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.omi-rail-links a.is-active svg {
+  color: var(--brand-violet);
 }
 
 .omi-rail-nav a {
@@ -76,10 +137,6 @@ button.omi-brand:hover {
   height: 17px;
 }
 
-.omi-contacts {
-  display: grid;
-  gap: 4px;
-}
 
 button.omi-contact {
   display: flex;
@@ -87,7 +144,7 @@ button.omi-contact {
   gap: 10px;
   width: 100%;
   min-height: 0;
-  padding: 8px;
+  padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
@@ -107,8 +164,8 @@ button.omi-contact.is-active {
 .omi-contact-avatar {
   display: block;
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
 }
 
 .omi-contact-copy {
@@ -129,7 +186,7 @@ button.omi-contact.is-active {
 .omi-account {
   position: relative;
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 
@@ -139,7 +196,7 @@ button.omi-account-button {
   gap: 8px;
   width: 100%;
   min-height: 0;
-  padding: 6px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -189,10 +246,10 @@ button.omi-account-button:hover {
   overflow-y: auto;
 }
 
-/* Chat fills the page; its messages and composer sit in a readable centre column. */
+/* Chat fills the page edge to edge; its messages and composer sit in a readable centre column. */
 .omi-main .interview-screen {
   height: 100dvh;
-  padding: 12px;
+  padding: 0;
 }
 
 .omi-main .chat-workspace {
@@ -205,6 +262,18 @@ button.omi-account-button:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--brand-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.omi-main .agentic-chat .card-heading {
+  min-height: 60px;
+  padding: 10px max(16px, calc((100% - 792px) / 2));
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
 }
 
 .omi-main .agentic-chat .chat-log {
@@ -426,8 +495,12 @@ button.omi-drawer-close:hover {
     flex: 1;
   }
 
-  .omi-rail .omi-contacts {
+  .omi-rail .omi-rail-section {
     display: none;
+  }
+
+  .omi-rail-nav {
+    display: flex;
   }
 
   .omi-account {

@@ -55,6 +55,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
   const profileAvatar = mainPhoto(profile, user?.avatar_url);
 
+  const navItems = [["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const;
   const showContactsHome = isMobile && page === "chat" && !mobileChatOpen;
   const chatOpenOnMobile = isMobile && page === "chat" && mobileChatOpen;
   const openOmi = () => { navigate("chat"); setMobileChatOpen(true); };
@@ -74,12 +75,21 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
             <strong>Omiryn</strong>
           </button>
           <nav className="omi-rail-nav" aria-label="Main navigation">
-            {([["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const).map(([item, Icon, label]) => (
+            {navItems.map(([item, Icon, label]) => (
               <a className={page === item ? "is-active" : ""} href={pathForPage[item]} key={item} title={label} aria-label={label} onClick={(event) => { event.preventDefault(); navigate(item); }}><Icon aria-hidden="true" /></a>
             ))}
           </nav>
         </div>
-        <div className="omi-contacts" aria-label="Chats">{omiRow}</div>
+        <div className="omi-rail-section" aria-label="Chats">
+          <p className="omi-rail-label">Chats</p>
+          {omiRow}
+        </div>
+        <nav className="omi-rail-section omi-rail-links" aria-label="You">
+          <p className="omi-rail-label">You</p>
+          {navItems.map(([item, Icon, label]) => (
+            <a className={page === item ? "is-active" : ""} href={pathForPage[item]} key={item} onClick={(event) => { event.preventDefault(); navigate(item); }}><Icon aria-hidden="true" />{label}</a>
+          ))}
+        </nav>
         <div className="omi-account">
           <button className="omi-account-button" type="button" onClick={() => setAccountOpen((value) => !value)} aria-expanded={accountOpen} aria-label="Account">
             <span className="omi-account-avatar"><AvatarImage src={profileAvatar} fallback={initial} /></span>
