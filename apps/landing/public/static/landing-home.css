@@ -401,6 +401,21 @@
 .o-story.is-static .o-phone { opacity: 0.35; }
 .o-story.is-static .s-you { left: 45%; top: 38%; }
 
+/* Phones: steps as a list, one full-size chat, then the match card (no pinning, no overlap). */
+.o-story.is-compact { min-height: 0; }
+.o-story.is-compact .o-story-steps { display: grid; gap: 22px; min-height: 0; }
+.o-story.is-compact .st { position: static; }
+.o-story.is-compact .o-h2 { font-size: 28px; }
+.o-story.is-compact .o-story-bar,
+.o-story.is-compact .blob,
+.o-story.is-compact .s-tags { display: none; }
+.o-story.is-compact .o-story-view { --k: 1; height: auto; }
+.o-story.is-compact .o-story-stage { display: grid; justify-items: center; gap: 18px; width: 100%; height: auto; transform: none; }
+.o-story.is-compact .o-phone { position: static; width: 100%; max-width: 360px; opacity: 1; transform: none; }
+.o-story.is-compact .o-feed { height: auto; }
+.o-story.is-compact .o-msg { font-size: 14.5px; }
+.o-story.is-compact .o-matchpop { position: static; width: 100%; max-width: 320px; translate: none; transform: rotate(-2deg); }
+
 /* ─────────── MARQUEE ─────────── */
 .o-marquee { padding: 16px 0; overflow: hidden; }
 .o-marquee-row {
