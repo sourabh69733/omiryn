@@ -9,6 +9,8 @@ export type Conversation = {
   agent_tone?: string;
   // How the companion speaks about itself: neutral (default), female or male.
   agent_voice?: "neutral" | "female" | "male";
+  // Temporary Chat: Omi learns nothing from it, and it is deleted when the user leaves it.
+  temporary?: boolean;
   messages: Message[];
 };
 export type MessageRecovery = {

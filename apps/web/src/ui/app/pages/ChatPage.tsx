@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -66,6 +66,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   // Right-side drawer: earlier chats, or usage (dev only). The chat stays open beside it.
   const [drawer, setDrawer] = useState<"earlier" | "usage" | null>(null);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
+  // The temporary chat on screen, deleted once the user leaves it.
+  const temporaryIdRef = useRef<string | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
   // Vibe lines, to show "Noted: ..." under the reply where Omi learned each one.
   const [vibeAreas, setVibeAreas] = useState<VibeArea[]>([]);
@@ -255,6 +257,48 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     });
     return recovered.latest_sequence;
   }
+
+  // Temporary Chat: not in History and not learned from. It is deleted as soon as the user
+  // leaves it (End, another chat, another page); the server sweeps any left open after a day.
+  async function startTemporaryChat() {
+    setError("");
+    try {
+      const response = await apiFetch("/api/agent/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_mode: "know_me", agent_tone: "warm", agent_model: runtime.model || null, temporary: true })
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not start a temporary chat."));
+      const created = (await response.json()) as Conversation;
+      ++openRequestRef.current;
+      setSelectedId(created.id);
+      setDrawer(null);
+      shouldStickToBottomRef.current = true;
+      setConversation(created);
+      syncChatToBottomAfterRender();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not start a temporary chat.");
+    }
+  }
+
+  function endTemporaryChat() {
+    const mainId = omiThreadId(summaries);
+    if (mainId) void openConversation(mainId);
+    else void createConversation();
+  }
+
+  useEffect(() => {
+    const previous = temporaryIdRef.current;
+    if (previous && previous !== conversation?.id) {
+      conversationCacheRef.current.delete(previous);
+      void apiFetch(`/api/agent/conversations/${previous}`, { method: "DELETE" });
+    }
+    temporaryIdRef.current = conversation?.temporary ? conversation.id : null;
+  }, [conversation?.id]);
+
+  useEffect(() => () => {
+    if (temporaryIdRef.current) void apiFetch(`/api/agent/conversations/${temporaryIdRef.current}`, { method: "DELETE" });
+  }, []);
 
   async function createConversation() {
     setLoading(true);
@@ -453,7 +497,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
 
   const openId = selectedId ?? conversation?.id ?? null;
   const omiId = omiThreadId(summaries);
-  const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId);
+  const temporary = Boolean(conversation?.temporary);
+  const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId && !temporary);
   const earlierUnread = summaries.some((item) => item.id !== omiId && !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
@@ -1116,7 +1161,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           ) : (
           <div className="card-heading">
             {onOpenNavigation ? <button type="button" className="omi-back" onClick={onOpenNavigation} aria-label="Open navigation"><Menu aria-hidden="true" /></button> : null}
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div></div>
+            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div>{temporary ? <span className="temporary-pill"><MessageCircleDashed aria-hidden="true" />Temporary</span> : null}</div>
             <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
               <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
                 <MoreHorizontal aria-hidden="true" />{earlierUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in an earlier chat" /> : null}
@@ -1125,6 +1170,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                 <div className="history-menu omi-chat-menu-list" role="menu">
                   <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("earlier"); }}><History aria-hidden="true" />Earlier chats{earlierUnread ? <span className="history-new-pill">New</span> : null}</button>
                   {conversation && !viewingEarlier ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setSelecting(true); setSelected([]); }}><ListChecks aria-hidden="true" />Select messages</button> : null}
+                  {temporary ? null : <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); void startTemporaryChat(); }}><MessageCircleDashed aria-hidden="true" />Temporary chat</button>}
                   {canShowUsage ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}><BarChart3 aria-hidden="true" />Usage (dev)</button> : null}
                 </div>
               ) : null}
@@ -1156,6 +1202,12 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
             </div>
           ) : (
             <>
+            {temporary ? (
+              <div className="omi-readonly-bar temporary-bar" role="status">
+                <span>Omi won't remember this chat.</span>
+                <button type="button" onClick={endTemporaryChat}>End chat</button>
+              </div>
+            ) : null}
             {replyTo ? (
               <div className="reply-preview" role="status">
                 <Reply aria-hidden="true" />

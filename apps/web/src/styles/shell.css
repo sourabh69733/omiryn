@@ -405,6 +405,37 @@ button.omi-menu-button[aria-expanded="true"] {
   border-radius: 999px;
 }
 
+/* Temporary Chat: a slim dashed bar over the composer and a label beside Omi's name. */
+.omi-readonly-bar.temporary-bar {
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
+  padding: 6px 6px 6px 14px;
+  border-style: dashed;
+}
+
+.omi-readonly-bar.temporary-bar button {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.temporary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.temporary-pill svg {
+  width: 13px;
+  height: 13px;
+}
+
 .omi-drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -740,6 +771,11 @@ button.omi-drawer-close:hover {
 /* Only the name sits next to the orb now; keep them centered on one row. */
 .omi-main .chat-title-lockup .terminal-mark {
   grid-row: auto;
+}
+
+.omi-main .chat-title-lockup:has(.temporary-pill) {
+  grid-template-columns: 36px auto auto;
+  justify-content: start;
 }
 
 .omi-main .agentic-chat .agent-status {
