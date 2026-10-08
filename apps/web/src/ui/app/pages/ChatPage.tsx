@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, ChevronLeft, ChevronRight, History, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, ChevronLeft, ChevronRight, History, Lock, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -21,7 +21,9 @@ const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
-export function ChatPage({ initialConversationId, userAvatar, onBack }: { initialConversationId?: string | null; userAvatar?: string | null; onBack?: () => void }) {
+export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
+
+export function ChatPage({ initialConversationId, userAvatar, onBack, onOmiStatus }: { initialConversationId?: string | null; userAvatar?: string | null; onBack?: () => void; onOmiStatus?: (status: OmiStatus) => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -380,6 +382,12 @@ export function ChatPage({ initialConversationId, userAvatar, onBack }: { initia
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
   const lastVisibleIsAgent = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "assistant";
+  // Tell the contacts rail what Omi is doing: typing, its last line, or that an earlier chat is open.
+  const omiTyping = Boolean(omiId && (sendingIds.has(omiId) || typingConversationId === omiId || (conversation?.id === omiId && typingVisible)));
+  const lastShown = conversation?.id === omiId ? [...visibleMessages].reverse().find((message) => message.content)?.content || "" : "";
+  useEffect(() => {
+    onOmiStatus?.({ typing: omiTyping, preview: lastShown, viewingEarlier });
+  }, [omiTyping, lastShown, viewingEarlier]);
 
   useLayoutEffect(() => {
     if (!shouldStickToBottomRef.current) return;
@@ -869,7 +877,7 @@ export function ChatPage({ initialConversationId, userAvatar, onBack }: { initia
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
             {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
             {!loading && !conversation ? <StateView kind="empty" title="Say hi to Omi" detail="Your chat with Omi will appear here."><button type="button" onClick={() => void createConversation()}>Start chatting</button></StateView> : null}
-            {!loading && conversation ? <p className="privacy-note chat-session-notice">Chats may be used to create learned signals and improve your Omiryn experience. Avoid sharing secrets, IDs, or data you do not want used for personalization.</p> : null}
+            {!loading && conversation ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Omi learns from your chats to find you friends. Don't share passwords or IDs.</p> : null}
             {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}

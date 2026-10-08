@@ -179,8 +179,34 @@ button.omi-contact.is-active {
 }
 
 .omi-contact-copy small {
+  overflow: hidden;
   color: var(--muted);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omi-contact-copy small.is-typing {
+  color: var(--brand-violet);
+  font-weight: 550;
+}
+
+/* The privacy reminder at the top of the chat: one quiet line, not a box. */
+.omi-chat-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.omi-chat-notice svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
 }
 
 .omi-account {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Bookmark, Sparkles, Users } from "lucide-react";
 import { apiFetch, signOut } from "../../lib/api";
 import { initAppLogger, trackPageView } from "../../lib/appLogger";
-import { ChatPage } from "./pages/ChatPage";
+import { ChatPage, type OmiStatus } from "./pages/ChatPage";
 import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
@@ -23,6 +23,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   // Phones show the contacts list first and the chat full screen; web shows both side by side.
   const isMobile = useIsMobile();
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [omiStatus, setOmiStatus] = useState<OmiStatus>({ typing: false, preview: "", viewingEarlier: false });
 
   useEffect(() => {
     initAppLogger();
@@ -60,9 +61,9 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const chatOpenOnMobile = isMobile && page === "chat" && mobileChatOpen;
   const openOmi = () => { navigate("chat"); setMobileChatOpen(true); };
   const omiRow = (
-    <button type="button" className={`omi-contact ${page === "chat" && !showContactsHome ? "is-active" : ""}`} onClick={openOmi}>
-      <span className="omi-contact-avatar"><AgentOrb /></span>
-      <span className="omi-contact-copy"><strong>Omi</strong><small>AI companion</small></span>
+    <button type="button" className={`omi-contact ${page === "chat" && !showContactsHome && !omiStatus.viewingEarlier ? "is-active" : ""}`} onClick={openOmi}>
+      <span className="omi-contact-avatar"><AgentOrb state={omiStatus.typing ? "thinking" : "idle"} /></span>
+      <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : <small>{omiStatus.preview || "AI companion"}</small>}</span>
     </button>
   );
 
@@ -106,7 +107,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       </aside>
       <main className="omi-main">
         {showContactsHome ? <div className="omi-contacts-home"><p className="omi-contacts-label">Chats</p>{omiRow}</div> : null}
-        {page === "chat" && !showContactsHome ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} onBack={isMobile ? () => setMobileChatOpen(false) : undefined} /> : null}
+        {page === "chat" && !showContactsHome ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} onBack={isMobile ? () => setMobileChatOpen(false) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} /> : null}
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
