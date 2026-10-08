@@ -165,3 +165,40 @@ a.mem-link:hover {
     gap: 6px;
   }
 }
+
+.matches-soon {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.matches-soon strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.matches-soon p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.matches-soon button.secondary-button {
+  min-height: 38px;
+  margin-top: 6px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.matches-soon button.secondary-button:hover {
+  border-color: var(--brand-violet);
+  color: var(--brand-violet);
+}

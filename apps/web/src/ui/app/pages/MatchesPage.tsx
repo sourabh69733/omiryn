@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Users } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { VIBE_STEPS, type Vibe, vibeStepIndex } from "../vibe";
 
@@ -23,5 +24,18 @@ export function MatchesPage({ onVibe }: { onVibe: () => void }) {
         ? `You're at "${VIBE_STEPS[step].label}". Matches need "Ready to match".`
         : "Omi is just getting to know you. Keep chatting.";
 
-  return <section className="screen matches-screen"><div className="matches-coming-soon"><div className="coming-soon-mark" aria-hidden="true"><span /></div><p className="eyebrow">Matches</p><h1>Coming soon.</h1><p>Omiryn will introduce you to people you'd actually get along with, based on the vibe Omi learns as you chat.</p>{progress ? <p className="matches-progress">{progress}</p> : null}<button type="button" className="vibe-chat-button" onClick={onVibe}>See your vibe</button></div></section>;
+  return (
+    <section className="screen matches-screen mem">
+      <header className="mem-head">
+        <h1>Matches</h1>
+        <p>People you'd actually get along with, found from the vibe Omi learns as you chat.</p>
+      </header>
+      <div className="mem-list matches-soon">
+        <span className="state-view-mark" aria-hidden="true"><Users /></span>
+        <strong>Matches are coming soon</strong>
+        {progress ? <p>{progress}</p> : null}
+        <button type="button" className="secondary-button" onClick={onVibe}>See your vibe</button>
+      </div>
+    </section>
+  );
 }
