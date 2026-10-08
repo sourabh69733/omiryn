@@ -40,9 +40,8 @@ export function VibePage({ onChat }: { onChat: () => void }) {
   const nextStep = vibe?.next_milestone ? VIBE_STEPS.find((step) => step.id === vibe.next_milestone) : null;
 
   return (
-    <section className="screen vibe-screen">
-      <header className="vibe-header">
-        <p className="eyebrow">Vibe</p>
+    <section className="screen vibe-screen mem">
+      <header className="mem-head">
         <h1>Your vibe</h1>
         <p>What Omi has picked up about who you'd get along with. It's how we'll find you friends.</p>
       </header>
@@ -77,11 +76,16 @@ export function VibePage({ onChat }: { onChat: () => void }) {
             </button>
           </div>
 
-          {(["basics", "deeper"] as const).map((stage) => (
+          {(["basics", "deeper"] as const).map((stage) => {
+            const areas = vibe.areas.filter((area) => area.stage === stage);
+            const known = areas.filter((area) => area.text);
+            const open = areas.filter((area) => !area.text);
+            return (
             <section className="vibe-group" key={stage}>
               <h2>{stage === "basics" ? "The basics" : "Going deeper"}</h2>
+              {known.length ? (
               <div className="vibe-cards">
-                {vibe.areas.filter((area) => area.stage === stage).map((area) => (
+                {known.map((area) => (
                   <article className={`vibe-card ${area.text ? "is-known" : ""}`} key={area.id}>
                     <div className="vibe-card-top">
                       <h3>{VIBE_AREA_LABELS[area.id] || area.id}</h3>
@@ -133,8 +137,16 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                   </article>
                 ))}
               </div>
+              ) : null}
+              {open.length ? (
+                <p className="vibe-open">
+                  <span>{known.length ? "Still to learn:" : "Omi hasn't picked these up yet:"}</span>
+                  {open.map((area) => <span className="vibe-open-chip" key={area.id}>{VIBE_AREA_LABELS[area.id] || area.id}{area.private ? <Lock aria-label="Private" /> : null}</span>)}
+                </p>
+              ) : null}
             </section>
-          ))}
+            );
+          })}
         </>
       ) : null}
     </section>
