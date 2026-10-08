@@ -737,6 +737,11 @@ button.omi-drawer-close:hover {
   min-width: 0;
 }
 
+/* Only the name sits next to the orb now; keep them centered on one row. */
+.omi-main .chat-title-lockup .terminal-mark {
+  grid-row: auto;
+}
+
 .omi-main .agentic-chat .agent-status {
   overflow: hidden;
   text-overflow: ellipsis;
