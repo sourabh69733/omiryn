@@ -755,7 +755,8 @@ button.omi-drawer-close:hover {
   }
 }
 
-/* Select mode: tap messages to pick them for deletion. */
+/* Select mode: tap messages to pick them. Nothing moves: the tick takes the place of Omi's avatar,
+   or sits in the empty space left of the user's bubble. */
 .message-row.is-selectable {
   cursor: pointer;
   border-radius: 14px;
@@ -772,18 +773,25 @@ button.omi-drawer-close:hover {
   background: rgba(124, 58, 237, 0.1);
 }
 
+.message-row.is-selectable .chat-avatar.agent {
+  visibility: hidden;
+}
+
 .message-select-mark {
+  position: absolute;
+  top: 50%;
+  left: 5px;
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  align-self: center;
+  box-sizing: border-box;
   width: 20px;
   height: 20px;
-  margin: 0 6px;
   border: 1.5px solid var(--line);
   border-radius: 50%;
+  background: #fff;
   color: #fff;
+  transform: translateY(-50%);
 }
 
 .message-row.is-selected .message-select-mark {
@@ -796,77 +804,236 @@ button.omi-drawer-close:hover {
   height: 13px;
 }
 
-.message-select-bar {
+/* The header becomes the selection toolbar, like WhatsApp; the composer stays put. */
+.card-heading.message-select-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #faf8ff;
-  color: var(--muted);
-  font-size: 13.5px;
 }
 
-.message-select-bar span {
+.select-toolbar-count {
   flex: 1;
+  font-weight: 650;
 }
 
-.message-select-bar .danger-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.message-select-toolbar button.select-toolbar-icon,
+.message-select-toolbar button.select-toolbar-text {
+  display: inline-grid;
+  place-items: center;
+  min-height: 0;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink, #1d1d1f);
 }
 
-.message-select-bar .danger-button svg {
-  width: 15px;
-  height: 15px;
+.message-select-toolbar button.select-toolbar-icon {
+  width: 36px;
+  padding: 0;
 }
 
-/* Desktop: a faint circle beside a message starts selecting. Phones hold the message instead. */
-.message-select-hint {
+.message-select-toolbar button.select-toolbar-icon:hover,
+.message-select-toolbar button.select-toolbar-text:hover {
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.message-select-toolbar button.select-toolbar-text {
+  color: #7c3aed;
+  font-weight: 650;
+}
+
+.message-select-toolbar button.select-toolbar-icon.is-danger {
+  color: #d1305f;
+}
+
+.message-select-toolbar svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* ⋯ beside each message: faint until the row is hovered; phones hold the message instead. */
+.message-menu {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center;
+  width: 0;
+}
+
+.message-row.user .message-menu {
+  order: -1;
+}
+
+.message-menu button.message-menu-trigger {
   display: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* Beats the global button rule (42px min-height, purple fill on hover). */
-  .message-row .message-select-hint,
-  .message-row .message-select-hint:hover {
+  .message-menu {
+    width: 28px;
+  }
+
+  .message-menu button.message-menu-trigger {
+    display: grid;
+    place-items: center;
+    width: 28px;
     min-height: 0;
-    background: transparent;
-  }
-
-  .message-row .message-select-hint:hover {
-    border-color: #7c3aed;
-  }
-
-  .message-select-hint {
-    display: inline-block;
-    flex: 0 0 auto;
-    align-self: center;
-    box-sizing: border-box;
-    width: 18px;
-    height: 18px;
-    margin: 0 6px;
+    height: 28px;
     padding: 0;
-    border: 1.5px solid var(--line);
     border-radius: 50%;
     background: transparent;
-    cursor: pointer;
+    color: var(--muted, #6b7280);
     opacity: 0;
     transition: opacity 0.15s ease;
   }
 
-  .message-row:hover .message-select-hint,
-  .message-select-hint:focus-visible {
+  .message-row:hover .message-menu button.message-menu-trigger,
+  .message-menu button.message-menu-trigger:focus-visible,
+  .message-menu button.message-menu-trigger.is-open {
     opacity: 1;
+  }
+
+  .message-menu button.message-menu-trigger:hover,
+  .message-menu button.message-menu-trigger.is-open {
+    background: rgba(124, 58, 237, 0.08);
   }
 }
 
-.message-row.user .message-select-hint,
-.message-row.user .message-select-mark {
-  order: -1;
+.message-menu-trigger svg {
+  width: 17px;
+  height: 17px;
+}
+
+.message-menu-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  min-width: 150px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(38, 53, 59, 0.14);
+}
+
+.message-row.user .message-menu-list {
+  right: 0;
+  left: auto;
+}
+
+.message-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink, #1d1d1f);
+  font-weight: 500;
+  text-align: left;
+}
+
+.message-menu-list button:hover {
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.message-menu-list button.is-danger {
+  color: #d1305f;
+}
+
+.message-menu-list svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* A quote of the message being replied to, inside the bubble and above the composer. */
+.message button.message-quote {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 0;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  border-left: 3px solid #7c3aed;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.08);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.message.user button.message-quote {
+  border-left-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.message button.message-quote:hover {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.message.user button.message-quote:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.message-quote span,
+.reply-preview span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  opacity: 0.85;
+}
+
+.reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto 8px;
+  padding: 8px 10px;
+  border-left: 3px solid #7c3aed;
+  border-radius: 10px;
+  background: #f5f0ff;
+  font-size: 13px;
+}
+
+.reply-preview > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reply-preview > svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: #7c3aed;
+}
+
+.reply-preview button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-height: 0;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted, #6b7280);
+}
+
+.reply-preview button:hover {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.reply-preview button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .clear-everything-option {
