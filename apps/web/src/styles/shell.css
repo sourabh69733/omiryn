@@ -1,5 +1,4 @@
-/* App frame: a contacts rail on the left and the page beside it (web); a top bar, a contacts home
-   and a full-screen chat (phones). Loaded last so it wins over the old header layout. */
+/* App frame: a contacts rail on web, full-screen chat and navigation panel on phones. */
 .omi-shell {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -482,17 +481,92 @@ button.omi-drawer-close:hover {
   gap: 12px;
 }
 
-.omi-contacts-home {
-  display: grid;
-  gap: 6px;
-  padding: 12px;
+.omi-mobile-navigation {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
 }
 
-.omi-contacts-label {
-  margin: 4px 8px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
+.omi-mobile-navigation-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(24, 24, 27, 0.32);
+}
+
+.omi-mobile-navigation-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(320px, 88vw);
+  padding: max(16px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: 18px 0 48px rgba(24, 24, 27, 0.12);
+}
+
+.omi-mobile-navigation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 0 8px;
+  font-size: 18px;
+}
+
+.omi-mobile-navigation-heading button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.omi-mobile-navigation-panel a,
+.omi-mobile-navigation-panel > button:not(.omi-mobile-navigation-backdrop) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.omi-mobile-navigation-panel a:hover,
+.omi-mobile-navigation-panel > button:hover {
+  background: #f4f0ff;
+}
+
+.omi-mobile-navigation-panel svg {
+  width: 19px;
+  height: 19px;
+}
+
+.omi-mobile-navigation-chat .agent-orb {
+  width: 24px;
+  height: 24px;
+}
+
+.omi-mobile-navigation-panel > button:last-child {
+  margin-top: auto;
+}
+
+.omi-mobile-navigation-panel :is(a, button):focus-visible,
+.omi-rail :is(a, button):focus-visible,
+.omi-main :is(a, button):focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 2px;
 }
 
 @keyframes omi-drawer-in {
@@ -509,6 +583,7 @@ button.omi-drawer-close:hover {
 /* Phones: the rail becomes a top bar; an open chat hides it and fills the screen. */
 @media (max-width: 760px) {
   .omi-shell {
+    height: var(--omi-viewport-height, 100dvh);
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -517,7 +592,7 @@ button.omi-drawer-close:hover {
     flex-direction: row;
     align-items: center;
     gap: 6px;
-    padding: 8px 10px;
+    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
@@ -586,6 +661,10 @@ button.omi-drawer-close:hover {
 
   .omi-drawer {
     width: 100%;
+  }
+
+  .omi-main .agentic-chat .composer {
+    margin-bottom: max(10px, env(safe-area-inset-bottom));
   }
 }
 

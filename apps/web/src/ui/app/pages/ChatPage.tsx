@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronLeft, ChevronRight, History, Lock, MoreHorizontal, RotateCw, Smile, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, History, Lock, Menu, MoreHorizontal, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -24,7 +24,7 @@ const CHAT_INPUT_MAX_LENGTH = 800;
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
 
-export function ChatPage({ initialConversationId, userAvatar, onBack, onOmiStatus }: { initialConversationId?: string | null; userAvatar?: string | null; onBack?: () => void; onOmiStatus?: (status: OmiStatus) => void }) {
+export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -909,7 +909,7 @@ export function ChatPage({ initialConversationId, userAvatar, onBack, onOmiStatu
       <div className="chat-workspace">
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           <div className="card-heading">
-            {onBack ? <button type="button" className="omi-back" onClick={onBack} aria-label="Back to chats"><ChevronLeft aria-hidden="true" /></button> : null}
+            {onOpenNavigation ? <button type="button" className="omi-back" onClick={onOpenNavigation} aria-label="Open navigation"><Menu aria-hidden="true" /></button> : null}
             <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2><p className="agent-status" aria-live="polite">{typingVisible ? "typing…" : "Finds your people"}</p></div></div>
             <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
               <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
@@ -935,9 +935,10 @@ export function ChatPage({ initialConversationId, userAvatar, onBack, onOmiStatu
           {composerBlocked ? <p className={`composer-pause-note ${composerLimit?.kind === "monthly" ? "is-monthly" : ""}`} id="composer-pause-note" role="status">{composerLimit?.message}<span>{composerLimit?.kind === "monthly" ? `Resets in ${formatLimitCountdown(pauseRemainingSeconds)}` : `Try again in ${formatLimitCountdown(pauseRemainingSeconds)}`}</span></p> : null}
           {vibeNote && vibeNote.conversationId === conversation?.id && vibeStepNote(vibeNote.milestone) ? (
             <div className="vibe-milestone-note" role="status">
-              <span>{vibeStepNote(vibeNote.milestone)}</span>
-              <a href={pathForPage.vibe} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.vibe); window.dispatchEvent(new PopStateEvent("popstate")); }}>See your vibe</a>
-              <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss"><X aria-hidden="true" /></button>
+              <Sparkles className="vibe-milestone-icon" aria-hidden="true" />
+              <span><strong>Your vibe is taking shape</strong>{vibeStepNote(vibeNote.milestone)}</span>
+              <a href={pathForPage.vibe} onClick={(event) => { event.preventDefault(); setVibeNote(null); window.history.pushState({}, "", pathForPage.vibe); window.dispatchEvent(new PopStateEvent("popstate")); }}>View vibe</a>
+              <button type="button" onClick={() => setVibeNote(null)} aria-label="Dismiss vibe update"><X aria-hidden="true" /></button>
             </div>
           ) : null}
           {viewingEarlier ? (
