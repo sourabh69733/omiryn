@@ -830,10 +830,22 @@ button.omi-drawer-close:hover {
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /* Beats the global button rule (42px min-height, purple fill on hover). */
+  .message-row .message-select-hint,
+  .message-row .message-select-hint:hover {
+    min-height: 0;
+    background: transparent;
+  }
+
+  .message-row .message-select-hint:hover {
+    border-color: #7c3aed;
+  }
+
   .message-select-hint {
     display: inline-block;
     flex: 0 0 auto;
     align-self: center;
+    box-sizing: border-box;
     width: 18px;
     height: 18px;
     margin: 0 6px;
