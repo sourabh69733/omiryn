@@ -89,9 +89,9 @@ export function evidenceChatPath(item: Pick<VibeEvidence, "conversation_id" | "m
 }
 
 // The chip says one thing: Confirmed when said on different days (counts toward matches), else
-// Still learning. Its color deepens with the proof (see confidenceLevel).
+// Said once: the line is known, just not repeated yet. Its color deepens with the proof (see confidenceLevel).
 export function strengthLabel(strength: VibeArea["strength"]): string {
-  return strength === "clear" ? "Confirmed" : "Still learning";
+  return strength === "clear" ? "Confirmed" : "Said once";
 }
 
 // 1: one message. 2: several messages, one day. 3: two days. 4: three or more days.
