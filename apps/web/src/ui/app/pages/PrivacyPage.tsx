@@ -30,13 +30,12 @@ export function PrivacyPage({ onProfile, onMemories, onContact }: PrivacyPagePro
         <section aria-labelledby="privacy-saved-title">
           <h2 id="privacy-saved-title">What is saved?</h2>
           <p>Your chats, your profile, and the memories Omi learns from them. If you upload a chat or add other context, that is saved too and can shape Omi's replies.</p>
-          <p>Your chats and memories are encrypted when stored. This is not end-to-end encryption, because Omi needs to read your messages to reply to you.</p>
+          <p>Your chats and memories are encrypted and stored securely. Some processing runs on trusted partners, listed in our Privacy Policy.</p>
         </section>
         <section aria-labelledby="privacy-access-title">
           <h2 id="privacy-access-title">Who can read a chat?</h2>
-          <p>You, and Omi so it can reply. Some of this processing runs on trusted service partners, listed in our Privacy Policy.</p>
-          <p>Our team has no tool that shows your chats, and chat text is kept out of our system records. We only read what you send us yourself, like feedback or a support message.</p>
-          <p>To be fully honest: because Omi has to read your messages, a small number of people who run Omiryn's servers could technically access them. We limit who has that access and do not look at chats.</p>
+          <p>Only you, and Omi so it can reply. We never read your messages. Our team only sees what you send us yourself, like feedback or a support request.</p>
+          <p>We are building new technology to give you even more privacy.</p>
         </section>
         <section aria-labelledby="privacy-control-title">
           <h2 id="privacy-control-title">What can you control?</h2>
