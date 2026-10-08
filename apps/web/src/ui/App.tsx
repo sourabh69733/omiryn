@@ -92,15 +92,12 @@ export function App() {
             <OmirynLogo />
             <div className="auth-intro-copy">
               <span className="auth-intro-orb"><AgentOrb state="idle" /></span>
-              <p className="auth-kicker">A better way to find your people</p>
               <h1 id="auth-intro-title">Talk first.<br /><em>Connect better.</em></h1>
               <p>Omiryn gets to know you through conversation, then helps you find friends who feel like your kind of people.</p>
             </div>
           </section>
           <section className="auth-card" aria-label="Sign in">
-            <p className="auth-card-kicker">Your space starts here</p>
-            <h2>Come on in.</h2>
-            <p className="auth-copy">One conversation is all it takes to begin.</p>
+            <h2>Sign in to Omiryn</h2>
             <button className="google-signin-button" type="button" onClick={() => void beginGoogleSignIn()} disabled={isSigningIn}>
               <span className="google-mark" aria-hidden="true">G</span>
               {isSigningIn ? "Opening Google..." : "Continue with Google"}

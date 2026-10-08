@@ -88,7 +88,6 @@ export function QuickSetup() {
         <OmirynLogo />
       </header>
       <form className="quick-setup-card" onSubmit={start} noValidate>
-        <p className="quick-setup-kicker">Just one quick step</p>
         <h1>What should Omi call you?</h1>
         <p className="quick-setup-intro">Then you can start talking. Omi will get to know you as you go.</p>
 

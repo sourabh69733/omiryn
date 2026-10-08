@@ -81,11 +81,10 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
   return (
     <section className="screen contact-screen">
       <div className="contact-shell">
-        <div className="screen-copy compact contact-title">
-          <p className="eyebrow">Contact</p>
-          <h1>Reach Omiryn.</h1>
-          <p>Share feedback, report an issue, ask for support, or request a community invite.</p>
-        </div>
+        <header className="mem-head contact-title">
+          <h1>Contact us</h1>
+          <p>Feedback, a problem, a privacy question, or anything else. We read every message.</p>
+        </header>
         <form className="contact-feedback-panel" onSubmit={submitContact}>
           <div className="contact-panel-heading">
             <span className="contact-panel-icon"><MessageCircle size={22} /></span>
