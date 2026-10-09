@@ -11,11 +11,17 @@ import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from agent.shared.clock import utc_now
-from storage import claim_due_agent_jobs, fail_agent_job, finish_agent_job
+from storage import (
+    claim_due_agent_jobs,
+    fail_agent_job,
+    finish_agent_job,
+    purge_expired_records,
+    record_audit_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,8 @@ DEFAULT_POLL_SECONDS = 10.0
 DEFAULT_LEASE_SECONDS = 300.0
 MAX_ATTEMPTS = 3
 RETRY_BASE_SECONDS = 60.0
+# Expired debug rows, finished jobs and stale temporary chats are deleted this often.
+RETENTION_EVERY = timedelta(hours=24)
 
 
 def _job_handlers() -> dict[str, JobHandler]:
@@ -55,6 +63,7 @@ class JobWorker:
         self._lease = lease_seconds or DEFAULT_LEASE_SECONDS
         self._handlers = handlers
         self._task: asyncio.Task[None] | None = None
+        self._last_retention: datetime | None = None
 
     def start(self) -> None:
         if self._task is None and jobs_enabled():
@@ -73,8 +82,23 @@ class JobWorker:
             await self._run(job)
         return len(jobs)
 
+    async def run_retention_if_due(self) -> dict[str, int] | None:
+        """Run the retention cleanup at startup and then once a day; returns what it deleted."""
+        now = utc_now()
+        if self._last_retention is not None and now - self._last_retention < RETENTION_EVERY:
+            return None
+        self._last_retention = now
+        deleted = await asyncio.to_thread(purge_expired_records)
+        record_audit_event("retention.purge", actor_id=None, actor_role="system", detail=deleted)
+        logger.info("agent.retention %s", " ".join(f"{key}={value}" for key, value in deleted.items()))
+        return deleted
+
     async def _loop(self) -> None:
         while True:
+            try:
+                await self.run_retention_if_due()
+            except Exception:
+                logger.exception("agent.retention.failed")
             try:
                 await self.run_once()
             except Exception:
