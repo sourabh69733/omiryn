@@ -6,6 +6,7 @@ from agent.context_engine.assembly import STYLE_CONTEXT_SOURCE_TYPES
 from agent.shared.timeline import valid_timezone_name
 from agent.memory_engine.data_points.feedback import normalize_data_point_feedback
 from security.auth import CurrentUser, require_user
+from storage.audit_log import record_audit_event
 from storage import (
     get_user_timezone,
     save_setup_basics,
@@ -266,6 +267,10 @@ async def create_me_data_request(
             },
         }
     )
+    record_audit_event(
+        "data_request.create", actor_id=user.id, actor_role="user", target_user_id=user.id,
+        target_id=str(request.get("id") or ""), detail={"request_type": payload.request_type},
+    )
     return {"request": request}
 
 
@@ -277,6 +282,10 @@ async def delete_me_account_data(
     if not confirm:
         raise HTTPException(status_code=400, detail="Pass confirm=true to delete account data.")
     summary = delete_user_private_data(user.id, user.email)
+    record_audit_event(
+        "account.delete", actor_id=user.id, actor_role="user", target_user_id=user.id,
+        detail={key: value for key, value in (summary.get("deleted") or {}).items() if isinstance(value, int)},
+    )
     deleted_photos = _delete_profile_photo_file_names(summary.get("profile_photo_file_names", []))
     return {
         "user_id": user.id,

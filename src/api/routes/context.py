@@ -13,6 +13,7 @@ from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.data_points.extraction.whatsapp_rules import extract_whatsapp_data_points
 from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_style_summary
 from security.auth import CurrentUser, require_user
+from storage.audit_log import record_audit_event
 from storage import (
     delete_context_source,
     delete_user_context_source,
@@ -116,6 +117,7 @@ def delete_conversation_context_source(
     deleted = delete_user_context_source(source_id, user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Context source not found.")
+    record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
 
@@ -126,6 +128,7 @@ def delete_me_context_source(
 ) -> dict[str, str]:
     if not delete_user_context_source(source_id, user.id):
         raise HTTPException(status_code=404, detail="Context source not found.")
+    record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
 

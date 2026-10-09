@@ -25,6 +25,8 @@ from agent.shared.timeline import parse_time
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
+from storage.audit_log import record_audit_event
+from storage.conversations import is_temporary_conversation
 from storage import (
     MessageDeletionError,
     count_memories_only_from_conversation,
@@ -269,6 +271,11 @@ async def delete_agent_messages(
         result = delete_conversation_messages(_user_id(user), conversation_id, payload.message_indexes)
     except MessageDeletionError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    record_audit_event(
+        "messages.delete", actor_id=user.id, actor_role="user", target_user_id=user.id,
+        target_id=conversation_id,
+        detail={"message_count": result["message_count"], "memories_forgotten": result["memories_forgotten"]},
+    )
     # Rebuild the chat summary, session log and topics from what is left.
     request_flush_now(conversation_id, _user_id(user))
     return result
@@ -299,8 +306,13 @@ async def delete_agent_conversation(
     user: CurrentUser = Depends(require_user),
 ) -> dict[str, str]:
     # Deleting the conversation also deletes its pending jobs.
+    temporary = is_temporary_conversation(conversation_id, _user_id(user))
     if not storage_delete_conversation(conversation_id, _user_id(user)):
         raise HTTPException(status_code=404, detail="Agent conversation not found.")
+    record_audit_event(
+        "chat.delete", actor_id=user.id, actor_role="user", target_user_id=user.id,
+        target_id=conversation_id, detail={"temporary": temporary},
+    )
     return {"conversation_id": conversation_id, "status": "deleted"}
 
 

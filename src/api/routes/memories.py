@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from security.auth import CurrentUser, require_user
+from storage.audit_log import record_audit_event
 from storage import (
     clear_omi_data,
     delete_agent_memory,
@@ -131,6 +132,10 @@ async def clear_me_omi(
     if payload.confirm.strip().lower() != "clear":
         raise HTTPException(status_code=400, detail='Type "clear" to confirm.')
     deleted = clear_omi_data(user.id)
+    record_audit_event(
+        "omi.clear", actor_id=user.id, actor_role="user", target_user_id=user.id,
+        detail={key: value for key, value in deleted.items() if isinstance(value, int)},
+    )
     return {"status": "cleared", "conversations": deleted.get("agent_conversations", 0), "memories": deleted.get("agent_memories", 0)}
 
 
@@ -163,6 +168,7 @@ async def delete_me_memory(
 ) -> dict[str, str]:
     if not delete_agent_memory(memory_id, user.id):
         raise HTTPException(status_code=404, detail="Memory not found.")
+    record_audit_event("memory.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=memory_id)
     return {"memory_id": memory_id, "status": "deleted"}
 
 
