@@ -69,6 +69,10 @@ V3 memory rules:
   The end date belongs only to the short-term memory; a settled fact you keep or restore gets none.
 - When it is unclear whether the old meaning still holds, keep the established memory and add only
   what the new message clearly says.
+- When the user says an ongoing activity or state is over ("done with <subject>", "finished", "quit",
+  "not doing that anymore"), it changed: supersede the memory with what is true now, or retract it when
+  nothing durable is left. If they also want it dropped from conversation, add a procedural memory
+  saying so.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.
 - existing_memories with targetable=false are rejected or superseded history. Never target their IDs.
   Do not recreate their meaning from an incidental repeat. Add a fresh memory only when new eligible user

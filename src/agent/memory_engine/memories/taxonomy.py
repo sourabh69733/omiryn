@@ -6,7 +6,8 @@ V3_MEMORY_TAXONOMY_GUIDANCE = """Memory kinds:
 - relationship: lived history or an interaction pattern involving a specific person or relationship;
   preserve whose behavior it was and do not convert it into a general personality trait.
 - procedural: instructions or learned preferences for how this companion should interact with the user;
-  ordinary interests and friend preferences are semantic, not procedural.
+  ordinary interests and friend preferences are semantic, not procedural. What the user is doing,
+  studying or working on is never procedural; "stop bringing up <subject>" is.
 
 Purposes are independent of kind:
 - profile describes the user.

@@ -135,7 +135,8 @@ User card rules:
   study, key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.
 - Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
-  financial details, no relative time words. Replace a line when the user corrects it.
+  financial details, no relative time words. Replace a line when the user corrects it, and update or
+  drop it when they say it ended or changed.
 - Leave out what is unknown; never write lines like "Name: not given".
 
 Vibe rules (who the user would get along with as a friend; Omiryn uses it to find them friends):
