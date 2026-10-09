@@ -621,6 +621,25 @@ agent_jobs = Table(
 Index("ix_agent_jobs_due", agent_jobs.c.status, agent_jobs.c.run_after)
 Index("ix_agent_jobs_user", agent_jobs.c.user_id)
 
+# Who did what to private data: admin views, deletions, data requests, retention runs.
+# Never holds message text or memory content: action names, IDs and counts only.
+# Kept when an account is deleted, as the record that the deletion happened.
+audit_events = Table(
+    "audit_events",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("actor_id", String, nullable=True),
+    # "user", "admin" or "system".
+    Column("actor_role", String, nullable=False),
+    Column("action", String, nullable=False),
+    Column("target_user_id", String, nullable=True),
+    Column("target_id", String, nullable=True),
+    Column("detail_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_audit_events_created", audit_events.c.created_at)
+Index("ix_audit_events_target_user", audit_events.c.target_user_id)
+
 agent_user_settings = Table(
     "agent_user_settings",
     metadata,

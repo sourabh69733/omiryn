@@ -28,6 +28,8 @@ from .memory_reviews import *
 from .thread_applications import *
 from .conversation_threads import *
 from .user_deletion import *
+from .audit_log import *
+from .retention import *
 from .utils import (
     _conversation_user_id,
     _isoformat_utc,
