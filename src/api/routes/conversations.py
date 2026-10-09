@@ -13,6 +13,7 @@ from agent.memory_engine.engine import (
     should_run_conversation_data_point_extraction,
 )
 from agent.cognition.background.idle import request_flush_now, schedule_idle_flush
+from agent.feedback.rating_memory import sync_rating_memories
 from agent.cognition.background.service import (
     run_background_cognition,
     should_schedule_background_cognition,
@@ -277,6 +278,8 @@ async def delete_agent_messages(
         target_id=conversation_id,
         detail={"message_count": result["message_count"], "memories_forgotten": result["memories_forgotten"]},
     )
+    # Ratings on deleted replies went with them.
+    _sync_rating_memories(_user_id(user))
     # Rebuild the chat summary, session log and topics from what is left.
     request_flush_now(conversation_id, _user_id(user))
     return result
@@ -429,6 +432,15 @@ async def retry_agent_message(
 REPLY_QUOTE_CHARS = 300
 
 
+def _sync_rating_memories(user_id: str) -> None:
+    """A reason given on several bad replies becomes a lasting how-to-talk memory."""
+    try:
+        sync_rating_memories(user_id)
+    except Exception:
+        # The rating itself is saved; the lasting memory catches up on the next rating.
+        logger.exception("agent.rating_memory.failed")
+
+
 def _reply_quote(messages: list[dict[str, Any]], index: int) -> dict[str, Any]:
     if index >= len(messages):
         raise HTTPException(status_code=400, detail="The message you replied to was not found.")
@@ -568,7 +580,9 @@ async def create_agent_message_feedback(
             },
         }
     )
-    return {"feedback": replace_agent_message_feedback(feedback)}
+    saved = replace_agent_message_feedback(feedback)
+    _sync_rating_memories(_user_id(user))
+    return {"feedback": saved}
 
 
 @router.delete("/api/agent/conversations/{conversation_id}/messages/{message_index}/feedback")
@@ -580,6 +594,7 @@ async def delete_agent_message_feedback(
     """Undo a rating; the next reply no longer learns from it."""
     _get_existing_conversation(conversation_id, user)
     cleared = clear_agent_message_feedback(_user_id(user), conversation_id, message_index)
+    _sync_rating_memories(_user_id(user))
     return {"message_index": message_index, "cleared": cleared}
 
 
