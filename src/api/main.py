@@ -25,10 +25,16 @@ from .helpers import _agent_user_context, _smart_reply_context_sources
 from .routes import run_agent_turn
 from .routes import router as api_router
 
+# The interactive API docs list every route; production does not publish them.
+_PUBLIC_DOCS = not production_runtime_enabled()
+
 app = FastAPI(
     title="Omiryn API",
     version="0.1.0",
     description="AI-assisted matchmaking platform API.",
+    docs_url="/docs" if _PUBLIC_DOCS else None,
+    redoc_url="/redoc" if _PUBLIC_DOCS else None,
+    openapi_url="/openapi.json" if _PUBLIC_DOCS else None,
 )
 
 logger = logging.getLogger(__name__)
