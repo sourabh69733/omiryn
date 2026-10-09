@@ -32,7 +32,7 @@ _KIND_LIMITS = {
     MemoryKind.SEMANTIC.value: 5,
     MemoryKind.EPISODIC.value: 5,
     MemoryKind.RELATIONSHIP.value: 4,
-    MemoryKind.PROCEDURAL.value: 3,
+    MemoryKind.PROCEDURAL.value: 5,
 }
 
 
