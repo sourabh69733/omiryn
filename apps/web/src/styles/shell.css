@@ -941,6 +941,23 @@ button.omi-drawer-close:hover {
   color: #d1305f;
 }
 
+/* A rated reply: the chosen thumb stays highlighted; choosing it again removes the rating. */
+.message-menu-list button.is-active {
+  color: var(--brand-violet);
+  font-weight: 600;
+}
+
+.message-menu-list button.is-quiet {
+  color: var(--muted);
+}
+
+.message-menu-heading {
+  margin: 2px 10px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .message-menu-list svg {
   width: 16px;
   height: 16px;

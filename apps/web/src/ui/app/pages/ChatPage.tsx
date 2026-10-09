@@ -1,6 +1,7 @@
 import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
@@ -20,8 +21,8 @@ import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
-// Four menu items plus padding, in pixels.
-const MESSAGE_MENU_HEIGHT = 190;
+// Six menu items plus padding, in pixels.
+const MESSAGE_MENU_HEIGHT = 260;
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
@@ -90,6 +91,10 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   // The ⋯ menu open on one message, and the message the next send replies to.
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [menuUp, setMenuUp] = useState(false);
+  // After "Bad reply" the menu asks what was off, in place.
+  const [menuAsksWhy, setMenuAsksWhy] = useState(false);
+  // How the user rated Omi's replies in this chat, by message index.
+  const [ratings, setRatings] = useState<ReadonlyMap<number, ReplyRating>>(() => new Map());
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
   useEffect(() => {
     // A selection, an open menu and a reply belong to one chat.
@@ -98,6 +103,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     setConfirmingMessages(false);
     setMenuFor(null);
     setReplyTo(null);
+    setRatings(new Map());
+    if (conversation && !conversation.temporary) void loadRatings(conversation.id);
   }, [conversation?.id]);
 
   useEffect(() => {
@@ -849,7 +856,37 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   function openMenu(index: number, anchor: Element) {
     const bottom = logRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
     setMenuUp(bottom - anchor.getBoundingClientRect().bottom < MESSAGE_MENU_HEIGHT);
+    setMenuAsksWhy(false);
     setMenuFor(index);
+  }
+
+  async function loadRatings(id: string) {
+    try {
+      const response = await apiFetch(`/api/agent/conversations/${id}/feedback`);
+      if (!response.ok || openConversationIdRef.current !== id) return;
+      const data = (await response.json()) as { feedback?: Array<{ message_index: number; rating: string }> };
+      setRatings(ratingsByMessage(data.feedback || []));
+    } catch {
+      // Optional: the menu works without showing earlier ratings.
+    }
+  }
+
+  // Omi learns from a rating on its next reply. Choosing the same rating again removes it.
+  async function rateMessage(index: number, rating: ReplyRating, reasons: string[] = []) {
+    if (!conversation) return;
+    const id = conversation.id;
+    const undo = ratings.get(index) === rating && !reasons.length;
+    setMenuFor(null);
+    setRatings((current) => withRating(current, index, undo ? null : rating));
+    const url = `/api/agent/conversations/${id}/messages/${index}/feedback`;
+    const response = await apiFetch(url, undo
+      ? { method: "DELETE" }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating, reasons }) },
+    ).catch(() => null);
+    if (!response?.ok && openConversationIdRef.current === id) {
+      setRatings((current) => withRating(current, index, ratings.get(index) ?? null));
+      setError("Couldn't save your rating. Try again.");
+    }
   }
 
   // Phones: hold a message to open its menu.
@@ -1082,12 +1119,28 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                       <div className="message-menu">
                         <button type="button" className={`message-menu-trigger ${menuFor === index ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index} onClick={(event) => { if (menuFor === index) setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
                         {menuFor === index ? (
+                          menuAsksWhy ? (
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu" aria-label="What was off?">
+                            <p className="message-menu-heading">What was off?</p>
+                            {BAD_REPLY_REASONS.map((reason) => (
+                              <button type="button" role="menuitem" key={reason.key} onClick={() => void rateMessage(index, "bad", [reason.key])}>{reason.label}</button>
+                            ))}
+                            <button type="button" role="menuitem" className="is-quiet" onClick={() => void rateMessage(index, "bad")}>Just bad</button>
+                          </div>
+                          ) : (
                           <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu">
                             <button type="button" role="menuitem" onClick={() => replyToMessage(index)}><Reply aria-hidden="true" />Reply</button>
                             <button type="button" role="menuitem" onClick={() => copyMessage(index)}><Copy aria-hidden="true" />Copy</button>
+                            {agent && !temporary ? (
+                              <>
+                                <button type="button" role="menuitemcheckbox" aria-checked={ratings.get(index) === "good"} className={ratings.get(index) === "good" ? "is-active" : ""} onClick={() => void rateMessage(index, "good")}><ThumbsUp aria-hidden="true" />{ratings.get(index) === "good" ? "Liked" : "Good reply"}</button>
+                                <button type="button" role="menuitemcheckbox" aria-checked={ratings.get(index) === "bad"} className={ratings.get(index) === "bad" ? "is-active" : ""} onClick={() => { if (ratings.get(index) === "bad") void rateMessage(index, "bad"); else setMenuAsksWhy(true); }}><ThumbsDown aria-hidden="true" />{ratings.get(index) === "bad" ? "Disliked" : "Bad reply"}</button>
+                              </>
+                            ) : null}
                             <button type="button" role="menuitem" onClick={() => { setMenuFor(null); startSelecting(index); }}><ListChecks aria-hidden="true" />Select</button>
                             <button type="button" role="menuitem" className="is-danger" onClick={() => deleteOneMessage(index)}><Trash2 aria-hidden="true" />Delete</button>
                           </div>
+                          )
                         ) : null}
                       </div>
                     ) : null}
@@ -1096,7 +1149,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                   {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp]);
+            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen">
