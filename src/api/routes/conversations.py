@@ -39,7 +39,8 @@ from storage import (
     list_context_sources,
     list_conversations as storage_list_conversations,
     list_user_context_sources,
-    save_agent_message_feedback,
+    clear_agent_message_feedback,
+    replace_agent_message_feedback,
     save_conversation,
     save_draft,
     set_conversation_archived,
@@ -567,7 +568,19 @@ async def create_agent_message_feedback(
             },
         }
     )
-    return {"feedback": save_agent_message_feedback(feedback)}
+    return {"feedback": replace_agent_message_feedback(feedback)}
+
+
+@router.delete("/api/agent/conversations/{conversation_id}/messages/{message_index}/feedback")
+async def delete_agent_message_feedback(
+    conversation_id: str,
+    message_index: int,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Undo a rating; the next reply no longer learns from it."""
+    _get_existing_conversation(conversation_id, user)
+    cleared = clear_agent_message_feedback(_user_id(user), conversation_id, message_index)
+    return {"message_index": message_index, "cleared": cleared}
 
 
 @router.get("/api/agent/conversations/{conversation_id}/feedback")

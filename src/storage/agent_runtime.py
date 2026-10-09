@@ -40,6 +40,24 @@ def save_agent_message_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
     return _agent_message_feedback_from_row(row)
 
 
+def replace_agent_message_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
+    """One rating per message: a new rating replaces the earlier one."""
+    clear_agent_message_feedback(feedback["user_id"], feedback["conversation_id"], int(feedback["message_index"]))
+    return save_agent_message_feedback(feedback)
+
+
+def clear_agent_message_feedback(user_id: str, conversation_id: str, message_index: int) -> int:
+    owner_id = _require_user_id(user_id, "agent message feedback")
+    with ENGINE.begin() as connection:
+        return connection.execute(
+            agent_message_feedback.delete().where(
+                agent_message_feedback.c.user_id == owner_id,
+                agent_message_feedback.c.conversation_id == conversation_id,
+                agent_message_feedback.c.message_index == message_index,
+            )
+        ).rowcount or 0
+
+
 def list_agent_message_feedback(
     conversation_id: str | None = None,
     user_id: str | None = None,
