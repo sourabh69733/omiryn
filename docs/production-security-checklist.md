@@ -1,6 +1,6 @@
 # Omiryn Production Security Checklist
 
-Last updated: August 25, 2026
+Last updated: October 10, 2026
 
 This checklist tracks the privacy and security layer required before a real public launch.
 
@@ -11,6 +11,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Safety page explains adult-only use, prohibited behavior, consent, reporting, and imported-context safety.
 - [x] AI Disclosure explains where AI is used, limitations, and user control.
 - [x] Contact page supports feedback, support, safety, privacy, correction, and deletion requests.
+- [ ] Update the Privacy Policy for the October 2026 controls (delete messages, Clear Omi, Temporary Chat, account delete), the retention windows below, and that chat text goes to AI model providers (DeepInfra, Mistral) to write replies.
 - [ ] Replace personal support email with a branded address such as `hello@omiryn.com`.
 - [ ] Legal review before wide public launch.
 
@@ -27,6 +28,21 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Add learned-signal correction/edit controls.
 - [x] Add signed-in Contact page for feedback, support, privacy, safety, and community invite requests.
 
+## User Privacy Controls
+
+- [x] Delete single or selected messages; what Omi learned only from them goes too (memories, vibe proof, notes, ratings), and chat summaries rebuild.
+- [x] Clear Omi: delete every chat and everything Omi learned, keeping the account and profile (typed confirmation).
+- [x] Temporary Chat: not in History, never learned from, deleted when the user leaves it or after 24 hours idle.
+- [x] Reply ratings from the message menu, one per message, with undo.
+
+## Retention And Audit
+
+- [x] Daily retention job in the API job worker (`src/storage/retention.py`): reply traces and context snapshots 30 days, background debug rows 90 days (free text scrubbed after 7), finished jobs and batch failures 30 days, stale temporary chats 24 hours, audit rows 365 days.
+- [x] Chats, memories, vibe lines and profiles are never removed by retention; only the user's own deletes remove them.
+- [x] `audit_events` table records chat, message, memory and upload deletes, Clear Omi, account delete, data requests, every admin view and each retention run. IDs and counts only, never text. Kept when an account is deleted.
+- [x] Admins can list audit rows at `GET /api/admin/audit`.
+- [ ] Encryption key rotation plan for `ENCRYPTION_MASTER_KEY`.
+
 ## Auth And Access Control
 
 - [x] Production startup fails unless `AUTH_REQUIRED=true`.
@@ -35,6 +51,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] All private user-data routes require signed-in auth.
 - [x] Admin routes allow only configured admin emails or user IDs.
 - [x] Unauthenticated admin dev bypass is disabled in production.
+- [x] Interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off in production.
 - [x] Admin UI is deployed separately and the API no longer serves admin frontend assets.
 - [ ] Add `https://admin.omiryn.com` to Supabase production redirect URLs.
 - [ ] If overriding `CORS_ALLOWED_ORIGINS`, include `https://admin.omiryn.com`.

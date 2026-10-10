@@ -118,3 +118,21 @@ Collects match quality feedback.
   "notes": "Conversation felt natural, but lifestyle may differ."
 }
 ```
+
+## Chat And Privacy Routes (built, October 2026)
+
+The sections above are the first sketch. These routes exist in `src/api/routes` today:
+
+| Route | What it does |
+| --- | --- |
+| `POST /api/agent/conversations` | Start a chat. `{"temporary": true}` starts a Temporary Chat (never in History, never learned from). |
+| `POST /api/agent/conversations/{id}/messages` | Send a message. Optional `reply_to_index` quotes an earlier message. |
+| `POST /api/agent/conversations/{id}/messages/deletion-impact` | `{"message_indexes": [...]}`: what deleting them also removes. |
+| `POST /api/agent/conversations/{id}/messages/delete` | Delete those messages and what was learned only from them. |
+| `DELETE /api/agent/conversations/{id}` | Delete a chat (also how the app ends a Temporary Chat). |
+| `POST /api/agent/conversations/{id}/messages/{index}/feedback` | Rate one of Omi's replies: `good` or `bad` with `reasons` (`too_much`, `bad_tone`, `wrong_memory`, `not_helpful`). Replaces an earlier rating. Refused in Temporary Chat. |
+| `DELETE /api/agent/conversations/{id}/messages/{index}/feedback` | Undo a rating. |
+| `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
+| `DELETE /api/me/account-data?confirm=true` | Delete the account's private data. |
+| `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
+

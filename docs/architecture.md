@@ -77,3 +77,6 @@ The first version should use a hybrid scoring system:
 - Sensitive fields should support field-level encryption.
 - Deleting an account should delete or anonymize derived data.
 - Match explanations should not expose private information without consent.
+
+What is built today (October 2026) is tracked in [production-security-checklist.md](production-security-checklist.md)
+under "User Privacy Controls" and "Retention And Audit", and in [progress.md](progress.md).
