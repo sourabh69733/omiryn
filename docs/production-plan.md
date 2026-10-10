@@ -1,6 +1,6 @@
 # Omiryn production plan
 
-Last updated 2 October 2026. What Omiryn needs to run end to end as a real product, and where each piece stands. [progress.md](progress.md) is the map of the agent and app; this page is the launch list.
+Last updated 10 October 2026. What Omiryn needs to run end to end as a real product, and where each piece stands. [progress.md](progress.md) is the map of the agent and app; this page is the launch list.
 
 Security and infra details live in [production-security-checklist.md](production-security-checklist.md) and [gcp-deployment.md](gcp-deployment.md); this page links to them instead of repeating them. [mvp-roadmap.md](mvp-roadmap.md) is from the dating era and is replaced by this page.
 
@@ -62,8 +62,10 @@ How the agent's background work and models behave on Cloud Run. Details: [progre
 
 | Item | Status | Notes |
 |---|---|---|
-| Privacy, Terms, Safety, AI disclosure, Contact pages | Done | Copy should be re-read against the friends-first product before launch. |
+| Privacy, Terms, Safety, AI disclosure, Contact pages | Partial | Copy should be re-read against the friends-first product before launch. The Privacy page does not yet mention delete messages, Clear Omi, Temporary Chat or the retention windows. |
 | Delete account and data | Done | Covers profile, chats, memories, photos, signals, logs. |
+| Delete messages, Clear Omi, Temporary Chat | Done | Message ⋯ menu and select mode; Clear Omi keeps the account; Temporary Chat is never learned from. |
+| Retention and audit log | Done | Daily cleanup of debug rows, finished jobs and stale temporary chats; `audit_events` for deletes, data requests and admin views. Windows in the security checklist. |
 | Data export | Partial | Requests are stored; the export file itself is not generated. |
 | Consent for sensitive vibe data (DPDP Act) | Missing | Values and beliefs are used for matching only with clear consent, never shown to matches. |
 | AI provider data terms | Missing | Confirm DeepInfra and the vibe check model do not store or train on API data, and say so on the Privacy page. |
