@@ -11,7 +11,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Safety page explains adult-only use, prohibited behavior, consent, reporting, and imported-context safety.
 - [x] AI Disclosure explains where AI is used, limitations, and user control.
 - [x] Contact page supports feedback, support, safety, privacy, correction, and deletion requests.
-- [ ] Update the Privacy Policy for the October 2026 controls (delete messages, Clear Omi, Temporary Chat, account delete), the retention windows below, and that chat text goes to AI model providers (DeepInfra, Mistral) to write replies.
+- [ ] (Drafted 2026-10-12 in `apps/landing/privacy.html`, needs owner review and a landing deploy) Update the Privacy Policy for the October 2026 controls (delete messages, Clear Omi, Temporary Chat, account delete), the retention windows below, and that chat text goes to AI model providers (DeepInfra, Mistral) to write replies.
 - [ ] Replace personal support email with a branded address such as `hello@omiryn.com`.
 - [ ] Legal review before wide public launch.
 
