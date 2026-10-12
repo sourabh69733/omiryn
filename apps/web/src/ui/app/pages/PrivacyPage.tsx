@@ -40,7 +40,8 @@ export function PrivacyPage({ onProfile, onMemories, onContact }: PrivacyPagePro
         </section>
         <section aria-labelledby="privacy-control-title">
           <h2 id="privacy-control-title">What can you control?</h2>
-          <p>You can review, correct, or delete Omi's memories, choose how each memory is used, delete a chat, or delete your account and data. Deleting a chat also removes memories that came only from it.</p>
+          <p>You can review, correct, or delete Omi's memories, choose how each memory is used, delete a message or a whole chat, clear everything Omi knows about you, or delete your account and data. Deleting messages or a chat also removes memories that came only from them.</p>
+          <p>For something you don't want remembered, start a Temporary Chat from the chat menu. Omi learns nothing from it, and it is deleted when you leave.</p>
           <p>You can request a copy of your data from Profile. Some copies, like backups, can take a little longer to be fully removed.</p>
           <button type="button" className="privacy-action" onClick={onMemories}>Review Omi's memories <ArrowRight aria-hidden="true" /></button>
         </section>
