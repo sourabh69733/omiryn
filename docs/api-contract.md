@@ -135,4 +135,5 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
 | `DELETE /api/me/account-data?confirm=true` | Delete the account's private data. |
 | `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
-
+| `GET /api/agent/settings/model` | Reply models on offer (name, strong point), the default and the user's pick. |
+| `PUT /api/agent/settings/model` | `{"model": "<id>"}` picks one; `{"model": null}` goes back to the default. |
