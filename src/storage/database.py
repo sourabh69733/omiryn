@@ -179,6 +179,7 @@ def _ensure_runtime_columns() -> None:
             "agent_style_source_id",
             "archived_at",
             "temporary",
+            "import_source_id",
         ),
     }
     with ENGINE.begin() as connection:

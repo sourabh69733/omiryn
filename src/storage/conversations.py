@@ -120,7 +120,11 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
         else:
             # Set once at creation; a chat never becomes temporary or stops being one.
             connection.execute(
-                agent_conversations.insert().values(**payload, temporary=bool(conversation.get("temporary")))
+                agent_conversations.insert().values(
+                    **payload,
+                    temporary=bool(conversation.get("temporary")),
+                    import_source_id=conversation.get("import_source_id"),
+                )
             )
 
 
@@ -156,6 +160,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "agent_style_source_id": row.get("agent_style_source_id"),
         "archived_at": _isoformat_utc(row.get("archived_at")),
         "temporary": bool(row.get("temporary")),
+        "import_source_id": row.get("import_source_id"),
         "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
 
@@ -231,6 +236,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "agent_style_source_id": row.get("agent_style_source_id"),
             "archived_at": _isoformat_utc(row.get("archived_at")),
             "temporary": bool(row.get("temporary")),
+            "import_source_id": row.get("import_source_id"),
             "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),
             "updated_at": _isoformat_utc(row["updated_at"]),
@@ -409,3 +415,30 @@ def delete_stale_temporary_conversations(user_id: str, hours: float = TEMPORARY_
             )
         ).scalars().all()
     return sum(1 for conversation_id in stale_ids if delete_conversation(conversation_id, owner_id))
+
+
+def delete_import_conversations(user_id: str, source_id: str) -> int:
+    """Delete the hidden chats made from one upload, and what Omi learned only from them."""
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        ids = connection.execute(
+            select(agent_conversations.c.id).where(
+                agent_conversations.c.user_id == owner_id,
+                agent_conversations.c.import_source_id == source_id,
+            )
+        ).scalars().all()
+    return sum(1 for conversation_id in ids if delete_conversation(conversation_id, owner_id))
+
+
+def import_conversation_ids(user_id: str) -> set[str]:
+    """IDs of this user's hidden chats made from uploads."""
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        return set(
+            connection.execute(
+                select(agent_conversations.c.id).where(
+                    agent_conversations.c.user_id == owner_id,
+                    agent_conversations.c.import_source_id.is_not(None),
+                )
+            ).scalars()
+        )

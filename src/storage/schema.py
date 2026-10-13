@@ -42,6 +42,9 @@ agent_conversations = Table(
     Column("archived_at", DateTime(timezone=True), nullable=True),
     # Temporary Chat: Omi reads what it knows but learns nothing here; deleted when ended.
     Column("temporary", Boolean, nullable=False, server_default="false"),
+    # Set on a hidden chat made from an upload (the context source it came from). Omi learns from
+    # it like any chat but never replies there; deleting the upload deletes it and what it taught.
+    Column("import_source_id", String, nullable=True),
     Column("messages_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
