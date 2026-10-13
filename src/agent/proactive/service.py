@@ -185,6 +185,7 @@ def _open_conversation(user_id: str, conversation_id: str) -> dict[str, Any] | N
         or conversation.get("status") != "active"
         or conversation.get("archived_at")
         or conversation.get("temporary")
+        or conversation.get("import_source_id")
     ):
         return None
     return conversation

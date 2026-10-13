@@ -366,7 +366,10 @@ def _load_admin_snapshot() -> dict[str, list[Any]]:
         return {
             "profile_rows": connection.execute(select(user_profiles)).mappings().all(),
             "conversation_rows": connection.execute(
-                select(agent_conversations).order_by(agent_conversations.c.updated_at.desc())
+                # Hidden chats made from uploads are not chats anyone had.
+                select(agent_conversations)
+                .where(agent_conversations.c.import_source_id.is_(None))
+                .order_by(agent_conversations.c.updated_at.desc())
             ).mappings().all(),
             "draft_rows": connection.execute(
                 select(draft_profiles).order_by(draft_profiles.c.updated_at.desc())
