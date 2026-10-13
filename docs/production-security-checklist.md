@@ -34,6 +34,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Clear Omi: delete every chat and everything Omi learned, keeping the account and profile (typed confirmation).
 - [x] Temporary Chat: not in History, never learned from, deleted when the user leaves it or after 24 hours idle.
 - [x] Reply ratings from the message menu, one per message, with undo.
+- [x] Uploads (WhatsApp export, notes): links, emails and phone numbers are masked before storage; only the user's own lines can become memories; other people's lines are sent to the background model as context. Deleting an upload deletes what it taught.
 
 ## Retention And Audit
 

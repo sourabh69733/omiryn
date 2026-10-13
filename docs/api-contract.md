@@ -137,3 +137,6 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
 | `GET /api/agent/settings/model` | Reply models on offer (name, strong point), the default and the user's pick. |
 | `PUT /api/agent/settings/model` | `{"model": "<id>"}` picks one; `{"model": null}` goes back to the default. |
+| `POST /api/agent/conversations/{id}/whatsapp-import` | Upload a WhatsApp export (`content`, `user_sender`, `title`). With `style_kind: user_style`, Omi learns from the user's own lines through a hidden chat. |
+| `POST /api/agent/conversations/{id}/context-sources` | Upload notes (`source_type: manual_notes` or `llm_profile`); Omi learns from them the same way. |
+| `DELETE /api/me/context-sources/{source_id}` | Delete an upload and what Omi learned only from it. |
