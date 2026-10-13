@@ -13,6 +13,8 @@ from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.data_points.extraction.whatsapp_rules import extract_whatsapp_data_points
 from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_style_summary
 from security.auth import CurrentUser, require_user
+from agent.cognition.background.uploads import learn_from_notes_upload, learn_from_whatsapp_upload
+from storage.conversations import delete_import_conversations
 from storage.audit_log import record_audit_event
 from storage import (
     delete_context_source,
@@ -38,6 +40,9 @@ from ..helpers import (
 )
 from ..models import ContextSourceAttachmentsUpdate, ContextSourceCreate, WhatsappChatImportCreate
 from ..usage_limits import CONTEXT_IMPORT_LIMIT, WHATSAPP_IMPORT_LIMIT, enforce_user_action_limit
+
+# Uploads written by or about the user; Omi learns memories, vibe and the user card from them.
+LEARNED_SOURCE_TYPES = {"llm_profile", "manual_notes"}
 
 router = APIRouter()
 
@@ -104,6 +109,11 @@ def create_conversation_context_source(
             "metadata": {"content_length": len(payload.content)},
         }
     )
+    if payload.source_type in LEARNED_SOURCE_TYPES:
+        try:
+            learn_from_notes_upload(_user_id(user), source["id"], payload.content)
+        except ValueError:
+            pass  # Nothing to learn from; the text is still saved as context.
     return _context_source_summary(source)
 
 
@@ -117,6 +127,7 @@ def delete_conversation_context_source(
     deleted = delete_user_context_source(source_id, user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Context source not found.")
+    delete_import_conversations(user.id, source_id)
     record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
@@ -128,6 +139,7 @@ def delete_me_context_source(
 ) -> dict[str, str]:
     if not delete_user_context_source(source_id, user.id):
         raise HTTPException(status_code=404, detail="Context source not found.")
+    delete_import_conversations(user.id, source_id)
     record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
@@ -286,6 +298,12 @@ def create_whatsapp_context_source(
         },
         _user_id(user),
     )
+    if payload.style_kind == "user_style":
+        # The user's own side of the chat teaches Omi about them; a friend's style import does not.
+        try:
+            learn_from_whatsapp_upload(_user_id(user), source["id"], payload.content, payload.user_sender)
+        except ValueError:
+            pass  # No lines of theirs to learn from; the style import still works.
     extractor_mode = data_point_extractor_mode()
     if user and extractor_mode == "rules":
         for point in extract_whatsapp_data_points(

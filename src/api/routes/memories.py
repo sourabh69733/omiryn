@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from security.auth import CurrentUser, require_user
+from storage.conversations import import_conversation_ids
 from storage.audit_log import record_audit_event
 from storage import (
     clear_omi_data,
@@ -32,8 +33,9 @@ async def get_me_memories(
         user.id,
         [str(memory["id"]) for memory in stored_memories],
     )
+    uploads = import_conversation_ids(user.id)
     memories = [
-        _user_memory_payload(memory, reviews.get(str(memory["id"])))
+        _user_memory_payload(memory, reviews.get(str(memory["id"])), uploads)
         for memory in stored_memories
     ]
     return {"count": len(memories), "memories": memories}
@@ -42,6 +44,7 @@ async def get_me_memories(
 def _user_memory_payload(
     memory: dict[str, object],
     feedback: dict[str, object] | None = None,
+    upload_chat_ids: set[str] | None = None,
 ) -> dict[str, object]:
     """Expose user-controlled memory fields without runtime implementation details."""
     fields = (
@@ -82,6 +85,9 @@ def _user_memory_payload(
         **{field: memory.get(field) for field in fields},
         "evidence": evidence,
         "feedback": latest_feedback,
+        # Learned only from an upload (shown as "from your upload").
+        "from_upload": bool(evidence)
+        and all(item.get("conversation_id") in (upload_chat_ids or set()) for item in evidence),
     }
 
 

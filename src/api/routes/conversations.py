@@ -192,8 +192,9 @@ async def list_agent_conversations(
         for source in _reusable_context_sources(list_user_context_sources(_user_id(user)))
     }
     for conversation in conversations:
-        if conversation.get("temporary"):
-            # A temporary chat lives only in the screen that opened it, never in History.
+        if conversation.get("temporary") or conversation.get("import_source_id"):
+            # A temporary chat lives only in the screen that opened it; a chat made from an
+            # upload is only for Omi to learn from. Neither shows in History.
             continue
         messages = conversation["messages"]
         context_sources = list_context_sources(conversation["id"], _user_id(user))
@@ -378,6 +379,8 @@ async def send_agent_message(
     conversation = _get_existing_conversation(conversation_id, user)
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
+    if conversation.import_source_id:
+        raise HTTPException(status_code=409, detail="This chat came from an upload; it can't be replied to.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     _remember_user_timezone(user, timezone_header)
     # A new message answers for any earlier one whose reply failed: the reply covers both.

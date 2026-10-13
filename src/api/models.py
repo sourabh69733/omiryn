@@ -171,6 +171,8 @@ class AgentConversation(BaseModel):
     agent_style_source_id: str | None = None
     # Temporary Chat: Omi learns nothing from it, and it is deleted when ended.
     temporary: bool = False
+    # A hidden chat made from an upload, for Omi to learn from; nobody writes in it.
+    import_source_id: str | None = None
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
