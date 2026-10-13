@@ -620,3 +620,78 @@ button.pf-link svg {
   min-height: 38px;
   border-radius: 999px;
 }
+
+/* Profile > Advanced: the reply model picker opens under its row. */
+.pf-model-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-model-current svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.15s ease;
+}
+
+.pf-model-current svg.is-open {
+  transform: rotate(180deg);
+}
+
+.pf-model-list {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 12px;
+}
+
+.pf-model-note {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+button.pf-model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+button.pf-model-option:hover {
+  background: rgba(124, 58, 237, 0.05);
+}
+
+button.pf-model-option.is-checked {
+  border-color: var(--brand-violet);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.pf-model-option span {
+  display: grid;
+  gap: 2px;
+}
+
+.pf-model-option strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pf-model-option small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pf-model-option svg {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--brand-violet);
+}
