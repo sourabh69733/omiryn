@@ -79,6 +79,8 @@ export type ProfileFact = {
 };
 export type CanonicalMemory = {
   id: string;
+  // Learned only from something the user uploaded.
+  from_upload?: boolean;
   kind: "semantic" | "episodic" | "relationship" | "procedural";
   purposes?: string[];
   key: string;

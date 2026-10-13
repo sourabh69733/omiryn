@@ -2,6 +2,7 @@ import { type FormEvent, type MouseEvent, useEffect, useState } from "react";
 import { CheckCircle2, MoreHorizontal, Quote, SlidersHorizontal } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { Notice, StateView } from "../StateView";
+import { MemoryUploads } from "../MemoryUploads";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
 import { canonicalMemoryCardTone, canonicalMemoryControls, memoryLabel, memoryValueLines, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
@@ -21,12 +22,6 @@ export function MemoriesPage() {
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [showImport, setShowImport] = useState(false);
-  const [importMode, setImportMode] = useState<"memory" | "whatsapp">("memory");
-  const [content, setContent] = useState("");
-  const [title, setTitle] = useState("Imported context");
-  const [userSender, setUserSender] = useState("");
-  const [saving, setSaving] = useState(false);
   const [savingFactId, setSavingFactId] = useState<string | null>(null);
   const [reviewItem, setReviewItem] = useState<ProfileFact | CanonicalMemory | null>(null);
   const [reviewMode, setReviewMode] = useState<"feedback" | "privacy" | null>(null);
@@ -83,38 +78,6 @@ export function MemoriesPage() {
   const showRejectedCanonical = visibleSectionCounts["rejected-canonical"] !== undefined;
   const showOldCanonical = visibleSectionCounts["old-canonical"] !== undefined;
   const oldIds = new Set(canonicalMemoryGroups.old.map((memory) => memory.id));
-  async function importContext(event: FormEvent) {
-    event.preventDefault();
-    if (content.trim().length < 20) return;
-    setSaving(true);
-    setError("");
-    try {
-      let listResponse = await apiFetch("/api/agent/conversations");
-      const list = await listResponse.json();
-      let conversationId = list.conversations?.[0]?.id as string | undefined;
-      if (!conversationId) {
-        const createResponse = await apiFetch("/api/agent/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_mode: "know_me" }) });
-        conversationId = (await createResponse.json()).id;
-      }
-      const endpoint = importMode === "whatsapp"
-        ? `/api/agent/conversations/${conversationId}/whatsapp-import`
-        : `/api/agent/conversations/${conversationId}/context-sources`;
-      const payload = importMode === "whatsapp"
-        ? { title: title.trim(), content: content.trim(), user_sender: userSender.trim() || null, style_kind: "user_style", style_name: title.trim() }
-        : { source_type: "llm_profile", title: title.trim(), content: content.trim() };
-      const response = await apiFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not save memory."));
-      trackAppEvent("memory_import_completed", { source_type: importMode === "whatsapp" ? "whatsapp_chat" : "manual_notes" }, { page: "memories" });
-      setContent(""); setShowImport(false); await load();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save memory."); }
-    finally { setSaving(false); }
-  }
-
-  async function removeSource(id: string) {
-    const response = await apiFetch(`/api/me/context-sources/${id}`, { method: "DELETE" });
-    if (response.ok) await load();
-  }
-
   async function patchFact(fact: ProfileFact, payload: Record<string, unknown>, eventName: Parameters<typeof trackAppEvent>[0]) {
     setSavingFactId(fact.id);
     setError("");
@@ -249,6 +212,7 @@ export function MemoriesPage() {
           {valueLines.length ? <><small>{label}</small>{valueLines.map((line) => <p key={line}>{line}</p>)}</> : <p>{label}</p>}
           {isOld ? <span className="mem-row-note">{oldMemoryNote(memory, canonicalMemories)}</span> : null}
           {memory.status && memory.status !== "active" && !isOld ? <span className="mem-flag">Not in use</span> : null}
+          {memory.from_upload ? <span className="mem-flag">From your upload</span> : null}
           {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="mem-flag">{sentenceCase(humanizeLabel(memory.sensitivity))}</span> : null}
         </div>
         <div className="history-row-menu mem-row-menu">
@@ -310,6 +274,7 @@ export function MemoriesPage() {
         </section>
       ) : null}
       {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
+      <MemoryUploads sources={sources} onChanged={load} />
       {canonicalMemoryGroups.old.length || canonicalMemoryGroups.rejected.length ? (
         <div className="mem-footer-links">
           {canonicalMemoryGroups.old.length ? <button className="mem-link is-muted" type="button" onClick={() => toggleSection("old-canonical", showOldCanonical)}>{showOldCanonical ? "Hide old memories" : `Old memories (${canonicalMemoryGroups.old.length})`}</button> : null}
