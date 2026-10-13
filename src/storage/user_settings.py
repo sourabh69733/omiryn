@@ -65,3 +65,28 @@ def set_user_timezone(user_id: str, timezone_name: str) -> str:
                 )
             )
     return timezone_name
+
+
+def get_reply_model(user_id: str) -> str | None:
+    """The reply model the user picked, or None for the app default."""
+    owner_id = _require_user_id(user_id, "agent user settings")
+    with ENGINE.begin() as connection:
+        return connection.execute(
+            select(agent_user_settings.c.reply_model).where(agent_user_settings.c.user_id == owner_id)
+        ).scalar_one_or_none()
+
+
+def set_reply_model(user_id: str, model: str | None) -> str | None:
+    """Store an already validated model ID; None goes back to the app default."""
+    owner_id = _require_user_id(user_id, "agent user settings")
+    with ENGINE.begin() as connection:
+        updated = connection.execute(
+            agent_user_settings.update()
+            .where(agent_user_settings.c.user_id == owner_id)
+            .values(reply_model=model, updated_at=func.now())
+        )
+        if not updated.rowcount:
+            connection.execute(
+                agent_user_settings.insert().values(user_id=owner_id, proactive_enabled=True, reply_model=model)
+            )
+    return model
