@@ -23,6 +23,9 @@ class MemoryMessage:
     initiated_by_companion: bool = False
     # The earlier message the user picked to answer: {"message_index", "text"}.
     replying_to: dict[str, Any] | None = None
+    # From a chat the user uploaded; role "other" lines carry the other person's name here.
+    imported: bool = False
+    speaker: str | None = None
 
 
 @dataclass(frozen=True)

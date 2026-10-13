@@ -116,6 +116,8 @@ def _memory_message(message: dict[str, object], *, scope: MemoryScope) -> Memory
         sent_at=message.get("created_at") if isinstance(message.get("created_at"), str) else None,
         initiated_by_companion=role == "assistant" and bool(message.get("proactive")),
         replying_to=_replying_to(message),
+        imported=bool(message.get("imported")),
+        speaker=str(message["speaker"]) if message.get("speaker") else None,
     )
 
 

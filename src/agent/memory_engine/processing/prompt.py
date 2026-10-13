@@ -89,6 +89,8 @@ def memory_batch_prompt(
                 **({"session": labels[message.message_index]} if message.message_index in labels else {}),
                 **({"initiated_by_companion": True} if message.initiated_by_companion else {}),
                 **({"replying_to": message.replying_to} if message.replying_to else {}),
+                **({"from_upload": True} if message.imported else {}),
+                **({"speaker": message.speaker} if message.speaker else {}),
             }
             for message in batch.messages
         ],
