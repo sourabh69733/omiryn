@@ -14,6 +14,7 @@ from agent.memory_engine.engine import (
 )
 from agent.cognition.background.idle import request_flush_now, schedule_idle_flush
 from agent.feedback.rating_memory import sync_rating_memories
+from agent.providers.shared.model_catalog import preferred_reply_model
 from agent.cognition.background.service import (
     run_background_cognition,
     should_schedule_background_cognition,
@@ -467,7 +468,7 @@ async def _reply_to_pending(
             user_text=str(pending["content"]),
             user_id=_user_id(user),
             user_profile=_agent_user_context(user),
-            model=conversation.agent_model,
+            model=preferred_reply_model(_user_id(user), conversation.agent_model),
             agent_mode=conversation.agent_mode,
             agent_tone=conversation.agent_tone,
             agent_name=conversation.agent_name,

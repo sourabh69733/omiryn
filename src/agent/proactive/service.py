@@ -14,6 +14,7 @@ from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import _provider_messages, generate_agent_reply
 from agent.providers.shared.messages import reply_window, summarized_through
+from agent.providers.shared.model_catalog import preferred_reply_model
 from agent.runtime.orchestrator import _visible_companion_reply
 from agent.shared.clock import utc_now
 from agent.shared.timeline import day_part, humanize_gap, parse_time, user_zone
@@ -389,7 +390,7 @@ async def _initiative_text(
         user_text=user_text,
         user_id=user_id,
         user_profile=get_user_profile(user_id),
-        model=conversation.get("agent_model"),
+        model=preferred_reply_model(user_id, conversation.get("agent_model")),
         agent_tone=conversation.get("agent_tone") or "auto",
         agent_name=conversation.get("agent_name"),
         style_source_id=conversation.get("agent_style_source_id"),
@@ -409,7 +410,7 @@ async def _initiative_text(
             {"role": "user", "content": cue},
         ],
         conversation_id=conversation["id"],
-        model=conversation.get("agent_model"),
+        model=preferred_reply_model(user_id, conversation.get("agent_model")),
         agent_mode=conversation.get("agent_mode") or "know_me",
         agent_tone=conversation.get("agent_tone") or "auto",
         agent_name=conversation.get("agent_name"),
