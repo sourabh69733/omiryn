@@ -140,7 +140,6 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
   const pickPhoto = (slot: number) => { setPhotoSlot(slot); setPhotoStatus(""); photoInput.current?.click(); };
   return (
     <section className="screen profile-screen pf">
-      <nav className="pf-tabs" aria-label="Profile sections"><span aria-current="page">Profile</span><button type="button" onClick={onPrivacy}>Privacy</button></nav>
       <input ref={photoInput} className="profile-photo-input" type="file" accept="image/*" onChange={(event) => void upload(event.target.files?.[0])} />
       <article className="pf-card">
         <button type="button" className="pf-portrait" onClick={() => pickPhoto(0)} disabled={uploadingPhotoSlot !== null} aria-label={photos[0] ? "Change main photo" : "Add main photo"}>

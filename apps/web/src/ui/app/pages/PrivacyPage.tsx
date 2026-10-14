@@ -1,5 +1,5 @@
 // Plain-language account privacy guide. It describes current behavior, not planned controls.
-import { ArrowRight, Brain, LockKeyhole, MessageCircle } from "lucide-react";
+import { ArrowRight, Brain, ChevronLeft, LockKeyhole, MessageCircle } from "lucide-react";
 
 type PrivacyPageProps = {
   onProfile: () => void;
@@ -10,7 +10,7 @@ type PrivacyPageProps = {
 export function PrivacyPage({ onProfile, onMemories, onContact }: PrivacyPageProps) {
   return (
     <section className="screen privacy-screen">
-      <nav className="pf-tabs" aria-label="Profile sections"><button type="button" onClick={onProfile}>Profile</button><span aria-current="page">Privacy</span></nav>
+      <button type="button" className="pf-back" onClick={onProfile}><ChevronLeft aria-hidden="true" />Profile</button>
 
       <header className="privacy-intro">
         <h1>Your privacy with Omi</h1>
