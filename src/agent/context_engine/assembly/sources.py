@@ -22,6 +22,7 @@ from agent.memory_engine.memories import (
     BROAD_RECALL_MEMORY_LIMIT,
     retrieve_agent_memories_for_reply,
 )
+from agent.memory_engine.memories.focus import focus_state
 from agent.memory_engine.memories.retrieval import might_fit_memories
 from agent.memory_engine.behavior.retrieval import retrieve_agent_behavior_rules_for_context
 from agent.memory_engine.data_points.retrieval.profile_facts import (
@@ -772,6 +773,11 @@ def _memory_time_note(memory: dict[str, Any], zone: Any, now: datetime | None = 
         notes.append(f"{'happens' if upcoming else 'happened'} {dated(event)}")
     if valid_until := parse_time(memory.get("valid_until")):
         notes.append(f"valid until {dated(valid_until)}")
+    state = focus_state(memory, now or utc_now())
+    if state == "current":
+        notes.append("a current focus of theirs")
+    elif state == "fading":
+        notes.append("a focus they have not mentioned for weeks: it may be over, so do not assume it is still going or ask about it")
     return f" ({'; '.join(notes)})" if notes else ""
 
 

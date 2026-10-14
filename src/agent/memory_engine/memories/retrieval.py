@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from agent.shared.clock import utc_now
+from .focus import focus_state
 from .models import MemoryKind, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import (
     aware_datetime,
@@ -121,6 +122,8 @@ def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:
         and MemoryUse.REPLY_CONTEXT.value in set(memory.get("allowed_uses") or [])
         and memory.get("sensitivity") != MemorySensitivity.HIGHLY_SENSITIVE.value
         and memory.get("kind") in _KIND_LIMITS
+        # An archived focus is history: not used in replies.
+        and focus_state(memory, now) != "archived"
     )
 
 
@@ -227,6 +230,8 @@ def might_fit_memories(
         for memory in list_agent_memories(user_id)
         if _reply_eligible(memory, current_time)
         and memory.get("kind") != MemoryKind.PROCEDURAL.value  # these are in how-to-talk
+        # A fading focus is not offered as something to bring up.
+        and focus_state(memory, current_time) != "fading"
         and str(memory.get("id")) not in exclude_ids
     ]
 
