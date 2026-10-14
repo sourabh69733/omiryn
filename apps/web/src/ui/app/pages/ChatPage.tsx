@@ -28,7 +28,8 @@ const MESSAGE_MENU_HEIGHT = 260;
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
 
-export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void }) {
+// Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
+export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -383,6 +384,11 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     });
   }
 
+  // Coming back to the chat shows its latest lines, including a reply that landed while away.
+  useLayoutEffect(() => {
+    if (active) syncChatToBottomAfterRender();
+  }, [active]);
+
   useLayoutEffect(() => {
     const messages = conversation?.messages ?? [];
     // A newly opened conversation, or a rolled-back one, shows everything at once.
@@ -416,8 +422,9 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   }, [sending]);
 
   useEffect(() => {
-    if (conversation) setSeen((current) => markSeen(current, conversation.id, conversation.messages.length));
-  }, [conversation?.id, conversation?.messages.length]);
+    // A reply that lands while another page is open stays unread until the chat is shown.
+    if (conversation && active) setSeen((current) => markSeen(current, conversation.id, conversation.messages.length));
+  }, [conversation?.id, conversation?.messages.length, active]);
 
   useEffect(() => saveSeen(seen), [seen]);
 
@@ -1026,7 +1033,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const composerBlocked = Boolean(composerLimit && (!composerLimit.until || pauseRemainingSeconds > 0));
 
   useEffect(() => {
-    if (!conversation || composerBlocked) return;
+    if (!conversation || composerBlocked || !active) return;
     const focusComposerOnType = (event: KeyboardEvent) => {
       // A plain, unmodified printable character typed anywhere on the page
       // should land in the composer instead of doing nothing.
@@ -1039,7 +1046,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
     };
     window.addEventListener("keydown", focusComposerOnType);
     return () => window.removeEventListener("keydown", focusComposerOnType);
-  }, [conversation, composerBlocked]);
+  }, [conversation, composerBlocked, active]);
 
   // Typing in the composer re-renders this page on every key; the message list and History only
   // rebuild when what they show changes, so long chats stay smooth to type in.
@@ -1155,7 +1162,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
             })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
 
   return (
-    <section className="screen interview-screen legacy-chat-screen">
+    <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
       <div className="chat-workspace">
         <section className={`chat-card agentic-chat ${loading || !conversation ? "conversation-empty" : ""}`}>
           {selecting ? (

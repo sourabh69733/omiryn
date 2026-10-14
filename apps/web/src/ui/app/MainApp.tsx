@@ -160,7 +160,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </aside>
       <main className="omi-main">
-        {page === "chat" ? <ChatPage initialConversationId={initialConversationId} userAvatar={profileAvatar} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} /> : null}
+        <ChatPage active={page === "chat"} initialConversationId={initialConversationId} userAvatar={profileAvatar} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
