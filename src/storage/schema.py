@@ -172,6 +172,8 @@ agent_memories = Table(
     Column("occurred_at", DateTime(timezone=True), nullable=True),
     Column("valid_from", DateTime(timezone=True), nullable=True),
     Column("valid_until", DateTime(timezone=True), nullable=True),
+    # Something the user is into for a while (studying a topic, a project); it fades when not mentioned.
+    Column("focus", Boolean, nullable=False, server_default="false"),
     Column("last_reinforced_at", DateTime(timezone=True), nullable=True),
     Column("supersedes_memory_id", String, nullable=True),
     Column("extractor", String, nullable=True),

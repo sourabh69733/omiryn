@@ -97,6 +97,8 @@ class MemoryRecord:
     occurred_at: datetime | None = None
     valid_from: datetime | None = None
     valid_until: datetime | None = None
+    # A current focus: fresh while mentioned, fading after weeks of silence (see focus.py).
+    focus: bool = False
     last_reinforced_at: datetime | None = None
     supersedes_memory_id: str | None = None
     extractor: str | None = None

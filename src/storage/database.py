@@ -140,7 +140,7 @@ def _reset_db_allowed(url: str) -> bool:
     return "test" in (parsed.database or "").lower()
 
 
-_BOOLEAN_COLUMNS = {"used_for_chat_context", "temporary"}
+_BOOLEAN_COLUMNS = {"used_for_chat_context", "temporary", "focus"}
 
 
 def _ensure_runtime_columns() -> None:
@@ -167,7 +167,7 @@ def _ensure_runtime_columns() -> None:
         "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
         "agent_memory_reviews": ("reasons", "comment"),
         "agent_user_settings": ("timezone", "reply_model"),
-        "agent_memories": ("statement",),
+        "agent_memories": ("statement", "focus"),
         "agent_conversations": (
             "user_id",
             "agent_provider",
