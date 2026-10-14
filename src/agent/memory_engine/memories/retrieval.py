@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from agent.shared.clock import utc_now
-from .focus import focus_state
+from agent.shared.timeline import session_gap
+
+from .focus import focus_state, last_mentioned
 from .models import MemoryKind, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import (
     aware_datetime,
@@ -207,6 +209,11 @@ MIGHT_FIT_LIMIT = 3
 UPCOMING_WINDOW = timedelta(days=7)
 
 
+def _said_this_session(memory: dict[str, Any], now: datetime) -> bool:
+    mentioned = last_mentioned(memory)
+    return mentioned is not None and now - mentioned < session_gap()
+
+
 def might_fit_memories(
     user_id: str,
     *,
@@ -232,6 +239,8 @@ def might_fit_memories(
         and memory.get("kind") != MemoryKind.PROCEDURAL.value  # these are in how-to-talk
         # A fading focus is not offered as something to bring up.
         and focus_state(memory, current_time) != "fading"
+        # Nor is something the user said in this session: they just told it, nothing new to raise.
+        and not _said_this_session(memory, current_time)
         and str(memory.get("id")) not in exclude_ids
     ]
 

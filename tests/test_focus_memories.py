@@ -84,6 +84,11 @@ class FocusStorageTest(unittest.TestCase):
         self.assertIn(fresh, offered)
         self.assertNotIn(fading, offered)
 
+    def test_something_said_this_session_is_not_offered_again(self) -> None:
+        just_said = self._add(0.05)  # about an hour ago
+        offered = {memory["id"] for memory in might_fit_memories(USER_ID, exclude_ids=set(), recently_offered=set(), now=NOW)}
+        self.assertNotIn(just_said, offered)
+
 
 if __name__ == "__main__":
     unittest.main()
