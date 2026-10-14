@@ -8,7 +8,8 @@ asks the real reply model one neutral question. Checked in code, no AI judge:
   (the control case, so closing is not just deleting everything);
 - card: the user card no longer says it is current;
 - left_open: the newest session note does not keep it open;
-- reply: the reply to a neutral question does not bring the subject up.
+- reply: the reply to a neutral question does not bring the subject up;
+- greeting: when the user comes back hours later, Omi's own greeting does not bring it up.
 """
 
 from __future__ import annotations
@@ -21,10 +22,12 @@ from uuid import uuid4
 
 from agent.cognition.background.service import run_background_cognition
 from agent.memory_engine.processing.service import get_processing_state
+from agent.proactive.service import greet_on_return
 from agent.runtime.orchestrator import run_agent_turn
 from agent.shared.clock import utc_now
 from storage import (
     create_agent_memory,
+    get_conversation,
     get_user_card,
     list_agent_memories,
     save_conversation,
@@ -131,6 +134,7 @@ class ClosureResult:
     card: str
     left_open: str
     reply: str
+    greeting: str
     errors: tuple[str, ...]
 
 
@@ -200,8 +204,11 @@ async def run_closure_case(case: ClosureCase, *, check_reply: bool = True) -> Cl
     ):
         problems.append("no how-to-talk memory about not bringing it up")
 
-    reply = ""
+    reply = greeting = ""
     if check_reply and case.closed:
+        greeting = await _greeting(conversation_id, user_id)
+        if re.search(SUBJECT, greeting.lower()):
+            problems.append("the return greeting brought it up again")
         reply = await _reply(conversation_id, user_id, messages)
         if re.search(SUBJECT, reply.lower()):
             problems.append("the reply brought it up again")
@@ -215,8 +222,17 @@ async def run_closure_case(case: ClosureCase, *, check_reply: bool = True) -> Cl
         card=card,
         left_open=left_open,
         reply=reply,
+        greeting=greeting,
         errors=tuple(errors),
     )
+
+
+async def _greeting(conversation_id: str, user_id: str) -> str:
+    """The greeting Omi sends on its own when the user comes back after a long gap."""
+    before = len(get_conversation(conversation_id, user_id)["messages"])
+    await greet_on_return(user_id, conversation_id, utc_now() + timedelta(hours=9))
+    after = get_conversation(conversation_id, user_id)["messages"]
+    return " ".join(str(message.get("content") or "") for message in after[before:])
 
 
 async def _reply(conversation_id: str, user_id: str, messages: list[dict[str, Any]]) -> str:

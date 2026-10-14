@@ -40,7 +40,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 async def _run(args: argparse.Namespace) -> int:
-    os.environ.update({"AGENT_PIPELINE_VERSION": "v3", "AGENT_PROVIDER": "deepinfra", "MEMORY_EMBEDDING_MODEL": "off"})
+    os.environ.update({"AGENT_PIPELINE_VERSION": "v3", "AGENT_PROVIDER": "deepinfra", "MEMORY_EMBEDDING_MODEL": "off", "PROACTIVE_MESSAGING_ENABLED": "true"})
     background = os.environ.get("MEMORY_BACKGROUND_V2_MODEL") or "chat model"
     reply_model = os.environ.get("DEEPINFRA_MODEL") or "default"
     cases = [case for case in CLOSURE_CASES if not args.case_ids or case.id in args.case_ids]
@@ -67,6 +67,8 @@ async def _run(args: argparse.Namespace) -> int:
             lines.extend(f"  - memory {memory}" for memory in result.memories)
             lines.append(f"  - card: {result.card.replace(chr(10), ' | ')}")
             lines.append(f"  - left open: {result.left_open or '(nothing)'}")
+            if result.greeting:
+                lines.append(f"  - greeting: {result.greeting}")
             if result.reply:
                 lines.append(f"  - reply: {result.reply}")
         lines.append("")
