@@ -27,6 +27,7 @@ class MemoryAddProposal:
     valid_from: datetime | None = None
     valid_until: datetime | None = None
     statement: str | None = None
+    focus: bool = False
 
 
 @dataclass(frozen=True)

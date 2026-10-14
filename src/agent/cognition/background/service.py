@@ -768,6 +768,7 @@ def _existing_memory_context(
                 "supersedes_memory_id": memory.get("supersedes_memory_id"),
                 "updated_at": memory["updated_at"],
                 "statement": memory.get("statement"),
+                **({"focus": True} if memory.get("focus") else {}),
                 "history": memory_history(memory, zone),
             }
             for memory in memories
@@ -879,6 +880,7 @@ def _add_operation_dict(operation: MemoryAddProposal, name: str) -> dict[str, An
         "sensitivity": operation.sensitivity.value,
         "confidence": operation.confidence,
         "importance": operation.importance,
+        "focus": operation.focus,
         "evidence_message_indexes": list(operation.evidence_message_indexes),
     }
 

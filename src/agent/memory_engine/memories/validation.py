@@ -40,6 +40,7 @@ _ADD_FIELDS = {
     "occurred_at",
     "valid_from",
     "valid_until",
+    "focus",
     "evidence_message_indexes",
 }
 _TARGET_FIELDS = {"operation", "target_memory_id", "evidence_message_indexes"}
@@ -248,6 +249,7 @@ def _validate_add(
         valid_from=valid_from,
         valid_until=valid_until,
         statement=statement,
+        focus=raw.get("focus") is True,
     ), []
 
 
