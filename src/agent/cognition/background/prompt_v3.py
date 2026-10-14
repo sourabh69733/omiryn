@@ -118,8 +118,10 @@ Session log rules:
 - sessions lists the chat sessions in this batch; code splits them at long silences and each
   message carries its session.
 - For every session with has_new_messages=true, return one session_log entry. gist: one or two
-  plain sentences on what the session was about, with names and specifics. unfinished: what was
-  left open when it stopped (anything half done or awaiting an answer), or null.
+  plain sentences on what the session was about, with names and specifics. unfinished: what the
+  user left half done that they would want picked up (a story stopped midway, a question to them
+  they have not answered yet), or null. Never the companion's own follow-up ideas or topics to
+  bring up again, and null when the user finished, closed or waved off the subject.
 - When previous_handoff.session_log has an entry for the same session, extend it.
 - A message with initiated_by_companion=true was sent first by the companion. If the user did not
   answer it, it was not what the session was about.
