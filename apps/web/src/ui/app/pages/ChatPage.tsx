@@ -26,10 +26,11 @@ const CHAT_INPUT_MAX_LENGTH = 800;
 const MESSAGE_MENU_HEIGHT = 260;
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
-export type OmiStatus = { typing: boolean; preview: string; viewingEarlier: boolean };
+// `away`: an earlier chat or a temporary chat is open, so the Omi row is not the open chat.
+export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean }) {
+export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0 }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -487,8 +488,18 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const omiTyping = Boolean(omiId && (sendingIds.has(omiId) || typingConversationId === omiId || (conversation?.id === omiId && typingVisible)));
   const lastShown = conversation?.id === omiId ? [...visibleMessages].reverse().find((message) => message.content)?.content || "" : "";
   useEffect(() => {
-    onOmiStatus?.({ typing: omiTyping, preview: lastShown, viewingEarlier });
-  }, [omiTyping, lastShown, viewingEarlier]);
+    onOmiStatus?.({ typing: omiTyping, preview: lastShown, away: viewingEarlier || temporary });
+  }, [omiTyping, lastShown, viewingEarlier, temporary]);
+
+  // The Omi row in the rail leaves an earlier or temporary chat for the main Omi chat.
+  useEffect(() => {
+    if (backToOmi && conversation && conversation.id !== omiId) endTemporaryChat();
+  }, [backToOmi]);
+
+  // A temporary chat ends when the user goes to another page, like leaving it any other way.
+  useEffect(() => {
+    if (!active && temporary) endTemporaryChat();
+  }, [active]);
 
   useLayoutEffect(() => {
     if (!shouldStickToBottomRef.current) return;

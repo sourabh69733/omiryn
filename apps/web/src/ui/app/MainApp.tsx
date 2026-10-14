@@ -25,7 +25,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const isMobile = useIsMobile();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mobileNavRef = useRef<HTMLElement | null>(null);
-  const [omiStatus, setOmiStatus] = useState<OmiStatus>({ typing: false, preview: "", viewingEarlier: false });
+  const [omiStatus, setOmiStatus] = useState<OmiStatus>({ typing: false, preview: "", away: false });
+  const [backToOmi, setBackToOmi] = useState(0);
 
   const closeMobileNavigation = () => {
     setMobileNavOpen(false);
@@ -113,9 +114,13 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
 
   const navItems = [["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const;
   const chatOpenOnMobile = isMobile && page === "chat";
-  const openOmi = () => navigate("chat");
+  // Already in chat but on an earlier or temporary chat: go back to the main Omi chat.
+  const openOmi = () => {
+    if (page === "chat" && omiStatus.away) setBackToOmi((count) => count + 1);
+    navigate("chat");
+  };
   const omiRow = (
-    <button type="button" className={`omi-contact ${page === "chat" && !omiStatus.viewingEarlier ? "is-active" : ""}`} onClick={openOmi}>
+    <button type="button" className={`omi-contact ${page === "chat" && !omiStatus.away ? "is-active" : ""}`} onClick={openOmi}>
       <span className="omi-contact-avatar"><AgentOrb state={omiStatus.typing ? "thinking" : "idle"} /></span>
       <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : omiStatus.preview ? <small>{omiStatus.preview}</small> : null}</span>
     </button>
@@ -160,7 +165,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </aside>
       <main className="omi-main">
-        <ChatPage active={page === "chat"} initialConversationId={initialConversationId} userAvatar={profileAvatar} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
+        <ChatPage active={page === "chat"} backToOmi={backToOmi} initialConversationId={initialConversationId} userAvatar={profileAvatar} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
