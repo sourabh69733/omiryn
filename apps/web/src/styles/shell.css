@@ -1081,3 +1081,149 @@ button.omi-drawer-close:hover {
   border-radius: 10px;
   font: inherit;
 }
+
+/* Composer tools: 📎 share a chat, then emoji. */
+.omi-main .agentic-chat .composer {
+  grid-template-columns: auto minmax(0, 1fr) 42px;
+}
+
+.composer-tools {
+  display: flex;
+  align-items: end;
+  align-self: end;
+}
+
+.chat-upload {
+  position: relative;
+}
+
+.agentic-chat .composer button.chat-upload-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: #77718d;
+}
+
+.agentic-chat .composer button.chat-upload-button:hover {
+  background: #f0edf6;
+  color: #5f5872;
+}
+
+.chat-upload-button svg {
+  width: 21px;
+  height: 21px;
+}
+
+.chat-upload-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  z-index: 25;
+  display: grid;
+  gap: 10px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(38, 53, 59, 0.16);
+}
+
+.chat-upload-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-upload-head strong {
+  font-size: 15px;
+}
+
+.chat-upload-head button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-height: 0;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+
+.chat-upload-head svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chat-upload-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-upload-names button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chat-upload-names button.is-active {
+  border-color: var(--brand-violet);
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--brand-violet);
+}
+
+.chat-upload-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.chat-upload-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.chat-upload-share {
+  min-height: 40px;
+  border-radius: 999px;
+}
+
+.omi-readonly-bar.upload-note {
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
+  padding: 8px 8px 8px 14px;
+}
+
+.omi-readonly-bar.upload-note button.upload-note-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-height: 0;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+
+.upload-note-close svg {
+  width: 15px;
+  height: 15px;
+}
