@@ -87,6 +87,42 @@ CLOSURE_CASES: tuple[ClosureCase, ...] = (
 
 
 @dataclass(frozen=True)
+class FocusResult:
+    passed: bool
+    memories: tuple[str, ...]
+    card: str
+
+
+async def run_focus_marking_case() -> FocusResult:
+    """A new study topic should be saved as a focus and stay out of the user card."""
+    user_id = f"focus-mark-{uuid4().hex[:8]}"
+    set_user_timezone(user_id, TIMEZONE)
+    conversation_id = f"{user_id}-chat"
+    start = utc_now() - timedelta(minutes=10)
+    texts = [
+        ("user", "I live in Jaipur and work as a backend dev"),
+        ("assistant", "Nice! Jaipur se backend dev, solid combo."),
+        ("user", "these days I'm studying transformers in ML, attention is tough but fun"),
+        ("assistant", "Attention pehle confusing lagta hai, phir click karta hai."),
+    ]
+    messages = [
+        {"role": role, "content": text, "created_at": (start + timedelta(minutes=i)).isoformat()}
+        for i, (role, text) in enumerate(texts)
+    ]
+    save_conversation({"id": conversation_id, "status": "active", "messages": messages}, user_id)
+    await run_background_cognition(conversation_id, user_id, messages)
+    active = [memory for memory in list_agent_memories(user_id) if memory["status"] == "active"]
+    card = get_user_card(user_id) or ""
+    study = [memory for memory in active if re.search(SUBJECT, _text(memory))]
+    passed = bool(study) and all(memory.get("focus") for memory in study) and not re.search(SUBJECT, card.lower())
+    return FocusResult(
+        passed=passed,
+        memories=tuple(f"[{'focus' if memory.get('focus') else 'lasting'}] {_text(memory)}" for memory in active),
+        card=card,
+    )
+
+
+@dataclass(frozen=True)
 class ClosureResult:
     case: ClosureCase
     passed: bool
@@ -204,4 +240,4 @@ def _text(memory: dict[str, Any]) -> str:
     return f"{memory.get('statement') or ''} {memory.get('value') or ''}".lower()
 
 
-__all__ = ["CLOSURE_CASES", "ClosureCase", "ClosureResult", "run_closure_case"]
+__all__ = ["CLOSURE_CASES", "ClosureCase", "ClosureResult", "FocusResult", "run_closure_case", "run_focus_marking_case"]

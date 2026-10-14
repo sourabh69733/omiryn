@@ -24,7 +24,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or "sqlite:///./data/omiryn_topic_closure_test.db"
 
-from agent.evals.memory.closure import CLOSURE_CASES, run_closure_case  # noqa: E402
+from agent.evals.memory.closure import CLOSURE_CASES, run_closure_case, run_focus_marking_case  # noqa: E402
 from storage import reset_db  # noqa: E402
 
 _PROVIDER_TRIES = 3
@@ -69,6 +69,18 @@ async def _run(args: argparse.Namespace) -> int:
             lines.append(f"  - left open: {result.left_open or '(nothing)'}")
             if result.reply:
                 lines.append(f"  - reply: {result.reply}")
+        lines.append("")
+    if not args.case_ids or "focus_marked" in args.case_ids:
+        marks = [await run_focus_marking_case() for _ in range(args.runs)]
+        wins = sum(mark.passed for mark in marks)
+        total += len(marks)
+        passed += wins
+        print(f"focus_marked: {wins}/{len(marks)} passed")
+        lines += [f"## focus_marked: {wins}/{len(marks)} passed", "", "A new study topic is saved as a focus and kept out of the user card.", ""]
+        for number, mark in enumerate(marks, 1):
+            lines.append(f"- Run {number}: {'PASS' if mark.passed else 'FAIL'}")
+            lines.extend(f"  - memory {memory}" for memory in mark.memories)
+            lines.append(f"  - card: {mark.card.replace(chr(10), ' | ')}")
         lines.append("")
     summary = f"Total: {passed}/{total} passed"
     print(summary)
