@@ -18,6 +18,7 @@ add creates a new memory:
   "occurred_at": "timezone-aware ISO-8601 timestamp or null",
   "valid_from": "timezone-aware ISO-8601 timestamp or null",
   "valid_until": "timezone-aware ISO-8601 timestamp or null",
+  "focus": false,
   "evidence_message_indexes": [0]
 }
 
@@ -73,6 +74,13 @@ V3 memory rules:
   "not doing that anymore"), it changed: supersede the memory with what is true now, or retract it when
   nothing durable is left. If they also want it dropped from conversation, add a procedural memory
   saying so.
+- focus is true for something the user is into for a while that will pass: studying a topic,
+  preparing for an exam, a project, training for an event, a phase. It is false for settled facts
+  (where they live, their job, the people in their life), lasting interests and preferences, and
+  one-off events. Write a focus as what they are doing ("Studying <subject>."), without "currently";
+  code tracks how fresh it is from when they last mentioned it. When they bring up an active focus
+  again, reinforce it. When they say it is over, supersede it with what is true now and focus
+  false ("Finished studying <subject> in <month year>."), or retract it.
 - Retract only when the user invalidates a memory without supplying a corrected replacement.
 - existing_memories with targetable=false are rejected or superseded history. Never target their IDs.
   Do not recreate their meaning from an incidental repeat. Add a fresh memory only when new eligible user

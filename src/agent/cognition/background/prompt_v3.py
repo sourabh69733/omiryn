@@ -141,6 +141,8 @@ User card rules:
 - One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, work or
   study, key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.
+- No current focus (what they are studying or working on these days): it lives in memories with
+  focus true, where it fades when they stop mentioning it.
 - Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
   financial details, no relative time words. Replace a line when the user corrects it. When they say
   something ended or changed, rewrite the whole line, label included, as it is now
