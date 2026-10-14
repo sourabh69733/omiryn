@@ -124,13 +124,10 @@ class SessionLogFlowTest(unittest.TestCase):
             sources = build_reply_context_sources(CONVERSATION_ID, None, "what were we doing last time?", USER_ID)
         block = next(s["content"] for s in sources if s["source_type"] == "recent_sessions")
         self.assertIn("- Wednesday 23 Sep, 3:30 pm (ended 2 days ago): Talked about a Goa trip", block)
-        # An older session's loose end is settled by the later session; only the latest one shows.
         self.assertNotIn("booked the Goa tickets", block)
-        self.assertIn(
-            "- Friday 25 Sep, 5:28 pm to 9:16 pm (ended 14 hours ago): Started a 20 questions game. "
-            "Left open: the game;",
-            block,
-        )
+        self.assertIn("- Friday 25 Sep, 5:28 pm to 9:16 pm (ended 14 hours ago): Started a 20 questions game.", block)
+        # The game itself stays in the chat history (see ReturnHistoryTest); the note is not shown.
+        self.assertNotIn("Left open", block)
 
 
 class ReturnHistoryTest(unittest.TestCase):

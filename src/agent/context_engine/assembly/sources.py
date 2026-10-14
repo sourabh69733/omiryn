@@ -419,7 +419,7 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
     now = utc_now()
     zone = user_zone(get_user_timezone(user_id))
     lines = ["Your recent chat sessions with the user, oldest first (start to end time):"]
-    for position, entry in enumerate(entries):
+    for entry in entries:
         started, ended = parse_time(entry.started_at), parse_time(entry.ended_at)
         if started is None:
             continue
@@ -427,10 +427,9 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
         span = _session_span(started, ended, zone)
         when = "this session so far" if current else f"ended {humanize_gap(now - (ended or started))} ago"
         line = f"- {span} ({when}): {entry.gist}"
-        # Only the latest session can still have something open: a later session either picked
-        # an older loose end up or let it go, and older notes would bring settled topics back.
-        if entry.unfinished and position == len(entries) - 1:
-            line += f" Left open: {entry.unfinished}"
+        # No "left open" note: the model kept filling it with its own follow-ups ("awaiting input
+        # on <subject>"), which brought settled topics back. Real loose ends reach the reply anyway:
+        # promises (self notes), open questions, threads, and the last session's tail in the history.
         lines.append(line)
     return [
         {
