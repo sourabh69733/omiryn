@@ -14,6 +14,7 @@ import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCoun
 import { isFailedMessage } from "../messageDelivery";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
+import { temporaryName } from "../temporaryName";
 import { canShowUsage, pathForPage } from "../appUtils";
 import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
@@ -71,6 +72,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   // The temporary chat on screen, deleted once the user leaves it.
   const temporaryIdRef = useRef<string | null>(null);
+  // Picked fresh for each Temporary Chat and shown as its title.
+  const [temporaryTitle, setTemporaryTitle] = useState("");
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
@@ -278,6 +281,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not start a temporary chat."));
       const created = (await response.json()) as Conversation;
+      setTemporaryTitle(temporaryName());
       ++openRequestRef.current;
       setSelectedId(created.id);
       setDrawer(null);
@@ -1186,7 +1190,11 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           ) : (
           <div className="card-heading">
             {onOpenNavigation ? <button type="button" className="omi-back" onClick={onOpenNavigation} aria-label="Open navigation"><Menu aria-hidden="true" /></button> : null}
-            <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div>{temporary ? <span className="temporary-pill"><MessageCircleDashed aria-hidden="true" />Temporary</span> : null}</div>
+            {temporary ? (
+              <div className="chat-title-lockup is-temporary"><span className="temporary-mark"><MessageCircleDashed aria-hidden="true" /></span><div><h2>{temporaryTitle || "Temporary chat"}</h2><small>Temporary chat</small></div></div>
+            ) : (
+              <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div></div>
+            )}
             <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
               <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
                 <MoreHorizontal aria-hidden="true" />{earlierUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in an earlier chat" /> : null}
@@ -1205,7 +1213,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
             {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
             {!loading && !conversation ? <StateView kind="empty" title="Say hi to Omi" detail="Your chat with Omi will appear here."><button type="button" onClick={() => void createConversation()}>Start chatting</button></StateView> : null}
-            {!loading && conversation ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Omi learns from your chats to find you friends. Don't share passwords or IDs.</p> : null}
+            {!loading && conversation && !temporary ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Omi learns from your chats to find you friends. Don't share passwords or IDs.</p> : null}
             {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}

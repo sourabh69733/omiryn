@@ -419,21 +419,28 @@ button.omi-menu-button[aria-expanded="true"] {
   font-size: 13px;
 }
 
-.temporary-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px dashed var(--line);
-  border-radius: 999px;
+/* Temporary Chat header: a dashed chat icon and its own name, so it never reads as the main Omi chat. */
+.temporary-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px dashed #c4b5fd;
+  border-radius: 50%;
+  color: var(--brand-violet);
+}
+
+.temporary-mark svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chat-title-lockup.is-temporary small {
+  display: block;
+  margin-top: 1px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
-}
-
-.temporary-pill svg {
-  width: 13px;
-  height: 13px;
 }
 
 .omi-drawer-backdrop {
@@ -724,10 +731,6 @@ button.omi-drawer-close:hover {
   grid-row: auto;
 }
 
-.omi-main .chat-title-lockup:has(.temporary-pill) {
-  grid-template-columns: 36px auto auto;
-  justify-content: start;
-}
 
 .omi-main .agentic-chat .agent-status {
   overflow: hidden;
