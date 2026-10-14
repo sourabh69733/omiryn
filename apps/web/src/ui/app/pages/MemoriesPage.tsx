@@ -213,6 +213,7 @@ export function MemoriesPage() {
           {isOld ? <span className="mem-row-note">{oldMemoryNote(memory, canonicalMemories)}</span> : null}
           {memory.status && memory.status !== "active" && !isOld ? <span className="mem-flag">Not in use</span> : null}
           {memory.from_upload ? <span className="mem-flag">From your upload</span> : null}
+          {memory.focus_state === "fading" && !isOld ? <span className="mem-flag">Fading: not mentioned lately</span> : null}
           {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="mem-flag">{sentenceCase(humanizeLabel(memory.sensitivity))}</span> : null}
         </div>
         <div className="history-row-menu mem-row-menu">
