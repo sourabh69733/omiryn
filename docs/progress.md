@@ -134,7 +134,7 @@ Done before: shared loading, empty and error states (`StateView`) and notices (`
 - Unit suite: about 1070 backend tests and 50 web tests, independent of the developer `.env`.
 - Memory evals with the real model: all 5 vibe grounding scenarios pass (small talk fills nothing, companion views never count, health and dating stay out, Hinglish filler fills nothing, only what the user showed).
 - Companion vibe scenarios (no interviewing, a dodge is respected, mood first) are written but not yet run with the real model.
-- Topic closure eval (`scripts/evals/run_topic_closure_evals.py`, 2026-10-14, Qwen3 235B background, Mistral Small replies, 3 runs per case): 13/15. Omi never brought a closed subject back in a later reply (0 of 9); the control kept an ongoing subject (3/3); a new study topic was saved as a focus and kept out of the card (3/3). Misses: twice the memory was not updated after a short "it is completed" (the focus fade is the safety net).
+- Topic closure eval (`scripts/evals/run_topic_closure_evals.py`, 2026-10-14, Qwen3 235B background, Mistral Small replies, 3 runs per case): 13/15. Omi never brought a closed subject back in a later reply (0 of 9); the control kept an ongoing subject (3/3); a new study topic was saved as a focus and kept out of the card (3/3). Misses: twice the memory was not updated after a short "it is completed" (the focus fade is the safety net). Rerun with the return greeting check and the might_fit same-session rule: 10/15. Greetings and replies never brought a closed subject back (0 of 18). Misses: `stop_asking` saved no how-to-talk memory 3 of 3 times, and `focus_marked` 1/3 (twice the model saved no focus memory, so the study line stayed in the card).
 
 ## 6. Next
 
