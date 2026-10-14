@@ -142,8 +142,10 @@ User card rules:
   study, key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.
 - Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
-  financial details, no relative time words. Replace a line when the user corrects it, and update or
-  drop it when they say it ended or changed.
+  financial details, no relative time words. Replace a line when the user corrects it. When they say
+  something ended or changed, rewrite the whole line, label included, as it is now
+  ("Finished studying <subject> in <month year>") or drop it. A line that starts "Currently ..."
+  about something that is over must not stay.
 - Leave out what is unknown; never write lines like "Name: not given".
 
 Vibe rules (who the user would get along with as a friend; Omiryn uses it to find them friends):
