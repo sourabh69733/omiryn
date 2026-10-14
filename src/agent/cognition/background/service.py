@@ -35,6 +35,7 @@ from storage.profile_facts import save_data_point_extraction_debug
 from storage.open_questions import add_open_questions, list_open_questions, resolve_open_questions
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
+from agent.memory_engine.memories.focus import without_focus_lines
 from storage.vibe_cards import get_vibe_card, update_vibe_card
 from agent.cognition.background.vibe_verify import stored_quote_lookup, verify_vibe_updates
 from agent.memory_engine.memories.vibe import with_current_proof
@@ -435,7 +436,8 @@ async def _run_claimed_background_cognition(
             and cognition.user_card != user_card
             and (config.live_memory_writes or config.live_v3_memory_writes)
         ):
-            set_user_card(user_id, cognition.user_card)
+            focus = [memory for memory in list_agent_memories(user_id) if memory.get("focus") and memory.get("status") == "active"]
+            set_user_card(user_id, without_focus_lines(cognition.user_card, focus))
         if (
             analysis.valid
             and not cognition.self_notes.empty

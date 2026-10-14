@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from agent.context_engine.assembly.sources import _memory_time_note
-from agent.memory_engine.memories.focus import focus_state
+from agent.memory_engine.memories.focus import focus_state, without_focus_lines
 from agent.memory_engine.memories.retrieval import _reply_eligible, might_fit_memories
 from agent.memory_engine.memories.validation import _validate_add, _ADD_FIELDS
 from storage import create_agent_memory, list_agent_memories, reset_db, save_conversation
@@ -52,6 +52,14 @@ class FocusFreshnessTest(unittest.TestCase):
         proposal, errors = _validate_add(raw, eligible_indexes={0}, expected_operation="add", allowed_fields=_ADD_FIELDS)
         self.assertEqual(errors, [])
         self.assertTrue(proposal.focus)
+
+
+class FocusCardTest(unittest.TestCase):
+    def test_card_lines_that_restate_a_focus_go_and_the_rest_stay(self) -> None:
+        focus = [{"statement": "Is studying transformers in ML.", "value": "studying transformers in ml"},
+                 {"statement": "Learning Rajasthani cooking in Jaipur.", "value": "rajasthani cooking"}]
+        card = "Lives in Jaipur.\nWorks as a backend developer.\nCurrently studying transformers in machine learning.\nPrefers Hinglish."
+        self.assertEqual(without_focus_lines(card, focus), "Lives in Jaipur.\nWorks as a backend developer.\nPrefers Hinglish.")
 
 
 class FocusStorageTest(unittest.TestCase):

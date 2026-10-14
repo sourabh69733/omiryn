@@ -9,6 +9,7 @@ focus and what counts as a mention; code only measures time.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
@@ -41,4 +42,29 @@ def focus_state(memory: dict[str, Any], now: datetime) -> FocusState | None:
     return "fading" if silence >= FRESH_FOR else "current"
 
 
-__all__ = ["ARCHIVED_AFTER", "FRESH_FOR", "focus_state", "last_mentioned"]
+_WORD = re.compile(r"[a-z0-9]+")
+# Words that only mark time or grammar; a focus line differs from its memory mostly by these.
+_FILLER = {"currently", "these", "days", "now", "still", "the", "and", "with", "for", "about", "into", "has", "was", "been"}
+
+
+def without_focus_lines(card: str, focus_memories: list[dict[str, Any]]) -> str:
+    """Drop user card lines that only restate an active focus memory.
+
+    A focus belongs in memories, where it fades when the user stops mentioning it; a copy in the
+    card would keep it current forever. A line goes when at least half its words, and two or more, are in one focus memory.
+    """
+    focus_words = [_words(f"{memory.get('statement') or ''} {memory.get('value') or ''}") for memory in focus_memories]
+    kept = []
+    for line in card.splitlines():
+        words = _words(line)
+        if any(len(words & known) >= 2 and len(words & known) / len(words) >= 0.5 for known in focus_words):
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def _words(text: str) -> set[str]:
+    return {word for word in _WORD.findall(text.lower()) if len(word) > 2 and word not in _FILLER}
+
+
+__all__ = ["ARCHIVED_AFTER", "FRESH_FOR", "focus_state", "last_mentioned", "without_focus_lines"]
