@@ -212,6 +212,8 @@ def create_whatsapp_context_source(
 ) -> dict[str, object]:
     _get_existing_conversation(conversation_id, user)
     enforce_user_action_limit(_user_id(user), WHATSAPP_IMPORT_LIMIT)
+    # iPhone exports start lines with an invisible left-to-right mark, which hides the date.
+    payload.content = payload.content.replace("\u200e", "")
     try:
         style_summary = build_whatsapp_style_summary(
             payload.content,

@@ -33,7 +33,7 @@ def whatsapp_upload_messages(export_text: str, user_sender: str | None, zone: Zo
     """The export as chat messages, oldest first. Raises ValueError for an unknown sender."""
     parsed = [
         message
-        for message in parse_whatsapp_export(export_text)
+        for message in parse_whatsapp_export(export_text.replace("\u200e", ""))
         if message.content.strip() and message.content.strip().lower() not in MEDIA_MARKERS
     ]
     if not parsed:
