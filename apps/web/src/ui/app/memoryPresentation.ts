@@ -102,7 +102,8 @@ export function partitionCanonicalMemories(
   rejected: CanonicalMemory[];
 } {
   const isOld = (memory: CanonicalMemory) =>
-    memory.status === "superseded" || (memory.status !== "retracted" && hasEnded(memory, now));
+    memory.status === "superseded" ||
+    (memory.status !== "retracted" && (hasEnded(memory, now) || memory.focus_state === "archived"));
   return {
     active: memories.filter((memory) => memory.status !== "retracted" && !isOld(memory)),
     old: memories.filter(isOld),
@@ -125,6 +126,10 @@ export function oldMemoryNote(memory: CanonicalMemory, all: CanonicalMemory[]): 
     const value = newer ? canonicalMemoryValueText(newer.value) : "";
     const when = day(newer?.created_at || memory.updated_at);
     return ["Replaced", value ? `by ${value}` : "", when ? `on ${when}` : ""].filter(Boolean).join(" ");
+  }
+  if (memory.focus_state === "archived") {
+    const last = day(memory.last_mentioned_at);
+    return last ? `Not mentioned since ${last}` : "Not mentioned in a while";
   }
   const ended = day(memory.valid_until);
   return ended ? `Ended on ${ended}` : "No longer current";

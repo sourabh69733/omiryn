@@ -76,6 +76,15 @@ test("an old memory says what replaced it, or when it ended", () => {
   assert.equal(oldMemoryNote(all[2], all), "Ended on 5 Oct");
 });
 
+test("an archived focus moves to old memories with when it was last mentioned", () => {
+  const focus = { id: "f", kind: "semantic" as const, key: "study", value: "Transformers", status: "active", focus_state: "archived" as const, last_mentioned_at: "2026-09-01T10:00:00Z" };
+  const fading = { id: "g", kind: "semantic" as const, key: "gym", value: "Marathon training", status: "active", focus_state: "fading" as const };
+  const groups = partitionCanonicalMemories([focus, fading]);
+  assert.deepEqual(groups.old.map((memory) => memory.id), ["f"]);
+  assert.deepEqual(groups.active.map((memory) => memory.id), ["g"]);
+  assert.equal(oldMemoryNote(focus, [focus]), "Not mentioned since 1 Sept");
+});
+
 test("memory keys read as plain labels", () => {
   assert.equal(memoryLabel("study_topic_current"), "Study topic (current)");
   assert.equal(memoryLabel("harry_potter_movies"), "Harry potter movies");

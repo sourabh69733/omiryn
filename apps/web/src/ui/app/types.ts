@@ -81,6 +81,9 @@ export type CanonicalMemory = {
   id: string;
   // Learned only from something the user uploaded.
   from_upload?: boolean;
+  // Something they are into for a while; fades after weeks without a mention.
+  focus_state?: "current" | "fading" | "archived" | null;
+  last_mentioned_at?: string | null;
   kind: "semantic" | "episodic" | "relationship" | "procedural";
   purposes?: string[];
   key: string;

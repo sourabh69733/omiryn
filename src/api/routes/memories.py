@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from security.auth import CurrentUser, require_user
 from storage.conversations import import_conversation_ids
+from agent.memory_engine.memories.focus import focus_state, last_mentioned
+from agent.shared.clock import utc_now
 from storage.audit_log import record_audit_event
 from storage import (
     clear_omi_data,
@@ -85,6 +87,9 @@ def _user_memory_payload(
         **{field: memory.get(field) for field in fields},
         "evidence": evidence,
         "feedback": latest_feedback,
+        # A current focus fades after weeks without a mention; computed here so the app shows it.
+        "focus_state": focus_state(memory, utc_now()),
+        "last_mentioned_at": _iso(last_mentioned(memory)) if memory.get("focus") else None,
         # Learned only from an upload (shown as "from your upload").
         "from_upload": bool(evidence)
         and all(item.get("conversation_id") in (upload_chat_ids or set()) for item in evidence),
@@ -176,6 +181,10 @@ async def delete_me_memory(
         raise HTTPException(status_code=404, detail="Memory not found.")
     record_audit_event("memory.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=memory_id)
     return {"memory_id": memory_id, "status": "deleted"}
+
+
+def _iso(moment) -> str | None:
+    return moment.isoformat() if moment else None
 
 
 __all__ = ["router"]
