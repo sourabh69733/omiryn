@@ -418,7 +418,7 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
     now = utc_now()
     zone = user_zone(get_user_timezone(user_id))
     lines = ["Your recent chat sessions with the user, oldest first (start to end time):"]
-    for entry in entries:
+    for position, entry in enumerate(entries):
         started, ended = parse_time(entry.started_at), parse_time(entry.ended_at)
         if started is None:
             continue
@@ -426,7 +426,9 @@ def _recent_sessions_sources(conversation_id: str, user_id: str | None) -> list[
         span = _session_span(started, ended, zone)
         when = "this session so far" if current else f"ended {humanize_gap(now - (ended or started))} ago"
         line = f"- {span} ({when}): {entry.gist}"
-        if entry.unfinished:
+        # Only the latest session can still have something open: a later session either picked
+        # an older loose end up or let it go, and older notes would bring settled topics back.
+        if entry.unfinished and position == len(entries) - 1:
             line += f" Left open: {entry.unfinished}"
         lines.append(line)
     return [

@@ -104,7 +104,8 @@ class SessionLogFlowTest(unittest.TestCase):
             "handoff": {
                 "summary": "", "active_people": [], "active_topics": [], "unresolved_references": [],
                 "session_log": [
-                    {"session": "s1", "gist": "Talked about a Goa trip in December."},
+                    {"session": "s1", "gist": "Talked about a Goa trip in December.",
+                     "unfinished": "whether the user booked the Goa tickets"},
                     {"session": "s2", "gist": "Started a 20 questions game.",
                      "unfinished": "the game; the user had not answered 'Is it an animal?'"},
                 ],
@@ -123,6 +124,8 @@ class SessionLogFlowTest(unittest.TestCase):
             sources = build_reply_context_sources(CONVERSATION_ID, None, "what were we doing last time?", USER_ID)
         block = next(s["content"] for s in sources if s["source_type"] == "recent_sessions")
         self.assertIn("- Wednesday 23 Sep, 3:30 pm (ended 2 days ago): Talked about a Goa trip", block)
+        # An older session's loose end is settled by the later session; only the latest one shows.
+        self.assertNotIn("booked the Goa tickets", block)
         self.assertIn(
             "- Friday 25 Sep, 5:28 pm to 9:16 pm (ended 14 hours ago): Started a 20 questions game. "
             "Left open: the game;",
