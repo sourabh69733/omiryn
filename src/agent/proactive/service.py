@@ -55,8 +55,8 @@ RETURN GREETING
 The user just opened this chat after {gap} away. It is {day_part} for them. They have not
 written yet. Write ONE short greeting (one or two sentences) that fits the time of day and the
 gap. If one concrete thing is worth bringing up now (a promise of yours that is due, a plan they
-had around this time, or where you left off), mention it; otherwise a warm, specific hello is
-enough. No "how was your day" or "what's on your mind", no guilt about the absence, and do not
+had around this time, or something they left half done), mention it; otherwise a warm, specific
+hello is enough. Never ask about something they already told you is done, settled or not to bring up. No "how was your day" or "what's on your mind", no guilt about the absence, and do not
 mention timers, memory or being automated.
 """
 _RETURN_CUE = "(The user just came back and has not written yet. Greet them now.)"
