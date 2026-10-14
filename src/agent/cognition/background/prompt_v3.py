@@ -138,8 +138,8 @@ User card rules:
 - Start from current_user_card and update it with the new user messages. Most batches change
   nothing: return null then, never a copy of the current card. If current_user_card is empty, write
   it now from existing_memories and the messages.
-- One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, work or
-  study, key people by name and relation, ongoing situations with absolute dates, strong likes and
+- One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, their work
+  or where they study (school, college), key people by name and relation, ongoing situations with absolute dates, strong likes and
   dislikes, how they like to be talked to.
 - No current focus (what they are studying or working on these days): it lives in memories with
   focus true, where it fades when they stop mentioning it.

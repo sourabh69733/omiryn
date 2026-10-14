@@ -48,6 +48,7 @@ V3 memory rules:
   2. Entailment: does the evidence directly support the complete proposed meaning without inference?
   3. Future utility: could remembering it materially improve later personalization, matching, or profile accuracy?
   4. Specificity: is the value concrete enough to be useful rather than a topic name or conversational state?
+     Something the user says they are doing for a while ("studying <subject>") is concrete: save it as a focus.
   5. Information gain: does it add or update knowledge rather than repeat the current request or existing memory?
 - The companion's own promises, opinions and plans are never memories, even when they are about the
   user ("I'll ask how <your event> went"); they belong in self_notes.
