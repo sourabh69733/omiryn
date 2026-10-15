@@ -40,17 +40,6 @@
   height: 100%;
 }
 
-.auth-kicker,
-.auth-card-kicker,
-.quick-setup-kicker {
-  margin: 0 0 12px;
-  color: var(--brand-violet);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .auth-intro h1 {
   margin: 0;
   color: var(--brand-ink);
@@ -96,11 +85,6 @@
   font-size: 30px;
   font-weight: 650;
   letter-spacing: -0.04em;
-}
-
-.auth-card .auth-copy {
-  margin-bottom: 26px;
-  font-size: 15px;
 }
 
 .auth-card > small {
