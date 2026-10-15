@@ -98,7 +98,31 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(freshness["rewritten"])
         self.assertFalse(freshness["still_stale"])
         generate.assert_awaited_once()
-        self.assertIn("Rewrite needed", generate.await_args.kwargs["system_prompt"])
+        self.assertEqual(generate.await_args.kwargs["system_prompt"], "SYSTEM")
+        self.assertIn("Rewrite needed", generate.await_args.args[0][-1]["content"])
+
+    async def test_rewrite_does_not_see_the_reply_it_copied(self) -> None:
+        greeting = "Shaam ho rahi hai, Sourabh! Toh padhai complete kar liya?"
+        generate = AsyncMock(return_value="hi again!")
+        history = [
+            {"role": "assistant", "content": greeting},
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "what are you up to"},
+            {"role": "user", "content": "hi"},
+        ]
+        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
+            reply, freshness = await _freshen_reply(
+                greeting,
+                previous_replies=[greeting, "what are you up to"],
+                reply_messages=history,
+                generation_arguments={"system_prompt": "SYSTEM"},
+            )
+        self.assertEqual(reply, "hi again!")
+        sent = generate.await_args.args[0]
+        self.assertNotIn(greeting, [message["content"] for message in sent])
+        self.assertIn("what are you up to", [message["content"] for message in sent])
+        self.assertEqual(sent[-1]["role"], "system")
+        self.assertNotIn("Shaam", sent[-1]["content"])
 
     async def test_fresh_draft_makes_no_extra_call(self) -> None:
         generate = AsyncMock()

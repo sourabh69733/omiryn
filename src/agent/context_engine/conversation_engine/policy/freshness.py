@@ -35,9 +35,9 @@ def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
     if len(words) < _MIN_WORDS_FOR_REPEAT_CHECK:
         return None
     earlier_replies = [item for item in previous_replies[-_RECENT_REPLIES:] if item.strip()]
-    for earlier in (_normalize(item) for item in earlier_replies):
-        if text == earlier or _similarity(text, earlier) >= _NEAR_COPY_SIMILARITY:
-            return f'it nearly repeats your earlier reply "{earlier[:80]}"'
+    for earlier in earlier_replies:
+        if _near_copy(text, _normalize(earlier)):
+            return "it nearly repeats a reply you already sent in this chat"
     opening = _opening(flat)
     if opening:
         same_opening = sum(1 for earlier in earlier_replies if _opening(earlier) == opening)
@@ -96,14 +96,36 @@ def recent_assistant_replies(messages: list[dict[str, Any]]) -> list[str]:
     ][-_RECENT_REPLIES:]
 
 
-def rewrite_instruction(draft: str, reason: str) -> str:
-    """Appended to the system prompt for the single rewrite attempt."""
+def without_copied_replies(messages: list[dict[str, Any]], draft: str) -> list[dict[str, Any]]:
+    """Chat history for a rewrite, minus the earlier replies the draft copied.
+
+    A copied reply left in the history pulls the rewrite straight back to it (seen live: a
+    greeting copied word for word on every "hi"), so the rewrite does not see it.
+    """
+    text = _normalize(draft.replace(REPLY_PART_SEPARATOR, " "))
+    return [
+        message
+        for message in messages
+        if message.get("role") != "assistant"
+        or not _near_copy(text, _normalize(str(message.get("content") or "")))
+    ]
+
+
+def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True) -> str:
+    """The last message the model reads for the single rewrite attempt.
+
+    A draft that copied an earlier reply is not quoted: the model copies the quote back.
+    """
+    said = f'your draft reply was "{draft.strip()[:400]}". It' if quote_draft else "your draft"
     return (
-        "\n\nRewrite needed: your draft reply was "
-        f'"{draft.strip()[:400]}". It needs a rewrite because {reason}. '
+        f"Rewrite needed: {said} needs a rewrite because {reason}. "
         "Write a different reply that responds specifically to the user's latest message, "
         "using what they actually said. Keep the same language, length and format rules."
     )
+
+
+def _near_copy(text: str, earlier: str) -> bool:
+    return bool(earlier) and (text == earlier or _similarity(text, earlier) >= _NEAR_COPY_SIMILARITY)
 
 
 def _opening(text: str) -> str | None:
@@ -141,4 +163,5 @@ __all__ = [
     "rewrite_instruction",
     "stale_reply_reason",
     "trim_questions",
+    "without_copied_replies",
 ]
