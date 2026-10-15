@@ -89,6 +89,24 @@ class FocusStorageTest(unittest.TestCase):
         offered = {memory["id"] for memory in might_fit_memories(USER_ID, exclude_ids=set(), recently_offered=set(), now=NOW)}
         self.assertNotIn(just_said, offered)
 
+    def test_a_finished_event_told_after_it_happened_is_not_offered(self) -> None:
+        def event(key: str, happened_days_ago: float, told_days_ago: float) -> str:
+            told = (NOW - timedelta(days=told_days_ago)).isoformat()
+            return create_agent_memory(
+                {
+                    "user_id": USER_ID, "kind": "episodic", "purposes": ["personalization"], "key": key,
+                    "value": key, "statement": f"{key}.", "importance": 0.9,
+                    "occurred_at": (NOW - timedelta(days=happened_days_ago)).isoformat(),
+                    "evidence": [{"conversation_id": "chat", "message_index": 0, "exact_quote": "studying transformers", "observed_at": told}],
+                }
+            )["id"]
+
+        finished = event("Completed the course", 1, 1)
+        told_ahead = event("Had an interview", 1, 2)
+        offered = {memory["id"] for memory in might_fit_memories(USER_ID, exclude_ids=set(), recently_offered=set(), now=NOW)}
+        self.assertNotIn(finished, offered)
+        self.assertIn(told_ahead, offered)
+
 
 if __name__ == "__main__":
     unittest.main()

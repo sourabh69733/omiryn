@@ -207,11 +207,30 @@ def _meets_relevance_threshold(
 MIGHT_FIT_LIMIT = 3
 # Events this close count as coming up; a friend would remember them now.
 UPCOMING_WINDOW = timedelta(days=7)
+NEWS_WINDOW = timedelta(days=1)
 
 
 def _said_this_session(memory: dict[str, Any], now: datetime) -> bool:
     mentioned = last_mentioned(memory)
     return mentioned is not None and now - mentioned < session_gap()
+
+
+def _reported_after_it_happened(memory: dict[str, Any], now: datetime) -> bool:
+    """News the user gave as it happened ("finished the course today"): it was talked through
+    then, so offering it again only brings back a closed subject. An event told ahead ("interview
+    tomorrow") is still offered, for the "how did it go?", and so is an old story told later."""
+    if memory.get("kind") != MemoryKind.EPISODIC.value:
+        return False
+    occurred = aware_datetime(memory.get("occurred_at"))
+    if occurred is None or occurred > now:
+        return False
+    told = [
+        time
+        for time in (aware_datetime(item.get("observed_at")) for item in memory.get("evidence") or [])
+        if time is not None
+    ] or [aware_datetime(memory.get("created_at"))]
+    first_told = min((time for time in told if time is not None), default=None)
+    return first_told is not None and occurred <= first_told <= occurred + NEWS_WINDOW
 
 
 def might_fit_memories(
@@ -241,6 +260,7 @@ def might_fit_memories(
         and focus_state(memory, current_time) != "fading"
         # Nor is something the user said in this session: they just told it, nothing new to raise.
         and not _said_this_session(memory, current_time)
+        and not _reported_after_it_happened(memory, current_time)
         and str(memory.get("id")) not in exclude_ids
     ]
 
