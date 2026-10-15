@@ -45,7 +45,10 @@ VIBE_LINE_RULES = """- A line is one or two plain English sentences, folding in 
   reaction to the companion is not enough. A short chat rarely shows more than one or two areas.
 - Preferences about a dating or marriage partner are not friend preferences; leave them out unless
   the user said they apply to friends too.
-- Never health, mental health, sexual or financial details, even when the user shared them."""
+- Never health, mental health, sexual or financial details, even when the user shared them.
+- Lasting traits only, not a current phase: what they are studying, building or preparing for
+  right now is a current focus memory, never a vibe line. When the user says something in a line
+  is over, rewrite the line without it."""
 
 # In order. "ready_to_match" is what matching will wait for.
 VIBE_MILESTONES = ("starting", "first_impressions", "basics", "ready_to_match", "deep")
