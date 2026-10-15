@@ -39,6 +39,7 @@ def batch_sessions(
     labels: dict[int, str] = {}
     starts: dict[str, str] = {}
     new_times: dict[str, datetime] = {}
+    user_spoke: set[str] = set()
     last = log[-1] if log else None
     key: str | None = None
     previous: datetime | None = None
@@ -57,12 +58,16 @@ def batch_sessions(
         labels[message.message_index] = label
         if message.scope == "new":
             new_times[label] = max(new_times.get(label, sent), sent)
+            if message.role == "user":
+                user_spoke.add(label)
     by_label = {label: start for start, label in starts.items()}
     sessions = [
         BatchSession(
             id=label,
             started_at=by_label[label],
-            has_new_messages=label in new_times,
+            # Only the companion spoke (an unanswered greeting): nothing about the user to log, and
+            # a gist of Omi's own question kept bringing its subject back.
+            has_new_messages=label in user_spoke,
             last_new_message_at=new_times[label].isoformat() if label in new_times else None,
         )
         for label in sorted(by_label, key=lambda item: int(item[1:]))
