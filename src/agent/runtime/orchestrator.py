@@ -26,6 +26,7 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     rewrite_instruction,
     stale_reply_reason,
     trim_questions,
+    without_copied_replies,
 )
 from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
@@ -412,13 +413,12 @@ async def _freshen_reply(
     if reason is None:
         return reply, None
     try:
+        # The note goes last, where the model follows it best, and the replies the draft copied
+        # leave the history so the rewrite cannot copy them again.
+        history = without_copied_replies(reply_messages, reply)
+        note = rewrite_instruction(reply, reason, quote_draft=len(history) == len(reply_messages))
         raw = await generate_agent_reply(
-            reply_messages,
-            **{
-                **generation_arguments,
-                "system_prompt": generation_arguments["system_prompt"]
-                + rewrite_instruction(reply, reason),
-            },
+            history + [{"role": "system", "content": note}], **generation_arguments
         )
         rewritten = _visible_companion_reply(raw, structured_companion_reply(raw))
     except Exception as error:
