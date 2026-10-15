@@ -62,6 +62,12 @@ class BatchSessionsTest(unittest.TestCase):
         self.assertEqual(sessions[0].started_at, FRI)
 
 
+    def test_a_session_where_only_the_companion_spoke_is_not_logged(self) -> None:
+        greeting = [_message("assistant", "did you finish the course?", SAT, proactive=True)]
+        _, sessions = batch_sessions(_batch(CHAT + greeting), ())
+        self.assertEqual([s.has_new_messages for s in sessions], [True, True, False])
+
+
 class MergeSessionLogTest(unittest.TestCase):
     def test_writes_sessions_with_new_messages_and_drops_bad_items(self) -> None:
         log = merge_session_log(
