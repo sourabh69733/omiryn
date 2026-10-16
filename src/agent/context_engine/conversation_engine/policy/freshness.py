@@ -36,7 +36,7 @@ def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
         return None
     earlier_replies = [item for item in previous_replies[-_RECENT_REPLIES:] if item.strip()]
     for earlier in earlier_replies:
-        if _near_copy(text, _normalize(earlier)):
+        if _copies(reply, earlier):
             return "it nearly repeats a reply you already sent in this chat"
     opening = _opening(flat)
     if opening:
@@ -97,17 +97,20 @@ def recent_assistant_replies(messages: list[dict[str, Any]]) -> list[str]:
 
 
 def without_copied_replies(messages: list[dict[str, Any]], draft: str) -> list[dict[str, Any]]:
-    """Chat history for a rewrite, minus the earlier replies the draft copied.
+    """Chat history for a rewrite, minus the earlier replies the draft copied or opened like.
 
     A copied reply left in the history pulls the rewrite straight back to it (seen live: a
     greeting copied word for word on every "hi"), so the rewrite does not see it.
     """
-    text = _normalize(draft.replace(REPLY_PART_SEPARATOR, " "))
+    opening = _opening(draft.replace(REPLY_PART_SEPARATOR, " "))
     return [
         message
         for message in messages
         if message.get("role") != "assistant"
-        or not _near_copy(text, _normalize(str(message.get("content") or "")))
+        or not (
+            _copies(draft, str(message.get("content") or ""))
+            or (opening and _opening(str(message.get("content") or "")) == opening)
+        )
     ]
 
 
@@ -124,8 +127,21 @@ def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True) ->
     )
 
 
-def _near_copy(text: str, earlier: str) -> bool:
-    return bool(earlier) and (text == earlier or _similarity(text, earlier) >= _NEAR_COPY_SIMILARITY)
+def _copies(draft: str, earlier: str) -> bool:
+    """The draft, or one of its bubbles, nearly copies the earlier reply or one of its bubbles;
+    a copy with one new bubble added is still a copy."""
+    return any(
+        part == other or _similarity(part, other) >= _NEAR_COPY_SIMILARITY
+        for part in _parts(draft)
+        for other in _parts(earlier)
+    )
+
+
+def _parts(text: str) -> list[str]:
+    bubbles = text.split(REPLY_PART_SEPARATOR)
+    parts = [text.replace(REPLY_PART_SEPARATOR, " "), *bubbles] if len(bubbles) > 1 else [text]
+    normalized = (_normalize(part) for part in parts)
+    return [part for part in normalized if len(part.split()) >= _MIN_WORDS_FOR_REPEAT_CHECK]
 
 
 def _opening(text: str) -> str | None:

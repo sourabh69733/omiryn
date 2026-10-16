@@ -9,6 +9,12 @@ from datetime import datetime
 from typing import Any
 
 from agent.context_engine.conversation_engine.policy import split_assistant_reply
+from agent.context_engine.conversation_engine.policy.freshness import (
+    recent_assistant_replies,
+    rewrite_instruction,
+    stale_reply_reason,
+    without_copied_replies,
+)
 from agent.context_engine.conversation_engine.state.service import list_threads
 from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
@@ -399,28 +405,42 @@ async def _initiative_text(
         assistant_message_index=len(messages),
     )
     system_prompt = package.system_prompt + instructions
-    raw = await generate_agent_reply(
-        [
-            *_provider_messages(
-                reply_window(
-                    messages,
-                    summarized_through(package.context_sources),
-                    (package.user_profile or {}).get("timezone"),
-                )
-            ),
-            {"role": "user", "content": cue},
-        ],
-        conversation_id=conversation["id"],
-        model=preferred_reply_model(user_id, conversation.get("agent_model")),
-        agent_mode=conversation.get("agent_mode") or "know_me",
-        agent_tone=conversation.get("agent_tone") or "auto",
-        agent_name=conversation.get("agent_name"),
-        context_sources=package.context_sources,
-        user_profile=package.user_profile,
-        system_prompt=system_prompt,
-        max_tokens=max_tokens,
+    history = reply_window(
+        messages,
+        summarized_through(package.context_sources),
+        (package.user_profile or {}).get("timezone"),
     )
-    return _visible_companion_reply(raw, structured_companion_reply(raw))
+
+    async def write(window: list[dict[str, Any]], note: str | None = None) -> str:
+        raw = await generate_agent_reply(
+            [
+                *_provider_messages(window),
+                {"role": "user", "content": cue},
+                *([{"role": "system", "content": note}] if note else []),
+            ],
+            conversation_id=conversation["id"],
+            model=preferred_reply_model(user_id, conversation.get("agent_model")),
+            agent_mode=conversation.get("agent_mode") or "know_me",
+            agent_tone=conversation.get("agent_tone") or "auto",
+            agent_name=conversation.get("agent_name"),
+            context_sources=package.context_sources,
+            user_profile=package.user_profile,
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+        )
+        return _visible_companion_reply(raw, structured_companion_reply(raw))
+
+    text = await write(history)
+    earlier = recent_assistant_replies(messages)
+    reason = None if _is_skip(text) else stale_reply_reason(text, earlier)
+    if reason is None:
+        return text
+    # Seen live: a greeting copied, word for word, the last greeting in the history. The retry
+    # does not see what it copied; a message nobody asked for is dropped rather than repeated.
+    text = await write(
+        without_copied_replies(history, text), rewrite_instruction(text, reason, quote_draft=False)
+    )
+    return "SKIP" if stale_reply_reason(text, earlier) else text
 
 
 def _is_skip(text: str) -> bool:

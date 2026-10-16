@@ -124,6 +124,12 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent[-1]["role"], "system")
         self.assertNotIn("Shaam", sent[-1]["content"])
 
+    async def test_a_copy_with_a_new_bubble_is_still_a_copy(self) -> None:
+        greeting = "Shaam ho rahi hai, Sourabh! Toh padhai complete kar liya?"
+        self.assertIsNotNone(
+            stale_reply_reason(f"{greeting}<next_message>Aaj ka plan kya hai bhai?", [greeting])
+        )
+
     async def test_fresh_draft_makes_no_extra_call(self) -> None:
         generate = AsyncMock()
         reply, freshness = await self._freshen("your manager has good taste", generate)

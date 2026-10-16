@@ -391,3 +391,39 @@ def test_topic_nudges_that_may_be_skipped_show_no_typing() -> None:
 
     assert asyncio.run(scenario()) == 0
     assert socket.sent == []
+
+
+GREETING = "Shaam ho rahi hai, Sourabh! Toh padhai complete kar liya?"
+
+
+def _initiative(replies: list[str]) -> tuple[str, AsyncMock]:
+    from types import SimpleNamespace
+
+    conversation = {
+        "id": CONVERSATION_ID,
+        "messages": [_msg("assistant", 600, proactive=True) | {"content": GREETING}, _msg("user", 590)],
+    }
+    package = SimpleNamespace(system_prompt="S", context_sources=[], user_profile={})
+    generate = AsyncMock(side_effect=replies)
+    with patch("agent.proactive.service.build_model_context_package", return_value=package), patch(
+        "agent.proactive.service.generate_agent_reply", generate
+    ):
+        text = asyncio.run(
+            proactive_service._initiative_text(
+                conversation, USER_ID, user_text="", instructions="", cue="(greet)", max_tokens=100
+            )
+        )
+    return text, generate
+
+
+def test_a_greeting_that_copies_an_earlier_one_is_retried_without_it() -> None:
+    text, generate = _initiative([GREETING, "Evening! Good to see you."])
+    assert text == "Evening! Good to see you."
+    retry = generate.await_args_list[1].args[0]
+    assert GREETING not in [message["content"] for message in retry]
+    assert retry[-1]["role"] == "system"
+
+
+def test_a_greeting_that_still_copies_is_dropped() -> None:
+    text, _ = _initiative([GREETING, GREETING])
+    assert proactive_service._is_skip(text)
