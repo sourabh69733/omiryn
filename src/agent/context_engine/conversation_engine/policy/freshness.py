@@ -19,6 +19,8 @@ _RECENT_REPLIES = 20
 _OPENING_MAX_WORDS = 4
 _OPENING_REPEAT_LIMIT = 2  # the same opening already used this many times recently
 _NEAR_COPY_SIMILARITY = 0.6
+# Same words in a new order ("sham ho gayi, abhi kya kar rahe ho?") is still the same message.
+_SAME_WORDS_SIMILARITY = 0.8
 
 
 def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
@@ -131,10 +133,17 @@ def _copies(draft: str, earlier: str) -> bool:
     """The draft, or one of its bubbles, nearly copies the earlier reply or one of its bubbles;
     a copy with one new bubble added is still a copy."""
     return any(
-        part == other or _similarity(part, other) >= _NEAR_COPY_SIMILARITY
+        part == other
+        or _similarity(part, other) >= _NEAR_COPY_SIMILARITY
+        or _word_overlap(part, other) >= _SAME_WORDS_SIMILARITY
         for part in _parts(draft)
         for other in _parts(earlier)
     )
+
+
+def _word_overlap(left: str, right: str) -> float:
+    left_words, right_words = set(left.split()), set(right.split())
+    return len(left_words & right_words) / len(left_words | right_words)
 
 
 def _parts(text: str) -> list[str]:

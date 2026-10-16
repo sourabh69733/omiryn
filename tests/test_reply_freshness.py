@@ -130,6 +130,12 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
             stale_reply_reason(f"{greeting}<next_message>Aaj ka plan kya hai bhai?", [greeting])
         )
 
+    async def test_the_same_question_reworded_is_a_copy(self) -> None:
+        self.assertIsNotNone(
+            stale_reply_reason("Sham ho gayi, abhi kya kar rahe ho?", ["Sham ho gayi! Kya kar rahe ho abhi?"])
+        )
+        self.assertIsNone(stale_reply_reason("Kya plan hai weekend ka?", ["Sham ho gayi! Kya kar rahe ho abhi?"]))
+
     async def test_fresh_draft_makes_no_extra_call(self) -> None:
         generate = AsyncMock()
         reply, freshness = await self._freshen("your manager has good taste", generate)
