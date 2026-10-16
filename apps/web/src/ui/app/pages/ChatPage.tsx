@@ -31,7 +31,7 @@ const MESSAGE_MENU_HEIGHT = 260;
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0 }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number }) {
+export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -487,6 +487,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
+  // A brand-new user's first chat: explain what Omi does until they send their first message.
+  const firstChat = Boolean(conversation && !temporary && conversation.id === omiId && summaries.length <= 1 && !conversation.messages.some((message) => message.role === "user"));
   const lastVisibleIsAgent = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "assistant";
   // Tell the contacts rail what Omi is doing: typing, its last line, or that an earlier chat is open.
   const omiTyping = Boolean(omiId && (sendingIds.has(omiId) || typingConversationId === omiId || (conversation?.id === omiId && typingVisible)));
@@ -1213,6 +1215,14 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
           <div className="chat-log" ref={logRef} onScroll={handleChatScroll} aria-live="polite">
             {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
             {!loading && !conversation ? <StateView kind="empty" title="Say hi to Omi" detail="Your chat with Omi will appear here."><button type="button" onClick={() => void createConversation()}>Start chatting</button></StateView> : null}
+            {!loading && firstChat ? (
+              <section className="omi-welcome" aria-label="Welcome to Omi">
+                <h3><AgentOrb state="idle" />This is Omi</h3>
+                <p>Talk about anything: your week, what you love, what bugs you.</p>
+                <p>As you chat, Omi learns your vibe. See it in {onOpenVibe ? <button type="button" onClick={onOpenVibe}>Vibe <ChevronRight aria-hidden="true" /></button> : "Vibe"}</p>
+                <p>Later, Omi introduces you to people you'd get along with.</p>
+              </section>
+            ) : null}
             {!loading && conversation && !temporary ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Omi learns from your chats to find you friends. Don't share passwords or IDs.</p> : null}
             {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}

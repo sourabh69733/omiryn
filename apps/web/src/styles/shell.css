@@ -190,6 +190,59 @@ button.omi-contact.is-active {
   font-weight: 550;
 }
 
+/* First chat only: what Omi does, gone after the user's first message. */
+.omi-welcome {
+  width: min(460px, 100%);
+  margin: 12px auto 6px;
+  padding: 18px 20px;
+  border: 1px solid #e6defc;
+  border-radius: 18px;
+  background: #faf8ff;
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.omi-welcome h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.omi-welcome h3 .agent-orb {
+  width: 28px;
+  height: 28px;
+}
+
+.omi-welcome p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.omi-welcome button {
+  display: inline;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  color: var(--brand-violet);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.omi-welcome button svg {
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+  vertical-align: -3px;
+}
+
 /* The privacy reminder at the top of the chat: one quiet line, not a box. */
 .omi-chat-notice {
   display: flex;
