@@ -23,7 +23,8 @@ export function QuickSetup() {
     apiFetch("/api/auth/me")
       .then((response) => (response.ok ? response.json() : null))
       .then((user: AuthUser | null) => {
-        const name = user?.display_name?.trim();
+        // First name only: it is what Omi will call the user, and they can change it.
+        const name = user?.display_name?.trim().split(/\s+/)[0];
         if (name && !cancelled) setDisplayName((current) => current.trim() || name);
       })
       .catch(() => undefined);
@@ -89,7 +90,7 @@ export function QuickSetup() {
       </header>
       <form className="quick-setup-card" onSubmit={start} noValidate>
         <h1>What should Omi call you?</h1>
-        <p className="quick-setup-intro">Then you can start talking. Omi will get to know you as you go.</p>
+        <p className="quick-setup-intro">Omi gets to know you as you chat.</p>
 
         <label className="quick-setup-label" htmlFor="display-name">Your name</label>
         <input
