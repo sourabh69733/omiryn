@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles, Users } from "lucide-react";
 import { apiFetch, ensureAuthenticatedSession, signInWithGoogle } from "../lib/api";
 import { MainApp } from "./app/MainApp";
 import { AgentOrb } from "./app/AgentOrb";
@@ -93,7 +93,11 @@ export function App() {
             <div className="auth-intro-copy">
               <span className="auth-intro-orb"><AgentOrb state="idle" /></span>
               <h1 id="auth-intro-title">Talk first.<br /><em>Connect better.</em></h1>
-              <p>Omiryn gets to know you through conversation, then helps you find friends who feel like your kind of people.</p>
+              <ol className="auth-steps">
+                <li><MessageCircle aria-hidden="true" />Just talk to Omi</li>
+                <li><Sparkles aria-hidden="true" />It learns your vibe</li>
+                <li><Users aria-hidden="true" />Meet people who click</li>
+              </ol>
             </div>
           </section>
           <section className="auth-card" aria-label="Sign in">

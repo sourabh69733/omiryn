@@ -56,12 +56,32 @@
   font-weight: 400;
 }
 
-.auth-intro-copy > p:last-child {
-  max-width: 480px;
-  margin: 22px 0 0;
-  color: var(--brand-muted);
+/* Three short steps instead of a paragraph: read in a glance. */
+.auth-steps {
+  display: grid;
+  gap: 12px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--brand-ink);
   font-size: 17px;
-  line-height: 1.55;
+  font-weight: 550;
+}
+
+.auth-steps svg {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f1ecff;
+  color: var(--brand-violet);
 }
 
 .auth-card,
@@ -145,8 +165,12 @@
     font-size: clamp(40px, 11vw, 60px);
   }
 
-  .auth-intro-copy > p:last-child {
-    margin-top: 16px;
+  .auth-steps {
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .auth-steps li {
     font-size: 15px;
   }
 }
