@@ -77,6 +77,9 @@ Conversation summary rules:
 - Return null for conversation_summary when the new messages add nothing lasting; the previous one
   is kept. Otherwise start from previous_handoff.conversation_summary and fold in the new messages.
   Never drop an earlier point unless the user corrected it.
+- Date every point instead of saying "currently": "On Tue 6 Oct the user said he was studying X",
+  not "The user is currently studying X". A dated point stays true; a "currently" goes stale. When
+  the user says something is over, rewrite the earlier point to say it ended and when.
 - Keep what a close friend would remember: events, plans, decisions, feelings, people by name, questions
   still open, and anything the companion promised, suggested, or gave an opinion on.
 - Date events with the day from sent_at, e.g. "On <weekday day month> the user said <what they said>".
@@ -118,7 +121,9 @@ Session log rules:
 - sessions lists the chat sessions in this batch; code splits them at long silences and each
   message carries its session.
 - For every session with has_new_messages=true, return one session_log entry. gist: one or two
-  plain sentences on what the session was about, with names and specifics. unfinished: what the
+  plain sentences on what the session was about, with names and specifics: what the user said
+  and did. The companion's own check-ins or questions the user did not take up are not what a
+  session was about. unfinished: what the
   user left half done that they would want picked up (a story stopped midway, a question to them
   they have not answered yet), or null. Never the companion's own follow-up ideas or topics to
   bring up again, and null when the user finished, closed or waved off the subject.
