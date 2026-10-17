@@ -1,0 +1,371 @@
+/* App-wide basics: element defaults, buttons, the boot loader, the account and brand bits. */
+
+:root {
+  color-scheme: light;
+  --ink: var(--brand-ink);
+  --muted: var(--brand-muted);
+  --soft: #f5f1fb;
+  --surface: var(--brand-bg);
+  --panel: #ffffff;
+  --line: var(--brand-line);
+  --primary: var(--brand-violet);
+  --primary-dark: var(--brand-violet-hover);
+  --accent: var(--brand-pink);
+  --success: #2f8f78;
+  --warning: #c88a1d;
+  --mist: #f2edff;
+  --mint: #5eead4;
+  --rose: #ff7eb3;
+  --lavender: #b49aff;
+  --amber: #fbbf24;
+  --shadow: 0 18px 50px rgba(64, 45, 118, 0.08);
+  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.46));
+  --glass-border: rgba(255, 255, 255, 0.58);
+  --glass-highlight: rgba(255, 255, 255, 0.72);
+  --glass-shadow: 0 22px 70px rgba(64, 45, 118, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --font-ui: var(--font-sans);
+  --font-chat: var(--font-sans);
+  --font-terminal: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 16% 8%, rgba(180, 154, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 84% 4%, rgba(255, 126, 179, 0.11), transparent 30%),
+    radial-gradient(circle at 76% 82%, rgba(94, 234, 212, 0.1), transparent 30%),
+    linear-gradient(180deg, #fffbff 0%, var(--surface) 44%, #ffffff 100%);
+  font-family: var(--font-ui);
+}
+
+.boot-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #17151d;
+  transition: opacity 0.24s ease, visibility 0.24s ease;
+}
+
+.boot-loader::before {
+  position: absolute;
+  inset: 0;
+  background: #17151d;
+  content: "";
+}
+
+.boot-loader::after {
+  content: none;
+}
+
+.boot-loader.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-mark-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: clamp(238px, 34vw, 420px);
+  aspect-ratio: 800 / 360;
+  filter:
+    drop-shadow(0 24px 46px rgba(27, 22, 42, 0.34))
+    drop-shadow(0 0 32px rgba(255, 126, 179, 0.2));
+  animation: bootStageArrive 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.boot-logo-glow {
+  position: absolute;
+  inset: 8% -18% 10%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 42%, rgba(106, 70, 255, 0.62), transparent 42%),
+    radial-gradient(circle at 66% 42%, rgba(255, 126, 179, 0.58), transparent 44%),
+    linear-gradient(90deg, rgba(106, 70, 255, 0.34), rgba(255, 126, 179, 0.32));
+  filter: blur(44px);
+  opacity: 0;
+  transform: scaleX(0.58);
+  animation: bootGlowIn 1.45s ease 0.14s forwards;
+}
+
+.boot-logo-image {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transform: translateY(8px) scale(0.985);
+  animation: bootLogoReveal 1.12s cubic-bezier(0.16, 1, 0.3, 1) 0.18s forwards;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 96px;
+}
+
+.brand strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 620;
+}
+
+.brand small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  display: grid;
+  gap: 6px;
+  min-width: 156px;
+  border: 1px solid rgba(180, 154, 255, 0.16);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.96), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(252, 248, 255, 0.96));
+  box-shadow:
+    0 18px 44px rgba(64, 45, 118, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  padding: 7px;
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+}
+
+.account-menu[hidden] {
+  display: none;
+}
+
+.account-menu button {
+  min-height: 38px;
+  border: 1px solid rgba(180, 154, 255, 0.12);
+  border-radius: 10px;
+  color: #2f294a;
+  background: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 680;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.account-menu button:hover,
+.account-menu button:focus-visible {
+  background:
+    linear-gradient(135deg, rgba(180, 154, 255, 0.24), rgba(255, 126, 179, 0.12)),
+    #ffffff;
+  outline: none;
+}
+
+.screen {
+  padding: 34px 0 20px;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 680;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.secondary-button {
+  color: var(--primary);
+  background: #e8f1ef;
+}
+
+.secondary-button:hover {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.danger-button {
+  background: var(--accent);
+}
+
+.danger-button:hover {
+  background: #854632;
+}
+
+.sidebar-usage-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sidebar-usage-total strong {
+  color: var(--ink);
+  font-family: var(--font-terminal);
+  font-size: 18px;
+}
+
+.sidebar-usage-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sidebar-usage-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.sidebar-usage-item.failed {
+  border-left-color: #d66b5d;
+}
+
+.sidebar-usage-item strong,
+.sidebar-usage-item span {
+  display: block;
+}
+
+.sidebar-usage-item strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.sidebar-usage-item span,
+.sidebar-usage-empty {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sidebar-usage-tokens {
+  min-width: 88px;
+  text-align: right;
+}
+
+.sidebar-usage-tokens strong {
+  font-family: var(--font-terminal);
+  font-size: 14px;
+}
+
+@media (max-width: 680px) {
+  body {
+    background: #fbfaf7;
+  }
+
+  main {
+    padding-top: calc(var(--app-header-height) + 8px);
+  }
+
+  .brand {
+    min-width: 0;
+    width: 82px;
+    gap: 0;
+  }
+
+  .brand small {
+    display: none;
+  }
+}
+
+/* Compact onboarding scale: keep the illustrated chat feel without poster-sized text or internal scrolling. */
+
+@media (max-width: 680px) {
+  html,
+  body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Final onboarding surface polish: the page is the canvas, not a card inside a card. */
+
+@keyframes bootGlowIn {
+  50% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0.62;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bootStageArrive {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bootLogoReveal {
+  38% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0) scale(1);
+  }
+}
