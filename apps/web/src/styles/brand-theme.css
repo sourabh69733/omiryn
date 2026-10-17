@@ -1,4 +1,4 @@
-/* App expression of the landing palette. Keep page layout in legacy-app.css and vibe.css. */
+/* App expression of the landing palette. Keep page layout in the screen files (chat.css, vibe.css, ...). */
 body {
   background: var(--brand-bg);
 }

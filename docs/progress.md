@@ -114,14 +114,13 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Split `legacy-app.css` | Move its remaining rules into files named by screen, merge the newer overrides, delete the file. |
-| 2 | Real-phone pass | Keyboard overlap, safe areas, tap sizes and home-screen use on a real iPhone and Android. |
-| 3 | Accessibility pass | Full keyboard, focus and contrast audit; screen reader labels. |
-| 4 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. Needs a small API; plan first. |
-| 5 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
-| 6 | Profile loads every visit | Profile refetches `/api/me/profile` and `/api/me/data-requests` one after the other on each visit. Keep the last profile in memory, refresh quietly, fetch in parallel; version and cache photo URLs. |
+| 1 | Real-phone pass | Keyboard overlap, safe areas, tap sizes and home-screen use on a real iPhone and Android. |
+| 2 | Accessibility pass | Full keyboard, focus and contrast audit; screen reader labels. |
+| 3 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. Needs a small API; plan first. |
+| 4 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
+| 5 | Profile loads every visit | Profile refetches `/api/me/profile` and `/api/me/data-requests` one after the other on each visit. Keep the last profile in memory, refresh quietly, fetch in parallel; version and cache photo URLs. |
 
-Done (2026-10-14 to 10-17): typing state clears on other pages; Temporary Chat header, names and exits; Profile/Privacy tabs removed; unused CSS removed (PR #5: `legacy-app.css` about 10,200 to 3,200 lines, built CSS 231 KB to 108 KB, checked with 0 computed-style differences on 35 screen states); first-run (sign-in steps, first-name prefill, first-chat welcome card); landing (one CTA at a time, no hero lead line, steady nav height, compact How it works on phones, PR #3).
+Done (2026-10-14 to 10-17): typing state clears on other pages; Temporary Chat header, names and exits; Profile/Privacy tabs removed; unused CSS removed (PR #5: `legacy-app.css` about 10,200 to 3,200 lines, built CSS 231 KB to 108 KB, checked with 0 computed-style differences on 35 screen states); `legacy-app.css` deleted: its rules now live in `app-base.css`, `chat.css`, and at the top of `onboarding.css`, `memories.css` and `contact.css` (same check, 0 differences); first-run (sign-in steps, first-name prefill, first-chat welcome card); landing (one CTA at a time, no hero lead line, steady nav height, compact How it works on phones, PR #3).
 
 Done before: contacts layout (PR #2); shared loading, empty and error states (`StateView`) and notices (`Notice`); the design system across Chat, Vibe, Memories, Matches and Profile; a mobile pass; "Not right" stays gone; short neutral limit messages; optional profile gender.
 
