@@ -100,6 +100,20 @@ def test_retrieval_keeps_procedural_guidance_without_topic_overlap() -> None:
     assert [memory["id"] for memory in selected] == [procedural["id"]]
 
 
+def test_every_how_to_talk_memory_reaches_the_reply_outside_the_fact_slots() -> None:
+    requests = [
+        _save_memory(key=f"conversation.style.{index}", value=f"style rule {index}", kind="procedural", purposes=["personalization"])
+        for index in range(7)
+    ]
+    facts = [_save_memory(key=f"deploy.fact.{index}", value=f"deployment fact {index}") for index in range(3)]
+
+    selected = _retrieve("my deployment failed", limit=3)
+
+    ids = {memory["id"] for memory in selected}
+    assert {memory["id"] for memory in requests} <= ids
+    assert {memory["id"] for memory in facts} <= ids
+
+
 def test_retrieval_is_kind_aware_and_ranks_relevant_memory_first() -> None:
     unrelated = _save_memory(
         key="food.preference",

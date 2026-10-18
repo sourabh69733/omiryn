@@ -12,7 +12,8 @@ from agent.memory_engine.memories import retrieve_agent_memories_for_reply
 
 
 RETRIEVAL_STRESS_MEMORY_COUNT = 100
-RETRIEVAL_STRESS_LIMIT = 5
+# Fact slots, exactly the relevant facts; the how-to-talk memory comes on top, outside the slots.
+RETRIEVAL_STRESS_LIMIT = 4
 RETRIEVAL_STRESS_QUERY = (
     "Help me plan how to talk to Riya about our relaxed Mysuru trip, "
     "one question at a time."
@@ -131,7 +132,8 @@ def build_retrieval_stress_fixture() -> tuple[RetrievalFixtureMemory, ...]:
             importance=1.0,
         ),
     )
-    kinds = ("semantic", "episodic", "relationship", "procedural")
+    # Every how-to-talk (procedural) memory reaches the reply by design, so noise is facts only.
+    kinds = ("semantic", "episodic", "relationship")
     noise = tuple(
         RetrievalFixtureMemory(
             key=f"fixture.noise.{kinds[index % len(kinds)]}.{index:03d}",
@@ -221,7 +223,7 @@ def run_retrieval_stress_evaluation(
         failures.append("Irrelevant memories leaked into the bounded reply context.")
     if violations:
         failures.append("A policy-ineligible memory was retrieved.")
-    if len(selected) > RETRIEVAL_STRESS_LIMIT:
+    if sum(item["kind"] != "procedural" for item in selected) > RETRIEVAL_STRESS_LIMIT:
         failures.append("The reply memory limit was exceeded.")
 
     return {

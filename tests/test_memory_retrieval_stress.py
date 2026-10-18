@@ -50,7 +50,8 @@ def test_real_retrieval_selects_only_expected_safe_memories() -> None:
     assert metrics["precision_at_k"] == 1.0
     assert metrics["irrelevant_selected_count"] == 0
     assert metrics["policy_violation_count"] == 0
-    assert metrics["selected_count"] == metrics["selection_limit"] == 5
+    # 4 fact slots plus the how-to-talk memory, which never takes a slot.
+    assert metrics["selected_count"] == metrics["selection_limit"] + 1 == 5
 
 
 def test_retrieval_report_explains_quality_and_safety_metrics() -> None:

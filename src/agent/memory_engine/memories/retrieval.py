@@ -65,6 +65,14 @@ def retrieve_agent_memories_for_reply(
         for memory in list_agent_memories(user_id)
         if _reply_eligible(memory, current_time)
     ]
+    # Every how-to-talk memory reaches the reply, newest first, in its own block and size budget;
+    # they never compete with facts for the shared slots.
+    how_to_talk = sorted(
+        (memory for memory in eligible if memory.get("kind") == MemoryKind.PROCEDURAL.value),
+        key=lambda memory: str(memory.get("created_at") or ""),
+        reverse=True,
+    )
+    eligible = [memory for memory in eligible if memory.get("kind") != MemoryKind.PROCEDURAL.value]
     embeddings = (
         list_agent_memory_embeddings(
             user_id,
@@ -103,7 +111,7 @@ def retrieve_agent_memories_for_reply(
     kind_counts: dict[str, int] = defaultdict(int)
     for memory, lexical_relevance, semantic_relevance in ranked:
         kind = str(memory.get("kind") or "")
-        if not broad and kind != MemoryKind.PROCEDURAL.value and not _meets_relevance_threshold(
+        if not broad and not _meets_relevance_threshold(
             lexical_relevance,
             semantic_relevance,
         ):
@@ -114,7 +122,7 @@ def retrieve_agent_memories_for_reply(
         kind_counts[kind] += 1
         if len(selected) >= limit:
             break
-    return selected
+    return selected + how_to_talk
 
 
 def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:
