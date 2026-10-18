@@ -58,7 +58,7 @@ class RatedRepliesTest(unittest.TestCase):
         self.assertEqual(_reply_feedback_sources(USER_ID), [])
 
 
-class SaveRequestsNowTest(unittest.TestCase):
+class SaveRequestsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.env = patch.dict(
             os.environ,
@@ -85,11 +85,9 @@ class SaveRequestsNowTest(unittest.TestCase):
             self.client.post(f"/api/agent/conversations/{self.conversation_id}/messages", json={"message": text})
         return flush
 
-    def test_a_how_to_talk_request_is_saved_right_away(self) -> None:
-        self.assertTrue(self._send("bas suno, sawal mat puchna please").called)
-
-    def test_an_ordinary_message_waits_for_the_idle_flush(self) -> None:
-        self.assertFalse(self._send("I watched a film today").called)
+    def test_a_how_to_talk_request_waits_for_the_idle_flush_like_any_message(self) -> None:
+        # No keyword list decides what is a request; the background model reads every message.
+        self.assertFalse(self._send("bas suno, sawal mat puchna please").called)
 
 
 if __name__ == "__main__":
