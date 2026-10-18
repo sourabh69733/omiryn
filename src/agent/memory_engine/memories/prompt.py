@@ -75,6 +75,9 @@ V3 memory rules:
   "not doing that anymore"), it changed: supersede the memory with what is true now, or retract it when
   nothing durable is left. If they also want it dropped from conversation, add a procedural memory
   saying so.
+- A how-to-talk request about the same thing as an active procedural memory changes it ("write more
+  now" after "keep it short", "ask me things again" after "no questions"): supersede that memory with
+  the new request, or retract it when they only drop the old one. Never keep both active.
 - focus is true for something the user is into for a while that will pass: studying a topic,
   preparing for an exam, a project, training for an event, a phase. It is false for settled facts
   (where they live, their job, the people in their life), lasting interests and preferences, and
