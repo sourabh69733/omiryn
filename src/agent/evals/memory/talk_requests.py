@@ -124,6 +124,9 @@ async def run_talk_request_case(case: TalkRequestCase) -> TalkRequestResult:
     old_id = None
     if case.replaces:
         statement, value = case.replaces
+        said_at = (start - timedelta(days=3)).isoformat()
+        old_chat = {"role": "user", "content": "keep it short", "created_at": said_at}
+        save_conversation({"id": f"{user_id}-old", "status": "active", "messages": [old_chat]}, user_id)
         old_id = create_agent_memory(
             {
                 "user_id": user_id,
@@ -134,7 +137,7 @@ async def run_talk_request_case(case: TalkRequestCase) -> TalkRequestResult:
                 "statement": statement,
                 "confidence": 0.9,
                 "importance": 0.8,
-                "evidence": [{"conversation_id": f"{user_id}-old", "message_index": 0, "exact_quote": "keep it short", "observed_at": (start - timedelta(days=3)).isoformat()}],
+                "evidence": [{"conversation_id": f"{user_id}-old", "message_index": 0, "exact_quote": "keep it short", "observed_at": said_at}],
             }
         )["id"]
     say("user", "hey")
