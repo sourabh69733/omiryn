@@ -763,7 +763,8 @@ def _datetime(value: Any, name: str, *, required: bool = False) -> datetime | No
             raise ValueError(f"memory {name} is invalid") from error
     if not isinstance(value, datetime):
         raise ValueError(f"memory {name} is invalid")
-    return value
+    # Stored as UTC: SQLite drops the offset, so "21:12+05:30" would come back as 21:12 UTC.
+    return value.astimezone(UTC) if value.tzinfo else value
 
 
 def _optional_text(value: Any) -> str | None:

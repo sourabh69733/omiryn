@@ -79,6 +79,15 @@ def test_create_and_read_memory_with_normalized_evidence() -> None:
     assert storage.get_agent_memory(saved["id"], "another-user") is None
 
 
+def test_local_times_keep_their_moment() -> None:
+    saved = storage.create_agent_memory(
+        _payload(valid_from="2026-10-18T21:12:00+05:30", occurred_at="2026-10-18T21:12:00+05:30")
+    )
+
+    assert saved["valid_from"] == "2026-10-18T15:42:00Z"
+    assert saved["occurred_at"] == "2026-10-18T15:42:00Z"
+
+
 def test_storage_encrypts_memory_value_and_exact_quote() -> None:
     key = base64.urlsafe_b64encode(b"0123456789abcdef0123456789abcdef").decode()
     with patch.dict(os.environ, {"ENCRYPTION_MASTER_KEY": key}):
