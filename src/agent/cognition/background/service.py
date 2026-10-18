@@ -36,6 +36,7 @@ from storage.open_questions import add_open_questions, list_open_questions, reso
 from storage.self_notes import add_self_notes, list_active_self_notes, resolve_self_notes
 from storage.user_cards import set_user_card
 from agent.memory_engine.memories.focus import without_focus_lines
+from agent.memory_engine.memories.user_card import without_replaced_lines
 from storage.vibe_cards import get_vibe_card, update_vibe_card
 from agent.cognition.background.vibe_verify import stored_quote_lookup, verify_vibe_updates
 from agent.memory_engine.memories.vibe import with_current_proof
@@ -430,14 +431,19 @@ async def _run_claimed_background_cognition(
                 message_index=batch.new_end_message_index,
                 proposal=cognition.thread.get("proposal"),
             )
+        replaced_ids = _replaced_memory_ids(analysis.operations) if memory_version == 3 else {}
         if (
             analysis.valid
-            and cognition.user_card
-            and cognition.user_card != user_card
+            and (cognition.user_card or replaced_ids)
             and (config.live_memory_writes or config.live_v3_memory_writes)
         ):
-            focus = [memory for memory in list_agent_memories(user_id) if memory.get("focus") and memory.get("status") == "active"]
-            set_user_card(user_id, without_focus_lines(cognition.user_card, focus))
+            memories = list_agent_memories(user_id)
+            focus = [memory for memory in memories if memory.get("focus") and memory.get("status") == "active"]
+            # The model sometimes updates a memory but returns no new card; its old line must not stay.
+            replaced = [(memory, replaced_ids[memory["id"]]) for memory in memories if memory["id"] in replaced_ids]
+            card = without_replaced_lines(without_focus_lines(cognition.user_card or user_card or "", focus), replaced)
+            if card != user_card:
+                set_user_card(user_id, card)
         if (
             analysis.valid
             and not cognition.self_notes.empty
@@ -790,6 +796,18 @@ def _existing_memory_context(
         }
         for memory in memories[:MAX_EXISTING_MEMORIES]
     ]
+
+
+def _replaced_memory_ids(operations: tuple[Any, ...]) -> dict[str, str | None]:
+    """Memories this batch replaced or retracted, with the text of what replaced each."""
+    replaced: dict[str, str | None] = {}
+    for operation in operations:
+        if isinstance(operation, MemorySupersedeProposal):
+            new = operation.replacement
+            replaced[operation.target_memory_id] = f"{new.statement or ''} {new.value}"
+        elif isinstance(operation, MemoryRetractProposal):
+            replaced[operation.target_memory_id] = None
+    return replaced
 
 
 def _save_cognition_debug_once(
