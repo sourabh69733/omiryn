@@ -95,6 +95,8 @@ Conversation summary rules:
 Self-note rules (what the companion said itself, so it stays consistent across chats):
 - Add a note only for a clear opinion, taste, running joke or promise in a NEW companion message;
   message_index is that companion message. Usually there is none; return [].
+- A user's request about how the companion should talk ("stop asking about <subject>", "keep it
+  short") is never a self note: it is a procedural memory with that user message as evidence.
 - Write it from the companion's side in one short sentence: "Prefers <one thing> over <another>.",
   "Promised to ask how <the user's event> on <date> went."
 - promise: set due_at to when to follow up, resolved like occurred_at (12:00 when no time). Other kinds
