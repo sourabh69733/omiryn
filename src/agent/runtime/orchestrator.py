@@ -28,6 +28,12 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     trim_questions,
     without_copied_replies,
 )
+from agent.context_engine.conversation_engine.policy.requests import (
+    broken_requests,
+    broken_requests_reason,
+    how_to_talk_requests,
+    request_check_input,
+)
 from agent.config import agent_pipeline_config
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
@@ -35,6 +41,7 @@ from agent.memory_engine.memories.embeddings import embed_memory_query, memory_q
 from agent.shared.clock import utc_now_iso
 from agent.providers import (
     AgentProviderError,
+    check_reply_requests,
     AgentProviderTruncationError,
     _provider_messages,
     assess_user_message_quality,
@@ -288,6 +295,13 @@ async def run_agent_turn(
             generation_arguments=generation_arguments,
             question_limit=context_package.question_limit,
         )
+        reply, request_check = await _follow_requests(
+            reply,
+            requests=how_to_talk_requests(context_package.context_sources),
+            reply_messages=reply_messages,
+            generation_arguments=generation_arguments,
+            question_limit=context_package.question_limit,
+        )
         reply, story_ended = strip_story_end(reply)
         reply, story_marked = strip_story_marker(reply)
         reply, requested_voice = strip_voice_marker(reply)
@@ -330,6 +344,7 @@ async def run_agent_turn(
                 "foreground_contract": "reply_only",
                 "fallback_reason": fallback_reason,
                 "freshness": freshness,
+                "request_check": request_check,
             },
         }
     )
@@ -436,6 +451,47 @@ async def _freshen_reply(
         "questions_trimmed": trimmed,
         "still_stale": problem(rewritten) is not None,
     }
+
+
+async def _follow_requests(
+    reply: str,
+    *,
+    requests: list[str],
+    reply_messages: list[dict[str, Any]],
+    generation_arguments: dict[str, Any],
+    question_limit: int = 1,
+) -> tuple[str, dict[str, Any] | None]:
+    """One rewrite when the draft breaks how the user asked to be talked to.
+
+    Runs only for users with saved how-to-talk requests. Best effort: any failure keeps the draft.
+    """
+    if not requests or not request_check_enabled():
+        return reply, None
+    conversation_id = str(generation_arguments.get("conversation_id") or "")
+    try:
+        raw = await check_reply_requests(request_check_input(reply, requests), conversation_id=conversation_id)
+    except Exception as error:
+        return reply, {"checked": False, "error": type(error).__name__}
+    broken = broken_requests(raw, requests)
+    if not broken:
+        return reply, {"checked": True, "broken": []}
+    try:
+        note = rewrite_instruction(reply, broken_requests_reason(broken))
+        raw_reply = await generate_agent_reply(
+            reply_messages + [{"role": "system", "content": note}], **generation_arguments
+        )
+        rewritten = _visible_companion_reply(raw_reply, structured_companion_reply(raw_reply))
+    except Exception as error:
+        return reply, {"checked": True, "broken": broken, "rewritten": False, "error": type(error).__name__}
+    if not rewritten.strip():
+        return reply, {"checked": True, "broken": broken, "rewritten": False}
+    if question_rule_reason(rewritten, question_limit):
+        rewritten = trim_questions(rewritten, question_limit)
+    return rewritten, {"checked": True, "broken": broken, "rewritten": True}
+
+
+def request_check_enabled() -> bool:
+    return os.getenv("AGENT_REQUEST_CHECK", "true").strip().lower() != "false"
 
 
 _NO_QUESTION_NOTE = (

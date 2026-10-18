@@ -8,6 +8,7 @@ from typing import Any
 from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.context_engine.conversation_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
 from agent.context_engine.conversation_engine.state import (
     conversation_thread_context_sources,
     conversation_thread_guidance,
@@ -68,8 +69,7 @@ WHATSAPP_FUEL_RETRIEVAL_LIMIT = 1
 DATA_POINT_SOURCE_TYPE = "data_points"
 AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 # Procedural memories (how the user wants to be talked to) get their own source, kept apart
-# from facts so the reply prompt can place them where they are followed.
-HOW_TO_TALK_SOURCE_TYPE = "how_to_talk"
+# from facts so the reply prompt can place them where they are followed (HOW_TO_TALK_SOURCE_TYPE).
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 USER_CARD_SOURCE_TYPE = "user_card"
 RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
