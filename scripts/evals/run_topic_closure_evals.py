@@ -66,6 +66,7 @@ async def _run(args: argparse.Namespace) -> int:
             lines.append(f"- Run {number}: {'PASS' if result.passed else 'FAIL: ' + '; '.join(result.problems)}")
             lines.extend(f"  - memory {memory}" for memory in result.memories)
             lines.append(f"  - card: {result.card.replace(chr(10), ' | ')}")
+            lines.append(f"  - summary: {result.summary or '(none)'}")
             lines.append(f"  - left open: {result.left_open or '(nothing)'}")
             if result.greeting:
                 lines.append(f"  - greeting: {result.greeting}")

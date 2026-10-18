@@ -7,6 +7,7 @@ asks the real reply model one neutral question. Checked in code, no AI judge:
 - memory: no lasting memory still says the subject is current (closing cases), or it still does
   (the control case, so closing is not just deleting everything);
 - card: the user card no longer says it is current;
+- summary: the rolling conversation summary, seeded with "currently studying", no longer says so;
 - left_open: the newest session note does not keep it open;
 - reply: the reply to a neutral question does not bring the subject up;
 - greeting: when the user comes back hours later, Omi's own greeting does not bring it up.
@@ -21,7 +22,8 @@ from typing import Any
 from uuid import uuid4
 
 from agent.cognition.background.service import run_background_cognition
-from agent.memory_engine.processing.service import get_processing_state
+from agent.memory_engine.processing.models import MemoryHandoff, MemoryProcessingState
+from agent.memory_engine.processing.service import get_processing_state, save_processing_state
 from agent.proactive.service import greet_on_return
 from agent.runtime.orchestrator import run_agent_turn
 from agent.shared.clock import utc_now
@@ -49,6 +51,8 @@ LATER_CHAT = (
     ("user", "haan yaar, goosebumps"),
 )
 OMI_ASKS = "Waise, transformers ki padhai kaisi chal rahi hai?"
+# What an earlier batch wrote before the user closed the subject.
+SEEDED_SUMMARY = "The user is currently studying transformers in machine learning and finds attention tough."
 
 
 @dataclass(frozen=True)
@@ -132,6 +136,7 @@ class ClosureResult:
     problems: tuple[str, ...]
     memories: tuple[str, ...]
     card: str
+    summary: str
     left_open: str
     reply: str
     greeting: str
@@ -166,6 +171,14 @@ async def run_closure_case(case: ClosureCase, *, check_reply: bool = True) -> Cl
         }
     )
     set_user_card(user_id, "Lives in Jaipur\nCurrently studying: transformers in machine learning")
+    save_processing_state(
+        MemoryProcessingState(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            processed_through_message_index=len(messages) - 1,
+            handoff=MemoryHandoff(conversation_summary=SEEDED_SUMMARY),
+        )
+    )
     say("assistant", OMI_ASKS)
     for role, text in (*case.turns, *LATER_CHAT):
         say(role, text)
@@ -181,19 +194,20 @@ async def run_closure_case(case: ClosureCase, *, check_reply: bool = True) -> Cl
     card = get_user_card(user_id) or ""
     state = get_processing_state(conversation_id, user_id)
     log = state.handoff.session_log if state else ()
+    summary = state.handoff.conversation_summary if state else ""
     left_open = (log[-1].unfinished or "") if log else ""
 
     problems: list[str] = []
     still = [text for text in lasting if re.search(STILL_CURRENT, text)]
     # A card line fails only when it still reads as ongoing with no sign that it ended.
-    card_still = any(
-        re.search(STILL_CURRENT, line) and not re.search(ENDED, line) for line in card.lower().splitlines()
-    )
+    card_still = any(_still_current(line) for line in card.splitlines())
     if case.closed:
         if still:
             problems.append("a memory still says it is current")
         if card_still:
             problems.append("the user card still says it is current")
+        if _still_current(summary):
+            problems.append("the summary still says it is current")
         if re.search(SUBJECT, left_open.lower()):
             problems.append("the session note keeps it open")
     else:
@@ -220,6 +234,7 @@ async def run_closure_case(case: ClosureCase, *, check_reply: bool = True) -> Cl
         problems=tuple(problems),
         memories=tuple(f"[{memory['kind']}{', until ' + str(memory['valid_until'])[:10] if memory.get('valid_until') else ''}] {_text(memory)}" for memory in active),
         card=card,
+        summary=summary,
         left_open=left_open,
         reply=reply,
         greeting=greeting,
@@ -250,6 +265,14 @@ async def _reply(conversation_id: str, user_id: str, messages: list[dict[str, An
     )
     new = turn.messages[len(messages) + 1:]
     return " ".join(str(message.get("content") or "") for message in new if message.get("role") == "assistant")
+
+
+def _still_current(text: str) -> bool:
+    """A sentence or line that reads as ongoing with no sign that it ended."""
+    return any(
+        re.search(STILL_CURRENT, part) and not re.search(ENDED, part)
+        for part in re.split(r"(?<=[.!?])\s+|\n", text.lower())
+    )
 
 
 def _text(memory: dict[str, Any]) -> str:
