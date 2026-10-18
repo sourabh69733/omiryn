@@ -14,6 +14,7 @@ BACKGROUND_COGNITION = "background_cognition"
 VIBE_BACKFILL = "vibe_backfill"
 VIBE_VERIFY = "vibe_verify"
 VIBE_INTRO = "vibe_intro"
+REPLY_REQUEST_CHECK = "reply_request_check"
 
 PROFILE_SIGNAL_EXTRACT = "profile_signal_extract"
 PROFILE_SIGNAL_BACKFILL = "profile_signal_backfill"

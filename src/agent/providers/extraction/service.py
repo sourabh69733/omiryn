@@ -20,6 +20,7 @@ from agent.cognition.background.vibe_prompt import (
     VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,
 )
+from agent.context_engine.conversation_engine.policy.requests import REQUEST_CHECK_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (
@@ -29,6 +30,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT,
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
+    REPLY_REQUEST_CHECK,
     VIBE_BACKFILL,
     VIBE_INTRO,
     VIBE_VERIFY,
@@ -139,6 +141,43 @@ _DEFAULT_VIBE_VERIFY_MODELS = {"deepinfra": "deepseek-ai/DeepSeek-V3.2"}
 def vibe_verify_model(provider: str) -> str | None:
     """VIBE_VERIFY_MODEL, else a strong default for the provider, else the provider's default."""
     return os.getenv("VIBE_VERIFY_MODEL", "").strip() or _DEFAULT_VIBE_VERIFY_MODELS.get(provider)
+
+
+# The reply check runs before the reply is sent, so it needs a fast model that is not the reply
+# model (that one drifts). On 8 real drafts (2026-10-18): Qwen3 235B 8/8 at ~1.4s, DeepSeek V3.2
+# 7/8 at ~2.6s, Llama 3.3 70B 7/8, Mistral Small 6/8.
+_DEFAULT_REQUEST_CHECK_MODELS = {"deepinfra": "Qwen/Qwen3-235B-A22B-Instruct-2507"}
+
+
+def request_check_model(provider: str) -> str | None:
+    """REQUEST_CHECK_MODEL, else a fast strong default for the provider."""
+    return os.getenv("REQUEST_CHECK_MODEL", "").strip() or _DEFAULT_REQUEST_CHECK_MODELS.get(provider)
+
+
+async def check_reply_requests(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 20,
+) -> dict[str, Any]:
+    """Which saved how-to-talk requests a draft reply breaks; returns {"broken": [...]}."""
+    provider = _provider_name()
+    model = model or request_check_model(provider)
+    if provider == "mock":
+        return {"broken": []}
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=REQUEST_CHECK_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": text}],
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=REPLY_REQUEST_CHECK,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
 
 
 async def write_vibe_intro(
