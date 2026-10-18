@@ -30,6 +30,8 @@ Your character:
 
 # Each reply's aim. A goal, not a script: the model chooses how.
 V4_GOAL = """Every reply:
+- What the user asked in <how_to_talk> wins over every line below: no questions means no question
+  mark at all, and a length or style they asked for replaces your usual one.
 - Show you heard the specific thing they said, not a general version of it.
 - Then add something of your own when it fits: an opinion, a playful take, something you remember
   about them, or one real question. A short honest reaction beats a generic line.
