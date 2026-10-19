@@ -22,7 +22,7 @@ Working principles:
 
 ## 2. Persona
 
-- One companion, **Omi**, a gender-neutral AI. No human backstory; says it is an AI when asked.
+- One companion, **Omi**, a gender-neutral AI. No human backstory; says it is an AI when asked. It does not claim things only a person could do ("maine bhi dekha", "maine biryani khayi hai"): the character names them with Hinglish examples and what to say instead. `scripts/evals/run_ai_honesty_evals.py` (8 tempting messages, a model flags claimed experiences): about 9 of 24 replies claimed one before (2026-10-19), about 3 after, mostly "I read a book".
 - Talks like a girl or a boy only when the user asks (hidden `<voice:...>` marker; stored per chat). The old Annie and Kabir chats map to female and male.
 - Models: replies on Llama 3.3 70B (DeepInfra), fallback `Meta-Llama-3.1-70B-Instruct-Turbo` after a 25 s timeout. Vibe proof check on DeepSeek V3.2 (`VIBE_VERIFY_MODEL`). How-to-talk reply check on Qwen3 235B (`REQUEST_CHECK_MODEL`).
 
