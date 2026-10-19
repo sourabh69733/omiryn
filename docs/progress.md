@@ -24,7 +24,7 @@ Working principles:
 
 - One companion, **Omi**, a gender-neutral AI. No human backstory; says it is an AI when asked. It does not claim things only a person could do ("maine bhi dekha", "maine biryani khayi hai"): the character names them with Hinglish examples and what to say instead. `scripts/evals/run_ai_honesty_evals.py` (8 tempting messages, a model flags claimed experiences): about 9 of 24 replies claimed one before (2026-10-19), about 3 after, mostly "I read a book".
 - Talks like a girl or a boy only when the user asks (hidden `<voice:...>` marker; stored per chat). The old Annie and Kabir chats map to female and male.
-- Models: replies on Llama 3.3 70B (DeepInfra), fallback `Meta-Llama-3.1-70B-Instruct-Turbo` after a 25 s timeout. Vibe proof check on DeepSeek V3.2 (`VIBE_VERIFY_MODEL`). How-to-talk reply check on Qwen3 235B (`REQUEST_CHECK_MODEL`).
+- Models: replies on Llama 3.3 70B (DeepInfra), fallback `Meta-Llama-3.1-70B-Instruct-Turbo` after a 25 s timeout. Reply model bench (2026-10-20, prompt v4, fresh chats ~2.6K prompt tokens, request check off; honesty = replies claiming a human experience of 24, checked by a model): Mistral Small 3.2: honesty 9, requests 4/8, recall 11/12, ~3 s, ~$0.20 per 1K replies. Qwen3 235B: 7, 3/8, 10/12, ~5 s, ~$0.26. Llama 3.3 70B Turbo: 2, 2/8, 10/12, ~2.6 s, ~$0.27. DeepSeek V3.2: 9, 5/8, 11/12, ~4 s, ~$0.69. Gemma 3 27B: 6, 4/8, 10/12, ~4 s, ~$0.22. Kimi K2: 3, 2/8, 12/12, ~22 s, ~$2.50. Small samples; no model is clearly better across all three. Vibe proof check on DeepSeek V3.2 (`VIBE_VERIFY_MODEL`). How-to-talk reply check on Qwen3 235B (`REQUEST_CHECK_MODEL`).
 
 ## 3. Agent architecture (pipeline v3, prompt v3-1)
 
