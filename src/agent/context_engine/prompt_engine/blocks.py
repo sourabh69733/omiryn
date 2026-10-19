@@ -34,6 +34,7 @@ _SOURCE_BLOCKS = {
     "agent_memories_v3": "memories",
     "how_to_talk": "how_to_talk",
     "reply_feedback": "how_to_talk",
+    "texting_style": "how_to_talk",
     "open_questions": "open_questions",
     "might_fit": "might_fit",
     "data_points": "memories",

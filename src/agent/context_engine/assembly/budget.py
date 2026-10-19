@@ -27,6 +27,8 @@ SOURCE_TYPE_PRIORITY = {
     "how_to_talk": 118,
     # The user's own ratings of recent replies; they shape how to talk.
     "reply_feedback": 117,
+    # How they text, measured from their own uploaded lines; one line.
+    "texting_style": 116,
     # A few memories the message does not touch; below the ones it does.
     "might_fit": 105,
     # One short doubt to clear up when it fits.
@@ -51,6 +53,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "agent_self_notes": 1000,
     "how_to_talk": 800,
     "reply_feedback": 1000,
+    "texting_style": 300,
     "open_questions": 600,
     "might_fit": 800,
     "agent_behavior_rules": 1400,

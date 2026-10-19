@@ -7,7 +7,7 @@ from typing import Any
 
 from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
-from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.context_engine.conversation_engine.personalization import style_adaptation_guide, texting_style_note
 from agent.context_engine.conversation_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
 from agent.context_engine.conversation_engine.state import (
     conversation_thread_context_sources,
@@ -59,6 +59,7 @@ from storage import (
     list_context_sources,
     list_user_context_sources,
 )
+from storage.context_sources import list_whatsapp_imports, list_whatsapp_style_profiles
 from text_vectors import build_text_embedding, cosine_similarity
 
 STYLE_CONTEXT_SOURCE_TYPES = {"whatsapp_chat", "friend_style"}
@@ -72,6 +73,7 @@ AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 # from facts so the reply prompt can place them where they are followed (HOW_TO_TALK_SOURCE_TYPE).
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 USER_CARD_SOURCE_TYPE = "user_card"
+TEXTING_STYLE_SOURCE_TYPE = "texting_style"
 RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
 RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
@@ -252,6 +254,7 @@ def build_reply_context_sources(
                 for source in retrieved_sources
                 if _source_identity(source) not in selected_style_ids
             ]
+            + _texting_style_sources(user_id)
         )
 
     return continuity_sources + (
@@ -262,6 +265,7 @@ def build_reply_context_sources(
             query_intent,
         )
         + retrieved_sources
+        + _texting_style_sources(user_id)
     )
 
 
@@ -496,6 +500,32 @@ def _recently_offered(conversation_id: str, user_id: str) -> set[str]:
             if source.get("source_type") == MIGHT_FIT_SOURCE_TYPE:
                 offered.update(str(item) for item in (source.get("metadata") or {}).get("memory_ids") or [])
     return offered
+
+
+def _texting_style_sources(user_id: str | None) -> list[dict[str, Any]]:
+    """How the user texts, from their own side of their newest uploaded chat, in every chat.
+
+    A friend's style import is left out: that is someone else's way of texting.
+    """
+    if not user_id:
+        return []
+    for upload in list_whatsapp_imports(user_id=user_id):  # newest first
+        if upload.get("style_kind") != "user_style" or not upload.get("selected_sender"):
+            continue
+        sender = str(upload["selected_sender"]).casefold()
+        for profile in list_whatsapp_style_profiles(str(upload["id"]), user_id):
+            note = texting_style_note(profile.get("summary") or {}) if str(profile.get("sender") or "").casefold() == sender else None
+            if note:
+                return [
+                    {
+                        "source_type": TEXTING_STYLE_SOURCE_TYPE,
+                        "title": "How the user texts",
+                        "content": note,
+                        "metadata": {"import_id": upload["id"]},
+                    }
+                ]
+        return []
+    return []
 
 
 def _reply_feedback_sources(user_id: str | None) -> list[dict[str, Any]]:
