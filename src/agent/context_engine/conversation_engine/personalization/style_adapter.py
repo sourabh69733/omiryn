@@ -37,6 +37,33 @@ def style_adaptation_guide(
     return "\n".join(lines)
 
 
+def texting_style_note(summary: dict[str, Any]) -> str | None:
+    """How the user texts, from the numbers of their own uploaded lines; None without them.
+
+    Code measures; the reply model only mirrors the rhythm. Emoji counts are left out: the stored
+    share counts any non-ASCII text, which includes Hindi script.
+    """
+    average_words = _float(summary.get("average_words"))
+    if average_words <= 0:
+        return None
+    habits = [f"about {max(1, round(average_words))} words per message"]
+    if _percentage(summary.get("short_message_share")) >= 60:
+        habits.append("mostly quick short lines")
+    if _percentage(summary.get("lowercase_opening_share")) >= 50:
+        habits.append("usually starting in lowercase")
+    question_share = _percentage(summary.get("question_share"))
+    if question_share >= 25:
+        habits.append("asking questions often")
+    elif question_share <= 5:
+        habits.append("rarely asking questions")
+    if _percentage(summary.get("exclamation_share")) >= 20:
+        habits.append("often with exclamation marks")
+    return (
+        f"From chats they shared, they text with {', '.join(habits)}. Match that rhythm and length "
+        "unless they asked for something else; it is how they text, not a request."
+    )
+
+
 def _style_traits(summary: dict[str, Any]) -> list[str]:
     traits: list[str] = []
     average_words = _float(summary.get("average_words"))
