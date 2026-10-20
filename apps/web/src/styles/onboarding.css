@@ -189,27 +189,19 @@
   height: auto;
 }
 
-.eyebrow {
-  margin: 0;
-  color: var(--purple);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .privacy-note {
   display: flex;
   gap: 11px;
   align-items: flex-start;
   margin-top: auto;
-  border: 1px solid rgba(66, 214, 200, 0.25);
-  border-radius: 16px;
-  padding: 14px;
-  color: var(--muted);
-  background: rgba(66, 214, 200, 0.07);
-  font-size: 11px;
-  line-height: 1.5;
+  border: 1px solid #dbe9e4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #64736e;
+  background: #f7fbf9;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 560;
 }
 
 .privacy-note svg {
@@ -311,7 +303,7 @@
   display: grid;
   min-height: 100dvh;
   place-items: center;
-  padding: 28px 18px;
+  padding: clamp(18px, 4vw, 56px);
   background:
     radial-gradient(circle at 15% 18%, rgba(118, 87, 220, 0.16), transparent 28%),
     radial-gradient(circle at 88% 82%, rgba(66, 214, 200, 0.13), transparent 26%),
@@ -321,14 +313,14 @@
 .auth-card {
   display: grid;
   width: min(100%, 440px);
-  justify-items: center;
+  justify-items: stretch;
   border: 1px solid rgba(214, 201, 248, 0.78);
   border-radius: 28px;
-  padding: clamp(32px, 6vw, 52px);
+  padding: clamp(26px, 4vw, 40px);
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 30px 90px rgba(55, 43, 92, 0.13);
-  text-align: center;
-  backdrop-filter: var(--blur);
+  text-align: left;
+  backdrop-filter: none;
 }
 
 .auth-card .brand-lockup {
@@ -358,7 +350,7 @@
   border-radius: 15px;
   color: var(--ink-soft);
   background: #fff;
-  box-shadow: 0 8px 22px rgba(39, 33, 64, 0.07);
+  box-shadow: none;
   font-weight: 720;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
@@ -388,10 +380,10 @@
 }
 
 .auth-card > small {
-  max-width: 310px;
+  max-width: none;
   margin-top: 20px;
-  color: var(--muted-2);
-  font-size: 10px;
+  color: var(--brand-muted);
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -468,9 +460,6 @@
   max-width: 820px;
   margin-right: auto;
   margin-left: auto;
-}
-
-.chat-composer {
   display: flex;
   gap: 10px;
   align-items: flex-end;
@@ -552,12 +541,19 @@
 }
 
 .legacy-react-shell .confirm-overlay {
-  z-index: 200;
+  z-index: 60;
+  padding: 16px;
+  background: rgba(24, 24, 27, 0.32);
+  backdrop-filter: blur(3px);
 }
 
 .legacy-react-shell .confirm-dialog {
   border-radius: 18px;
   animation: confirm-dialog-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 22px;
 }
 
 .legacy-react-shell .confirm-actions button:disabled {
@@ -586,6 +582,7 @@
   display: flex;
   align-items: center;
   padding: 18px clamp(16px, 4vw, 64px);
+  padding-top: max(18px, env(safe-area-inset-top));
 }
 
 .quick-setup-card {
@@ -735,8 +732,8 @@
   border: 0;
   border-radius: 999px;
   color: #fff;
-  background: linear-gradient(135deg, var(--purple-2), var(--purple));
-  box-shadow: 0 10px 24px rgba(118, 87, 220, 0.22);
+  background: var(--brand-violet);
+  box-shadow: none;
   font: inherit;
   font-size: 16px;
   font-weight: 650;

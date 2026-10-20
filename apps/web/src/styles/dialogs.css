@@ -1,11 +1,5 @@
 /* Popups (confirm, review, usage, evidence) in the calm style: white, rounded, one clear title,
    no eyebrow labels. On phones they rise from the bottom as sheets. */
-.legacy-react-shell .confirm-overlay {
-  z-index: 60;
-  padding: 16px;
-  background: rgba(24, 24, 27, 0.32);
-  backdrop-filter: blur(3px);
-}
 
 .legacy-react-shell .confirm-dialog,
 .legacy-react-shell .evidence-dialog {
@@ -13,13 +7,6 @@
   border-radius: 20px;
   background: #ffffff;
   box-shadow: 0 24px 60px rgba(39, 33, 64, 0.18);
-}
-
-.legacy-react-shell .confirm-dialog {
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 14px;
-  width: min(440px, 100%);
-  padding: 22px;
 }
 
 .legacy-react-shell .confirm-dialog .eyebrow,

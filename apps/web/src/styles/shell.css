@@ -79,10 +79,10 @@ button.omi-brand:hover {
   margin: 0 0 4px;
   padding: 0 8px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .omi-rail-links a {
@@ -135,7 +135,6 @@ button.omi-brand:hover {
   width: 17px;
   height: 17px;
 }
-
 
 button.omi-contact {
   display: flex;
@@ -352,6 +351,10 @@ button.omi-account-button:hover {
   padding: 10px max(16px, calc((100% - 792px) / 2));
   border-bottom: 1px solid var(--line);
   background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
 .omi-main .agentic-chat .chat-log {
@@ -761,12 +764,6 @@ button.omi-drawer-close:hover {
 
 /* Chat header: back arrow, then Omi's avatar and name right beside it, and the menu at the far
    right (like any messaging app), instead of a centred name floating between them. */
-.omi-main .agentic-chat .card-heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-}
 
 .omi-main .chat-title-lockup {
   flex: 1;
@@ -783,7 +780,6 @@ button.omi-drawer-close:hover {
 .omi-main .chat-title-lockup .terminal-mark {
   grid-row: auto;
 }
-
 
 .omi-main .agentic-chat .agent-status {
   overflow: hidden;

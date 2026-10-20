@@ -286,17 +286,6 @@
   margin-top: 4px;
 }
 
-.privacy-note {
-  border: 1px solid #dbe9e4;
-  border-radius: 8px;
-  color: #64736e;
-  background: #f7fbf9;
-  font-size: 12px;
-  font-weight: 560;
-  line-height: 1.45;
-  padding: 10px 12px;
-}
-
 .profile-photo-input {
   position: absolute;
   width: 1px;

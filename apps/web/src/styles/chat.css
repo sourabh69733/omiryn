@@ -43,6 +43,10 @@ button:not(:where(.epr-btn)):disabled {
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .chat-card::before {
@@ -52,7 +56,7 @@ button:not(:where(.epr-btn)):disabled {
   border-radius: inherit;
   background:
     linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(94, 234, 212, 0.08) 54%, transparent 76%);
-  content: "";
+  content: none;
   pointer-events: none;
 }
 
@@ -337,27 +341,16 @@ button.history-archived-toggle:hover {
   box-shadow: none;
 }
 
-.chat-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .agentic-chat {
   border-color: rgba(180, 154, 255, 0.16);
   color: var(--ink);
   background:
-    radial-gradient(circle at 8% 0%, rgba(180, 154, 255, 0.16), transparent 30%),
-    radial-gradient(circle at 96% 4%, rgba(255, 126, 179, 0.09), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 243, 255, 0.96)),
-    #fffbff;
+    #fff;
   font-family: var(--font-chat);
   font-variant-ligatures: none;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  box-shadow: 0 26px 70px rgba(22, 52, 50, 0.12);
+  box-shadow: 0 8px 30px rgba(24, 24, 27, 0.05);
 }
 
 .card-heading {
@@ -444,6 +437,9 @@ button.history-archived-toggle:hover {
 .agentic-chat .chat-log {
   position: relative;
   z-index: 1;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(255, 126, 179, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(251, 248, 255, 0.56), rgba(255, 255, 255, 0.08));
 }
 
 .chat-title-lockup {
@@ -531,12 +527,6 @@ button.history-archived-toggle:hover {
 .chat-log::-webkit-scrollbar {
   width: 0;
   height: 0;
-}
-
-.agentic-chat .chat-log {
-  background:
-    radial-gradient(circle at 96% 0%, rgba(255, 126, 179, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(251, 248, 255, 0.56), rgba(255, 255, 255, 0.08));
 }
 
 .message {
@@ -762,8 +752,8 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .message.agent {
   position: relative;
-  border-color: #e8e4f0;
-  color: #2f294a;
+  border-color: var(--brand-line);
+  color: var(--brand-ink);
   background: #ffffff;
   /* background: #f5f3f9; */
   box-shadow: none;
@@ -845,9 +835,9 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .message.user {
   position: relative;
-  border-color: #7764f6;
+  border-color: var(--primary);
   color: #ffffff;
-  background: #7764f6;
+  background: var(--primary);
   /* background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
     linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.15), rgba(94, 234, 212, 0.13)),
@@ -1182,6 +1172,9 @@ button.history-archived-toggle:hover {
   color: var(--ink);
   background: #ffffff;
   outline: none;
+  min-width: 0;
+  min-height: 46px;
+  padding: 12px 14px;
 }
 
 .agentic-chat .composer > input,
@@ -1401,13 +1394,6 @@ button.history-archived-toggle:hover {
   stroke-linejoin: round;
 }
 
-.composer > input,
-.composer > textarea {
-  min-width: 0;
-  min-height: 46px;
-  padding: 12px 14px;
-}
-
 .composer > textarea {
   max-height: 140px;
   resize: none;
@@ -1428,10 +1414,9 @@ button.history-archived-toggle:hover {
 }
 
 .agentic-chat .composer:focus-within {
-  border-color: rgba(119, 100, 246, 0.48);
+  border-color: var(--primary);
   box-shadow:
-    0 8px 24px rgba(64, 45, 118, 0.08),
-    0 0 0 4px rgba(180, 154, 255, 0.14);
+    0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
 .usage-summary {
@@ -1452,12 +1437,8 @@ button.history-archived-toggle:hover {
   }
 
   .chat-card {
-    height: auto;
-    min-height: auto;
-  }
-
-  .chat-card {
     height: min(720px, calc(100vh - 120px));
+    min-height: auto;
   }
 }
 
@@ -1479,7 +1460,7 @@ button.history-archived-toggle:hover {
 
   .chat-card {
     height: 100%;
-    min-height: 0;
+    min-height: 560px;
     border-radius: 8px;
   }
 
@@ -1503,6 +1484,10 @@ button.history-archived-toggle:hover {
 
   .agentic-chat .agent-status {
     font-size: 11px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chat-controls {
@@ -1514,13 +1499,6 @@ button.history-archived-toggle:hover {
 
   .chat-controls .model-picker {
     display: none;
-  }
-
-  .agentic-chat .agent-status {
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .agentic-chat .chat-log {
@@ -1612,10 +1590,6 @@ button.history-archived-toggle:hover {
     padding: 0;
   }
 
-  .chat-card {
-    min-height: 560px;
-  }
-
   .interview-screen:not([hidden]) .chat-card {
     position: fixed;
     top: calc(10px + var(--app-header-height) + 8px);
@@ -1626,26 +1600,12 @@ button.history-archived-toggle:hover {
     min-height: 0;
   }
 
-  .agentic-chat .card-heading {
-    align-items: center;
-    flex-direction: row;
-  }
-
-  .chat-controls {
-    align-items: center;
-    flex-direction: row;
-  }
-
   .model-picker {
     min-width: 0;
   }
 
   .message {
     max-width: min(92%, calc(100% - 46px));
-  }
-
-  .composer {
-    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 

@@ -95,8 +95,8 @@
 }
 
 .vibe-callout.is-ready {
-  border-color: rgba(47, 143, 120, 0.35);
-  background: linear-gradient(135deg, #ffffff, rgba(94, 234, 212, 0.12));
+  border-color: rgba(124, 58, 237, 0.22);
+  background: #f7f2ff;
 }
 
 .vibe-callout div {
@@ -153,7 +153,7 @@
 
 .vibe-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 12px;
 }
 

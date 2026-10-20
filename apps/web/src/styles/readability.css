@@ -1,38 +1,17 @@
 /* Readability floor for the whole app, loaded last: secondary text at least 13px (timestamps
    12px), a darker grey for muted text, no small uppercase labels, and normal letter spacing on big
    headings. Keep new styles at or above these sizes instead of adding more overrides here. */
-:root {
-  --brand-muted: #55555f;
-  --muted: #55555f;
-}
 
 /* Section labels read as words, not decoration. */
-.omi-rail-label {
-  font-size: 13px;
-  letter-spacing: 0;
-  text-transform: none;
-}
 
 /* Big headings: tight but never touching. */
 .auth-intro h1 {
   letter-spacing: -0.03em;
 }
 
-.auth-intro h1 em {
-  letter-spacing: -0.01em;
-}
-
 .auth-card h2,
 .contact-title h1 {
   letter-spacing: -0.02em;
-}
-
-.auth-card h2 {
-  margin-bottom: 22px;
-}
-
-.contact-title h1 {
-  font-size: 26px;
 }
 
 /* Secondary text: 13px minimum. */
