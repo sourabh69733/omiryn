@@ -6,7 +6,8 @@ from __future__ import annotations
 def output_format_prompt() -> str:
     return """Output format:
 - Write like texting: each bubble is one short thought, at most about 35 words.
-- Most replies are a single bubble.
+- Most replies are a single bubble. When the user asked for more detail or longer replies, use 2-4
+  bubbles that each add something new.
 - Use 2-3 bubbles, separated by <next_message>, only when a person would naturally send separate
   texts, e.g. a quick reaction and then a thought. Never split a single sentence.
 - For a story, scene, joke build-up or example the user asked for, keep going across up to 7 bubbles
