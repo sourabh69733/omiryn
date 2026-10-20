@@ -476,7 +476,7 @@ async def _follow_requests(
     if not broken:
         return reply, {"checked": True, "broken": []}
     try:
-        note = rewrite_instruction(reply, broken_requests_reason(broken))
+        note = rewrite_instruction(reply, broken_requests_reason(broken), keep_length=False)
         raw_reply = await generate_agent_reply(
             reply_messages + [{"role": "system", "content": note}], **generation_arguments
         )

@@ -116,16 +116,22 @@ def without_copied_replies(messages: list[dict[str, Any]], draft: str) -> list[d
     ]
 
 
-def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True) -> str:
+def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True, keep_length: bool = True) -> str:
     """The last message the model reads for the single rewrite attempt.
 
-    A draft that copied an earlier reply is not quoted: the model copies the quote back.
+    A draft that copied an earlier reply is not quoted: the model copies the quote back. When the
+    draft broke how the user asked to be talked to, the length may be the very thing to change.
     """
     said = f'your draft reply was "{draft.strip()[:400]}". It' if quote_draft else "your draft"
+    keep = (
+        "Keep the same language, length and format rules."
+        if keep_length
+        else "Keep the same language; follow what the user asked, even when it changes the length or format."
+    )
     return (
         f"Rewrite needed: {said} needs a rewrite because {reason}. "
         "Write a different reply that responds specifically to the user's latest message, "
-        "using what they actually said. Keep the same language, length and format rules."
+        f"using what they actually said. {keep}"
     )
 
 
