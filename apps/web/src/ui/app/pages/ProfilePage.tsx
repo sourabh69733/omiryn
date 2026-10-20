@@ -12,13 +12,18 @@ type Intro = { intro: string | null; chips: string[]; ready: boolean; edited?: b
 const INTRO_MAX = 200;
 const MAX_CHIPS = 5;
 
+// The last loaded profile, kept for this tab so Profile opens at once on later visits and refreshes
+// quietly. Cleared on sign-out so the next account never sees it.
+let lastProfile: { data: ProfileResponse; dataRequests: DataRequest[]; intro?: Intro } | null = null;
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") window.addEventListener("omiryn:auth-required", () => { lastProfile = null; });
+
 // Your profile: photos, basics and what Omi has picked up about you, with account actions below.
 export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange }: { onVibe?: () => void; onPrivacy?: () => void; fallbackAvatar?: string | null; onProfileChange?: (profile: Profile | null) => void }) {
-  const [data, setData] = useState<ProfileResponse | null>(null);
-  const [form, setForm] = useState<Profile>({});
+  const [data, setData] = useState<ProfileResponse | null>(lastProfile?.data ?? null);
+  const [form, setForm] = useState<Profile>(lastProfile?.data.profile || {});
   const [status, setStatus] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
+  const [dataRequests, setDataRequests] = useState<DataRequest[]>(lastProfile?.dataRequests ?? []);
   const [requestStatus, setRequestStatus] = useState("");
   const [photoStatus, setPhotoStatus] = useState("");
   const [sendingRequest, setSendingRequest] = useState(false);
@@ -27,13 +32,28 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
   const [photoSlot, setPhotoSlot] = useState(0);
   const [uploadingPhotoSlot, setUploadingPhotoSlot] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
+  const editingRef = useRef(false);
+  editingRef.current = editing;
   // undefined while loading; the page never waits on it.
-  const [intro, setIntro] = useState<Intro | undefined>(undefined);
+  const [intro, setIntro] = useState<Intro | undefined>(lastProfile?.intro);
   // Editing the intro: the user's own words, which Omi keeps and learns from.
   const [introDraft, setIntroDraft] = useState<{ text: string; chips: string[]; chipInput: string } | null>(null);
   const [introStatus, setIntroStatus] = useState("");
-  async function load() { const response = await apiFetch("/api/me/profile"); if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load profile.")); const next = await response.json() as ProfileResponse; setData(next); setForm(next.profile || {}); onProfileChange?.(next.profile || null); setStatus(""); const requestResponse = await apiFetch("/api/me/data-requests"); if (requestResponse.ok) setDataRequests(((await requestResponse.json()).requests || []) as DataRequest[]); }
-  function firstLoad() { setLoadError(""); load().catch((caught) => setLoadError(caught.message)); }
+  // Profile and data requests load together. While editing, a background refresh leaves the form alone.
+  async function load() {
+    const [response, requestResponse] = await Promise.all([apiFetch("/api/me/profile"), apiFetch("/api/me/data-requests")]);
+    if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load profile."));
+    const next = await response.json() as ProfileResponse;
+    const requests = requestResponse.ok ? ((await requestResponse.json()).requests || []) as DataRequest[] : lastProfile?.dataRequests ?? [];
+    setData(next);
+    if (!editingRef.current) setForm(next.profile || {});
+    setDataRequests(requests);
+    onProfileChange?.(next.profile || null);
+    setStatus("");
+    lastProfile = { ...lastProfile, data: next, dataRequests: requests };
+  }
+  // With a saved profile on screen, a failed refresh keeps it instead of showing an error page.
+  function firstLoad() { setLoadError(""); load().catch((caught) => { if (!lastProfile) setLoadError(caught.message); }); }
   useEffect(firstLoad, []);
   useEffect(() => {
     apiFetch("/api/me/intro")
@@ -41,6 +61,8 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
       .then((value: Intro) => setIntro(value))
       .catch(() => setIntro({ intro: null, chips: [], ready: false }));
   }, []);
+  // Keep the saved copy's intro current, including after an edit or a rewrite.
+  useEffect(() => { if (lastProfile && intro) lastProfile = { ...lastProfile, intro }; }, [intro, data]);
   async function save(event: FormEvent) { event.preventDefault(); setStatus("Saving profile…"); const response = await apiFetch("/api/me/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.display_name || null, age: Number(form.age), gender: form.gender, city: form.city || null, phone: form.phone || null }) }); if (!response.ok) { setStatus(await apiErrorMessage(response, "Could not save profile.")); return; } trackAppEvent("profile_saved", {}, { page: "profile" }); setStatus("Profile saved."); setEditing(false); await load(); }
   async function submitDataRequest(requestType: "export" | "deletion") {
     setSendingRequest(true);
