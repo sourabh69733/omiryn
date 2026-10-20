@@ -10,7 +10,7 @@ add creates a new memory:
   "memory_kind": "semantic | episodic | relationship | procedural",
   "purposes": ["profile | matching | personalization"],
   "key": "short stable semantic key",
-  "value": "specific scalar, array, or object",
+  "value": "specific scalar, array, or object; never a bare true or false (write \"no emojis in replies\", not true)",
   "statement": "one short plain sentence about the user, e.g. Has a <thing> called <name>.",
   "sensitivity": "standard | sensitive | highly_sensitive",
   "confidence": 0.0,
