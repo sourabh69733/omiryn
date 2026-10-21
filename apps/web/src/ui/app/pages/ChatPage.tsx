@@ -1318,7 +1318,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
         {drawer ? (
           <>
             <button className="omi-drawer-backdrop" type="button" onClick={() => setDrawer(null)} aria-label="Close panel" />
-            <aside className="omi-drawer" aria-label={drawer === "earlier" ? "Earlier chats" : "Usage"}>
+            <aside className="omi-drawer" role="dialog" aria-modal="true" aria-label={drawer === "earlier" ? "Earlier chats" : "Usage"}>
               <div className="omi-drawer-head">
                 <strong>{drawer === "earlier" ? "Earlier chats" : "Usage"}</strong>
                 <button type="button" className="omi-drawer-close" onClick={() => setDrawer(null)} aria-label="Close"><X aria-hidden="true" /></button>

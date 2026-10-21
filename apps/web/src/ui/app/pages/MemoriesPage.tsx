@@ -298,7 +298,7 @@ export function MemoriesPage() {
       ) : null}
       {reviewItem && reviewMode ? (
         <div className="confirm-overlay signal-review-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && savingFactId !== reviewItem.id) { setReviewItem(null); setReviewMode(null); setError(""); } }}>
-          <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title">
+          <section className="confirm-dialog signal-review-dialog" role="dialog" aria-modal="true" aria-labelledby="signal-review-title" onKeyDown={(event) => { if (event.key === "Escape" && savingFactId !== reviewItem.id) { setReviewItem(null); setReviewMode(null); setError(""); } }}>
             <div className="confirm-copy">
               <p className="eyebrow">{reviewMode === "feedback" ? "Review signal" : "Usage control"}</p>
               <h2 id="signal-review-title">{reviewMode === "feedback" ? "Is this true about you?" : "Where can Omi use this?"}</h2>
@@ -364,7 +364,7 @@ export function MemoriesPage() {
       ) : null}
       {evidenceItem ? (
         <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEvidenceItem(null); }}>
-          <section className="evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="evidence-title">
+          <section className="evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="evidence-title" onKeyDown={(event) => { if (event.key === "Escape") setEvidenceItem(null); }}>
             <div className="evidence-dialog-header">
               <div>
                 <p className="eyebrow">Evidence</p>
