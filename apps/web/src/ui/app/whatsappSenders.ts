@@ -24,3 +24,23 @@ export function chatTitle(fileName: string, senders: ChatSender[], me: string | 
   if (fromFile && fromFile.toLowerCase() !== "_chat" && fromFile !== fileName.replace(/\.txt$/i, "")) return fromFile;
   return senders.find((sender) => sender.name !== me)?.name || "WhatsApp chat";
 }
+
+// The sender who is the user, from their own names ("Sourabh" or "Sourabh Sahu"), or null when
+// no single sender clearly matches; then the app asks "Which one is you?".
+export function senderForUser(senders: ChatSender[], userNames: string[]): string | null {
+  const mine = userNames.map(nameWords).filter((words) => words.length);
+  if (!mine.length) return null;
+  const exact = senders.filter((sender) => mine.some((words) => words.join(" ") === nameWords(sender.name).join(" ")));
+  if (exact.length === 1) return exact[0].name;
+  if (exact.length > 1) return null;
+  // Same first name, and one name's words all appear in the other ("Sourabh" and "Sourabh sahu").
+  const close = senders.filter((sender) => {
+    const theirs = nameWords(sender.name);
+    return mine.some((words) => words[0] === theirs[0] && (words.every((word) => theirs.includes(word)) || theirs.every((word) => words.includes(word))));
+  });
+  return close.length === 1 ? close[0].name : null;
+}
+
+function nameWords(name: string): string[] {
+  return name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+}

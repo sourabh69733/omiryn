@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chatSenders, chatTitle } from "./whatsappSenders";
+import { chatSenders, chatTitle, senderForUser } from "./whatsappSenders";
 
 const ANDROID = `13/09/2026, 9:15 pm - Riya: hey did you see the match
 13/09/2026, 9:16 pm - Sourabh: yes!! kohli was insane
@@ -22,4 +22,18 @@ test("the title comes from the file name, else the other person", () => {
   const senders = chatSenders(ANDROID);
   assert.equal(chatTitle("WhatsApp Chat with Riya.txt", senders, "Sourabh"), "Riya");
   assert.equal(chatTitle("_chat.txt", senders, "Sourabh"), "Riya");
+});
+
+const PEOPLE = [{ name: "Farheen Parvez", count: 120 }, { name: "Sourabh sahu", count: 110 }];
+
+test("the user is found by full name, first name, or a longer profile name", () => {
+  assert.equal(senderForUser(PEOPLE, ["Sourabh Sahu"]), "Sourabh sahu");
+  assert.equal(senderForUser(PEOPLE, ["Sourabh"]), "Sourabh sahu");
+  assert.equal(senderForUser([{ name: "Sourabh", count: 3 }, { name: "Riya", count: 2 }], ["Sourabh Sahu"]), "Sourabh");
+});
+
+test("no clear match asks the user", () => {
+  assert.equal(senderForUser(PEOPLE, ["Amit"]), null);
+  assert.equal(senderForUser(PEOPLE, []), null);
+  assert.equal(senderForUser([{ name: "Sourabh K", count: 5 }, { name: "Sourabh sahu", count: 4 }], ["Sourabh"]), null);
 });
