@@ -208,7 +208,8 @@
   flex: none;
   border: 0;
   border-radius: 999px;
-  padding: 3px 9px;
+  /* At least 24px tall, so it is easy to tap. */
+  padding: 5px 10px;
   font-size: 11px;
   font-weight: 650;
   cursor: pointer;
@@ -230,13 +231,14 @@
   color: #9a6510;
 }
 
+/* Levels 3 and 4 use a deeper green than --success so the 13px label passes 4.5:1 contrast. */
 .vibe-strength.is-level-3 {
   background: rgba(47, 143, 120, 0.14);
-  color: var(--success);
+  color: #1d6352;
 }
 
 .vibe-strength.is-level-4 {
-  background: var(--success);
+  background: #22705d;
   color: #fff;
 }
 
@@ -308,7 +310,7 @@
   border: 0;
   background: none;
   color: var(--muted);
-  padding: 2px 0;
+  padding: 4px 0;
   font-size: 12px;
   cursor: pointer;
 }
@@ -436,7 +438,7 @@
 }
 
 .vibe-card .vibe-strength.is-level-4:hover {
-  background: var(--success);
+  background: #22705d;
 }
 
 .vibe-quotes li.vibe-proof-summary {
