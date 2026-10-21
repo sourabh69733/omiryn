@@ -10,10 +10,11 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from agent.shared.clock import utc_now
+from agent.shared.clock import utc_now, utc_now_iso
 from agent.shared.timeline import user_zone
 from ingestion.upload_chat import notes_upload_messages, whatsapp_upload_messages
 from storage import get_user_timezone, save_conversation
+from storage.context_sources import update_context_source_metadata
 
 from .idle import request_flush_now
 
@@ -35,6 +36,8 @@ def _start(user_id: str, source_id: str, messages: list[dict[str, Any]]) -> str:
         {"id": conversation_id, "status": "active", "import_source_id": source_id, "messages": messages},
         user_id,
     )
+    # The app shows this until the reader starts (next worker pass, within seconds).
+    update_context_source_metadata(source_id, user_id, {"reading": {"state": "queued", "updated_at": utc_now_iso()}})
     request_flush_now(conversation_id, user_id)
     return conversation_id
 

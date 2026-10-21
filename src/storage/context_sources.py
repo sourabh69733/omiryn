@@ -51,6 +51,42 @@ def save_context_source(source: dict[str, Any]) -> dict[str, Any]:
     return _context_source_from_row(row)
 
 
+def get_context_source_metadata(source_id: str, user_id: str) -> dict[str, Any] | None:
+    """One source's metadata, or None when the user has no such source."""
+    owner_id = _require_user_id(user_id, "context source")
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(conversation_context_sources.c.metadata_json).where(
+                conversation_context_sources.c.id == source_id,
+                conversation_context_sources.c.user_id == owner_id,
+            )
+        ).first()
+    return dict(row[0] or {}) if row is not None else None
+
+
+def update_context_source_metadata(source_id: str, user_id: str, changes: dict[str, Any]) -> bool:
+    """Merge `changes` into one source's metadata; False when the user has no such source."""
+    owner_id = _require_user_id(user_id, "context source")
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(conversation_context_sources.c.metadata_json).where(
+                conversation_context_sources.c.id == source_id,
+                conversation_context_sources.c.user_id == owner_id,
+            )
+        ).first()
+        if row is None:
+            return False
+        connection.execute(
+            conversation_context_sources.update()
+            .where(
+                conversation_context_sources.c.id == source_id,
+                conversation_context_sources.c.user_id == owner_id,
+            )
+            .values(metadata_json={**(row[0] or {}), **changes})
+        )
+    return True
+
+
 def list_context_sources(conversation_id: str, user_id: str | None = None) -> list[dict[str, Any]]:
     owner_id = _require_user_id(user_id, "context source list")
     statement = (
