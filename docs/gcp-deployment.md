@@ -187,8 +187,9 @@ one bot delivers either to a webhook or to `poll`, never both.
 .venv/bin/python scripts/telegram_bot.py info
 ```
 
-Grouping quick messages works within one instance; with several instances a burst can split
-across them (each part is still answered).
+Grouping quick messages works within one instance. With several instances, two messages of a
+burst can be handled at once and their saves can overwrite each other, so keep the service at
+one instance (`--max-instances 1`) during the Telegram test, or add a database lock first.
 
 ## 8. Encrypt Existing Data
 
