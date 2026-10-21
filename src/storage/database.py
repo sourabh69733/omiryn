@@ -182,6 +182,7 @@ def _ensure_runtime_columns() -> None:
             "archived_at",
             "temporary",
             "import_source_id",
+            "channel",
         ),
     }
     with ENGINE.begin() as connection:

@@ -124,6 +124,7 @@ def save_conversation(conversation: dict[str, Any], user_id: str | None = None) 
                     **payload,
                     temporary=bool(conversation.get("temporary")),
                     import_source_id=conversation.get("import_source_id"),
+                    channel=conversation.get("channel"),
                 )
             )
 
@@ -161,6 +162,7 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "archived_at": _isoformat_utc(row.get("archived_at")),
         "temporary": bool(row.get("temporary")),
         "import_source_id": row.get("import_source_id"),
+        "channel": row.get("channel"),
         "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
     }
 
@@ -237,6 +239,7 @@ def list_conversations(user_id: str | None = None) -> list[dict[str, Any]]:
             "archived_at": _isoformat_utc(row.get("archived_at")),
             "temporary": bool(row.get("temporary")),
             "import_source_id": row.get("import_source_id"),
+            "channel": row.get("channel"),
             "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
             "created_at": _isoformat_utc(row["created_at"]),
             "updated_at": _isoformat_utc(row["updated_at"]),

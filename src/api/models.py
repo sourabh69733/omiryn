@@ -173,6 +173,8 @@ class AgentConversation(BaseModel):
     temporary: bool = False
     # A hidden chat made from an upload, for Omi to learn from; nobody writes in it.
     import_source_id: str | None = None
+    # A messaging app's own chat ("telegram"); not shown in the web app.
+    channel: str | None = None
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
