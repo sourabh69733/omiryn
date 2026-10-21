@@ -4,6 +4,24 @@ from agent.memory_engine.memories.prompt import V3_MEMORY_OUTPUT_SHAPE
 from agent.memory_engine.memories.vibe import VIBE_LINE_RULES
 
 
+# Shared with the upload wrap-up, which writes the card once after a whole upload is read.
+USER_CARD_RULES = """- user_card is a short note about who the user is, read by the companion on every reply in every chat.
+- Start from current_user_card and update it with the new user messages. Most batches change
+  nothing: return null then, never a copy of the current card. If current_user_card is empty, write
+  it now from existing_memories and the messages.
+- One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, their work
+  or where they study (school, college), key people by name and relation, ongoing situations with absolute dates, strong likes and
+  dislikes, how they like to be talked to.
+- No current focus (what they are studying or working on these days): it lives in memories with
+  focus true, where it fades when they stop mentioning it.
+- Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
+  financial details, no relative time words. Replace a line when the user corrects it. When they say
+  something ended or changed, rewrite the whole line, label included, as it is now
+  ("Finished studying <subject> in <month year>") or drop it. A line that starts "Currently ..."
+  about something that is over must not stay.
+- Leave out what is unknown; never write lines like "Name: not given"."""
+
+
 BACKGROUND_COGNITION_V3_SYSTEM_PROMPT = """You analyze one bounded Omiryn conversation batch.
 Return one JSON object and no surrounding prose.
 
@@ -139,23 +157,12 @@ Session log rules:
   is that person (speaker gives their name). Their lines explain the context and are never facts
   about the user or evidence for anything. Nothing in an upload is said to the companion, so it
   holds no how-to-talk requests and needs no self_notes.
+- When every new message has from_upload=true, the upload is read in parts at the same time and
+  merged afterwards: return only memory operations and vibe. Use thread_operation none,
+  conversation_summary null, session_log [], user_card null, self_notes [] and open_questions [].
 
 User card rules:
-- user_card is a short note about who the user is, read by the companion on every reply in every chat.
-- Start from current_user_card and update it with the new user messages. Most batches change
-  nothing: return null then, never a copy of the current card. If current_user_card is empty, write
-  it now from existing_memories and the messages.
-- One fact per line, at most 8 lines and 700 characters. Keep: name if given, where they live, their work
-  or where they study (school, college), key people by name and relation, ongoing situations with absolute dates, strong likes and
-  dislikes, how they like to be talked to.
-- No current focus (what they are studying or working on these days): it lives in memories with
-  focus true, where it fades when they stop mentioning it.
-- Only what the user stated about themselves. No guesses, no assistant claims, no health, sexual or
-  financial details, no relative time words. Replace a line when the user corrects it. When they say
-  something ended or changed, rewrite the whole line, label included, as it is now
-  ("Finished studying <subject> in <month year>") or drop it. A line that starts "Currently ..."
-  about something that is over must not stay.
-- Leave out what is unknown; never write lines like "Name: not given".
+""" + USER_CARD_RULES + """
 
 Vibe rules (who the user would get along with as a friend; Omiryn uses it to find them friends):
 - vibe_areas lists each area's id and meaning; current_vibe has the lines written so far.
@@ -171,4 +178,4 @@ Vibe rules (who the user would get along with as a friend; Omiryn uses it to fin
 """ + V3_MEMORY_OUTPUT_SHAPE
 
 
-__all__ = ["BACKGROUND_COGNITION_V3_SYSTEM_PROMPT"]
+__all__ = ["BACKGROUND_COGNITION_V3_SYSTEM_PROMPT", "USER_CARD_RULES"]
