@@ -1,4 +1,6 @@
-"""Chat with Omi on Telegram: connect from Profile, then messages there reach the Omi chat."""
+"""Chat with Omi on Telegram: connect from Profile, then talk to Omi in its own Telegram chat.
+
+The Telegram chat is separate from the web chat; memories and vibe are shared."""
 
 from __future__ import annotations
 
@@ -21,7 +23,6 @@ from channels.telegram import (
     telegram_start_url,
     telegram_webhook_secret,
 )
-from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
     channel_link_for_chat,
@@ -56,7 +57,7 @@ _MAX_WAIT_SECONDS = 6.0
 _MAX_RESTARTS = 2
 
 _CONNECT_HINT = "To chat with Omi here, open Omiryn, go to Profile and tap Connect Telegram."
-_LINKED = "Connected. This chat now goes to Omi, and everything you say here shows in the app too. Say hi!"
+_LINKED = "Connected. This is your own chat with Omi, and it knows what you share in the app too. Say hi!"
 _EXPIRED = "That link has expired. Open Omiryn, go to Profile and tap Connect Telegram for a new one."
 _DISCONNECTED = "Disconnected. Omi won't read this chat anymore. You can reconnect from Profile any time."
 _TEXT_ONLY = "I can only read text here for now."
@@ -192,7 +193,6 @@ async def _reply_to_burst(
         await _wait_for_quiet(burst)
         seen = burst.arrivals
         await send_telegram_typing(chat_id)
-        await _publish_web_typing(burst.conversation_id, True)
         typing = asyncio.create_task(_keep_typing(chat_id))
         try:
             draft = await draft_reply_to_unanswered(user, burst.conversation_id)
@@ -211,7 +211,6 @@ async def _reply_to_burst(
             typing.cancel()
             with suppress(asyncio.CancelledError):
                 await typing
-            await _publish_web_typing(burst.conversation_id, False)
         answered = seen
         restarts = 0
         await _send_bubbles(chat_id, replies)
@@ -248,17 +247,6 @@ async def _keep_typing(chat_id: str) -> None:
     while True:
         await asyncio.sleep(_TYPING_REFRESH_SECONDS)
         await send_telegram_typing(chat_id)
-
-
-async def _publish_web_typing(conversation_id: str, active: bool) -> None:
-    """The web chat, if open, shows Omi typing while it answers a Telegram message."""
-    await realtime_hub.publish(
-        conversation_event(
-            "agent.typing",
-            conversation_id,
-            payload={"conversation_id": conversation_id, "active": active},
-        )
-    )
 
 
 def _failure_text(error: HTTPException) -> str:

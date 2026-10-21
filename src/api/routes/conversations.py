@@ -126,21 +126,23 @@ async def create_agent_conversation(
     return _new_conversation(user, payload)
 
 
-def omi_conversation(user: CurrentUser) -> AgentConversation:
-    """The user's one ongoing Omi chat, the same one the web app opens; started if missing."""
+def channel_conversation(user: CurrentUser, channel: str) -> AgentConversation:
+    """The user's ongoing chat on a messaging app, separate from the web chat; started if missing."""
     rows = [
         row
         for row in storage_list_conversations(_user_id(user))
-        if not row.get("temporary") and not row.get("import_source_id") and row.get("status") == "active"
+        if row.get("channel") == channel and row.get("status") == "active"
     ]
     open_rows = [row for row in rows if not row.get("archived_at")]
     newest = max(open_rows or rows, key=lambda row: str(row.get("created_at") or ""), default=None)
     if newest is None:
-        return _new_conversation(user, AgentConversationCreate(agent_tone="warm"))
+        return _new_conversation(user, AgentConversationCreate(agent_tone="warm"), channel=channel)
     return AgentConversation.model_validate(newest)
 
 
-def _new_conversation(user: CurrentUser, payload: AgentConversationCreate | None) -> AgentConversation:
+def _new_conversation(
+    user: CurrentUser, payload: AgentConversationCreate | None, channel: str | None = None
+) -> AgentConversation:
     conversation_id = str(uuid4())
     runtime = agent_runtime_status()
     selected_model = _normalize_selected_model(
@@ -159,7 +161,11 @@ def _new_conversation(user: CurrentUser, payload: AgentConversationCreate | None
         agent_name=agent_name,
         agent_style_source_id=payload.agent_style_source_id if payload else None,
         temporary=bool(payload and payload.temporary),
-        messages=[
+        channel=channel,
+        # A messaging app chat starts with the user's message; a greeting there was never sent.
+        messages=[]
+        if channel
+        else [
             {
                 "role": "assistant",
                 "content": _initial_agent_message({**persona, "name": agent_name}, user_profile),
@@ -210,9 +216,10 @@ async def list_agent_conversations(
         for source in _reusable_context_sources(list_user_context_sources(_user_id(user)))
     }
     for conversation in conversations:
-        if conversation.get("temporary") or conversation.get("import_source_id"):
+        if conversation.get("temporary") or conversation.get("import_source_id") or conversation.get("channel"):
             # A temporary chat lives only in the screen that opened it; a chat made from an
-            # upload is only for Omi to learn from. Neither shows in History.
+            # upload is only for Omi to learn from; a Telegram chat lives in Telegram. None
+            # shows in History.
             continue
         messages = conversation["messages"]
         context_sources = list_context_sources(conversation["id"], _user_id(user))
@@ -623,8 +630,8 @@ class DraftReply:
 
 
 async def save_unanswered_message(user: CurrentUser, text: str, channel: str) -> AgentConversation:
-    """Save a message in the user's Omi chat now; a later reply answers it."""
-    conversation = omi_conversation(user)
+    """Save a message in the user's chat on that app now; a later reply answers it."""
+    conversation = channel_conversation(user, channel)
     if conversation.status != "active" or conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat can't be replied to.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
