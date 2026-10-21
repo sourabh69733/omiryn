@@ -172,6 +172,13 @@ Telegram v1 (`src/api/routes/telegram.py`, `src/channels/telegram.py`):
 - Off by default: `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, and `TELEGRAM_ALLOWED_EMAILS` for test users. `scripts/telegram_bot.py` sets the webhook, or `poll` forwards messages to a local API without a public URL.
 - Not yet: story parts, nudges and return greetings reach only the web app; no groups, photos or voice notes; no sign-up from inside Telegram.
 - Test plan: 10-20 users for 2 weeks; compare messages per day and return rate on Telegram against the web (user messages carry `channel`).
+- Before opening Telegram to everyone: a database lock so two instances never save the same chat at once (until then, one Cloud Run instance), and story parts sent to Telegram (autoplay now needs the web chat open).
+
+Discord (planned, not started; chosen 2026-10-21 because students use it more than Telegram):
+- Discord delivers normal messages only over a live connection (the Gateway), not webhooks, so it needs an always-on process. Options: A) API on Cloud Run with min 1 instance and CPU always on; B) a small separate bot worker that holds the connection and calls the API (recommended); C) slash command only (`/omi ...`), serverless but clunky.
+- Users can DM a bot only when they share a server with it, so an Omiryn Discord server comes with it; it can grow into the community (match drops, events).
+- Reuse the Telegram pieces: move message grouping, save, draft and commit into a shared channel module; connect from Profile (one-time code, or Discord sign-in that also adds the user to the server); its own chat with shared memories and vibe; typing, bubbles, disconnect.
+- About 2-3 days. Needs from the owner: a Discord application with a bot token, and the server.
 
 ## 7. Parked
 
