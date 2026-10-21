@@ -1177,7 +1177,8 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                         ) : null}
                       </div>
                     ) : null}
-                    {!agent ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback="You" /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {/* The user's own photo shows only when they have one; no placeholder bubble. */}
+                    {!agent && userAvatar ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback={null} /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
                   {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>

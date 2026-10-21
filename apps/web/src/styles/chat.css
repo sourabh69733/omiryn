@@ -653,6 +653,11 @@ button.history-archived-toggle:hover {
     linear-gradient(135deg, #6a46ff, #b49aff 52%, #ff7eb3);
 }
 
+/* A photo that fails to load leaves the circle empty: hide it rather than show a blank badge. */
+.chat-avatar.user:empty {
+  display: none;
+}
+
 .chat-avatar img {
   display: block;
   width: 100%;
