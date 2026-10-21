@@ -77,6 +77,8 @@ secret_args=(
   "$(optional_secret_arg DEEPINFRA_API_KEY "${DEEPINFRA_API_KEY_SECRET:-}")"
   "$(optional_secret_arg FIREWORKS_API_KEY "${FIREWORKS_API_KEY_SECRET:-}")"
   "$(optional_secret_arg OPENAI_API_KEY "${OPENAI_API_KEY_SECRET:-}")"
+  "$(optional_secret_arg TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN_SECRET:-}")"
+  "$(optional_secret_arg TELEGRAM_WEBHOOK_SECRET "${TELEGRAM_WEBHOOK_SECRET_SECRET:-}")"
 )
 filtered_secret_args=()
 for value in "${secret_args[@]}"; do
@@ -135,6 +137,9 @@ optional_env_names=(
   MEMORY_IDLE_FLUSH_SECONDS
   VIBE_VERIFY_MODEL
   PROACTIVE_MESSAGING_ENABLED
+  TELEGRAM_ENABLED
+  TELEGRAM_BOT_USERNAME
+  TELEGRAM_ALLOWED_EMAILS
   IP_LOCATION_DB_PATH
   FIREWORKS_MODEL
   FIREWORKS_AVAILABLE_MODELS

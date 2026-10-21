@@ -77,6 +77,14 @@ DEEPINFRA_API_KEY_SECRET=omiryn-deepinfra-api-key
 FIREWORKS_API_KEY_SECRET=
 OPENAI_API_KEY_SECRET=
 
+# Optional: chat with Omi on Telegram. Leave the secret names empty to keep it off.
+TELEGRAM_ENABLED=false
+TELEGRAM_BOT_USERNAME=
+# Comma-separated tester emails; empty lets everyone connect.
+TELEGRAM_ALLOWED_EMAILS=
+TELEGRAM_BOT_TOKEN_SECRET=
+TELEGRAM_WEBHOOK_SECRET_SECRET=
+
 # Secret values used only by scripts/gcp/gcp-sync-secrets.sh.
 # Do not commit real values.
 DATABASE_URL=
@@ -87,3 +95,5 @@ GROQ_API_KEY=
 DEEPINFRA_API_KEY=
 FIREWORKS_API_KEY=
 OPENAI_API_KEY=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
