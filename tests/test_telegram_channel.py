@@ -1,12 +1,15 @@
 """Chat with Omi on Telegram: connect with a one-time code, then messages reach the Omi chat."""
 
+import asyncio
 import os
 import unittest
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
+import httpx
 from fastapi.testclient import TestClient
 
+from agent.runtime.orchestrator import AgentTurnResult, _turn_notes
 from agent.shared.clock import utc_now
 from api.main import app, current_user
 from api.routes import telegram as telegram_routes
@@ -27,7 +30,7 @@ CHAT_ID = 555001
 SECRET = "webhook-secret"
 
 
-class TelegramChannelTest(unittest.TestCase):
+class _TelegramTestBase(unittest.TestCase):
     def setUp(self) -> None:
         self.env = patch.dict(
             os.environ,
@@ -58,6 +61,7 @@ class TelegramChannelTest(unittest.TestCase):
             patch.object(telegram_routes, "send_telegram_message", self.sent),
             patch.object(telegram_routes, "send_telegram_typing", AsyncMock()),
             patch.object(telegram_routes, "_BUBBLE_PAUSE_SECONDS", 0),
+            patch.object(telegram_routes, "_QUIET_SECONDS", 0),
         ]
         for item in self.patches:
             item.start()
@@ -89,6 +93,9 @@ class TelegramChannelTest(unittest.TestCase):
     def _omi_chat(self) -> dict:
         return next(row for row in list_conversations(USER_ID) if not row["temporary"])
 
+
+
+class TelegramChannelTest(_TelegramTestBase):
     def test_link_points_to_the_bot_with_a_one_time_code(self) -> None:
         response = self.client.post("/api/channels/telegram/link")
 
@@ -251,3 +258,89 @@ class TelegramChannelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _FakeTurn:
+    """Stands in for the model: records each call and answers with one bubble per call."""
+
+    def __init__(self, delay: float = 0.0) -> None:
+        self.calls: list[dict] = []
+        self.delay = delay
+
+    async def __call__(self, **kwargs) -> AgentTurnResult:
+        self.calls.append(kwargs)
+        await asyncio.sleep(self.delay)
+        user_message = {"role": "user", "content": kwargs["user_text"]}
+        reply = {"role": "assistant", "content": f"reply {len(self.calls)}"}
+        return AgentTurnResult(messages=[*kwargs["messages"], user_message, reply], quality_valid=True)
+
+
+class TelegramBurstTest(_TelegramTestBase):
+    """Several quick messages get one reply that answers them together."""
+
+    async def _send_all(self, texts: list[str], gap: float = 0.0) -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+
+            async def send(index: int, text: str):
+                await asyncio.sleep(index * gap)
+                update_id = 10 + index
+                return await client.post(
+                    "/api/channels/telegram/webhook",
+                    json={"update_id": update_id, "message": {"message_id": update_id, "text": text, "chat": {"id": CHAT_ID, "type": "private"}}},
+                    headers={"X-Telegram-Bot-Api-Secret-Token": SECRET},
+                )
+
+            responses = await asyncio.gather(*(send(index, text) for index, text in enumerate(texts)))
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+
+    def test_a_burst_gets_one_reply(self) -> None:
+        self._connect()
+        self.sent.reset_mock()
+        turn = _FakeTurn()
+
+        with patch.object(telegram_routes, "_QUIET_SECONDS", 0.2), patch("api.main.run_agent_turn", turn):
+            asyncio.run(self._send_all(["hey", "listen", "I got the job!"], gap=0.02))
+
+        self.assertEqual(len(turn.calls), 1)
+        self.assertEqual(turn.calls[0]["user_text"], "I got the job!")
+        self.assertEqual(turn.calls[0]["unanswered_count"], 3)
+        self.assertEqual(self._sent_texts(), ["reply 1"])
+        messages = self._omi_chat()["messages"]
+        self.assertEqual([m["content"] for m in messages[1:]], ["hey", "listen", "I got the job!", "reply 1"])
+        self.assertTrue(all(m["delivery_status"] == "read" for m in messages[1:4]))
+
+    def test_a_message_sent_while_omi_writes_restarts_the_reply(self) -> None:
+        self._connect()
+        self.sent.reset_mock()
+        turn = _FakeTurn(delay=0.3)
+
+        with patch("api.main.run_agent_turn", turn):
+            asyncio.run(self._send_all(["hey", "wait, one more thing"], gap=0.1))
+
+        self.assertEqual(len(turn.calls), 2)
+        self.assertEqual(turn.calls[1]["unanswered_count"], 2)
+        # The first draft is thrown away; only the reply covering both is saved and sent.
+        self.assertEqual(self._sent_texts(), ["reply 2"])
+        messages = self._omi_chat()["messages"]
+        self.assertEqual([m["content"] for m in messages[1:]], ["hey", "wait, one more thing", "reply 2"])
+
+    def test_a_burst_that_fails_marks_every_message_for_retry(self) -> None:
+        self._connect()
+        self.sent.reset_mock()
+
+        with patch.object(telegram_routes, "_QUIET_SECONDS", 0.2), patch(
+            "api.main.run_agent_turn", AsyncMock(side_effect=RuntimeError("model down"))
+        ):
+            asyncio.run(self._send_all(["hey", "you there?"], gap=0.02))
+
+        self.assertEqual(self._sent_texts(), [telegram_routes._REPLY_FAILED])
+        messages = self._omi_chat()["messages"]
+        self.assertEqual([m["delivery_status"] for m in messages[1:]], ["failed", "failed"])
+
+
+class UnansweredNoteTest(unittest.TestCase):
+    def test_omi_is_told_when_several_messages_came_in_a_row(self) -> None:
+        self.assertEqual(_turn_notes(1, (), 1), [])
+        [note] = _turn_notes(1, (), 3)
+        self.assertIn("last 3 messages in a row", note["content"])

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import logging
-from collections import defaultdict
+from dataclasses import dataclass
 from contextlib import suppress
 from typing import Any
 
@@ -34,7 +34,12 @@ from storage import (
 )
 
 from ..helpers import _user_id
-from .conversations import omi_conversation, post_user_message
+from .conversations import (
+    commit_reply,
+    draft_reply_to_unanswered,
+    mark_unanswered_failed,
+    save_unanswered_message,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -43,6 +48,12 @@ logger = logging.getLogger(__name__)
 _BUBBLE_PAUSE_SECONDS = 0.8
 # Telegram shows "typing…" for about five seconds; renew it before it fades.
 _TYPING_REFRESH_SECONDS = 4.0
+# People often send a thought in several quick messages. Omi waits for this much quiet before
+# replying, but never longer than the max, and then answers them together.
+_QUIET_SECONDS = 1.5
+_MAX_WAIT_SECONDS = 6.0
+# Times a draft is thrown away because more messages came in before any bubble was sent.
+_MAX_RESTARTS = 2
 
 _CONNECT_HINT = "To chat with Omi here, open Omiryn, go to Profile and tap Connect Telegram."
 _LINKED = "Connected. This chat now goes to Omi, and everything you say here shows in the app too. Say hi!"
@@ -51,8 +62,19 @@ _DISCONNECTED = "Disconnected. Omi won't read this chat anymore. You can reconne
 _TEXT_ONLY = "I can only read text here for now."
 _REPLY_FAILED = "Couldn't reply right now. Send your message again in a bit."
 
-# One reply at a time per chat: quick messages are answered in order, never side by side.
-_chat_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+@dataclass
+class _Burst:
+    """Messages one chat sent since Omi last replied. One request (the first) does the replying."""
+
+    conversation_id: str
+    arrivals: int = 0
+    last_at: float = 0.0
+    replying: bool = False
+
+
+_bursts: dict[str, _Burst] = {}
 
 
 @router.get("/api/channels/telegram")
@@ -126,8 +148,25 @@ async def telegram_webhook(
         await send_telegram_message(chat_id, _TEXT_ONLY)
         return {"ok": True}
 
-    async with _chat_locks[chat_id]:
-        await _reply(chat_id, CurrentUser(id=link["user_id"]), text, background_tasks)
+    user = CurrentUser(id=link["user_id"])
+    try:
+        conversation = await save_unanswered_message(user, text, CHANNEL)
+    except HTTPException as error:
+        await send_telegram_message(chat_id, _failure_text(error))
+        return {"ok": True}
+    burst = _bursts.setdefault(chat_id, _Burst(conversation_id=conversation.id))
+    burst.arrivals += 1
+    burst.last_at = asyncio.get_running_loop().time()
+    if burst.replying:
+        # The request already replying picks this message up.
+        return {"ok": True}
+    # On Cloud Run the server has CPU only while a request is open, so this request stays open
+    # until every message of the burst is answered.
+    burst.replying = True
+    try:
+        await _reply_to_burst(chat_id, user, burst, background_tasks)
+    finally:
+        _bursts.pop(chat_id, None)
     return {"ok": True}
 
 
@@ -144,37 +183,65 @@ async def _start(chat_id: str, code: str) -> None:
     await send_telegram_message(chat_id, _LINKED)
 
 
-async def _reply(chat_id: str, user: CurrentUser, text: str, background_tasks: BackgroundTasks) -> None:
-    conversation = omi_conversation(user)
-    reply_from = len(conversation.messages) + 1
-    # Sent before any reply work, so "typing…" shows at once however busy the server is.
-    await send_telegram_typing(chat_id)
-    await _publish_web_typing(conversation.id, True)
-    typing = asyncio.create_task(_keep_typing(chat_id))
-    try:
-        updated = await post_user_message(conversation, user, text, background_tasks, channel=CHANNEL)
-    except HTTPException as error:
-        await send_telegram_message(chat_id, _failure_text(error))
-        return
-    except Exception:
-        logger.exception("telegram.reply.failed")
-        await send_telegram_message(chat_id, _REPLY_FAILED)
-        return
-    finally:
-        typing.cancel()
-        with suppress(asyncio.CancelledError):
-            await typing
-        await _publish_web_typing(conversation.id, False)
-    bubbles = [
-        str(message.get("content") or "").strip()
-        for message in updated.messages[reply_from:]
-        if message.get("role") == "assistant"
-    ]
+async def _reply_to_burst(
+    chat_id: str, user: CurrentUser, burst: _Burst, background_tasks: BackgroundTasks
+) -> None:
+    answered = 0
+    restarts = 0
+    while burst.arrivals > answered:
+        await _wait_for_quiet(burst)
+        seen = burst.arrivals
+        await send_telegram_typing(chat_id)
+        await _publish_web_typing(burst.conversation_id, True)
+        typing = asyncio.create_task(_keep_typing(chat_id))
+        try:
+            draft = await draft_reply_to_unanswered(user, burst.conversation_id)
+            if burst.arrivals > seen and restarts < _MAX_RESTARTS:
+                # More came in while Omi wrote: start over so the reply covers those too.
+                restarts += 1
+                continue
+            replies = await commit_reply(user, draft, background_tasks) if draft else []
+        except Exception as error:
+            if not isinstance(error, HTTPException):
+                logger.exception("telegram.reply.failed")
+            _mark_failed(user, burst.conversation_id)
+            await send_telegram_message(chat_id, _REPLY_FAILED)
+            return
+        finally:
+            typing.cancel()
+            with suppress(asyncio.CancelledError):
+                await typing
+            await _publish_web_typing(burst.conversation_id, False)
+        answered = seen
+        restarts = 0
+        await _send_bubbles(chat_id, replies)
+
+
+async def _wait_for_quiet(burst: _Burst) -> None:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _MAX_WAIT_SECONDS
+    while True:
+        now = loop.time()
+        wait = min(burst.last_at + _QUIET_SECONDS, deadline) - now
+        if wait <= 0:
+            return
+        await asyncio.sleep(wait)
+
+
+async def _send_bubbles(chat_id: str, replies: list[dict[str, Any]]) -> None:
+    bubbles = [str(message.get("content") or "").strip() for message in replies if message.get("role") == "assistant"]
     for index, bubble in enumerate(bubble for bubble in bubbles if bubble):
         if index:
             await send_telegram_typing(chat_id)
             await asyncio.sleep(_BUBBLE_PAUSE_SECONDS)
         await send_telegram_message(chat_id, bubble)
+
+
+def _mark_failed(user: CurrentUser, conversation_id: str) -> None:
+    try:
+        mark_unanswered_failed(user, conversation_id)
+    except Exception:
+        logger.exception("telegram.mark_failed.failed")
 
 
 async def _keep_typing(chat_id: str) -> None:
