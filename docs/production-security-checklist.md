@@ -53,6 +53,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Admin routes allow only configured admin emails or user IDs.
 - [x] Unauthenticated admin dev bypass is disabled in production.
 - [x] Interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off in production.
+- [x] Telegram webhook accepts only requests with the configured secret header; link codes are one-time, expire in 15 minutes and are stored hashed. Telegram is off unless `TELEGRAM_ENABLED=true`.
+- [ ] Set a long random `TELEGRAM_WEBHOOK_SECRET` in production and keep the bot token in the secret manager.
 - [x] Admin UI is deployed separately and the API no longer serves admin frontend assets.
 - [ ] Add `https://admin.omiryn.com` to Supabase production redirect URLs.
 - [ ] If overriding `CORS_ALLOWED_ORIGINS`, include `https://admin.omiryn.com`.
@@ -67,7 +69,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Run `scripts/data_ops/assign-legacy-data-to-user.sh --dry-run` and backfill/delete legacy anonymous rows before deployment.
 - [ ] Daily backups are enabled.
 - [ ] Restore process is tested.
-- [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, and public leads where applicable.
+- [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, Telegram links, and public leads where applicable.
 - [x] Add admin/internal view for deletion and export requests.
 - [x] Raw chat/import text is not written to application logs or provider error usage metadata.
 - [x] Production startup requires profile photos to use GCS instead of ephemeral local disk.
