@@ -15,6 +15,7 @@ from agent.memory_engine.data_points.extraction.prompts import (
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.upload_prompt import UPLOAD_WRAP_UP_SYSTEM_PROMPT
 from agent.cognition.background.vibe_prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
     VIBE_INTRO_SYSTEM_PROMPT,
@@ -31,6 +32,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
     REPLY_REQUEST_CHECK,
+    UPLOAD_WRAP_UP,
     VIBE_BACKFILL,
     VIBE_INTRO,
     VIBE_VERIFY,
@@ -147,6 +149,31 @@ def vibe_verify_model(provider: str) -> str | None:
 # model (that one drifts). On 8 real drafts (2026-10-18): Qwen3 235B 8/8 at ~1.4s, DeepSeek V3.2
 # 7/8 at ~2.6s, Llama 3.3 70B 7/8, Mistral Small 6/8.
 _DEFAULT_REQUEST_CHECK_MODELS = {"deepinfra": "Qwen/Qwen3-235B-A22B-Instruct-2507"}
+
+
+async def analyze_upload_wrap_up(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 120,
+) -> dict[str, Any]:
+    """Group duplicate memories and write the card and vibe lines after an upload's parts."""
+    provider = _provider_name()
+    if provider == "mock":
+        return {"same": [], "user_card": None, "vibe": {}}
+    content = await provider_chat(
+        provider=provider,
+        system_prompt=UPLOAD_WRAP_UP_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": text}],
+        temperature=0,
+        conversation_id=conversation_id,
+        request_kind=UPLOAD_WRAP_UP,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        response_format={"type": "json_object"},
+    )
+    return _parse_json_object(content)
 
 
 def request_check_model(provider: str) -> str | None:
