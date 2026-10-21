@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 import sys
 from typing import Any
 from uuid import uuid4
@@ -498,22 +499,8 @@ async def _reply_to_pending(
     pending: dict[str, Any],
     background_tasks: BackgroundTasks,
 ) -> AgentConversation:
-    runtime = agent_runtime_status()
-    _sync_conversation_runtime(conversation, runtime)
     try:
-        turn = await _run_agent_turn_callable()(
-            conversation_id=conversation.id,
-            messages=prior_messages,
-            user_text=str(pending["content"]),
-            user_id=_user_id(user),
-            user_profile=_agent_user_context(user),
-            model=preferred_reply_model(_user_id(user), conversation.agent_model),
-            agent_mode=conversation.agent_mode,
-            agent_tone=conversation.agent_tone,
-            agent_name=conversation.agent_name,
-            style_source_id=conversation.agent_style_source_id,
-            **({"reply_to": pending["reply_to"]} if pending.get("reply_to") else {}),
-        )
+        turn = await _run_turn(conversation, user, prior_messages, pending)
     except (AgentProviderError, Exception) as error:
         logger.warning(
             "agent.reply.failed conversation_id=%s error=%s", conversation.id, type(error).__name__
@@ -543,14 +530,50 @@ async def _reply_to_pending(
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     await _publish_new_messages(conversation, previous_message_count)
+    _learn_after_reply(conversation, user, turn.quality_valid, background_tasks)
+    return conversation
+
+
+async def _run_turn(
+    conversation: AgentConversation,
+    user: CurrentUser,
+    prior_messages: list[dict[str, Any]],
+    pending: dict[str, Any],
+    unanswered_count: int = 1,
+):
+    """Omi's reply to `pending`, without saving it."""
+    _sync_conversation_runtime(conversation, agent_runtime_status())
+    return await _run_agent_turn_callable()(
+        conversation_id=conversation.id,
+        messages=prior_messages,
+        user_text=str(pending["content"]),
+        user_id=_user_id(user),
+        user_profile=_agent_user_context(user),
+        model=preferred_reply_model(_user_id(user), conversation.agent_model),
+        agent_mode=conversation.agent_mode,
+        agent_tone=conversation.agent_tone,
+        agent_name=conversation.agent_name,
+        style_source_id=conversation.agent_style_source_id,
+        **({"reply_to": pending["reply_to"]} if pending.get("reply_to") else {}),
+        **({"unanswered_count": unanswered_count} if unanswered_count > 1 else {}),
+    )
+
+
+def _learn_after_reply(
+    conversation: AgentConversation,
+    user: CurrentUser,
+    quality_valid: bool,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Schedule background learning from the chat after a saved reply."""
     if conversation.temporary:
         # Temporary Chat: no memories, vibe, notes, topics or profile facts from it.
-        return conversation
+        return
     if should_run_conversation_data_point_extraction(
         conversation.id,
         _user_id(user),
         conversation.messages,
-        turn.quality_valid,
+        quality_valid,
     ):
         background_tasks.add_task(
             capture_deep_profile_facts_from_conversation,
@@ -563,7 +586,7 @@ async def _reply_to_pending(
         conversation.id,
         _user_id(user),
         conversation.messages,
-        turn.quality_valid,
+        quality_valid,
     )
     if run_cognition_now:
         background_tasks.add_task(
@@ -577,14 +600,122 @@ async def _reply_to_pending(
         conversation.id,
         _user_id(user),
         conversation.messages,
-        turn.quality_valid,
+        quality_valid,
     ):
         # Durable idle flush; after a threshold run it is a backstop that finds nothing
         # pending unless that run was lost to a crash or restart.
         # A how-to-talk request ("no questions", "chhota likho") is saved by this run too, in any
         # language, a couple of minutes after the chat goes quiet; the current chat follows it at once.
         schedule_idle_flush(conversation.id, _user_id(user))
+
+
+# Messaging apps: a message is saved as it arrives and answered later, so several sent in a row
+# can get one reply. Saving and committing never wait on anything in between, so in one process
+# they never overwrite each other.
+
+
+@dataclass(frozen=True)
+class DraftReply:
+    conversation_id: str
+    # The last user message the draft answers; anything after it came in while writing.
+    answered_through: int
+    turn: Any
+
+
+async def save_unanswered_message(user: CurrentUser, text: str, channel: str) -> AgentConversation:
+    """Save a message in the user's Omi chat now; a later reply answers it."""
+    conversation = omi_conversation(user)
+    if conversation.status != "active" or conversation.import_source_id:
+        raise HTTPException(status_code=409, detail="This chat can't be replied to.")
+    enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+    index = len(conversation.messages)
+    conversation.messages.append(
+        {
+            "role": "user",
+            "content": text,
+            "created_at": utc_now_iso(),
+            "delivery_status": "sending",
+            "channel": channel,
+        }
+    )
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    set_conversation_archived(conversation.id, _user_id(user), False)
+    await _publish_new_messages(conversation, index)
     return conversation
+
+
+async def draft_reply_to_unanswered(user: CurrentUser, conversation_id: str) -> DraftReply | None:
+    """Omi's reply to every message since its last reply, read together. Nothing is saved."""
+    conversation = _get_existing_conversation(conversation_id, user)
+    unanswered = _unanswered_indexes(conversation.messages)
+    if not unanswered:
+        return None
+    last = unanswered[-1]
+    turn = await _run_turn(
+        conversation,
+        user,
+        conversation.messages[:last],
+        conversation.messages[last],
+        unanswered_count=len(unanswered),
+    )
+    return DraftReply(conversation_id=conversation.id, answered_through=last, turn=turn)
+
+
+async def commit_reply(
+    user: CurrentUser, draft: DraftReply, background_tasks: BackgroundTasks
+) -> list[dict[str, Any]]:
+    """Save a draft's replies after the messages it answered; returns the reply messages."""
+    conversation = _get_existing_conversation(draft.conversation_id, user)
+    stored = conversation.messages
+    answered = draft.answered_through
+    if len(stored) <= answered or stored[answered].get("role") != "user":
+        # Messages were deleted while Omi wrote; the reply no longer fits the chat.
+        return []
+    quality = draft.turn.messages[answered].get("quality")
+    if quality:
+        stored[answered]["quality"] = quality
+    first_unanswered = _mark_answered(stored, answered)
+    replies = [dict(message) for message in draft.turn.messages[answered + 1 :]]
+    start = len(stored)
+    conversation.messages = [*stored, *replies]
+    if getattr(draft.turn, "agent_voice", None):
+        conversation.agent_voice = draft.turn.agent_voice
+    _stamp_new_messages(conversation.messages, start)
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    # From the first answered message, so the web chat also sees them marked read.
+    await _publish_new_messages(conversation, first_unanswered)
+    _learn_after_reply(conversation, user, draft.turn.quality_valid, background_tasks)
+    return conversation.messages[start:]
+
+
+def mark_unanswered_failed(user: CurrentUser, conversation_id: str) -> None:
+    """The reply failed: the web chat shows these messages with a Retry."""
+    conversation = _get_existing_conversation(conversation_id, user)
+    for index in _unanswered_indexes(conversation.messages):
+        conversation.messages[index]["delivery_status"] = REPLY_FAILED
+    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+
+
+def _unanswered_indexes(messages: list[dict[str, Any]]) -> list[int]:
+    """User messages after Omi's last message, oldest first."""
+    indexes: list[int] = []
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if message.get("deleted"):
+            continue
+        if message.get("role") != "user":
+            break
+        indexes.append(index)
+    return indexes[::-1]
+
+
+def _mark_answered(messages: list[dict[str, Any]], through: int) -> int:
+    """Mark the unanswered messages up to `through` read; returns the first one's index."""
+    first = through
+    for index in _unanswered_indexes(messages[: through + 1]):
+        messages[index]["delivery_status"] = "read"
+        first = min(first, index)
+    return first
 
 
 @router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/feedback")
