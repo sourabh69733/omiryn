@@ -7,6 +7,11 @@ import { Notice } from "./StateView";
 
 type TelegramStatus = { available: boolean; connected: boolean; bot_username: string | null };
 
+// Omi as a chat bubble: Omi's own chat on Telegram.
+function TelegramIcon() {
+  return <img className="pf-telegram-icon" src="/assets/agent/omi-chat-bubble-48.webp" srcSet="/assets/agent/omi-chat-bubble-48.webp 1x, /assets/agent/omi-chat-bubble-96.webp 2x" width={24} height={24} alt="" />;
+}
+
 export function TelegramSetting() {
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,7 +84,7 @@ export function TelegramSetting() {
     <>
       {status.connected ? (
         <div className="pf-row">
-          <span>Telegram</span>
+          <span className="pf-telegram-label"><TelegramIcon />Telegram</span>
           <span className="pf-telegram-state">
             <span className="pf-muted">Connected</span>
             <button type="button" className="pf-telegram-action" onClick={() => void disconnect()} disabled={busy}>Disconnect</button>
@@ -87,7 +92,7 @@ export function TelegramSetting() {
         </div>
       ) : (
         <button type="button" className="pf-row is-action" onClick={() => void connect()} disabled={busy}>
-          <span>Chat with Omi on Telegram</span>
+          <span className="pf-telegram-label"><TelegramIcon />Chat with Omi on Telegram</span>
           <span className="pf-muted pf-model-current">{busy ? "Opening…" : "Connect"}<ChevronRight aria-hidden="true" /></span>
         </button>
       )}

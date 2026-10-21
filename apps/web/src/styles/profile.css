@@ -715,3 +715,16 @@ button.pf-telegram-action:hover {
   padding: 0 0 12px;
   border-bottom: 1px solid var(--line);
 }
+
+.pf-telegram-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pf-telegram-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+}
