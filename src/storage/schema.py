@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Index, Integer, MetaData, String, Table, func
+from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, Float, Index, Integer, MetaData, String, Table, func
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
 
@@ -655,6 +655,36 @@ agent_user_settings = Table(
     # The reply model the user picked in Profile > Advanced; null uses the app default.
     Column("reply_model", String, nullable=True),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# A messaging app chat (Telegram today) linked to an Omiryn account, one per user and channel.
+# Messages sent there go to the user's Omi chat.
+channel_links = Table(
+    "channel_links",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("channel", String, primary_key=True),
+    Column("external_chat_id", String, nullable=False),
+    # The newest update the bot handled; a webhook delivery Telegram retries is ignored.
+    Column("last_update_id", BigInteger, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index(
+    "ux_channel_links_chat",
+    channel_links.c.channel,
+    channel_links.c.external_chat_id,
+    unique=True,
+)
+
+# One-time codes behind "Connect Telegram". Only a hash is stored; a code works once.
+channel_link_codes = Table(
+    "channel_link_codes",
+    metadata,
+    Column("code_hash", String, primary_key=True),
+    Column("user_id", String, nullable=False),
+    Column("channel", String, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 # A short "who this user is" note across all chats, rewritten by background cognition
