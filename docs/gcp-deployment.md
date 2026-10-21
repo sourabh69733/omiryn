@@ -172,6 +172,24 @@ Production deploys also require:
 ./scripts/gcp-logs.sh
 ```
 
+### Telegram (optional)
+
+Runs inside the same Cloud Run service; no extra server. Use a separate bot for local testing:
+one bot delivers either to a webhook or to `poll`, never both.
+
+1. In `.gcp.env`: `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_ALLOWED_EMAILS` (testers),
+   the secret names `TELEGRAM_BOT_TOKEN_SECRET` and `TELEGRAM_WEBHOOK_SECRET_SECRET`, and their values.
+2. `./scripts/gcp-sync-secrets.sh`, then `./scripts/gcp-deploy.sh`.
+3. Point the bot at the service (run locally with the production token and secret in `.env`):
+
+```bash
+.venv/bin/python scripts/telegram_bot.py set-webhook --url https://<service-url>/api/channels/telegram/webhook
+.venv/bin/python scripts/telegram_bot.py info
+```
+
+Grouping quick messages works within one instance; with several instances a burst can split
+across them (each part is still answered).
+
 ## 8. Encrypt Existing Data
 
 Dry run first:
