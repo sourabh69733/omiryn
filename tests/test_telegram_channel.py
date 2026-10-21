@@ -90,8 +90,8 @@ class _TelegramTestBase(unittest.TestCase):
     def _sent_texts(self) -> list[str]:
         return [call.args[1] for call in self.sent.await_args_list]
 
-    def _omi_chat(self) -> dict:
-        return next(row for row in list_conversations(USER_ID) if not row["temporary"])
+    def _telegram_chat(self) -> dict:
+        return next(row for row in list_conversations(USER_ID) if row["channel"] == "telegram")
 
 
 
@@ -148,21 +148,19 @@ class TelegramChannelTest(_TelegramTestBase):
         self.assertEqual(self._sent_texts(), [telegram_routes._CONNECT_HINT])
         self.assertEqual(list_conversations(USER_ID), [])
 
-    def test_a_message_goes_to_the_omi_chat_and_the_reply_comes_back(self) -> None:
+    def test_a_message_gets_a_reply_in_telegram(self) -> None:
         self._connect()
-        web_chat_id = self.client.post("/api/agent/conversations").json()["id"]
         self.sent.reset_mock()
 
         response = self._webhook("hey, I just moved to Pune", update_id=2)
 
         self.assertEqual(response.status_code, 200)
-        chat = self._omi_chat()
-        self.assertEqual(chat["id"], web_chat_id)
-        user_message = chat["messages"][1]
+        chat = self._telegram_chat()
+        user_message = chat["messages"][0]
         self.assertEqual(user_message["content"], "hey, I just moved to Pune")
         self.assertEqual(user_message["channel"], "telegram")
         self.assertEqual(user_message["delivery_status"], "read")
-        replies = [message["content"] for message in chat["messages"][2:] if message["role"] == "assistant"]
+        replies = [message["content"] for message in chat["messages"][1:] if message["role"] == "assistant"]
         self.assertTrue(replies)
         self.assertEqual(self._sent_texts(), replies)
 
@@ -180,13 +178,23 @@ class TelegramChannelTest(_TelegramTestBase):
 
         self.assertEqual(order[:2], ["typing", "turn"])
 
-    def test_a_first_message_starts_the_omi_chat_when_there_is_none(self) -> None:
+    def test_telegram_has_its_own_chat_apart_from_the_web_chat(self) -> None:
         self._connect()
+        web_chat = self.client.post("/api/agent/conversations").json()
 
         self._webhook("hi", update_id=2)
+        self._webhook("still there?", update_id=3)
 
-        self.assertEqual(len(list_conversations(USER_ID)), 1)
-        self.assertEqual(self._omi_chat()["messages"][1]["content"], "hi")
+        telegram_chat = self._telegram_chat()
+        self.assertNotEqual(telegram_chat["id"], web_chat["id"])
+        # It starts with the user's message: no greeting that Telegram never showed.
+        self.assertEqual(telegram_chat["messages"][0]["content"], "hi")
+        self.assertEqual(len([m for m in telegram_chat["messages"] if m["role"] == "user"]), 2)
+        web_messages = next(row for row in list_conversations(USER_ID) if row["id"] == web_chat["id"])["messages"]
+        self.assertEqual(web_messages, web_chat["messages"])
+        # The web app's chat list never shows it.
+        listed = [row["id"] for row in self.client.get("/api/agent/conversations").json()["conversations"]]
+        self.assertEqual(listed, [web_chat["id"]])
 
     def test_a_retried_delivery_is_answered_once(self) -> None:
         self._connect()
@@ -194,7 +202,7 @@ class TelegramChannelTest(_TelegramTestBase):
         self._webhook("hi", update_id=2)
         self._webhook("hi", update_id=2)
 
-        user_messages = [m for m in self._omi_chat()["messages"] if m["role"] == "user"]
+        user_messages = [m for m in self._telegram_chat()["messages"] if m["role"] == "user"]
         self.assertEqual(len(user_messages), 1)
 
     def test_a_failed_reply_is_told_in_the_chat(self) -> None:
@@ -206,7 +214,7 @@ class TelegramChannelTest(_TelegramTestBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self._sent_texts(), [telegram_routes._REPLY_FAILED])
-        self.assertEqual(self._omi_chat()["messages"][1]["delivery_status"], "failed")
+        self.assertEqual(self._telegram_chat()["messages"][0]["delivery_status"], "failed")
 
     def test_non_text_messages_get_a_short_note(self) -> None:
         self._connect()
@@ -306,9 +314,9 @@ class TelegramBurstTest(_TelegramTestBase):
         self.assertEqual(turn.calls[0]["user_text"], "I got the job!")
         self.assertEqual(turn.calls[0]["unanswered_count"], 3)
         self.assertEqual(self._sent_texts(), ["reply 1"])
-        messages = self._omi_chat()["messages"]
-        self.assertEqual([m["content"] for m in messages[1:]], ["hey", "listen", "I got the job!", "reply 1"])
-        self.assertTrue(all(m["delivery_status"] == "read" for m in messages[1:4]))
+        messages = self._telegram_chat()["messages"]
+        self.assertEqual([m["content"] for m in messages], ["hey", "listen", "I got the job!", "reply 1"])
+        self.assertTrue(all(m["delivery_status"] == "read" for m in messages[:3]))
 
     def test_a_message_sent_while_omi_writes_restarts_the_reply(self) -> None:
         self._connect()
@@ -322,8 +330,8 @@ class TelegramBurstTest(_TelegramTestBase):
         self.assertEqual(turn.calls[1]["unanswered_count"], 2)
         # The first draft is thrown away; only the reply covering both is saved and sent.
         self.assertEqual(self._sent_texts(), ["reply 2"])
-        messages = self._omi_chat()["messages"]
-        self.assertEqual([m["content"] for m in messages[1:]], ["hey", "wait, one more thing", "reply 2"])
+        messages = self._telegram_chat()["messages"]
+        self.assertEqual([m["content"] for m in messages], ["hey", "wait, one more thing", "reply 2"])
 
     def test_a_burst_that_fails_marks_every_message_for_retry(self) -> None:
         self._connect()
@@ -335,8 +343,8 @@ class TelegramBurstTest(_TelegramTestBase):
             asyncio.run(self._send_all(["hey", "you there?"], gap=0.02))
 
         self.assertEqual(self._sent_texts(), [telegram_routes._REPLY_FAILED])
-        messages = self._omi_chat()["messages"]
-        self.assertEqual([m["delivery_status"] for m in messages[1:]], ["failed", "failed"])
+        messages = self._telegram_chat()["messages"]
+        self.assertEqual([m["delivery_status"] for m in messages], ["failed", "failed"])
 
 
 class UnansweredNoteTest(unittest.TestCase):
