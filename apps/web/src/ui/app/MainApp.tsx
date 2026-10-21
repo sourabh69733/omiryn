@@ -14,10 +14,12 @@ import { AvatarImage } from "./AvatarImage";
 import { mainPhoto } from "./profilePhoto";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import { useIsMobile } from "./useIsMobile";
+import { useKeyboardA11y } from "./useKeyboardA11y";
 import type { AuthUser, Page, Profile, ProfileResponse } from "./types";
 
 export function MainApp({ initialConversationId }: { initialConversationId?: string | null }) {
   const [page, setPage] = useState<Page>(pageFromPath);
+  useKeyboardA11y();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -176,7 +178,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       {isMobile && mobileNavOpen ? (
         <div className="omi-mobile-navigation">
           <button type="button" className="omi-mobile-navigation-backdrop" onClick={closeMobileNavigation} aria-label="Close navigation" />
-          <nav className="omi-mobile-navigation-panel" role="dialog" aria-modal="true" aria-label="Mobile navigation" ref={mobileNavRef} onKeyDown={(event) => {
+          <nav className="omi-mobile-navigation-panel" role="dialog" aria-modal="true" data-focus-managed aria-label="Mobile navigation" ref={mobileNavRef} onKeyDown={(event) => {
             if (event.key !== "Tab") return;
             const controls = mobileNavRef.current?.querySelectorAll<HTMLElement>("a, button:not(:disabled)");
             if (!controls?.length) return;
