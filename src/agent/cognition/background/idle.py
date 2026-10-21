@@ -15,6 +15,7 @@ from agent.jobs.queue import cancel_job, schedule_job
 from agent.memory_engine.processing.service import get_processing_state
 from storage import get_conversation, list_conversations
 
+from .upload_read import read_upload
 from .service import (
     background_cognition_enabled,
     has_pending_background_cognition,
@@ -84,6 +85,12 @@ async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
     messages = list(conversation.get("messages") or [])
     if not has_pending_background_cognition(conversation_id, user_id, messages):
         return {"status": "no_pending_messages", "operation_count": 0}
+    if conversation.get("import_source_id") and _processed_through(conversation_id, user_id) == -1:
+        # A fresh upload is read all at once, in parallel parts, instead of 7 lines per run.
+        result = await read_upload(conversation, user_id)
+        if result.get("status") == "already_processing":
+            schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=_BUSY_RETRY_SECONDS)
+        return result
 
     cursor_before = _processed_through(conversation_id, user_id)
     result = await run_background_cognition(
