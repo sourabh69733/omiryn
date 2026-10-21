@@ -15,13 +15,19 @@ Input:
 - current_user_card: the user's card before this upload.
 - vibe_areas: what each friend-vibe area means; current_vibe: lines written so far.
 - vibe_candidates: per area, lines the parts wrote, each with an id.
+- chat_with: the person the user was chatting with in this upload, or null for notes.
 
 Output:
 {
   "same": [["<candidate id>", "<candidate id>"]],
   "user_card": "the updated card, one fact per line; null only to keep a current_user_card unchanged",
-  "vibe": {"<area id>": {"line": "one line for the area", "from": ["<vibe candidate id>"]}}
+  "vibe": {"<area id>": {"line": "one line for the area", "from": ["<vibe candidate id>"]}},
+  "chat_with": {"statement": "Chats with <name> on WhatsApp, mostly about <what the candidates show>.", "from": ["<candidate id>"]}
 }
+
+chat_with: when chat_with is given, one plain sentence about the two of them: who the person is to
+the user only if a candidate says so, and what they mostly talk about, from the candidates you list
+in "from". null when chat_with is null.
 
 same: groups of candidate ids that say the same thing about the user (one fact, one event, one
 person). Leave a candidate out when nothing else matches it. Never group different facts.

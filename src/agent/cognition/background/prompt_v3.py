@@ -160,6 +160,13 @@ Session log rules:
 - When every new message has from_upload=true, the upload is read in parts at the same time and
   merged afterwards: return only memory operations and vibe. Use thread_operation none,
   conversation_summary null, session_log [], user_card null, self_notes [] and open_questions [].
+- The user shared an upload so the companion gets to know them, and in a chat with a friend people
+  reveal themselves in passing. The user's own lines there are real evidence about them: what they
+  say about their work, study, routine, opinions, likes and dislikes, frustrations, plans, places and
+  people counts even as an aside ("I don't trust finance influencers" is an opinion memory; "my
+  task took 8 iterations again" says what their work is like). Keep what says something lasting
+  about them; skip one-off trivia (what they ate once, a number from one task, who did what once).
+  Banter, "haha", "ok" and replies with no content of their own still teach nothing.
 
 User card rules:
 """ + USER_CARD_RULES + """
