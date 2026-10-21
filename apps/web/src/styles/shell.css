@@ -1247,6 +1247,21 @@ button.omi-drawer-close:hover {
   line-height: 1.45;
 }
 
+.chat-upload-note strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.chat-upload-change {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand-violet);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .chat-upload-error {
   margin: 0;
   color: #b42318;

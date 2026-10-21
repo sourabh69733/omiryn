@@ -5,7 +5,7 @@ import { Paperclip, X } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { trackAppEvent } from "../../lib/appLogger";
 import type { SharedUpload } from "./UploadReading";
-import { type ChatSender, chatSenders, chatTitle } from "./whatsappSenders";
+import { type ChatSender, chatSenders, chatTitle, senderForUser } from "./whatsappSenders";
 
 // The API's limit; a longer export keeps its most recent part.
 const MAX_CHARS = 200000;
@@ -13,11 +13,13 @@ const MAX_NAMES = 6;
 
 type Picked = { fileName: string; text: string; senders: ChatSender[] };
 
-export function ChatUpload({ conversationId, disabled, onShared }: { conversationId: string | null; disabled?: boolean; onShared: (upload: SharedUpload) => void }) {
+export function ChatUpload({ conversationId, disabled, userNames = [], onShared }: { conversationId: string | null; disabled?: boolean; userNames?: string[]; onShared: (upload: SharedUpload) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
   const [me, setMe] = useState<string | null>(null);
+  // Found from their name, so "Which one is you?" is skipped; they can still change it.
+  const [matched, setMatched] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,8 +43,11 @@ export function ChatUpload({ conversationId, disabled, onShared }: { conversatio
     if (!file) return;
     const text = (await file.text()).slice(-MAX_CHARS);
     setError("");
-    setMe(null);
-    setPicked({ fileName: file.name, text, senders: chatSenders(text) });
+    const senders = chatSenders(text);
+    const found = senderForUser(senders, userNames);
+    setMe(found);
+    setMatched(Boolean(found));
+    setPicked({ fileName: file.name, text, senders });
   }
 
   async function share() {
@@ -83,10 +88,12 @@ export function ChatUpload({ conversationId, disabled, onShared }: { conversatio
       {picked ? (
         <div className="chat-upload-panel" role="dialog" aria-label="Share with Omi">
           <div className="chat-upload-head">
-            <strong>{isChat ? "Which one is you?" : "Share these notes?"}</strong>
+            <strong>{!isChat ? "Share these notes?" : matched ? "Share this chat?" : "Which one is you?"}</strong>
             <button type="button" aria-label="Cancel" onClick={() => setPicked(null)} disabled={sharing}><X aria-hidden="true" /></button>
           </div>
-          {isChat ? (
+          {isChat && matched ? (
+            <p className="chat-upload-note">Sharing as <strong>{me}</strong>. <button type="button" className="chat-upload-change" onClick={() => setMatched(false)} disabled={sharing}>Not you?</button></p>
+          ) : isChat ? (
             <div className="chat-upload-names" role="radiogroup" aria-label="Your name in this chat">
               {picked!.senders.slice(0, MAX_NAMES).map((sender) => (
                 <button type="button" role="radio" aria-checked={me === sender.name} className={me === sender.name ? "is-active" : ""} key={sender.name} onClick={() => setMe(sender.name)}>{sender.name}</button>

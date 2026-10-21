@@ -32,7 +32,7 @@ const MESSAGE_MENU_HEIGHT = 260;
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: string | null; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: string | null; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -1288,7 +1288,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                 </div>
               ) : null}
               <div className="composer-tools">
-              {temporary ? null : <ChatUpload conversationId={conversation?.id ?? null} disabled={composerBlocked} onShared={showUpload} />}
+              {temporary ? null : <ChatUpload conversationId={conversation?.id ?? null} disabled={composerBlocked} userNames={userNames} onShared={showUpload} />}
               <div className="emoji-picker-anchor" ref={emojiPickerRef}>
                 <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => { closeEmojiShortcodeSuggestions(); setEmojiPickerOpen((value) => !value); }}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
                 {emojiPickerOpen ? (

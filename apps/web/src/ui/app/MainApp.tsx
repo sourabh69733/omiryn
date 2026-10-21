@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Sparkles, Users, X } from "lucide-react";
 import { apiFetch, signOut } from "../../lib/api";
 import { initAppLogger, trackPageView } from "../../lib/appLogger";
@@ -111,6 +111,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
 
   // The profile is the source of truth; Google's name and photo are only the fallback.
   const displayName = profile?.display_name || user?.display_name || user?.email || "Account";
+  // Their names, to find them among the people in a shared WhatsApp chat.
+  const userNames = useMemo(() => [profile?.display_name, user?.display_name].filter((name): name is string => Boolean(name)), [profile?.display_name, user?.display_name]);
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
   const profileAvatar = mainPhoto(profile, user?.avatar_url);
 
@@ -167,7 +169,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </aside>
       <main className="omi-main">
-        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenVibe={() => navigate("vibe")} initialConversationId={initialConversationId} userAvatar={profileAvatar} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
+        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenVibe={() => navigate("vibe")} initialConversationId={initialConversationId} userAvatar={profileAvatar} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}
