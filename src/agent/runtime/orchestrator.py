@@ -79,7 +79,10 @@ async def run_agent_turn(
     style_source_id: str | None,
     agent_name: str | None = None,
     reply_to: dict[str, Any] | None = None,
+    unanswered_count: int = 1,
 ) -> AgentTurnResult:
+    """`unanswered_count` > 1: the user sent several messages in a row (on a messaging app);
+    the earlier ones are the last items of `messages` and this reply answers them all."""
     updated_messages = [dict(message) for message in messages]
     trace = save_agent_trace(
         {
@@ -232,6 +235,7 @@ async def run_agent_turn(
     reply_messages = reply_messages + _turn_notes(
         context_package.question_limit,
         context_package.query_intent.labels if context_package.query_intent else (),
+        unanswered_count,
     )
     provider_messages = _provider_messages(reply_messages)
     save_agent_trace_step(
@@ -519,9 +523,20 @@ _STORY_AUTOPLAY_ENDING = (
 )
 
 
-def _turn_notes(question_limit: int, intent_labels: tuple[str, ...] = ()) -> list[dict[str, str]]:
+_UNANSWERED_NOTE = (
+    "The user sent their last {count} messages in a row before you replied. Read them together "
+    "and reply once: answer each one that needs an answer, in its own short bubble, and let "
+    "greetings or fillers pass without a bubble of their own."
+)
+
+
+def _turn_notes(
+    question_limit: int, intent_labels: tuple[str, ...] = (), unanswered_count: int = 1
+) -> list[dict[str, str]]:
     """Per-turn rules placed after the user's message."""
     notes = []
+    if unanswered_count > 1:
+        notes.append({"role": "system", "content": _UNANSWERED_NOTE.format(count=unanswered_count)})
     ending = _STORY_AUTOPLAY_ENDING if story_autoplay_enabled() else _STORY_ENDING
     if "story_continuation" in intent_labels:
         notes.append({"role": "system", "content": _STORY_CONTINUE_NOTE + ending})
