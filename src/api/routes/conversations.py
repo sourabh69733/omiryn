@@ -122,6 +122,24 @@ async def create_agent_conversation(
     timezone_header: str | None = Header(default=None, alias="X-Timezone"),
 ) -> AgentConversation:
     _remember_user_timezone(user, timezone_header)
+    return _new_conversation(user, payload)
+
+
+def omi_conversation(user: CurrentUser) -> AgentConversation:
+    """The user's one ongoing Omi chat, the same one the web app opens; started if missing."""
+    rows = [
+        row
+        for row in storage_list_conversations(_user_id(user))
+        if not row.get("temporary") and not row.get("import_source_id") and row.get("status") == "active"
+    ]
+    open_rows = [row for row in rows if not row.get("archived_at")]
+    newest = max(open_rows or rows, key=lambda row: str(row.get("created_at") or ""), default=None)
+    if newest is None:
+        return _new_conversation(user, AgentConversationCreate(agent_tone="warm"))
+    return AgentConversation.model_validate(newest)
+
+
+def _new_conversation(user: CurrentUser, payload: AgentConversationCreate | None) -> AgentConversation:
     conversation_id = str(uuid4())
     runtime = agent_runtime_status()
     selected_model = _normalize_selected_model(
@@ -376,12 +394,30 @@ async def send_agent_message(
     timezone_header: str | None = Header(default=None, alias="X-Timezone"),
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
+    _remember_user_timezone(user, timezone_header)
+    return await post_user_message(
+        conversation, user, payload.message, background_tasks, reply_to_index=payload.reply_to_index
+    )
+
+
+async def post_user_message(
+    conversation: AgentConversation,
+    user: CurrentUser,
+    text: str,
+    background_tasks: BackgroundTasks,
+    *,
+    reply_to_index: int | None = None,
+    channel: str | None = None,
+) -> AgentConversation:
+    """Save the user's message, reply to it and schedule background learning.
+
+    Shared by the web chat and messaging apps; `channel` marks where the message came from.
+    """
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
     if conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat came from an upload; it can't be replied to.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
-    _remember_user_timezone(user, timezone_header)
     # A new message answers for any earlier one whose reply failed: the reply covers both.
     for message in conversation.messages:
         if message.get("role") == "user" and _reply_failed(message):
@@ -389,16 +425,17 @@ async def send_agent_message(
     prior_messages = list(conversation.messages)
     pending = {
         "role": "user",
-        "content": payload.message,
+        "content": text,
         "created_at": utc_now_iso(),
         "delivery_status": "sending",
-        **({"reply_to": _reply_quote(prior_messages, payload.reply_to_index)} if payload.reply_to_index is not None else {}),
+        **({"reply_to": _reply_quote(prior_messages, reply_to_index)} if reply_to_index is not None else {}),
+        **({"channel": channel} if channel else {}),
     }
     # Saved before the model runs, so a failed reply never loses what the user wrote.
     conversation.messages = [*prior_messages, pending]
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
     # Writing in an archived chat brings it back to the main list.
-    set_conversation_archived(conversation_id, _user_id(user), False)
+    set_conversation_archived(conversation.id, _user_id(user), False)
     return await _reply_to_pending(conversation, user, prior_messages, pending, background_tasks)
 
 
@@ -499,8 +536,9 @@ async def _reply_to_pending(
     user_message = conversation.messages[previous_message_count]
     # Keep when the user actually wrote it, even when this reply came from a retry.
     user_message["created_at"] = pending["created_at"]
-    if pending.get("reply_to"):
-        user_message["reply_to"] = pending["reply_to"]
+    for key in ("reply_to", "channel"):
+        if pending.get(key):
+            user_message[key] = pending[key]
     user_message["delivery_status"] = "read"
     _stamp_new_messages(conversation.messages, previous_message_count)
     save_conversation(conversation.model_dump(mode="json"), _user_id(user))
