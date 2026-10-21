@@ -499,7 +499,7 @@ button.pf-link {
   gap: 4px;
   min-height: 0;
   margin-left: 10px;
-  padding: 0;
+  padding: 4px 0;
   border: 0;
   background: transparent;
   color: var(--brand-violet);

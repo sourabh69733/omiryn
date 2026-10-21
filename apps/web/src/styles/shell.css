@@ -378,6 +378,7 @@ button.omi-account-button:hover {
 
 button.omi-back {
   display: grid;
+  flex: none;
   place-items: center;
   width: 34px;
   min-height: 0;

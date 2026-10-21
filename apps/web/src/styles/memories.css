@@ -614,7 +614,8 @@ a.mem-link,
 button.mem-link {
   justify-self: start;
   min-height: 0;
-  padding: 0;
+  /* Vertical padding keeps the tap area at least 24px tall. */
+  padding: 4px 0;
   border: 0;
   background: transparent;
   color: var(--brand-violet);
