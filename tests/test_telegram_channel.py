@@ -159,6 +159,20 @@ class TelegramChannelTest(unittest.TestCase):
         self.assertTrue(replies)
         self.assertEqual(self._sent_texts(), replies)
 
+    def test_typing_shows_before_omi_starts_writing(self) -> None:
+        self._connect()
+        order: list[str] = []
+        typing = AsyncMock(side_effect=lambda chat_id: order.append("typing"))
+
+        async def turn(**kwargs):
+            order.append("turn")
+            raise RuntimeError("stop here")
+
+        with patch.object(telegram_routes, "send_telegram_typing", typing), patch("api.main.run_agent_turn", turn):
+            self._webhook("hi", update_id=2)
+
+        self.assertEqual(order[:2], ["typing", "turn"])
+
     def test_a_first_message_starts_the_omi_chat_when_there_is_none(self) -> None:
         self._connect()
 

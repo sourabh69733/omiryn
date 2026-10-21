@@ -21,6 +21,7 @@ from channels.telegram import (
     telegram_start_url,
     telegram_webhook_secret,
 )
+from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser, require_user
 from storage import (
     channel_link_for_chat,
@@ -146,6 +147,9 @@ async def _start(chat_id: str, code: str) -> None:
 async def _reply(chat_id: str, user: CurrentUser, text: str, background_tasks: BackgroundTasks) -> None:
     conversation = omi_conversation(user)
     reply_from = len(conversation.messages) + 1
+    # Sent before any reply work, so "typing…" shows at once however busy the server is.
+    await send_telegram_typing(chat_id)
+    await _publish_web_typing(conversation.id, True)
     typing = asyncio.create_task(_keep_typing(chat_id))
     try:
         updated = await post_user_message(conversation, user, text, background_tasks, channel=CHANNEL)
@@ -160,6 +164,7 @@ async def _reply(chat_id: str, user: CurrentUser, text: str, background_tasks: B
         typing.cancel()
         with suppress(asyncio.CancelledError):
             await typing
+        await _publish_web_typing(conversation.id, False)
     bubbles = [
         str(message.get("content") or "").strip()
         for message in updated.messages[reply_from:]
@@ -174,8 +179,19 @@ async def _reply(chat_id: str, user: CurrentUser, text: str, background_tasks: B
 
 async def _keep_typing(chat_id: str) -> None:
     while True:
-        await send_telegram_typing(chat_id)
         await asyncio.sleep(_TYPING_REFRESH_SECONDS)
+        await send_telegram_typing(chat_id)
+
+
+async def _publish_web_typing(conversation_id: str, active: bool) -> None:
+    """The web chat, if open, shows Omi typing while it answers a Telegram message."""
+    await realtime_hub.publish(
+        conversation_event(
+            "agent.typing",
+            conversation_id,
+            payload={"conversation_id": conversation_id, "active": active},
+        )
+    )
 
 
 def _failure_text(error: HTTPException) -> str:
