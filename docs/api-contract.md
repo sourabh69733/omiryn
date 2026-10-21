@@ -140,7 +140,7 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `GET /api/channels/telegram` | `available` (on for this account), `connected`, `bot_username`. |
 | `POST /api/channels/telegram/link` | A `t.me` link with a one-time code (15 minutes); Start in Telegram connects. 404 when off, 403 when not on the tester list. |
 | `DELETE /api/channels/telegram` | Disconnect; Omi says so in the Telegram chat. |
-| `POST /api/channels/telegram/webhook` | Telegram only, checked by the `X-Telegram-Bot-Api-Secret-Token` header. Messages from a connected chat go to the user's Omi chat. |
+| `POST /api/channels/telegram/webhook` | Telegram only, checked by the `X-Telegram-Bot-Api-Secret-Token` header. Messages from a connected chat go to the user's Telegram chat with Omi (`channel: telegram`, hidden from the web list). |
 | `POST /api/agent/conversations/{id}/whatsapp-import` | Upload a WhatsApp export (`content`, `user_sender`, `title`). With `style_kind: user_style`, Omi learns from the user's own lines through a hidden chat. |
 | `POST /api/agent/conversations/{id}/context-sources` | Upload notes (`source_type: manual_notes` or `llm_profile`); Omi learns from them the same way. |
 | `DELETE /api/me/context-sources/{source_id}` | Delete an upload and what Omi learned only from it. |
