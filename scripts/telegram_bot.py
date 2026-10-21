@@ -17,6 +17,7 @@ import argparse
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
@@ -65,6 +66,9 @@ def main() -> int:
 def _poll(token: str, secret: str, api: str) -> int:
     _bot(token, "deleteWebhook")
     print(f"Polling Telegram and forwarding to {api}. Ctrl+C to stop.")
+    # Forwarded side by side, like Telegram's webhook: the API holds the first message of a
+    # burst open while it waits for the rest, so waiting here would stop the rest arriving.
+    workers = ThreadPoolExecutor(max_workers=8)
     offset = None
     while True:
         try:
@@ -75,16 +79,20 @@ def _poll(token: str, secret: str, api: str) -> int:
             continue
         for update in updates.get("result") or []:
             offset = update["update_id"] + 1
-            try:
-                response = httpx.post(
-                    f"{api}/api/channels/telegram/webhook",
-                    json=update,
-                    headers={"X-Telegram-Bot-Api-Secret-Token": secret},
-                    timeout=120,
-                )
-                print(f"update {update['update_id']}: {response.status_code}")
-            except httpx.HTTPError as error:
-                print(f"update {update['update_id']}: API unreachable ({type(error).__name__})")
+            workers.submit(_forward, api, secret, update)
+
+
+def _forward(api: str, secret: str, update: dict) -> None:
+    try:
+        response = httpx.post(
+            f"{api}/api/channels/telegram/webhook",
+            json=update,
+            headers={"X-Telegram-Bot-Api-Secret-Token": secret},
+            timeout=120,
+        )
+        print(f"update {update['update_id']}: {response.status_code}")
+    except httpx.HTTPError as error:
+        print(f"update {update['update_id']}: API unreachable ({type(error).__name__})")
 
 
 def _bot(token: str, method: str, **payload: object) -> dict:
