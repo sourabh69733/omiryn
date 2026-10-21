@@ -144,3 +144,4 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `POST /api/agent/conversations/{id}/whatsapp-import` | Upload a WhatsApp export (`content`, `user_sender`, `title`). With `style_kind: user_style`, Omi learns from the user's own lines through a hidden chat. |
 | `POST /api/agent/conversations/{id}/context-sources` | Upload notes (`source_type: manual_notes` or `llm_profile`); Omi learns from them the same way. |
 | `DELETE /api/me/context-sources/{source_id}` | Delete an upload and what Omi learned only from it. |
+| `GET /api/me/context-sources/{source_id}/reading` | How far Omi got reading an upload: `state` (`queued`, `reading`, `merging`, `done`, `failed`, or `none` for older uploads), `parts`, `parts_done`, `learned`, `seconds`. The same object is in the upload's `metadata.reading`. |
