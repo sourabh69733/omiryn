@@ -166,7 +166,9 @@ Open decision: memory evals grade purposes exactly, or only required-present / f
 Telegram v1 (`src/api/routes/telegram.py`, `src/channels/telegram.py`):
 - Connect from Profile: a `t.me/<bot>?start=<code>` link with a one-time code (15 minutes, stored hashed); tapping Start links that Telegram chat to the account (`channel_links`). `/disconnect` in Telegram or Disconnect in Profile unlinks.
 - A message there runs the same turn as the web (`post_user_message`) in the user's Omi chat, marked `channel: telegram`, so memories, vibe and the web chat all see it. Each reply bubble is a separate Telegram message, with typing shown while Omi writes.
-- Webhook checks Telegram's secret header, answers a retried delivery once (`last_update_id`) and handles one message at a time per chat. Private chats and text only.
+- Quick messages are grouped: each is saved and shown at once, Omi waits for 1.5 s of quiet (6 s at most), then one reply answers them together, still in short bubbles (the model is told how many came in a row). A message that arrives before any bubble is sent restarts the draft (twice at most); one that arrives later gets the next reply. The first message's webhook request stays open until the burst is answered, so Cloud Run keeps CPU. Grouping is per server process for now.
+- "typing…" shows in Telegram as soon as Omi starts writing, and the web chat, if open, shows typing dots.
+- Webhook checks Telegram's secret header and answers a retried delivery once (`last_update_id`). Private chats and text only.
 - Off by default: `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, and `TELEGRAM_ALLOWED_EMAILS` for test users. `scripts/telegram_bot.py` sets the webhook, or `poll` forwards messages to a local API without a public URL.
 - Not yet: story parts, nudges and return greetings reach only the web app; no groups, photos or voice notes; no sign-up from inside Telegram.
 - Test plan: 10-20 users for 2 weeks; compare messages per day and return rate on Telegram against the web (user messages carry `channel`).
