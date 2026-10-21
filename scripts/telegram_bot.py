@@ -4,7 +4,7 @@
   set-webhook --url https://<api>/api/channels/telegram/webhook   point Telegram at the API
   info                                                              show the current webhook
   delete-webhook                                                    stop webhook delivery
-  poll [--api http://localhost:8000]                                local testing, no public URL
+  poll [--api http://127.0.0.1:8001]                                local testing, no public URL
 
 poll asks Telegram for new messages and hands each one to the local API's webhook, the same
 way Telegram would. Telegram only allows it while no webhook is set, so it removes the webhook
@@ -36,7 +36,7 @@ def main() -> int:
     commands.add_parser("info")
     commands.add_parser("delete-webhook")
     poll = commands.add_parser("poll")
-    poll.add_argument("--api", default="http://localhost:8000")
+    poll.add_argument("--api", default=f"http://127.0.0.1:{os.getenv('APP_PORT', '8001')}")
     args = parser.parse_args()
 
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
