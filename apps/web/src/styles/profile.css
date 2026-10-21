@@ -686,3 +686,32 @@ button.pf-model-option.is-checked {
   height: 17px;
   color: var(--brand-violet);
 }
+
+.pf-telegram-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button.pf-telegram-action {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+button.pf-telegram-action:hover {
+  background: transparent;
+  color: #b42318;
+}
+
+.pf-telegram-note {
+  margin: 0;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}

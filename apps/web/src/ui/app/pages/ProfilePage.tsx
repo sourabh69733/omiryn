@@ -6,6 +6,7 @@ import { Notice, StateView } from "../StateView";
 import type { DataRequest, Profile, ProfileResponse } from "../types";
 import { mainPhoto } from "../profilePhoto";
 import { ReplyModelSetting } from "../ReplyModelSetting";
+import { TelegramSetting } from "../TelegramSetting";
 import { blobPath } from "../vibeRing";
 
 type Intro = { intro: string | null; chips: string[]; ready: boolean; edited?: boolean };
@@ -245,6 +246,7 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
         <div className="pf-row"><span>Email</span><span className="pf-muted">{data.user?.email || "Signed in"}</span></div>
         <div className="pf-row"><span>Gender</span><span className="pf-muted">{genderLabel}</span></div>
         {form.phone ? <div className="pf-row"><span>Mobile</span><span className="pf-muted">{form.phone}</span></div> : null}
+        <TelegramSetting />
         <button type="button" className="pf-row is-action" onClick={onPrivacy}><span>How Omi uses your data</span><ChevronRight aria-hidden="true" /></button>
         <button type="button" className="pf-row is-action" onClick={() => setPendingDataRequest("export")} disabled={sendingRequest}><span>Export my data</span><ChevronRight aria-hidden="true" /></button>
         <button type="button" className="pf-row is-action" onClick={() => void signOut()}><span>Sign out</span><ChevronRight aria-hidden="true" /></button>
