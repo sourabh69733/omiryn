@@ -13,6 +13,7 @@ from . import (
     profile,
     public,
     realtime,
+    telegram,
     usage,
     vibe,
 )
@@ -31,5 +32,6 @@ router.include_router(realtime.router)
 router.include_router(drafts.router)
 router.include_router(demo.router)
 router.include_router(vibe.router)
+router.include_router(telegram.router)
 
 __all__ = ["router", "run_agent_turn"]
