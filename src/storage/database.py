@@ -38,6 +38,8 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "data_point_extraction_debug",
     "agent_message_feedback",
     "agent_open_questions",
+    "channel_links",
+    "channel_link_codes",
 )
 
 
