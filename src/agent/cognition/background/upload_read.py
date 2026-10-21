@@ -23,7 +23,7 @@ from typing import Any
 
 from agent.memory_engine.memories.embeddings import index_agent_memories
 from agent.memory_engine.memories.focus import without_focus_lines
-from agent.memory_engine.memories.models import MemoryKind
+from agent.memory_engine.memories.models import MemoryKind, MemoryPurpose, MemorySensitivity
 from agent.memory_engine.memories.operations import (
     MemoryAddProposal,
     MemoryAnalysisV3,
@@ -102,8 +102,10 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
         cognitions = await asyncio.gather(*(read(part) for part in parts))
         _progress(source_id, user_id, state="merging")
         candidates, others, vibe_candidates = _collect(cognitions)
-        wrap = await _wrap_up(conversation_id, candidates, vibe_candidates, context, model)
+        partner = chat_partner(whole)
+        wrap = await _wrap_up(conversation_id, candidates, vibe_candidates, context, model, partner)
         operations = merge_operations(candidates, others, wrap.get("same"))
+        operations += partner_memory(partner, wrap.get("chat_with"), candidates, whole, context["memories"])
         if operations:
             applied = apply_validated_memory_analysis_v3(
                 whole,
@@ -219,9 +221,22 @@ def _collect(cognitions: list[Any]) -> tuple[list[tuple[str, MemoryAddProposal]]
     return candidates, others, vibe
 
 
+# Waits before each retry of a part. The provider answers "model busy" (429) under load, so an
+# instant retry fails too; the last try uses the background model instead of the fast one.
+RETRY_WAITS = (5.0, 15.0)
+
+
+def _attempt_models(model: str | None) -> list[str | None]:
+    fallback = os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or None
+    return [model] * len(RETRY_WAITS) + [fallback if fallback and fallback != model else model]
+
+
 async def _read_part(part: MemoryBatch, context: dict[str, Any], model: str | None) -> Any:
-    """One part through the normal background prompt; one retry on a failed or invalid answer."""
-    for attempt in range(2):
+    """One part through the normal background prompt, retried with waits and a fallback model."""
+    error: Exception = RuntimeError("part was not read")
+    for attempt, attempt_model in enumerate(_attempt_models(model)):
+        if attempt:
+            await asyncio.sleep(RETRY_WAITS[min(attempt, len(RETRY_WAITS)) - 1])
         try:
             raw = await analyze_background_cognition(
                 background_cognition_prompt(
@@ -236,7 +251,7 @@ async def _read_part(part: MemoryBatch, context: dict[str, Any], model: str | No
                     None,
                 ),
                 conversation_id=part.conversation_id,
-                model=model,
+                model=attempt_model,
                 timeout_seconds=_timeout_seconds(),
                 memory_version=3,
             )
@@ -251,7 +266,7 @@ async def _read_part(part: MemoryBatch, context: dict[str, Any], model: str | No
             )
             if cognition.memory.valid:
                 return cognition
-            error: Exception = ValueError("; ".join(cognition.memory.errors)[:300])
+            error = ValueError("; ".join(cognition.memory.errors)[:300])
         except Exception as caught:  # provider or parse failure
             error = caught
         logger.warning("agent.upload_read.part_failed attempt=%s error_type=%s", attempt + 1, type(error).__name__)
@@ -264,8 +279,10 @@ async def _wrap_up(
     vibe_candidates: dict[str, list[dict[str, Any]]],
     context: dict[str, Any],
     model: str | None,
+    partner: str | None = None,
 ) -> dict[str, Any]:
     payload = {
+        "chat_with": partner,
         "candidates": [
             {"id": candidate_id, "kind": proposal.kind.value, "statement": proposal.statement or str(proposal.value)}
             for candidate_id, proposal in candidates
@@ -277,8 +294,19 @@ async def _wrap_up(
             area_id: [{"id": line["id"], "line": line["text"]} for line in lines] for area_id, lines in vibe_candidates.items()
         },
     }
-    raw = await analyze_upload_wrap_up(json.dumps(payload, ensure_ascii=False), conversation_id=conversation_id, model=model)
-    return raw if isinstance(raw, dict) else {}
+    text = json.dumps(payload, ensure_ascii=False)
+    models = _attempt_models(model)
+    for attempt, attempt_model in enumerate(models):
+        if attempt:
+            await asyncio.sleep(RETRY_WAITS[min(attempt, len(RETRY_WAITS)) - 1])
+        try:
+            raw = await analyze_upload_wrap_up(text, conversation_id=conversation_id, model=attempt_model)
+            return raw if isinstance(raw, dict) else {}
+        except Exception as error:
+            if attempt == len(models) - 1:
+                raise
+            logger.warning("agent.upload_read.wrap_up_failed attempt=%s error_type=%s", attempt + 1, type(error).__name__)
+    return {}
 
 
 async def _save_after(
@@ -309,6 +337,51 @@ async def _save_after(
     updates = merge_vibe(wrap.get("vibe"), vibe_candidates, memory_proof(whole, candidates))
     if updates and context["vibe"] is not None:
         await _apply_vibe(whole, context["vibe"], updates)
+
+
+def chat_partner(whole: MemoryBatch) -> str | None:
+    """Who the user was chatting with: the other person with the most lines, None for notes."""
+    counts: dict[str, int] = {}
+    for message in whole.messages:
+        if message.role == "other" and message.speaker:
+            counts[message.speaker] = counts.get(message.speaker, 0) + 1
+    return max(counts, key=counts.__getitem__) if counts else None
+
+
+def partner_memory(
+    partner: str | None,
+    written: Any,
+    candidates: list[tuple[str, MemoryAddProposal]],
+    whole: MemoryBatch,
+    existing: list[dict[str, Any]],
+) -> tuple[Any, ...]:
+    """One relationship memory about who the chat was with, proven by the user's own lines.
+
+    The upload itself shows they talk; what about comes from the wrap-up. An earlier memory about
+    the same person is replaced, so a second upload of that chat does not add a copy.
+    """
+    if not partner:
+        return ()
+    written = written if isinstance(written, dict) else {}
+    statement = " ".join(str(written.get("statement") or "").split())[:240] or f"Chats with {partner} on WhatsApp."
+    by_id = dict(candidates)
+    proof = sorted({index for item in written.get("from") or [] if item in by_id for index in by_id[item].evidence_message_indexes})
+    if not proof:
+        proof = [message.message_index for message in whole.messages if message.role == "user"][:3]
+    key = "chat_partner." + re.sub(r"[^a-z0-9]+", "_", partner.lower()).strip("_")
+    memory = MemoryAddProposal(
+        kind=MemoryKind.RELATIONSHIP,
+        purposes=frozenset({MemoryPurpose.PERSONALIZATION}),
+        key=key,
+        value=statement,
+        sensitivity=MemorySensitivity.STANDARD,
+        confidence=0.85,
+        importance=0.6,
+        evidence_message_indexes=tuple(proof[:8]),
+        statement=statement,
+    )
+    earlier = next((item for item in existing if item.get("key") == key and item.get("targetable") is not False), None)
+    return (MemorySupersedeProposal(target_memory_id=str(earlier["id"]), replacement=memory),) if earlier else (memory,)
 
 
 def card_lines(card: Any) -> Any:
@@ -383,4 +456,4 @@ def _progress(source_id: str, user_id: str, **changes: Any) -> None:
         logger.warning("agent.upload_read.progress_failed error_type=%s", type(error).__name__)
 
 
-__all__ = ["DEFAULT_UPLOAD_MODEL", "MAX_PARTS", "PART_USER_LINES", "card_lines", "memory_proof", "merge_operations", "merge_vibe", "read_upload", "upload_parts"]
+__all__ = ["DEFAULT_UPLOAD_MODEL", "MAX_PARTS", "PART_USER_LINES", "card_lines", "chat_partner", "memory_proof", "merge_operations", "merge_vibe", "partner_memory", "read_upload", "upload_parts"]

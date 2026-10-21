@@ -71,6 +71,22 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(merge_vibe({}, candidates)["humor"]["text"], "Dry jokes.")
 
 
+class BusyProviderTest(unittest.IsolatedAsyncioTestCase):
+    async def test_a_busy_model_is_retried_with_waits_then_the_background_model(self) -> None:
+        from agent.cognition.background import upload_read
+
+        part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
+        context = {"memories": [], "timezone": "Asia/Kolkata", "card": "", "vibe": None}
+        answer = {"decision": "no_change", "operations": [], "thread_operation": {"operation": "none"}, "handoff": {"summary": "", "active_people": [], "active_topics": [], "unresolved_references": []}, "user_card": None, "vibe": {}}
+        reader = AsyncMock(side_effect=[RuntimeError("429 busy"), RuntimeError("429 busy"), answer])
+        with patch.dict(os.environ, {"MEMORY_BACKGROUND_V2_MODEL": "big-model"}), patch.object(upload_read, "analyze_background_cognition", reader), patch.object(upload_read.asyncio, "sleep", AsyncMock()) as sleep:
+            cognition = await upload_read._read_part(part, context, "fast-model")
+
+        self.assertTrue(cognition.memory.valid)
+        self.assertEqual([call.kwargs["model"] for call in reader.await_args_list], ["fast-model", "fast-model", "big-model"])
+        self.assertEqual([call.args[0] for call in sleep.await_args_list], [5.0, 15.0])
+
+
 class PartsTest(unittest.TestCase):
     def test_parts_cover_every_user_line_once(self) -> None:
         messages = [{"role": "user", "content": f"line number {index} about my day"} for index in range(70)]
