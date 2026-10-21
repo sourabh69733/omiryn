@@ -1,7 +1,8 @@
-import { Fragment, lazy, Suspense, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
+import { rememberedUpload, rememberUpload, type SharedUpload, UploadReading } from "../UploadReading";
 import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
@@ -103,7 +104,12 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
   const [ratings, setRatings] = useState<ReadonlyMap<number, ReplyRating>>(() => new Map());
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
   // "Omi is reading your chat with …" after sharing a WhatsApp export.
-  const [uploadNote, setUploadNote] = useState("");
+  const [sharedUpload, setSharedUpload] = useState<SharedUpload | null>(() => rememberedUpload());
+  const showUpload = useCallback((upload: SharedUpload | null) => {
+    rememberUpload(upload);
+    setSharedUpload(upload);
+  }, []);
+  const dismissUpload = useCallback(() => showUpload(null), [showUpload]);
   useEffect(() => {
     // A selection, an open menu and a reply belong to one chat.
     setSelecting(false);
@@ -1251,12 +1257,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                 <button type="button" onClick={endTemporaryChat}>End chat</button>
               </div>
             ) : null}
-            {uploadNote ? (
-              <div className="omi-readonly-bar upload-note" role="status">
-                <span>{uploadNote}</span>
-                <button type="button" className="upload-note-close" onClick={() => setUploadNote("")} aria-label="Dismiss"><X aria-hidden="true" /></button>
-              </div>
-            ) : null}
+            {sharedUpload ? <UploadReading upload={sharedUpload} onDismiss={dismissUpload} /> : null}
             {replyTo ? (
               <div className="reply-preview" role="status">
                 <Reply aria-hidden="true" />
@@ -1286,7 +1287,7 @@ export function ChatPage({ initialConversationId, userAvatar, onOpenNavigation, 
                 </div>
               ) : null}
               <div className="composer-tools">
-              {temporary ? null : <ChatUpload conversationId={conversation?.id ?? null} disabled={composerBlocked} onShared={setUploadNote} />}
+              {temporary ? null : <ChatUpload conversationId={conversation?.id ?? null} disabled={composerBlocked} onShared={showUpload} />}
               <div className="emoji-picker-anchor" ref={emojiPickerRef}>
                 <button className="emoji-trigger-button" type="button" disabled={!conversation || composerBlocked} aria-label="Add emoji" aria-expanded={emojiPickerOpen} onClick={() => { closeEmojiShortcodeSuggestions(); setEmojiPickerOpen((value) => !value); }}><Smile className="emoji-trigger-icon" aria-hidden="true" /></button>
                 {emojiPickerOpen ? (

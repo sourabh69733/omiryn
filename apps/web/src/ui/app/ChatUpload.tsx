@@ -4,6 +4,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { Paperclip, X } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { trackAppEvent } from "../../lib/appLogger";
+import type { SharedUpload } from "./UploadReading";
 import { type ChatSender, chatSenders, chatTitle } from "./whatsappSenders";
 
 // The API's limit; a longer export keeps its most recent part.
@@ -12,7 +13,7 @@ const MAX_NAMES = 6;
 
 type Picked = { fileName: string; text: string; senders: ChatSender[] };
 
-export function ChatUpload({ conversationId, disabled, onShared }: { conversationId: string | null; disabled?: boolean; onShared: (note: string) => void }) {
+export function ChatUpload({ conversationId, disabled, onShared }: { conversationId: string | null; disabled?: boolean; onShared: (upload: SharedUpload) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -65,7 +66,8 @@ export function ChatUpload({ conversationId, disabled, onShared }: { conversatio
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Couldn't share that file."));
       trackAppEvent("memory_import_completed", { source_type: isChat ? "whatsapp_chat" : "manual_notes" }, { page: "chat" });
       setPicked(null);
-      onShared(isChat ? `Omi is reading your chat with ${title}. It'll know you better in a few minutes.` : "Omi is reading your notes. It'll know you better in a few minutes.");
+      const source = (await response.json()) as { id: string };
+      onShared({ sourceId: source.id, label: isChat ? `your chat with ${title}` : "your notes" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Couldn't share that file.");
     } finally {
