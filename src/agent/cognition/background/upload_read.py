@@ -363,10 +363,12 @@ def partner_memory(
     if not partner:
         return ()
     written = written if isinstance(written, dict) else {}
-    statement = " ".join(str(written.get("statement") or "").split())[:240] or f"Chats with {partner} on WhatsApp."
     by_id = dict(candidates)
     proof = sorted({index for item in written.get("from") or [] if item in by_id for index in by_id[item].evidence_message_indexes})
-    if not proof:
+    # What they talk about must come from memories learned here; without any, only the plain fact.
+    statement = " ".join(str(written.get("statement") or "").split())[:240] if proof else ""
+    if not statement:
+        statement = f"Chats with {partner} on WhatsApp."
         proof = [message.message_index for message in whole.messages if message.role == "user"][:3]
     key = "chat_partner." + re.sub(r"[^a-z0-9]+", "_", partner.lower()).strip("_")
     memory = MemoryAddProposal(
