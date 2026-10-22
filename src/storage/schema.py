@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, Float, Index, Integer, MetaData, String, Table, func
+from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, Float, Index, Integer, MetaData, String, Table, Text, func
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn.db"
 
@@ -569,6 +569,24 @@ whatsapp_people = Table(
     Column("role", String, nullable=False),
     Column("metadata_json", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Meaning search over stored chats: one vector per chunk of consecutive messages. The vector is
+# float32 bytes in base64; content_hash says when a chunk changed and needs a new one.
+chat_chunk_embeddings = Table(
+    "chat_chunk_embeddings",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("user_id", String, nullable=False, index=True),
+    Column("conversation_id", String, nullable=False, index=True),
+    Column("chunk_index", Integer, nullable=False),
+    Column("start_index", Integer, nullable=False),
+    Column("end_index", Integer, nullable=False),
+    Column("provider", String, nullable=False),
+    Column("model", String, nullable=False),
+    Column("vector", Text, nullable=False),
+    Column("content_hash", String, nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 # What Omi made of one uploaded chat (both sides): summary, topics, the other person. Encrypted;
