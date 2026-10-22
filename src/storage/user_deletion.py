@@ -47,6 +47,7 @@ from .schema import (
     whatsapp_messages,
     whatsapp_people,
     whatsapp_style_profiles,
+    upload_digests,
 )
 
 
@@ -68,6 +69,7 @@ def delete_user_private_data(user_id: str, email: str | None = None) -> dict[str
             agent_behavior_rules,
             data_point_extraction_debug,
             whatsapp_style_profiles,
+            upload_digests,
             whatsapp_people,
             whatsapp_chunks,
             whatsapp_messages,
@@ -124,6 +126,7 @@ _OMI_TABLES = (
     agent_behavior_rules,
     data_point_extraction_debug,
     whatsapp_style_profiles,
+    upload_digests,
     whatsapp_people,
     whatsapp_chunks,
     whatsapp_messages,

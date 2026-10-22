@@ -571,6 +571,19 @@ whatsapp_people = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# What Omi made of one uploaded chat (both sides): summary, topics, the other person. Encrypted;
+# deleted with the upload.
+upload_digests = Table(
+    "upload_digests",
+    metadata,
+    Column("source_id", String, primary_key=True),
+    Column("user_id", String, nullable=False, index=True),
+    Column("conversation_id", String, nullable=False),
+    Column("partner_name", String, nullable=True),
+    Column("digest_json", JSON, nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 whatsapp_style_profiles = Table(
     "whatsapp_style_profiles",
     metadata,

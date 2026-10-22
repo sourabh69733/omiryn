@@ -17,6 +17,7 @@ from .open_questions import *
 from .message_deletion import *
 from .agent_jobs import *
 from .context_sources import *
+from .upload_digests import *
 from .public import *
 from .data_requests import *
 from .app_events import *
