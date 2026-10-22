@@ -129,6 +129,8 @@ async def _openai_compatible_chat(
                 total_tokens=usage.get("total_tokens"),
             )
             message = choice["message"]
+            if tool_choice == "auto" and (called := _called_tool(message)) is not None:
+                return called
             tool_arguments = _selected_tool_arguments(message, tool_choice)
             if tool_arguments is not None:
                 return tool_arguments
@@ -322,6 +324,8 @@ async def _groq_chat(
                 total_tokens=usage.get("total_tokens"),
             )
             message = choice["message"]
+            if tool_choice == "auto" and (called := _called_tool(message)) is not None:
+                return called
             tool_arguments = _selected_tool_arguments(message, tool_choice)
             if tool_arguments is not None:
                 return tool_arguments
@@ -378,6 +382,37 @@ def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
         "x-ratelimit-reset-tokens",
     ]
     return {name: response.headers[name] for name in header_names if name in response.headers}
+
+
+# With tool_choice "auto" the model may answer or call a tool; a call comes back as this marker
+# plus {"name": ..., "arguments": {...}}, so the caller can tell it from a reply.
+TOOL_CALL_MARKER = "\u0000tool_call\u0000"
+
+
+def _called_tool(message: dict[str, Any]) -> str | None:
+    for tool_call in message.get("tool_calls") or []:
+        function = tool_call.get("function") if isinstance(tool_call, dict) else None
+        if not isinstance(function, dict) or not function.get("name"):
+            continue
+        arguments = function.get("arguments")
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments or "{}")
+            except ValueError:
+                arguments = {}
+        return TOOL_CALL_MARKER + json.dumps({"name": function["name"], "arguments": arguments if isinstance(arguments, dict) else {}})
+    return None
+
+
+def parse_tool_call(text: str) -> tuple[str, dict[str, Any]] | None:
+    """(name, arguments) when a reply call ended in a tool call, else None."""
+    if not isinstance(text, str) or not text.startswith(TOOL_CALL_MARKER):
+        return None
+    try:
+        called = json.loads(text[len(TOOL_CALL_MARKER):])
+    except ValueError:
+        return None
+    return str(called.get("name") or ""), dict(called.get("arguments") or {})
 
 
 def _selected_tool_arguments(
