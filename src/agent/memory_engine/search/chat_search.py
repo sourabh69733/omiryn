@@ -18,9 +18,15 @@ from zoneinfo import ZoneInfo
 
 from agent.shared.clock import utc_now
 from agent.shared.timeline import parse_time, user_zone
+from agent.memory_engine.memories.embeddings import embed_memory_query
 from storage import get_conversation, get_user_timezone, list_conversations
+from storage.chat_embeddings import list_chunk_embeddings
 
 MAX_HITS = 8
+# Meaning matches: chunks at least this similar (bge-m3 cosine; related text scored 0.48-0.63 and
+# unrelated up to 0.44 in the memory retrieval calibration), at most this many.
+MEANING_FLOOR = 0.5
+MEANING_HITS = 4
 # A line must match at least this share of the query, weighted by how rare each word is.
 MIN_SCORE = 0.3
 # And the matched words together must be rare enough: "what about" alone matches nothing useful.
@@ -61,6 +67,11 @@ class SearchHit:
     chat: str
     lines: tuple[str, ...]
     score: float
+    # Where it came from, to merge word and meaning hits and keep them in time order.
+    conversation_id: str = ""
+    start: int = 0
+    end: int = 0
+    at: datetime | None = None
 
 
 def search_chats(
@@ -75,17 +86,10 @@ def search_chats(
     zone = user_zone(get_user_timezone(user_id))
     since = (now or utc_now()) - timedelta(days=days) if days and days > 0 else None
     terms = _terms(query)
-    chats: dict[str, dict[str, Any]] = {}
+    chats = load_chats(user_id, person)
     lines: list[tuple[dict[str, Any], int, datetime, set[str], str]] = []
-    for summary in list_conversations(user_id):
-        if summary.get("temporary"):
-            continue
-        conversation = get_conversation(summary["id"], user_id) or {}
-        messages = list(conversation.get("messages") or [])
-        partner = _partner(messages)
-        if person and not (partner and _same_person(person, partner)):
-            continue
-        chats[summary["id"]] = {"messages": messages, "partner": partner}
+    for chat in chats.values():
+        summary, messages = chat["summary"], chat["messages"]
         for index, message in enumerate(messages):
             text = str(message.get("content") or "")
             sent = parse_time(message.get("created_at"))
@@ -112,15 +116,41 @@ def search_chats(
         chat = chats[summary["id"]]
         window = range(max(0, index - CONTEXT_LINES), min(len(chat["messages"]), index + CONTEXT_LINES + 1))
         shown.update((summary["id"], position) for position in window)
-        hits.append(
-            SearchHit(
-                when=sent.astimezone(zone).strftime("%a %d %b %Y, %H:%M") if sent != _NO_TIME else "unknown time",
-                chat=f"WhatsApp chat with {chat['partner']} (uploaded)" if summary.get("import_source_id") and chat["partner"] else ("uploaded notes" if summary.get("import_source_id") else "chat with you"),
-                lines=tuple(_line(chat["messages"][position], chat["partner"]) for position in window),
-                score=round(score, 2),
-            )
-        )
+        hits.append(_hit(chat, window.start, window.stop - 1, sent, score, zone))
     return hits
+
+
+def load_chats(user_id: str, person: str | None = None) -> dict[str, dict[str, Any]]:
+    """The user's stored chats (never temporary ones), only the upload with `person` if given."""
+    chats: dict[str, dict[str, Any]] = {}
+    for summary in list_conversations(user_id):
+        if summary.get("temporary"):
+            continue
+        conversation = get_conversation(summary["id"], user_id) or {}
+        messages = list(conversation.get("messages") or [])
+        partner = _partner(messages)
+        if person and not (partner and _same_person(person, partner)):
+            continue
+        chats[summary["id"]] = {"summary": summary, "messages": messages, "partner": partner}
+    return chats
+
+
+def _hit(chat: dict[str, Any], start: int, end: int, sent: datetime, score: float, zone: Any) -> SearchHit:
+    summary = chat["summary"]
+    if summary.get("import_source_id"):
+        where = f"WhatsApp chat with {chat['partner']} (uploaded)" if chat["partner"] else "uploaded notes"
+    else:
+        where = "chat with you"
+    return SearchHit(
+        when=sent.astimezone(zone).strftime("%a %d %b %Y, %H:%M") if sent != _NO_TIME else "unknown time",
+        chat=where,
+        lines=tuple(_line(chat["messages"][position], chat["partner"]) for position in range(start, end + 1)),
+        score=round(score, 2),
+        conversation_id=str(summary["id"]),
+        start=start,
+        end=end,
+        at=sent,
+    )
 
 
 def search_note(query: str, person: str | None, days: int | None, hits: list[SearchHit]) -> str:
@@ -203,4 +233,73 @@ def _score(weights: dict[str, float], words: set[str]) -> float:
     return sum(weight * _matches(term, words) for term, weight in weights.items()) / total if total > 0 else 0.0
 
 
-__all__ = ["SEARCH_TOOL", "SearchHit", "search_chats", "search_note"]
+async def search_chats_hybrid(
+    user_id: str,
+    query: str = "",
+    *,
+    person: str | None = None,
+    days: int | None = None,
+    now: datetime | None = None,
+    limit: int = MAX_HITS,
+) -> list[SearchHit]:
+    """Word matches (names, dates, exact words) plus meaning matches over chunk vectors, merged
+    and in time order. Without vectors (off, failed, not built yet) it is the word search alone."""
+    words = search_chats(user_id, query, person=person, days=days, now=now, limit=limit)
+    meaning = await meaning_hits(user_id, query, person=person, days=days, now=now) if query.strip() else []
+    taken = [(hit.conversation_id, hit.start, hit.end) for hit in words]
+    merged = list(words)
+    for hit in meaning:
+        if len(merged) >= limit:
+            break
+        if any(cid == hit.conversation_id and start <= hit.end and hit.start <= end for cid, start, end in taken):
+            continue
+        merged.append(hit)
+        taken.append((hit.conversation_id, hit.start, hit.end))
+    return sorted(merged, key=lambda hit: hit.at or _NO_TIME)
+
+
+async def meaning_hits(
+    user_id: str,
+    query: str,
+    *,
+    person: str | None = None,
+    days: int | None = None,
+    now: datetime | None = None,
+) -> list[SearchHit]:
+    from .chat_index import embedding_target
+
+    target = embedding_target()
+    if target is None:
+        return []
+    query_vector = await embed_memory_query(query)
+    if not query_vector:
+        return []
+    chats = load_chats(user_id, person)
+    rows = list_chunk_embeddings(user_id, *target, conversation_ids=set(chats)) if chats else []
+    since = (now or utc_now()) - timedelta(days=days) if days and days > 0 else None
+    zone = user_zone(get_user_timezone(user_id))
+    scored = sorted(((_cosine(query_vector["values"], row["vector"]), row) for row in rows), key=lambda item: item[0], reverse=True)
+    hits = []
+    for similarity, row in scored:
+        if similarity < MEANING_FLOOR or len(hits) >= MEANING_HITS:
+            break
+        chat = chats[row["conversation_id"]]
+        end = min(row["end_index"], len(chat["messages"]) - 1)
+        if end < row["start_index"]:
+            continue
+        sent = parse_time(chat["messages"][row["start_index"]].get("created_at")) or _NO_TIME
+        if since and sent < since:
+            continue
+        hits.append(_hit(chat, row["start_index"], end, sent, similarity, zone))
+    return hits
+
+
+def _cosine(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right) or not left:
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right))
+    norm = math.sqrt(sum(a * a for a in left)) * math.sqrt(sum(b * b for b in right))
+    return dot / norm if norm else 0.0
+
+
+__all__ = ["SEARCH_TOOL", "SearchHit", "load_chats", "meaning_hits", "search_chats", "search_chats_hybrid", "search_note"]
