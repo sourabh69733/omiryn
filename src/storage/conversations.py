@@ -10,6 +10,7 @@ from agent.shared.clock import utc_now
 from .conversation_threads import _delete_threads_only_from
 from .database import ENGINE
 from .schema import (
+    chat_chunk_embeddings,
     user_profiles,
     agent_memory_embeddings,
     agent_memory_reviews,
@@ -304,6 +305,12 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
             agent_usage_events.delete().where(
                 agent_usage_events.c.conversation_id == conversation_id,
                 agent_usage_events.c.user_id == owner_id,
+            )
+        )
+        connection.execute(
+            chat_chunk_embeddings.delete().where(
+                chat_chunk_embeddings.c.conversation_id == conversation_id,
+                chat_chunk_embeddings.c.user_id == owner_id,
             )
         )
         connection.execute(

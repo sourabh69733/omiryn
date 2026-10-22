@@ -23,6 +23,7 @@ from .conversation_threads import _delete_threads_only_from
 from .conversations import forget_memory_evidence, get_conversation, save_conversation
 from .database import ENGINE
 from .schema import (
+    chat_chunk_embeddings,
     agent_memories,
     agent_memory_evidence,
     agent_message_feedback,
@@ -101,6 +102,7 @@ def delete_conversation_messages(user_id: str, conversation_id: str, message_ind
             memory_processing_states,
             memory_processing_leases,
             memory_batch_failures,
+            chat_chunk_embeddings,
         ):
             connection.execute(
                 table.delete().where(table.c.user_id == owner_id, table.c.conversation_id == conversation_id)
