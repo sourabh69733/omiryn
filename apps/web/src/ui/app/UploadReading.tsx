@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 
 export type SharedUpload = { sourceId: string; label: string };
-type Reading = { state: string; parts?: number; parts_done?: number; learned?: number };
+type Reading = { state: string; parts?: number; parts_done?: number; learned?: number; topics?: number };
 
 const STORAGE_KEY = "omiryn.upload_reading";
 const POLL_MS = 3000;
@@ -72,10 +72,12 @@ export function readingText(reading: Reading, label: string) {
       return parts ? `Omi is reading ${label}… ${reading.parts_done ?? 0} of ${parts} parts` : `Omi is reading ${label}…`;
     case "merging":
       return `Omi is putting together what it learned from ${label}…`;
-    case "done":
-      return reading.learned
-        ? `Done. Omi learned ${reading.learned} ${reading.learned === 1 ? "thing" : "things"} from ${label}.`
-        : `Done reading ${label}. Nothing new to remember.`;
+    case "done": {
+      const learned = reading.learned ? `${reading.learned} ${reading.learned === 1 ? "thing" : "things"} about you` : "";
+      const topics = reading.topics ? `${reading.topics} ${reading.topics === 1 ? "topic" : "topics"}` : "";
+      const found = [learned, topics].filter(Boolean).join(" and ");
+      return found ? `Done. From ${label}, Omi learned ${found}. Ask it anything about that chat.` : `Done reading ${label}. Nothing new to remember.`;
+    }
     case "failed":
       return `Omi couldn't finish reading ${label}. It will try again in a minute.`;
     case "none":

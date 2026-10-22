@@ -46,7 +46,8 @@ export type ContextSource = {
   preview?: string;
   content_length?: number;
   attached?: boolean;
-  metadata?: { reading?: { state: string; parts?: number; parts_done?: number; learned?: number } };
+  metadata?: { reading?: { state: string; parts?: number; parts_done?: number; learned?: number; topics?: number } };
+  digest?: { summary?: string; chat_dates?: { from?: string | null; to?: string | null }; topics?: { title: string; started?: string | null; ended?: string | null }[] };
 };
 export type DataRequest = {
   id: string;

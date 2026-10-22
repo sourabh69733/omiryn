@@ -584,6 +584,36 @@
   color: var(--muted);
 }
 
+.mem-upload-digest {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mem-upload-digest summary {
+  width: fit-content;
+  color: var(--brand-violet);
+  cursor: pointer;
+}
+
+.mem-upload-digest p,
+.mem-row-copy .mem-upload-digest p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mem-upload-digest ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+
+.mem-upload-digest li span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .mem-row-note {
   color: var(--muted);
   font-size: 12px;
