@@ -214,6 +214,14 @@ class ReadingEndpointTest(unittest.TestCase):
         self.assertEqual(self.client.delete(f"/api/me/context-sources/{self.source['id']}").status_code, 200)
         self.assertEqual(list_upload_digests(USER_ID), [])
 
+    def test_memories_page_gets_each_uploads_summary_and_topics(self) -> None:
+        from storage.upload_digests import save_upload_digest
+
+        save_upload_digest(self.source["id"], USER_ID, "main", "Farheen", {"summary": "Work chat.", "threads": [{"title": "Review cycles", "started": "2026-10-15", "lines": [1, 2]}]})
+        [source] = [s for s in self.client.get("/api/me/profile").json()["memory_sources"] if s["id"] == self.source["id"]]
+        self.assertEqual(source["digest"]["summary"], "Work chat.")
+        self.assertEqual(source["digest"]["topics"], [{"title": "Review cycles", "started": "2026-10-15", "ended": None}])
+
     def test_progress_is_readable_and_owned(self) -> None:
         response = self.client.get(f"/api/me/context-sources/{self.source['id']}/reading")
         self.assertEqual(response.json()["parts_done"], 2)

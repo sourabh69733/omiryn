@@ -20,6 +20,7 @@ from storage import (
     list_user_data_requests,
     list_data_point_feedback,
     list_profile_facts,
+    list_upload_digests,
     list_user_context_sources,
     save_data_request,
     save_data_point_feedback,
@@ -188,6 +189,14 @@ async def get_me_profile(
     data_point_feedback = list_data_point_feedback(user_id=user.id)
     data_point_feedback_by_fact = _latest_data_point_feedback_by_fact(data_point_feedback)
     facts_with_feedback = _profile_facts_with_feedback(facts, data_point_feedback_by_fact)
+    overviews = {stored["source_id"]: _digest_overview(stored["digest"]) for stored in list_upload_digests(user.id)}
+
+    def summary(source: dict[str, object]) -> dict[str, object]:
+        item = _context_source_summary(source)
+        if source["id"] in overviews:
+            item["digest"] = overviews[source["id"]]
+        return item
+
     response = {
         "user": _auth_user_payload(user),
         "profile": profile,
@@ -196,12 +205,12 @@ async def get_me_profile(
         "data_point_feedback_summary": _summarize_data_point_feedback(data_point_feedback),
         "profile_photo_max_count": PROFILE_PHOTO_MAX_COUNT,
         "style_sources": [
-            _context_source_summary(source)
+            summary(source)
             for source in sources
             if source.get("source_type") in STYLE_CONTEXT_SOURCE_TYPES
         ],
         "memory_sources": [
-            _context_source_summary(source)
+            summary(source)
             for source in sources
             if source.get("source_type") not in STYLE_CONTEXT_SOURCE_TYPES
         ],
@@ -703,4 +712,17 @@ async def create_data_point_feedback(
             if updated_fact
             else None
         ),
+    }
+
+
+def _digest_overview(digest: dict[str, object]) -> dict[str, object]:
+    """What the Memories page shows of an uploaded chat: summary and topics, no quoted lines."""
+    return {
+        "summary": digest.get("summary") or "",
+        "chat_dates": digest.get("chat_dates") or {},
+        "topics": [
+            {"title": topic.get("title"), "started": topic.get("started"), "ended": topic.get("ended")}
+            for topic in digest.get("threads") or []
+            if isinstance(topic, dict) and topic.get("title")
+        ],
     }
