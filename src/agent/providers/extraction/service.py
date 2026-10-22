@@ -15,7 +15,7 @@ from agent.memory_engine.data_points.extraction.prompts import (
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.upload_prompt import UPLOAD_WRAP_UP_SYSTEM_PROMPT
+from agent.cognition.background.upload_prompt import UPLOAD_MERGE_SYSTEM_PROMPT, UPLOAD_PART_SYSTEM_PROMPT
 from agent.cognition.background.vibe_prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
     VIBE_INTRO_SYSTEM_PROMPT,
@@ -32,7 +32,8 @@ from agent.observability.usage import (
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
     REPLY_REQUEST_CHECK,
-    UPLOAD_WRAP_UP,
+    UPLOAD_MERGE,
+    UPLOAD_PART,
     VIBE_BACKFILL,
     VIBE_INTRO,
     VIBE_VERIFY,
@@ -151,24 +152,41 @@ def vibe_verify_model(provider: str) -> str | None:
 _DEFAULT_REQUEST_CHECK_MODELS = {"deepinfra": "Qwen/Qwen3-235B-A22B-Instruct-2507"}
 
 
-async def analyze_upload_wrap_up(
+async def analyze_upload_part(
     text: str,
     *,
     conversation_id: str,
     model: str | None = None,
-    timeout_seconds: float | None = 120,
+    timeout_seconds: float | None = 180,
 ) -> dict[str, Any]:
-    """Group duplicate memories and write the card and vibe lines after an upload's parts."""
+    """Structured notes from one part of an uploaded chat (both sides)."""
+    return await _upload_call(UPLOAD_PART_SYSTEM_PROMPT, UPLOAD_PART, text, conversation_id, model, timeout_seconds)
+
+
+async def analyze_upload_merge(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 180,
+) -> dict[str, Any]:
+    """One digest from the notes of every part of an uploaded chat."""
+    return await _upload_call(UPLOAD_MERGE_SYSTEM_PROMPT, UPLOAD_MERGE, text, conversation_id, model, timeout_seconds)
+
+
+async def _upload_call(
+    system_prompt: str, request_kind: str, text: str, conversation_id: str, model: str | None, timeout_seconds: float | None
+) -> dict[str, Any]:
     provider = _provider_name()
     if provider == "mock":
-        return {"same": [], "user_card": None, "vibe": {}}
+        return {}
     content = await provider_chat(
         provider=provider,
-        system_prompt=UPLOAD_WRAP_UP_SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         messages=[{"role": "user", "content": text}],
         temperature=0,
         conversation_id=conversation_id,
-        request_kind=UPLOAD_WRAP_UP,
+        request_kind=request_kind,
         model=model,
         timeout_seconds=timeout_seconds,
         response_format={"type": "json_object"},
