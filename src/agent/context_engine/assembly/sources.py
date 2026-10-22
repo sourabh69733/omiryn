@@ -9,6 +9,7 @@ from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide, texting_style_note
 from agent.context_engine.conversation_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
+from agent.context_engine.assembly.uploaded_chats import uploaded_chat_sources
 from agent.context_engine.conversation_engine.state import (
     conversation_thread_context_sources,
     conversation_thread_guidance,
@@ -231,6 +232,7 @@ def build_reply_context_sources(
         + _self_note_sources(user_id, user_text)
         + _open_question_sources(conversation_id, user_id)
         + _reply_feedback_sources(user_id)
+        + (uploaded_chat_sources(user_id, user_text) if pipeline.memory_contract_version == 3 else [])
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,

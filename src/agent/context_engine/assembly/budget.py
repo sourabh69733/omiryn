@@ -29,6 +29,8 @@ SOURCE_TYPE_PRIORITY = {
     "reply_feedback": 117,
     # How they text, measured from their own uploaded lines; one line.
     "texting_style": 116,
+    # Uploaded chats: an index line each, more when the message names the person or a topic.
+    "shared_chats": 114,
     # A few memories the message does not touch; below the ones it does.
     "might_fit": 105,
     # One short doubt to clear up when it fits.
@@ -54,6 +56,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "how_to_talk": 800,
     "reply_feedback": 1000,
     "texting_style": 300,
+    "shared_chats": 3500,
     "open_questions": 600,
     "might_fit": 800,
     "agent_behavior_rules": 1400,
