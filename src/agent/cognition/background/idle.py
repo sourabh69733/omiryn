@@ -15,6 +15,8 @@ from agent.jobs.queue import cancel_job, schedule_job
 from agent.memory_engine.processing.service import get_processing_state
 from storage import get_conversation, list_conversations
 
+from agent.memory_engine.search import index_chat
+
 from .upload_read import read_upload
 from .service import (
     background_cognition_enabled,
@@ -90,6 +92,8 @@ async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
         result = await read_upload(conversation, user_id)
         if result.get("status") == "already_processing":
             schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=_BUSY_RETRY_SECONDS)
+        else:
+            await index_chat(user_id, conversation_id)
         return result
 
     cursor_before = _processed_through(conversation_id, user_id)
@@ -110,6 +114,8 @@ async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
     logger.info(
         "agent.memory_flush conversation_id=%s status=%s", conversation_id, result.get("status")
     )
+    # New messages become searchable by meaning; best effort, search falls back to words.
+    await index_chat(user_id, conversation_id)
     return result
 
 

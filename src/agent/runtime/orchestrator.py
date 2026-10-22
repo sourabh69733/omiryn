@@ -49,7 +49,7 @@ from agent.providers import (
 )
 from agent.providers.shared.messages import reply_window, summarized_through
 from agent.providers.gateway.clients import parse_tool_call
-from agent.memory_engine.search import SEARCH_TOOL, search_chats, search_note
+from agent.memory_engine.search import SEARCH_TOOL, search_chats_hybrid, search_note
 from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from storage import (
@@ -492,7 +492,7 @@ async def _answer_with_search(
     query = str(arguments.get("query") or "").strip()[:200]
     person = str(arguments.get("person") or "").strip()[:80] or None
     days = arguments.get("days") if isinstance(arguments.get("days"), int) and arguments.get("days") > 0 else None
-    hits = search_chats(user_id, query, person=person, days=days) if name == SEARCH_TOOL["function"]["name"] else []
+    hits = await search_chats_hybrid(user_id, query, person=person, days=days) if name == SEARCH_TOOL["function"]["name"] else []
     note = search_note(query, person, days, hits)
     reply = await generate_agent_reply(reply_messages + [{"role": "system", "content": note}], **generation_arguments)
     return reply, {"tool": name, "query": query, "person": person, "days": days, "hits": len(hits)}
