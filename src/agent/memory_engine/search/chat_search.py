@@ -1,0 +1,206 @@
+"""Search the user's past chats, real lines with dates, for the reply model's search_chats tool.
+
+Summaries and memories lose things; the stored messages do not. When a reply depends on something
+said before ("did Farheen mention her wedding?", "what did we talk about this week?"), the reply
+model calls the tool and answers from the lines this returns, labelled with who said them and when.
+It covers chats with Omi and uploaded chats, never temporary chats. Matching is by words, forgiving
+of Hinglish spelling (shaadi/shadi) and word endings (engaged/engagement).
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from agent.shared.clock import utc_now
+from agent.shared.timeline import parse_time, user_zone
+from storage import get_conversation, get_user_timezone, list_conversations
+
+MAX_HITS = 8
+# A line must match at least this share of the query, weighted by how rare each word is.
+MIN_SCORE = 0.3
+# And the matched words together must be rare enough: "what about" alone matches nothing useful.
+# Only with enough lines to tell common words from rare ones.
+MIN_WEIGHT = 1.0
+MIN_LINES_FOR_WEIGHT = 50
+_NO_TIME = datetime.min.replace(tzinfo=ZoneInfo("UTC"))
+LINE_CHARS = 280
+# Around each hit: lines before and after, so a reply shows what it answered.
+CONTEXT_LINES = 1
+_WORD = re.compile(r"[\w']+")
+
+SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_chats",
+        "description": (
+            "Search the user's past chats with you and the WhatsApp chats they uploaded. Use it when the "
+            "answer depends on something said before that the context above does not hold: what someone "
+            "said, a past event, what you two talked about recently. Returns real lines with dates. "
+            "Try other words or spellings if nothing comes back."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words to look for. Empty for the most recent lines."},
+                "person": {"type": "string", "description": "Only the uploaded chat with this person."},
+                "days": {"type": "integer", "description": "Only the last N days."},
+            },
+        },
+    },
+}
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    when: str
+    chat: str
+    lines: tuple[str, ...]
+    score: float
+
+
+def search_chats(
+    user_id: str,
+    query: str = "",
+    *,
+    person: str | None = None,
+    days: int | None = None,
+    now: datetime | None = None,
+    limit: int = MAX_HITS,
+) -> list[SearchHit]:
+    zone = user_zone(get_user_timezone(user_id))
+    since = (now or utc_now()) - timedelta(days=days) if days and days > 0 else None
+    terms = _terms(query)
+    chats: dict[str, dict[str, Any]] = {}
+    lines: list[tuple[dict[str, Any], int, datetime, set[str], str]] = []
+    for summary in list_conversations(user_id):
+        if summary.get("temporary"):
+            continue
+        conversation = get_conversation(summary["id"], user_id) or {}
+        messages = list(conversation.get("messages") or [])
+        partner = _partner(messages)
+        if person and not (partner and _same_person(person, partner)):
+            continue
+        chats[summary["id"]] = {"messages": messages, "partner": partner}
+        for index, message in enumerate(messages):
+            text = str(message.get("content") or "")
+            sent = parse_time(message.get("created_at"))
+            if not text.strip() or (since and (sent is None or sent < since)):
+                continue
+            lines.append((summary, index, sent or _NO_TIME, _terms(text), str(message.get("role") or "")))
+    weights = _weights(terms, [words for *_, words, _ in lines])
+    candidates: list[tuple[float, datetime, dict[str, Any], int]] = []
+    for summary, index, sent, words, role in lines:
+        score = _score(weights, words) if terms else (1.0 if role in {"user", "other"} else 0.0)
+        if terms and len(lines) >= MIN_LINES_FOR_WEIGHT and _matched_weight(weights, words) < MIN_WEIGHT:
+            continue
+        if score >= (MIN_SCORE if terms else 1.0):
+            candidates.append((score, sent, summary, index))
+    # Best matches first; without words, the newest lines.
+    candidates.sort(key=lambda item: (item[0], item[1]) if terms else (item[1], item[0]), reverse=True)
+    hits: list[SearchHit] = []
+    shown: set[tuple[str, int]] = set()
+    for score, sent, summary, index in candidates:
+        if len(hits) >= limit:
+            break
+        if (summary["id"], index) in shown:
+            continue
+        chat = chats[summary["id"]]
+        window = range(max(0, index - CONTEXT_LINES), min(len(chat["messages"]), index + CONTEXT_LINES + 1))
+        shown.update((summary["id"], position) for position in window)
+        hits.append(
+            SearchHit(
+                when=sent.astimezone(zone).strftime("%a %d %b %Y, %H:%M") if sent != _NO_TIME else "unknown time",
+                chat=f"WhatsApp chat with {chat['partner']} (uploaded)" if summary.get("import_source_id") and chat["partner"] else ("uploaded notes" if summary.get("import_source_id") else "chat with you"),
+                lines=tuple(_line(chat["messages"][position], chat["partner"]) for position in window),
+                score=round(score, 2),
+            )
+        )
+    return hits
+
+
+def search_note(query: str, person: str | None, days: int | None, hits: list[SearchHit]) -> str:
+    """The system note the final reply reads: what was searched and what came back."""
+    asked = f'"{query}"' if query else "the most recent lines"
+    scope = "".join([f", in the chat with {person}" if person else "", f", last {days} days" if days else ""])
+    if not hits:
+        return (
+            f"You searched past chats for {asked}{scope} and found nothing. Say plainly that you could not "
+            "find it; do not guess."
+        )
+    lines = [
+        f"You searched past chats for {asked}{scope}. These are real lines, with who said them and when. "
+        "Answer from them; lines from \"You (Omi)\" are your own earlier words, not facts. If they do not "
+        "answer the question, say so instead of guessing."
+    ]
+    for hit in hits:
+        lines.append(f"[{hit.when} · {hit.chat}]")
+        lines.extend(f"  {line}" for line in hit.lines)
+    return "\n".join(lines)
+
+
+def _line(message: dict[str, Any], partner: str | None) -> str:
+    role = message.get("role")
+    who = "User" if role == "user" else "You (Omi)" if role == "assistant" else (message.get("speaker") or partner or "Them")
+    text = " ".join(str(message.get("content") or "").split())
+    return f"{who}: {text[:LINE_CHARS]}{'…' if len(text) > LINE_CHARS else ''}"
+
+
+def _partner(messages: list[dict[str, Any]]) -> str | None:
+    counts: dict[str, int] = {}
+    for message in messages:
+        if message.get("role") == "other" and message.get("speaker"):
+            counts[message["speaker"]] = counts.get(message["speaker"], 0) + 1
+    return max(counts, key=counts.__getitem__) if counts else None
+
+
+def _same_person(asked: str, partner: str) -> bool:
+    asked_words, partner_words = _terms(asked), _terms(partner)
+    return bool(asked_words & partner_words)
+
+
+def _terms(text: str) -> set[str]:
+    return {_normal(word) for word in _WORD.findall(text.casefold()) if len(word) > 2}
+
+
+def _normal(word: str) -> str:
+    """Hinglish spellings vary in doubled vowels and h: shaadi/shadi, bhai/bai, bahut/bohot."""
+    word = re.sub(r"aa+", "a", word)
+    word = re.sub(r"ee+", "i", word)
+    word = re.sub(r"oo+", "u", word)
+    return word.replace("h", "")
+
+
+def _weights(terms: set[str], documents: list[set[str]]) -> dict[str, float]:
+    """Rare words count more: "engaged" over "kya" or "about" (BM25's idf, never zero)."""
+    total = len(documents)
+    weights = {}
+    for term in terms:
+        found = sum(1 for words in documents if _matches(term, words))
+        weights[term] = math.log(1 + (total - found + 0.5) / (found + 0.5))
+    return weights
+
+
+def _matches(term: str, words: set[str]) -> float:
+    """1 for the word itself, 0.8 for the same first 5 letters (engaged/engagement)."""
+    if term in words:
+        return 1.0
+    if len(term) >= 5 and any(len(word) >= 5 and word[:5] == term[:5] for word in words):
+        return 0.8
+    return 0.0
+
+
+def _matched_weight(weights: dict[str, float], words: set[str]) -> float:
+    return sum(weight * _matches(term, words) for term, weight in weights.items())
+
+
+def _score(weights: dict[str, float], words: set[str]) -> float:
+    total = sum(weights.values())
+    return sum(weight * _matches(term, words) for term, weight in weights.items()) / total if total > 0 else 0.0
+
+
+__all__ = ["SEARCH_TOOL", "SearchHit", "search_chats", "search_note"]
