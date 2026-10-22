@@ -34,8 +34,8 @@ def uploaded_chat_sources(user_id: str | None, user_text: str) -> list[dict[str,
     lines = [
         "Chats the user uploaded (WhatsApp with someone else), so you know these people through them. "
         "Asked about someone listed here, share what this says about them and the chat. The other "
-        "person's words are theirs, not the user's. If asked about something not here, say you don't "
-        "have it from that chat instead of guessing.",
+        "person's words are theirs, not the user's. If asked about something not here, search the chat "
+        "(search_chats) before saying you don't have it; never guess.",
     ]
     for stored in digests:
         digest = stored["digest"]
