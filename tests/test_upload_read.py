@@ -1,4 +1,4 @@
-"""An upload is read in parallel parts, merged once, and reports its progress."""
+"""An upload (both sides) is read in parallel parts, merged into memories and a digest, and tracked."""
 
 import json
 import os
@@ -8,14 +8,16 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from agent.cognition.background.idle import run_memory_flush_job
-from agent.cognition.background.upload_read import card_lines, merge_operations, merge_vibe, upload_parts
-from agent.cognition.background.uploads import learn_from_notes_upload
+from agent.cognition.background.upload_notes import Gathered, check_part, merged_memories
+from agent.cognition.background.upload_read import card_lines, merge_vibe, upload_parts
+from agent.cognition.background.uploads import learn_from_whatsapp_upload
 from agent.memory_engine.memories.models import MemoryKind, MemoryPurpose, MemorySensitivity
 from agent.memory_engine.memories.operations import MemoryAddProposal, MemoryReinforceProposal
 from api.main import app, current_user
 from security.auth import CurrentUser
-from storage import get_user_card, list_agent_memories, reset_db, save_conversation
+from storage import get_user_card, list_agent_memories, reset_db, save_conversation, set_user_timezone
 from storage.context_sources import get_context_source_metadata, save_context_source
+from storage.upload_digests import list_upload_digests
 
 USER_ID = "upload-read-user"
 
@@ -34,10 +36,14 @@ def _add(statement: str, evidence: tuple[int, ...], confidence: float = 0.8) -> 
     )
 
 
+def _gathered(*candidates: tuple[str, MemoryAddProposal]) -> Gathered:
+    return Gathered(list(candidates), {}, {}, {}, [], {})
+
+
 class MergeTest(unittest.TestCase):
     def test_a_fact_learned_by_two_parts_is_one_memory_with_both_proofs(self) -> None:
-        candidates = [("c1", _add("Lives in Pune.", (2,))), ("c2", _add("Lives in Pune, Kothrud area.", (40,), 0.9)), ("c3", _add("Plays badminton.", (5,)))]
-        merged = merge_operations(candidates, {}, [["c1", "c2"], ["c3", "c99"]])
+        gathered = _gathered(("c1", _add("Lives in Pune.", (2,))), ("c2", _add("Lives in Pune, Kothrud area.", (40,), 0.9)), ("c3", _add("Plays badminton.", (5,))))
+        merged = merged_memories(gathered, {"same": [["c1", "c2"], ["c3", "c99"]]}, [])
 
         self.assertEqual(len(merged), 2)
         pune = next(item for item in merged if "Pune" in item.statement)
@@ -45,9 +51,11 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(pune.evidence_message_indexes, (2, 40))
         self.assertEqual(pune.confidence, 0.9)
 
-    def test_changes_to_existing_memories_pass_through(self) -> None:
-        reinforce = MemoryReinforceProposal(target_memory_id="m1", confidence=0.9, importance=0.5, evidence_message_indexes=(3,))
-        self.assertEqual(merge_operations([], {"m1": reinforce}, "not a list"), (reinforce,))
+    def test_a_fact_already_remembered_reinforces_that_memory(self) -> None:
+        gathered = _gathered(("c1", _add("Lives in Pune.", (2,))))
+        [operation] = merged_memories(gathered, {"known": [{"candidate": "c1", "memory": "m1"}, {"candidate": "c1", "memory": "unknown"}]}, [{"id": "m1"}])
+        self.assertIsInstance(operation, MemoryReinforceProposal)
+        self.assertEqual((operation.target_memory_id, operation.evidence_message_indexes), ("m1", (2,)))
 
     def test_vibe_line_keeps_the_proof_of_the_lines_it_joined(self) -> None:
         proof = lambda index: {"conversation_id": "u", "message_index": index}  # noqa: E731
@@ -73,18 +81,39 @@ class MergeTest(unittest.TestCase):
 
 class BusyProviderTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_busy_model_is_retried_with_waits_then_the_background_model(self) -> None:
+        from zoneinfo import ZoneInfo
+
         from agent.cognition.background import upload_read
 
         part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
-        context = {"memories": [], "timezone": "Asia/Kolkata", "card": "", "vibe": None}
-        answer = {"decision": "no_change", "operations": [], "thread_operation": {"operation": "none"}, "handoff": {"summary": "", "active_people": [], "active_topics": [], "unresolved_references": []}, "user_card": None, "vibe": {}}
+        answer = {"threads": [{"title": "Trekking", "summary": "Loves treks.", "lines": [0]}]}
         reader = AsyncMock(side_effect=[RuntimeError("429 busy"), RuntimeError("429 busy"), answer])
-        with patch.dict(os.environ, {"MEMORY_BACKGROUND_V2_MODEL": "big-model"}), patch.object(upload_read, "analyze_background_cognition", reader), patch.object(upload_read.asyncio, "sleep", AsyncMock()) as sleep:
-            cognition = await upload_read._read_part(part, context, "fast-model")
+        with patch.dict(os.environ, {"MEMORY_UPLOAD_MODEL": "fast-model", "MEMORY_BACKGROUND_V2_MODEL": "big-model"}), patch.object(upload_read, "analyze_upload_part", reader), patch.object(upload_read.asyncio, "sleep", AsyncMock()) as sleep:
+            notes = await upload_read._read_part(part, None, ZoneInfo("UTC"))
 
-        self.assertTrue(cognition.memory.valid)
+        self.assertEqual(notes.threads[0]["title"], "Trekking")
         self.assertEqual([call.kwargs["model"] for call in reader.await_args_list], ["fast-model", "fast-model", "big-model"])
         self.assertEqual([call.args[0] for call in sleep.await_args_list], [5.0, 15.0])
+
+    async def test_a_part_that_comes_back_empty_is_read_by_the_other_model(self) -> None:
+        from zoneinfo import ZoneInfo
+
+        from agent.cognition.background import upload_read
+
+        part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
+        reader = AsyncMock(side_effect=[{}, {"threads": [{"title": "Trekking", "summary": "x", "lines": [0]}]}])
+        with patch.dict(os.environ, {"MEMORY_UPLOAD_MODEL": "fast-model", "MEMORY_BACKGROUND_V2_MODEL": "big-model"}), patch.object(upload_read, "analyze_upload_part", reader), patch.object(upload_read.asyncio, "sleep", AsyncMock()) as sleep:
+            notes = await upload_read._read_part(part, None, ZoneInfo("UTC"))
+
+        self.assertFalse(notes.empty)
+        self.assertEqual([call.kwargs["model"] for call in reader.await_args_list], ["fast-model", "big-model"])
+        sleep.assert_not_awaited()
+
+    def test_notes_citing_lines_outside_the_part_are_dropped(self) -> None:
+        part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
+        notes = check_part({"threads": [{"title": "Trek", "lines": [0, 99]}, {"title": "Ghost", "lines": [42]}], "about_user": [{"operation": "add", "memory_kind": "procedural", "key": "k", "value": "v", "statement": "s", "evidence_message_indexes": [0]}]}, part)
+        self.assertEqual([(t["title"], t["lines"]) for t in notes.threads], [("Trek", [0])])
+        self.assertEqual(notes.memories, ())
 
 
 class PartsTest(unittest.TestCase):
@@ -96,45 +125,65 @@ class PartsTest(unittest.TestCase):
         self.assertEqual([part.new_start_message_index for part in parts], [0, 30, 60])
 
 
+EXPORT = """13/10/2026, 9:15 pm - Farheen: how was the review today
+13/10/2026, 9:16 pm - Sourabh: 8th cycle again, this task is never ending
+13/10/2026, 9:30 pm - Farheen: same here, my lead keeps changing specs
+13/10/2026, 9:31 pm - Sourabh: also finance influencers are clowns, never trust them
+"""
+
+
 class ReadUploadTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         reset_db()
         self.env = patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"})
         self.env.start()
+        set_user_timezone(USER_ID, "Asia/Kolkata")
         save_conversation({"id": "main", "status": "active", "messages": []}, USER_ID)
-        self.source = save_context_source({"user_id": USER_ID, "conversation_id": "main", "source_type": "manual_notes", "title": "Notes", "content": "x"})
+        self.source = save_context_source({"user_id": USER_ID, "conversation_id": "main", "source_type": "whatsapp_chat", "title": "Farheen", "content": "x"})
 
     def tearDown(self) -> None:
         self.env.stop()
 
-    async def test_fresh_upload_is_read_in_parts_merged_and_tracked(self) -> None:
+    async def test_both_sides_become_memories_and_a_digest(self) -> None:
         with patch("agent.cognition.background.uploads.request_flush_now"):
-            hidden = learn_from_notes_upload(USER_ID, self.source["id"], "I live in Pune.\n\nI play badminton every weekend.")
+            hidden = learn_from_whatsapp_upload(USER_ID, self.source["id"], EXPORT, "Sourabh")
         self.assertEqual(get_context_source_metadata(self.source["id"], USER_ID)["reading"]["state"], "queued")
 
         def part_answer(payload: str, **_: object) -> dict:
-            index = next(m["message_index"] for m in json.loads(payload)["messages"] if m["role"] == "user" and m["evidence_eligible"])
+            lines = {m["from"]: m["i"] for m in json.loads(payload)["messages"]}
+            mine, hers = lines["user"], lines["Farheen"]
             return {
-                "decision": "propose",
-                "operations": [{"operation": "add", "memory_kind": "semantic", "purposes": ["profile"], "key": "home.city", "value": "Pune", "statement": "Lives in Pune.", "sensitivity": "standard", "confidence": 0.9, "importance": 0.6, "evidence_message_indexes": [index]}],
-                "thread_operation": {"operation": "none"},
-                "handoff": {"summary": "", "active_people": [], "active_topics": [], "unresolved_references": []},
-                "user_card": None,
-                "vibe": {},
+                "threads": [{"title": "Endless review cycles", "summary": "Both are stuck in long reviews.", "user_view": "Frustrated.", "other_view": "Lead changes specs.", "lines": [mine, hers]}],
+                "about_user": [{"operation": "add", "memory_kind": "semantic", "purposes": ["profile"], "key": "views.finance_influencers", "value": "distrusts finance influencers", "statement": "Distrusts finance influencers.", "sensitivity": "standard", "confidence": 0.9, "importance": 0.5, "evidence_message_indexes": [mine]}],
+                "about_other": [{"fact": "Her lead keeps changing specs.", "lines": [hers]}],
             }
 
-        wrap = {"same": [], "user_card": "Lives in Pune", "vibe": {}}
-        with patch("agent.cognition.background.upload_read.analyze_background_cognition", AsyncMock(side_effect=part_answer)) as reader, patch(
-            "agent.cognition.background.upload_read.analyze_upload_wrap_up", AsyncMock(return_value=wrap)
+        merge = {
+            "threads": [{"title": "Endless review cycles", "summary": "Both are stuck in long reviews.", "from": ["t1"]}],
+            "person": [{"text": "Her lead keeps changing specs.", "from": ["o1"]}],
+            "summary": "Two colleagues venting about review work.",
+            "index_line": "Farheen: review cycles, finance",
+            "relationship": {"statement": "Chats with Farheen on WhatsApp, mostly about review work.", "from": ["t1"]},
+            "user_card": "Distrusts finance influencers",
+        }
+        with patch("agent.cognition.background.upload_read.analyze_upload_part", AsyncMock(side_effect=part_answer)) as reader, patch(
+            "agent.cognition.background.upload_read.analyze_upload_merge", AsyncMock(return_value=merge)
         ):
             result = await run_memory_flush_job({"conversation_id": hidden, "user_id": USER_ID})
 
         self.assertEqual(result["status"], "upload_read")
         self.assertEqual(reader.await_count, 1)
-        self.assertEqual([m["statement"] for m in list_agent_memories(USER_ID)], ["Lives in Pune."])
-        self.assertEqual(get_user_card(USER_ID), "Lives in Pune")
+        statements = sorted(m["statement"] for m in list_agent_memories(USER_ID))
+        self.assertEqual(statements, ["Chats with Farheen on WhatsApp, mostly about review work.", "Distrusts finance influencers."])
+        self.assertEqual(get_user_card(USER_ID), "Distrusts finance influencers")
+        [stored] = list_upload_digests(USER_ID)
+        digest = stored["digest"]
+        self.assertEqual((stored["partner_name"], digest["index_line"]), ("Farheen", "Farheen: review cycles, finance"))
+        self.assertEqual(digest["threads"][0]["started"], "2026-10-13")
+        self.assertEqual(len(digest["threads"][0]["lines"]), 2)
+        self.assertEqual(digest["person"][0]["text"], "Her lead keeps changing specs.")
         reading = get_context_source_metadata(self.source["id"], USER_ID)["reading"]
-        self.assertEqual((reading["state"], reading["parts_done"], reading["learned"]), ("done", 1, 1))
+        self.assertEqual((reading["state"], reading["parts_done"], reading["learned"], reading["topics"]), ("done", 1, 2, 1))
         # Read once: the normal flush finds nothing left.
         again = await run_memory_flush_job({"conversation_id": hidden, "user_id": USER_ID})
         self.assertEqual(again["status"], "no_pending_messages")
@@ -157,6 +206,13 @@ class ReadingEndpointTest(unittest.TestCase):
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
         self.env.stop()
+
+    def test_deleting_the_upload_deletes_its_digest(self) -> None:
+        from storage.upload_digests import save_upload_digest
+
+        save_upload_digest(self.source["id"], USER_ID, "main", "Farheen", {"summary": "x"})
+        self.assertEqual(self.client.delete(f"/api/me/context-sources/{self.source['id']}").status_code, 200)
+        self.assertEqual(list_upload_digests(USER_ID), [])
 
     def test_progress_is_readable_and_owned(self) -> None:
         response = self.client.get(f"/api/me/context-sources/{self.source['id']}/reading")

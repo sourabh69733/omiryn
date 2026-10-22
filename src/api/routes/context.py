@@ -15,6 +15,7 @@ from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_
 from security.auth import CurrentUser, require_user
 from agent.cognition.background.uploads import learn_from_notes_upload, learn_from_whatsapp_upload
 from storage.context_sources import get_context_source_metadata
+from storage.upload_digests import delete_upload_digest
 from storage.conversations import delete_import_conversations
 from storage.audit_log import record_audit_event
 from storage import (
@@ -129,6 +130,7 @@ def delete_conversation_context_source(
     if not deleted:
         raise HTTPException(status_code=404, detail="Context source not found.")
     delete_import_conversations(user.id, source_id)
+    delete_upload_digest(source_id, user.id)
     record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
@@ -141,6 +143,7 @@ def delete_me_context_source(
     if not delete_user_context_source(source_id, user.id):
         raise HTTPException(status_code=404, detail="Context source not found.")
     delete_import_conversations(user.id, source_id)
+    delete_upload_digest(source_id, user.id)
     record_audit_event("upload.delete", actor_id=user.id, actor_role="user", target_user_id=user.id, target_id=source_id)
     return {"source_id": source_id, "status": "deleted"}
 
