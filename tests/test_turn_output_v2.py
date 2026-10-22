@@ -1,4 +1,6 @@
 import unittest
+
+from agent.memory_engine.search import SEARCH_TOOL
 from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.contracts.models import ModelContextPackage
@@ -441,7 +443,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             "Tell me more about what made that important to you.",
         )
         self.assertEqual(model_call.await_count, 2)
-        self.assertNotIn("tools", model_call.await_args_list[0].kwargs)
+        self.assertIn(model_call.await_args_list[0].kwargs.get("tools"), (None, [SEARCH_TOOL]))
         self.assertNotIn("tools", model_call.await_args_list[1].kwargs)
         self.assertEqual(model_call.await_args_list[1].kwargs["max_tokens"], 400)
         model_step = next(

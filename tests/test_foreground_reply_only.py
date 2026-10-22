@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 
+from agent.memory_engine.search import SEARCH_TOOL
+
 import agent.runtime.orchestrator as orchestrator
 from unittest.mock import AsyncMock, patch
 
@@ -57,8 +59,9 @@ class ForegroundReplyOnlyTest(unittest.IsolatedAsyncioTestCase):
             result.messages[-1]["content"],
             "That sounds like a meaningful change. What led to it?",
         )
-        self.assertIsNone(provider.await_args.kwargs.get("tools"))
-        self.assertIsNone(provider.await_args.kwargs.get("tool_choice"))
+        # The only tool a reply may offer is the past-chat search; never a structured output.
+        self.assertIn(provider.await_args.kwargs.get("tools"), (None, [SEARCH_TOOL]))
+        self.assertIn(provider.await_args.kwargs.get("tool_choice"), (None, "auto"))
         self.assertFalse(hasattr(orchestrator, "parse_turn_output_v2"))
         self.assertFalse(hasattr(orchestrator, "capture_turn_output_data_points"))
 
