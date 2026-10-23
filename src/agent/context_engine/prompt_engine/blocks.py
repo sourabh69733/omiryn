@@ -36,6 +36,7 @@ _SOURCE_BLOCKS = {
     "reply_feedback": "how_to_talk",
     "texting_style": "how_to_talk",
     "shared_chats": "shared_chats",
+    "past_lines": "past_lines",
     "open_questions": "open_questions",
     "might_fit": "might_fit",
     "data_points": "memories",
@@ -52,6 +53,7 @@ BLOCK_CHAR_LIMITS = {
     "friend_vibe": 3600,
     "memories": 3200,
     "shared_chats": 3600,
+    "past_lines": 3000,
     "your_notes": 1400,
     "this_chat": 3600,
     "attached": 4000,
@@ -154,6 +156,7 @@ def build_companion_system_prompt_v4(
         ]),
         ("memories", grouped.get("memories", [])),
         ("shared_chats", grouped.get("shared_chats", [])),
+        ("past_lines", grouped.get("past_lines", [])),
         ("your_notes", grouped.get("your_notes", [])),
         ("this_chat", grouped.get("this_chat", [])),
         ("attached", (

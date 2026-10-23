@@ -75,6 +75,7 @@ AGENT_MEMORIES_V3_SOURCE_TYPE = "agent_memories_v3"
 CONVERSATION_SUMMARY_SOURCE_TYPE = "conversation_summary"
 USER_CARD_SOURCE_TYPE = "user_card"
 TEXTING_STYLE_SOURCE_TYPE = "texting_style"
+PAST_LINES_SOURCE_TYPE = "past_lines"
 RECENT_SESSIONS_SOURCE_TYPE = "recent_sessions"
 RECENT_SESSION_LIMIT = 5
 SELF_NOTES_SOURCE_TYPE = "agent_self_notes"
@@ -236,6 +237,7 @@ def build_reply_context_sources(
         + _open_question_sources(conversation_id, user_id)
         + _reply_feedback_sources(user_id)
         + (uploaded_chat_sources(user_id, user_text) if pipeline.memory_contract_version == 3 else [])
+        + (_past_lines_sources(user_id, conversation_id, user_text, memory_query_embedding) if pipeline.memory_contract_version == 3 else [])
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
@@ -505,6 +507,27 @@ def _recently_offered(conversation_id: str, user_id: str) -> set[str]:
             if source.get("source_type") == MIGHT_FIT_SOURCE_TYPE:
                 offered.update(str(item) for item in (source.get("metadata") or {}).get("memory_ids") or [])
     return offered
+
+
+def _past_lines_sources(
+    user_id: str | None,
+    conversation_id: str,
+    user_text: str,
+    query_embedding: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Real past lines that may answer this message, found by code before every reply."""
+    if not user_id:
+        return []
+    # Imported here: search reaches the providers, which import this module.
+    from agent.memory_engine.search import recall_lines, recall_note
+
+    try:
+        hits = recall_lines(user_id, user_text, query_embedding, conversation_id=conversation_id)
+    except Exception:  # recall is a bonus; the reply goes on without it
+        return []
+    if not hits:
+        return []
+    return [{"source_type": PAST_LINES_SOURCE_TYPE, "title": "Lines from earlier chats", "content": recall_note(hits), "metadata": {"hits": len(hits)}}]
 
 
 def _texting_style_sources(user_id: str | None) -> list[dict[str, Any]]:

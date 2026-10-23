@@ -31,6 +31,8 @@ SOURCE_TYPE_PRIORITY = {
     "texting_style": 116,
     # Uploaded chats: an index line each, more when the message names the person or a topic.
     "shared_chats": 114,
+    # Real past lines that may answer this message, found by search before the reply.
+    "past_lines": 116,
     # A few memories the message does not touch; below the ones it does.
     "might_fit": 105,
     # One short doubt to clear up when it fits.
@@ -57,6 +59,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "reply_feedback": 1000,
     "texting_style": 300,
     "shared_chats": 3500,
+    "past_lines": 2800,
     "open_questions": 600,
     "might_fit": 800,
     "agent_behavior_rules": 1400,
