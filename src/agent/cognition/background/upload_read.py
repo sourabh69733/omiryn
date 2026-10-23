@@ -65,6 +65,9 @@ logger = logging.getLogger(__name__)
 # speed is the limit, so smaller parts finish sooner.
 PART_USER_LINES = int(os.getenv("MEMORY_UPLOAD_PART_LINES", "30"))
 MAX_PARTS = int(os.getenv("MEMORY_UPLOAD_MAX_PARTS", "6"))
+# The whole upload is stored and searchable; memories and the digest come from the user's newest
+# lines only, so reading stays about a minute however long the chat is.
+READ_USER_LINES = int(os.getenv("MEMORY_UPLOAD_READ_LINES", "300"))
 _EVERY_LINE = 10**9
 # On a 150-line upload (2026-10-21): Qwen3-Next 80B read parts in ~25 s; Qwen3 235B took ~170 s.
 DEFAULT_UPLOAD_MODEL = "Qwen/Qwen3-Next-80B-A3B-Instruct"
@@ -159,11 +162,12 @@ def _background_model() -> str | None:
 
 
 def upload_parts(conversation_id: str, user_id: str, messages: list[dict[str, Any]]) -> list[MemoryBatch]:
-    """The upload split into parts of about PART_USER_LINES user lines, at most MAX_PARTS."""
-    user_lines = sum(1 for message in messages if message.get("role") == "user")
-    per_part = max(PART_USER_LINES, math.ceil(user_lines / MAX_PARTS))
+    """The newest READ_USER_LINES user lines split into parts of about PART_USER_LINES, at most MAX_PARTS."""
+    user_positions = [index for index, message in enumerate(messages) if message.get("role") == "user"]
+    read = user_positions[-READ_USER_LINES:]
+    per_part = max(PART_USER_LINES, math.ceil(len(read) / MAX_PARTS))
     parts: list[MemoryBatch] = []
-    cursor = -1
+    cursor = read[0] - 1 if read else -1
     while True:
         batch = build_memory_batch(
             conversation_id=conversation_id,

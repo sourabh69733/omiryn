@@ -124,6 +124,15 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(sum(part.meaningful_user_message_count for part in parts), 70)
         self.assertEqual([part.new_start_message_index for part in parts], [0, 30, 60])
 
+    def test_a_long_upload_is_read_from_its_newest_lines(self) -> None:
+        from agent.cognition.background import upload_read
+
+        messages = [{"role": "user", "content": f"line number {index} about my day"} for index in range(500)]
+        with patch.object(upload_read, "READ_USER_LINES", 120):
+            parts = upload_parts("c", "u", messages)
+        self.assertEqual(parts[0].new_start_message_index, 380)
+        self.assertEqual(sum(part.meaningful_user_message_count for part in parts), 120)
+
 
 EXPORT = """13/10/2026, 9:15 pm - Farheen: how was the review today
 13/10/2026, 9:16 pm - Sourabh: 8th cycle again, this task is never ending
