@@ -217,9 +217,12 @@ def build_reply_context_sources(
         durable_memory_sources += _might_fit_sources(conversation_id, user_id, durable_memory_sources)
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
+    # In v3 a chat the user uploaded of their own reaches replies through shared_chats and search;
+    # the older chunk retrieval stays only for a friend's style they chose for Omi to copy.
+    own_upload = _own_upload if pipeline.memory_contract_version == 3 else (lambda source: False)
     structured_whatsapp_sources = _structured_whatsapp_context_sources(
-        all_sources,
-        attached_sources,
+        [source for source in all_sources if not own_upload(source)],
+        [source for source in attached_sources if not own_upload(source)],
         selected_styles,
         user_text,
         user_id,
@@ -885,6 +888,12 @@ def _structured_whatsapp_context_sources(
         if source
     ]
     return [_with_query_intent(source, query_intent) for source in sources]
+
+
+def _own_upload(source: dict[str, Any]) -> bool:
+    """A WhatsApp chat of the user's own (not a friend's style to copy)."""
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+    return source.get("source_type") == "whatsapp_chat" and (metadata.get("style_kind") or "user_style") == "user_style"
 
 
 def _active_whatsapp_context_source_ids(
