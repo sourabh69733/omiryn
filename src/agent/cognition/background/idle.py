@@ -18,7 +18,9 @@ from storage import get_conversation, list_conversations
 from agent.memory_engine.search import index_chat
 
 from .card_rebuild import schedule_card_rebuild
-from .upload_read import read_upload
+from agent.shared.clock import utc_now_iso
+
+from .upload_read import mark_upload_progress, read_upload
 from .service import (
     background_cognition_enabled,
     has_pending_background_cognition,
@@ -100,6 +102,8 @@ async def run_memory_flush_job(job: dict[str, Any]) -> dict[str, Any]:
             schedule_job(MEMORY_FLUSH_JOB, user_id, conversation_id, delay_seconds=_BUSY_RETRY_SECONDS)
         else:
             await index_chat(user_id, conversation_id)
+            source_id = str(conversation["import_source_id"])
+            mark_upload_progress(source_id, user_id, state="done", finished_at=utc_now_iso())
         return result
 
     cursor_before = _processed_through(conversation_id, user_id)

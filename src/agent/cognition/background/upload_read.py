@@ -97,7 +97,7 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
         if whole is None or not parts:
             _progress(source_id, user_id, state="done", parts=0, parts_done=0, learned=0, topics=0)
             return {"status": "no_pending_messages", "operation_count": 0}
-        _progress(source_id, user_id, state="reading", parts=len(parts), parts_done=0, learned=0)
+        _progress(source_id, user_id, state="reading", parts=len(parts), parts_done=0, learned=0, started_at=utc_now_iso(), step_started_at=utc_now_iso())
         partner = chat_partner(whole)
         context = _shared_context(user_id, whole)
         zone = user_zone(context["timezone"])
@@ -111,7 +111,7 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
             return notes
 
         gathered = gather(list(await asyncio.gather(*(read(part) for part in parts))))
-        _progress(source_id, user_id, state="merging")
+        _progress(source_id, user_id, state="merging", step_started_at=utc_now_iso())
         merge = await _merge(conversation_id, gathered, partner, whole, context)
         operations = merged_memories(gathered, merge, context["memories"])
         operations += relationship_memory(partner, merge, gathered, whole, context["memories"])
@@ -131,7 +131,8 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
         await _save_after(whole, applied, operations, merge, gathered, context)
         learned = applied.applied_count if applied else 0
         seconds = round(monotonic() - started, 1)
-        _progress(source_id, user_id, state="done", learned=learned, topics=len(digest["threads"]), seconds=seconds)
+        # Done once the chat is searchable too (the job indexes it next and marks it done).
+        _progress(source_id, user_id, state="indexing", learned=learned, topics=len(digest["threads"]), seconds=seconds, step_started_at=utc_now_iso())
         logger.info("agent.upload_read conversation_id=%s parts=%s learned=%s topics=%s seconds=%s", conversation_id, len(parts), learned, len(digest["threads"]), seconds)
         return {"status": "upload_read", "parts": len(parts), "applied_count": learned, "topics": len(digest["threads"]), "seconds": seconds, "operation_count": len(operations)}
     except Exception:
@@ -333,6 +334,11 @@ def _shared_context(user_id: str, whole: MemoryBatch) -> dict[str, Any]:
     }
 
 
+def mark_upload_progress(source_id: str, user_id: str, **changes: Any) -> None:
+    """For the job that finishes an upload after reading (indexing, done)."""
+    _progress(source_id, user_id, **changes)
+
+
 def _progress(source_id: str, user_id: str, **changes: Any) -> None:
     """Keep the upload's reading progress in its metadata; never fails the read."""
     if not source_id:
@@ -352,6 +358,7 @@ __all__ = [
     "chat_partner",
     "memory_proof",
     "merge_model",
+    "mark_upload_progress",
     "merge_vibe",
     "read_upload",
     "upload_model",
