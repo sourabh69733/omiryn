@@ -16,6 +16,7 @@ from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PR
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
 from agent.cognition.background.upload_prompt import UPLOAD_MERGE_SYSTEM_PROMPT, UPLOAD_PART_SYSTEM_PROMPT
+from agent.cognition.background.card_rebuild_prompt import CARD_REBUILD_SYSTEM_PROMPT
 from agent.cognition.background.vibe_prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
     VIBE_INTRO_SYSTEM_PROMPT,
@@ -32,6 +33,7 @@ from agent.observability.usage import (
     PROFILE_EXTRACT_REPAIR,
     PROFILE_FACT_EXTRACT,
     REPLY_REQUEST_CHECK,
+    CARD_REBUILD,
     UPLOAD_MERGE,
     UPLOAD_PART,
     VIBE_BACKFILL,
@@ -172,6 +174,18 @@ async def analyze_upload_merge(
 ) -> dict[str, Any]:
     """One digest from the notes of every part of an uploaded chat."""
     return await _upload_call(UPLOAD_MERGE_SYSTEM_PROMPT, UPLOAD_MERGE, text, conversation_id, model, timeout_seconds)
+
+
+async def rebuild_user_card_text(
+    text: str,
+    *,
+    conversation_id: str | None = None,
+    model: str | None = None,
+    timeout_seconds: float | None = 120,
+) -> dict[str, Any]:
+    """The user card written from scratch from all memories; {"user_card": "..."}."""
+    model = model or os.getenv("MEMORY_BACKGROUND_V2_MODEL", "").strip() or None
+    return await _upload_call(CARD_REBUILD_SYSTEM_PROMPT, CARD_REBUILD, text, conversation_id or "", model, timeout_seconds)
 
 
 async def _upload_call(
