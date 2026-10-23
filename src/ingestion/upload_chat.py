@@ -3,8 +3,9 @@
 A WhatsApp export keeps its real times, so sessions, dates and "when they said it" stay true.
 The user's own lines are role "user" (the only lines that can prove a memory); everyone else's
 are role "other" with their name, as context only. Quick bursts from one person are merged into
-one message, links, emails and phone numbers are masked, and only the most recent part is kept,
-so one upload costs a few background runs, not hundreds.
+one message, and links, emails and phone numbers are masked. Up to MAX_UPLOAD_MESSAGES (the newest)
+are stored, so search can find things said months ago; reading the upload for memories and its
+digest covers only the newest part (see agent.cognition.background.upload_read).
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from zoneinfo import ZoneInfo
 
 from .whatsapp import MEDIA_MARKERS, _redact_private_text, _select_sender, parse_whatsapp_export
 
-# The user's own messages kept from one upload (after merging bursts), newest first.
-MAX_USER_MESSAGES = 150
+# Messages kept from one upload (after merging bursts), newest first: months of a busy chat.
+MAX_UPLOAD_MESSAGES = 5000
 # Lines from one sender this close together are one message.
 BURST_GAP = timedelta(minutes=5)
 MESSAGE_CHARS = 800
@@ -66,10 +67,9 @@ def whatsapp_upload_messages(export_text: str, user_sender: str | None, zone: Zo
                 "_sent": sent,
             }
         )
-    user_positions = [index for index, item in enumerate(merged) if item["role"] == "user"]
-    if not user_positions:
+    if not any(item["role"] == "user" for item in merged):
         raise ValueError("None of the messages in this export are yours.")
-    start = user_positions[-MAX_USER_MESSAGES] if len(user_positions) > MAX_USER_MESSAGES else 0
+    start = max(0, len(merged) - MAX_UPLOAD_MESSAGES)
     # Keep the other person's line just before the window, so the first kept reply has what it answers.
     if start and merged[start - 1]["role"] == "other":
         start -= 1
@@ -129,4 +129,4 @@ def _parse_time(stamp: str | None, day_first: bool, zone: ZoneInfo) -> datetime 
         return None
 
 
-__all__ = ["MAX_USER_MESSAGES", "notes_upload_messages", "whatsapp_upload_messages"]
+__all__ = ["MAX_UPLOAD_MESSAGES", "notes_upload_messages", "whatsapp_upload_messages"]

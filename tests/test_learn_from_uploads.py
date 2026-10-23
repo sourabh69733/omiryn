@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 from agent.memory_engine.processing.context import build_memory_batch
 from agent.memory_engine.processing.prompt import memory_batch_prompt
 from api.main import app, current_user
-from ingestion.upload_chat import MAX_USER_MESSAGES, whatsapp_upload_messages
+from ingestion import upload_chat
+from ingestion.upload_chat import whatsapp_upload_messages
 from security.auth import CurrentUser
 from storage import create_agent_memory, get_conversation, list_agent_memories, list_conversations, reset_db
 
@@ -42,12 +43,14 @@ class UploadMessagesTest(unittest.TestCase):
         export = "9/13/26, 9:15 PM - Sourabh: hello there friend\n9/14/26, 9:15 AM - Riya: hi"
         self.assertTrue(whatsapp_upload_messages(export, "sourabh", ZoneInfo("UTC"))[0]["created_at"].startswith("2026-09-13T21:15"))
 
-    def test_only_the_most_recent_messages_are_kept(self) -> None:
-        lines = [f"01/01/2026, 10:{minute:02d} am - Me: line {minute}" for minute in range(10)]
-        lines += [f"0{day}/02/2026, 10:00 am - Me: day {day}" for day in range(1, 10)]
-        export = "\n".join(lines * 20)
-        kept = [m for m in whatsapp_upload_messages(export, "me", ZoneInfo("UTC")) if m["role"] == "user"]
-        self.assertLessEqual(len(kept), MAX_USER_MESSAGES)
+    def test_the_whole_chat_is_kept_up_to_the_newest_limit(self) -> None:
+        lines = [f"0{day}/02/2026, {hour:02d}:00 - {'Me' if hour % 2 else 'Riya'}: line {day}-{hour}" for day in range(1, 10) for hour in range(1, 13)]
+        kept = whatsapp_upload_messages("\n".join(lines), "me", ZoneInfo("UTC"))
+        self.assertEqual(len(kept), 108)  # nothing cut: months-old lines stay searchable
+        with patch.object(upload_chat, "MAX_UPLOAD_MESSAGES", 10):
+            newest = whatsapp_upload_messages("\n".join(lines), "me", ZoneInfo("UTC"))
+        self.assertEqual([m["content"] for m in newest][-1], "line 9-12")
+        self.assertLessEqual(len(newest), 11)  # the limit, plus the line the first kept reply answers
 
     def test_background_memory_sees_who_said_it(self) -> None:
         messages = whatsapp_upload_messages(EXPORT, "sourabh", ZoneInfo("Asia/Kolkata"))
