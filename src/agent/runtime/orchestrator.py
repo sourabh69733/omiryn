@@ -28,6 +28,7 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     trim_questions,
     without_copied_replies,
 )
+from agent.context_engine.conversation_engine.policy.unknown import says_unknown
 from agent.context_engine.conversation_engine.policy.requests import (
     broken_requests,
     broken_requests_reason,
@@ -50,6 +51,7 @@ from agent.providers import (
 from agent.providers.shared.messages import reply_window, summarized_through
 from agent.providers.gateway.clients import parse_tool_call
 from agent.memory_engine.search import SEARCH_TOOL, search_chats_hybrid, search_note
+from agent.memory_engine.search.chat_search import without_companion_lines
 from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from storage import (
@@ -276,6 +278,16 @@ async def run_agent_turn(
             raw_reply, chat_search = await _answer_with_search(
                 raw_reply, user_id=user_id, reply_messages=reply_messages, generation_arguments=generation_arguments
             )
+            if chat_search is None and user_id and chat_search_enabled() and says_unknown(raw_reply):
+                raw_reply, chat_search = await _search_when_unsure(
+                    raw_reply,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    query=memory_query_text(user_text, messages),
+                    message_count=len(messages),
+                    reply_messages=reply_messages,
+                    generation_arguments=generation_arguments,
+                )
         except AgentProviderTruncationError:
             fallback_reason = "output_truncated"
             raw_reply = await generate_agent_reply(
@@ -496,6 +508,43 @@ async def _answer_with_search(
     note = search_note(query, person, days, hits)
     reply = await generate_agent_reply(reply_messages + [{"role": "system", "content": note}], **generation_arguments)
     return reply, {"tool": name, "query": query, "person": person, "days": days, "hits": len(hits)}
+
+
+async def _search_when_unsure(
+    draft: str,
+    *,
+    user_id: str,
+    conversation_id: str,
+    query: str,
+    message_count: int,
+    reply_messages: list[dict[str, Any]],
+    generation_arguments: dict[str, Any],
+) -> tuple[str, dict[str, Any] | None]:
+    """The draft says Omi does not know: search the real lines once before sending that.
+
+    The current chat's recent messages are skipped (the draft already saw them), and only the
+    user's or the other person's lines can match, so Omi's own earlier "I don't know" never counts.
+    When the search finds nothing, the honest draft stands.
+    """
+    try:
+        hits = without_companion_lines(
+            await search_chats_hybrid(
+                user_id,
+                query[:300],
+                limit=6,
+                skip=(conversation_id, max(0, message_count - 30)),
+                match_roles={"user", "other"},
+            )
+        )
+    except Exception as error:
+        return draft, {"tool": "unsure_search", "error": type(error).__name__}
+    if not hits:
+        return draft, {"tool": "unsure_search", "query": query[:120], "hits": 0}
+    note = search_note(query[:120], None, None, hits) + (
+        "\nYour draft said you don't know; check these lines first and answer from them if they do."
+    )
+    reply = await generate_agent_reply(reply_messages + [{"role": "system", "content": note}], **generation_arguments)
+    return reply, {"tool": "unsure_search", "query": query[:120], "hits": len(hits)}
 
 
 async def _follow_requests(
