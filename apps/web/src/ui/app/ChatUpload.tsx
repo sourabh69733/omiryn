@@ -7,8 +7,8 @@ import { trackAppEvent } from "../../lib/appLogger";
 import type { SharedUpload } from "./UploadReading";
 import { type ChatSender, chatSenders, chatTitle, senderForUser } from "./whatsappSenders";
 
-// The API's limit; a longer export keeps its most recent part.
-const MAX_CHARS = 200000;
+// The API's limit (about months of a busy chat); a longer export keeps its most recent part.
+const MAX_CHARS = 1_000_000;
 const MAX_NAMES = 6;
 
 type Picked = { fileName: string; text: string; senders: ChatSender[] };

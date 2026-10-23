@@ -274,7 +274,8 @@ class WhatsappChatImportCreate(BaseModel):
     user_sender: str | None = Field(default=None, max_length=120)
     style_name: str | None = Field(default=None, max_length=120)
     style_kind: WhatsappStyleKind = "user_style"
-    content: str = Field(min_length=50, max_length=200000)
+    # A whole chat is stored and searchable; a longer export keeps its newest part (the app sends that).
+    content: str = Field(min_length=50, max_length=1_000_000)
 
 
 class SetupBasics(BaseModel):

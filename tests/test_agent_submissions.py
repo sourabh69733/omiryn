@@ -337,7 +337,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
             f"/api/agent/conversations/{conversation_id}/whatsapp-import",
             json={
                 "title": "Large import",
-                "content": "x" * 200001,
+                "content": "x" * 1_000_001,
                 "style_kind": "user_style",
             },
         )
