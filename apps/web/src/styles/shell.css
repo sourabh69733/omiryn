@@ -1279,6 +1279,91 @@ button.omi-drawer-close:hover {
   padding: 8px 8px 8px 14px;
 }
 
+.omi-readonly-bar.upload-progress {
+  align-items: flex-start;
+}
+
+.upload-progress-copy {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.upload-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.upload-progress-head strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.upload-progress.is-failed .upload-progress-head strong {
+  color: #b42318;
+}
+
+.upload-progress-time {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.upload-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.upload-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.upload-steps li span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.upload-steps li.is-active {
+  color: var(--brand-violet);
+  font-weight: 600;
+}
+
+.upload-steps li.is-active span {
+  border-color: var(--brand-violet);
+  animation: upload-step-pulse 1.2s ease-in-out infinite;
+}
+
+.upload-steps li.is-done span {
+  border-color: transparent;
+  background: var(--brand-violet);
+  color: #fff;
+}
+
+@keyframes upload-step-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-steps li.is-active span { animation: none; }
+}
+
 .omi-readonly-bar.upload-note button.upload-note-close {
   display: grid;
   place-items: center;

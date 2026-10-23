@@ -70,7 +70,9 @@ function readingStatus(source: ContextSource) {
   }
   if (reading.state === "failed") return "Couldn't finish, retrying";
   if (reading.state === "reading" && reading.parts) return `Reading ${reading.parts_done ?? 0} of ${reading.parts}`;
-  return reading.state === "merging" ? "Almost done" : "Reading…";
+  if (reading.state === "merging") return "Putting together";
+  if (reading.state === "indexing") return "Making it searchable";
+  return "Reading…";
 }
 
 function shortDate(day: string) {

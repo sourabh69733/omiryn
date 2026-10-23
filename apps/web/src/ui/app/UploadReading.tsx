@@ -5,7 +5,15 @@ import { X } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 
 export type SharedUpload = { sourceId: string; label: string };
-type Reading = { state: string; parts?: number; parts_done?: number; learned?: number; topics?: number };
+type Reading = {
+  state: string;
+  parts?: number;
+  parts_done?: number;
+  learned?: number;
+  topics?: number;
+  started_at?: string;
+  finished_at?: string;
+};
 
 const STORAGE_KEY = "omiryn.upload_reading";
 const POLL_MS = 3000;
@@ -30,6 +38,7 @@ export function rememberedUpload(): SharedUpload | null {
 
 export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onDismiss: () => void }) {
   const [reading, setReading] = useState<Reading>({ state: "queued" });
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let stopped = false;
@@ -57,32 +66,76 @@ export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onD
     };
   }, [upload.sourceId, onDismiss]);
 
+  const finished = reading.state === "done" || reading.state === "none";
+  useEffect(() => {
+    if (finished) return;
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, [finished]);
+
+  const step = STEPS.findIndex((item) => item.state === reading.state);
+  const elapsed = elapsedText(reading, now);
   return (
-    <div className="omi-readonly-bar upload-note" role="status">
-      <span>{readingText(reading, upload.label)}</span>
+    <div className={`omi-readonly-bar upload-note upload-progress${reading.state === "failed" ? " is-failed" : ""}${finished ? " is-done" : ""}`} role="status">
+      <div className="upload-progress-copy">
+        <div className="upload-progress-head">
+          <strong>{readingText(reading, upload.label)}</strong>
+          {elapsed ? <span className="upload-progress-time">{elapsed}</span> : null}
+        </div>
+        {reading.state !== "none" ? (
+          <ol className="upload-steps" aria-label="Steps">
+            {STEPS.map((item, index) => {
+              const status = finished || index < step ? "is-done" : index === step ? "is-active" : "";
+              return (
+                <li key={item.state} className={status}>
+                  <span aria-hidden="true">{finished || index < step ? "✓" : index + 1}</span>
+                  {item.label}
+                  {index === 0 && reading.state === "reading" && reading.parts ? ` ${reading.parts_done ?? 0}/${reading.parts}` : ""}
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
+      </div>
       <button type="button" className="upload-note-close" onClick={onDismiss} aria-label="Dismiss"><X aria-hidden="true" /></button>
     </div>
   );
 }
 
+const STEPS = [
+  { state: "reading", label: "Reading" },
+  { state: "merging", label: "Putting together" },
+  { state: "indexing", label: "Making it searchable" },
+];
+
 export function readingText(reading: Reading, label: string) {
-  const parts = reading.parts ?? 0;
   switch (reading.state) {
     case "reading":
-      return parts ? `Omi is reading ${label}… ${reading.parts_done ?? 0} of ${parts} parts` : `Omi is reading ${label}…`;
+      return `Step 1 of 3 · Omi is reading ${label}`;
     case "merging":
-      return `Omi is putting together what it learned from ${label}…`;
+      return `Step 2 of 3 · Putting together what Omi learned`;
+    case "indexing":
+      return `Step 3 of 3 · Making ${label} searchable`;
     case "done": {
       const learned = reading.learned ? `${reading.learned} ${reading.learned === 1 ? "thing" : "things"} about you` : "";
       const topics = reading.topics ? `${reading.topics} ${reading.topics === 1 ? "topic" : "topics"}` : "";
-      const found = [learned, topics].filter(Boolean).join(" and ");
-      return found ? `Done. From ${label}, Omi learned ${found}. Ask it anything about that chat.` : `Done reading ${label}. Nothing new to remember.`;
+      const found = [learned, topics].filter(Boolean).join(", ");
+      return found ? `✓ Done · learned ${found}. Ask Omi anything about ${label}.` : `✓ Done reading ${label}. Ask Omi anything about it.`;
     }
     case "failed":
-      return `Omi couldn't finish reading ${label}. It will try again in a minute.`;
+      return `Couldn't finish reading ${label}. Trying again in a minute.`;
     case "none":
       return `Omi has read ${label}.`;
     default:
-      return `Omi will start reading ${label} in a moment…`;
+      return `Starting to read ${label}…`;
   }
+}
+
+function elapsedText(reading: Reading, now: number) {
+  const started = reading.started_at ? Date.parse(reading.started_at) : NaN;
+  if (Number.isNaN(started)) return "";
+  const end = reading.state === "done" && reading.finished_at ? Date.parse(reading.finished_at) : now;
+  const seconds = Math.max(0, Math.round((end - started) / 1000));
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  return reading.state === "done" ? `took ${clock}` : clock;
 }
