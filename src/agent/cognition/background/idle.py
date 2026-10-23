@@ -17,6 +17,7 @@ from storage import get_conversation, list_conversations
 
 from agent.memory_engine.search import index_chat
 
+from .card_rebuild import schedule_card_rebuild
 from .upload_read import read_upload
 from .service import (
     background_cognition_enabled,
@@ -67,6 +68,11 @@ def catch_up_pending(user_id: str) -> list[str]:
             queued.append(conversation["id"])
     if queued:
         logger.info("agent.memory_catch_up user_id=%s conversations=%s", user_id, len(queued))
+    # About once a day the card is rewritten from all memories, so stale lines do not stay.
+    try:
+        schedule_card_rebuild(user_id)
+    except Exception as error:
+        logger.warning("agent.card_rebuild.schedule_failed error_type=%s", type(error).__name__)
     return queued
 
 
