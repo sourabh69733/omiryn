@@ -729,6 +729,8 @@ agent_user_cards = Table(
     Column("user_id", String, primary_key=True),
     Column("card", String, nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    # When the card was last rewritten from all memories (not patched by one chat).
+    Column("rebuilt_at", DateTime(timezone=True), nullable=True),
 )
 
 # The user's friend vibe: one line per compatibility area, written by background cognition from

@@ -170,6 +170,7 @@ def _ensure_runtime_columns() -> None:
         "agent_memory_reviews": ("reasons", "comment"),
         "agent_user_settings": ("timezone", "reply_model"),
         "agent_memories": ("statement", "focus"),
+        "agent_user_cards": ("rebuilt_at",),
         "agent_conversations": (
             "user_id",
             "agent_provider",
