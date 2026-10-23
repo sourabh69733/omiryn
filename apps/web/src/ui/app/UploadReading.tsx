@@ -80,8 +80,12 @@ export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onD
       <div className="upload-progress-copy">
         <div className="upload-progress-head">
           <strong>{readingText(reading, upload.label)}</strong>
-          {elapsed ? <span className="upload-progress-time">{elapsed}</span> : null}
+          {elapsed && !finished ? <span className="upload-progress-time">{elapsed}</span> : null}
         </div>
+        {finished ? <p className="upload-progress-summary">{doneSummary(reading, elapsed)}</p> : null}
+        {reading.state !== "none" && reading.state !== "failed" && !finished ? (
+          <div className="upload-progress-bar" aria-hidden="true"><span style={{ width: `${progressPercent(reading)}%` }} /></div>
+        ) : null}
         {reading.state !== "none" ? (
           <ol className="upload-steps" aria-label="Steps">
             {STEPS.map((item, index) => {
@@ -104,31 +108,43 @@ export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onD
 
 const STEPS = [
   { state: "reading", label: "Reading" },
-  { state: "merging", label: "Putting together" },
-  { state: "indexing", label: "Making it searchable" },
+  { state: "merging", label: "Understanding" },
+  { state: "indexing", label: "Saving" },
 ];
 
 export function readingText(reading: Reading, label: string) {
   switch (reading.state) {
     case "reading":
-      return `Step 1 of 3 · Omi is reading ${label}`;
+      return `Omi is reading ${label}…`;
     case "merging":
-      return `Step 2 of 3 · Putting together what Omi learned`;
+      return "Omi is understanding what you two talk about…";
     case "indexing":
-      return `Step 3 of 3 · Making ${label} searchable`;
-    case "done": {
-      const learned = reading.learned ? `${reading.learned} ${reading.learned === 1 ? "thing" : "things"} about you` : "";
-      const topics = reading.topics ? `${reading.topics} ${reading.topics === 1 ? "topic" : "topics"}` : "";
-      const found = [learned, topics].filter(Boolean).join(", ");
-      return found ? `✓ Done · learned ${found}. Ask Omi anything about ${label}.` : `✓ Done reading ${label}. Ask Omi anything about it.`;
-    }
+      return "Omi is saving it so it can remember later…";
+    case "done":
+      return `Done! Omi knows ${label} now. Ask it anything.`;
     case "failed":
-      return `Couldn't finish reading ${label}. Trying again in a minute.`;
+      return "Something went wrong. Omi will try again in a minute.";
     case "none":
       return `Omi has read ${label}.`;
     default:
-      return `Starting to read ${label}…`;
+      return `Getting ready to read ${label}…`;
   }
+}
+
+function doneSummary(reading: Reading, elapsed: string) {
+  return [
+    reading.learned ? `Learned ${reading.learned} ${reading.learned === 1 ? "thing" : "things"} about you` : "",
+    reading.topics ? `${reading.topics} ${reading.topics === 1 ? "topic" : "topics"}` : "",
+    elapsed,
+  ].filter(Boolean).join(" · ");
+}
+
+// How far along, for the bar: reading fills most of it, part by part.
+function progressPercent(reading: Reading) {
+  if (reading.state === "reading") return 5 + 60 * ((reading.parts_done ?? 0) / Math.max(1, reading.parts ?? 1));
+  if (reading.state === "merging") return 75;
+  if (reading.state === "indexing") return 92;
+  return 3;
 }
 
 function elapsedText(reading: Reading, now: number) {

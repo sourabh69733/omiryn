@@ -1313,6 +1313,31 @@ button.omi-drawer-close:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.upload-progress-summary {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.upload-progress-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.upload-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-violet);
+  transition: width 0.8s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-progress-bar span { transition: none; }
+}
+
 .upload-steps {
   display: flex;
   flex-wrap: wrap;
