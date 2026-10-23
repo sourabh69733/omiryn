@@ -63,6 +63,11 @@ def uploaded_chat_sources(user_id: str | None, user_text: str) -> list[dict[str,
     ]
 
 
+def names_uploaded_person(user_id: str | None, user_text: str) -> bool:
+    """The message names someone from a chat the user uploaded."""
+    return bool(user_id) and any(_names(stored["partner_name"], user_text) for stored in list_upload_digests(user_id))
+
+
 def matching_topics(threads: list[dict[str, Any]], user_text: str, *, ignore: str | None = None) -> list[dict[str, Any]]:
     """Topics that share enough words with the message, best first. The other person's name is in
     most topics, so it never counts as a match by itself (naming them brings the chat anyway)."""
@@ -150,4 +155,4 @@ def _overlap(left: set[str], right: set[str]) -> float:
     return len(left & right) / math.sqrt(len(left) * len(right)) if left and right else 0.0
 
 
-__all__ = ["SHARED_CHATS_SOURCE_TYPE", "matching_topics", "uploaded_chat_sources"]
+__all__ = ["SHARED_CHATS_SOURCE_TYPE", "matching_topics", "names_uploaded_person", "uploaded_chat_sources"]

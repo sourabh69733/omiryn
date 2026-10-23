@@ -9,7 +9,7 @@ from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
 from agent.context_engine.conversation_engine.personalization import style_adaptation_guide, texting_style_note
 from agent.context_engine.conversation_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
-from agent.context_engine.assembly.uploaded_chats import uploaded_chat_sources
+from agent.context_engine.assembly.uploaded_chats import names_uploaded_person, uploaded_chat_sources
 from agent.context_engine.conversation_engine.state import (
     conversation_thread_context_sources,
     conversation_thread_guidance,
@@ -208,6 +208,7 @@ def build_reply_context_sources(
         if pipeline.memory_contract_version == 3
         else _agent_behavior_rule_context_sources(user_id)
     )
+    past_lines: list[dict[str, Any]] = []
     if pipeline.memory_contract_version == 3:
         durable_memory_sources = _agent_memory_v3_context_sources(
             user_id,
@@ -215,7 +216,11 @@ def build_reply_context_sources(
             memory_query_embedding,
             broad="profile_recall" in query_intent.labels,
         )
-        durable_memory_sources += _might_fit_sources(conversation_id, user_id, durable_memory_sources)
+        past_lines = _past_lines_sources(user_id, conversation_id, user_text, memory_query_embedding)
+        # A question about someone (or one with real past lines to answer it) gets no unrelated
+        # memories to weave in: one subject at a time.
+        if not (past_lines or names_uploaded_person(user_id, user_text)):
+            durable_memory_sources += _might_fit_sources(conversation_id, user_id, durable_memory_sources)
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
     # In v3 a chat the user uploaded of their own reaches replies through shared_chats and search;
@@ -237,7 +242,7 @@ def build_reply_context_sources(
         + _open_question_sources(conversation_id, user_id)
         + _reply_feedback_sources(user_id)
         + (uploaded_chat_sources(user_id, user_text) if pipeline.memory_contract_version == 3 else [])
-        + (_past_lines_sources(user_id, conversation_id, user_text, memory_query_embedding) if pipeline.memory_contract_version == 3 else [])
+        + past_lines
     ) + conversation_thread_context_sources(
         conversation_id,
         user_id,
@@ -752,7 +757,7 @@ def _how_to_talk_sources(memories: list[dict[str, Any]]) -> list[dict[str, Any]]
 def _memory_facts_sources(user_id: str, memories: list[dict[str, Any]]) -> list[dict[str, Any]]:
     zone = user_zone(get_user_timezone(user_id))
     lines = [
-        "Relevant durable memories about the user.",
+        "Relevant durable memories about the user themselves, never about other people they mention.",
         "Use only when helpful; do not quote them as a list or say you have stored notes.",
         "Memories about relationships describe lived history, not a desired partner trait.",
         "Dates carry their distance from today in brackets; use that wording (e.g. 'this Friday, "
