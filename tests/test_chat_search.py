@@ -5,7 +5,7 @@ import unittest
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-from agent.memory_engine.search import SEARCH_TOOL, search_chats, search_note
+from agent.memory_engine.search import SEARCH_TOOL, recall_lines, search_chats, search_note
 from agent.providers.gateway.clients import TOOL_CALL_MARKER, parse_tool_call
 from agent.runtime.orchestrator import _answer_with_search
 from storage import reset_db, save_conversation, set_user_timezone
@@ -78,6 +78,26 @@ class ChatSearchTest(unittest.TestCase):
         note = search_note("trek", None, None, search_chats(USER_ID, "trek", now=NOW))
         self.assertIn("your own earlier words, not facts", note)
         self.assertIn("Sinhagad", note)
+
+
+class RecallBeforeReplyTest(unittest.TestCase):
+    def setUp(self) -> None:
+        reset_db()
+        set_user_timezone(USER_ID, "Asia/Kolkata")
+        save_conversation({"id": "upload", "status": "active", "import_source_id": "src", "messages": [_message("other", "decided to do engagement next year", 8, "Farheen")]}, USER_ID)
+        omi = [_message("assistant", "Farheen loves movies and talks short", 20), _message("user", "hmm ok", 20)]
+        omi += [_message("user", f"line {n}", 21) for n in range(40)]
+        omi += [_message("user", "is she going to get engaged?", 22)]
+        save_conversation({"id": "omi", "status": "active", "messages": omi}, USER_ID)
+
+    def test_a_real_line_comes_in_without_the_model_asking(self) -> None:
+        hits = recall_lines(USER_ID, "is she going to get engaged?", None, conversation_id="omi")
+        self.assertEqual([hit.chat for hit in hits], ["WhatsApp chat with Farheen (uploaded)"])
+        self.assertIn("Farheen: decided to do engagement next year", hits[0].lines)
+
+    def test_small_talk_and_omis_own_words_bring_nothing(self) -> None:
+        self.assertEqual(recall_lines(USER_ID, "hi", None, conversation_id="omi"), [])
+        self.assertEqual(recall_lines(USER_ID, "farheen loves movies", None, conversation_id="omi"), [])
 
 
 class SearchInReplyTest(unittest.IsolatedAsyncioTestCase):

@@ -27,6 +27,17 @@ MAX_HITS = 8
 # unrelated up to 0.44 in the memory retrieval calibration), at most this many.
 MEANING_FLOOR = 0.5
 MEANING_HITS = 4
+# Found by code before every reply: at most this many, skipping the chat's last messages.
+RECALL_HITS = 4
+RECALL_SKIP_RECENT = 30
+# Short chunks ("hi / hey, sab theek?") sit close to every query in bge-m3 and add only noise.
+MIN_CHUNK_CHARS = 120
+# Found by code, not asked for: only the best few meaning matches, a bit above the plain floor
+# (on a real Hinglish chat related chunks scored 0.55-0.57 and noise 0.52-0.55).
+RECALL_MEANING_FLOOR = 0.53
+RECALL_MEANING_HITS = 3
+RECALL_MIN_WORDS = 2
+RECALL_WORD_LETTERS = 5
 # A line must match at least this share of the query, weighted by how rare each word is.
 MIN_SCORE = 0.3
 # And the matched words together must be rare enough: "what about" alone matches nothing useful.
@@ -82,7 +93,11 @@ def search_chats(
     days: int | None = None,
     now: datetime | None = None,
     limit: int = MAX_HITS,
+    skip: tuple[str, int] | None = None,
+    match_roles: set[str] | None = None,
 ) -> list[SearchHit]:
+    """Word search. `skip` = (chat id, first index): lines the reply already sees are left out.
+    `match_roles`: only lines by these roles can be the match (Omi's lines still show around it)."""
     zone = user_zone(get_user_timezone(user_id))
     since = (now or utc_now()) - timedelta(days=days) if days and days > 0 else None
     terms = _terms(query)
@@ -93,7 +108,9 @@ def search_chats(
         for index, message in enumerate(messages):
             text = str(message.get("content") or "")
             sent = parse_time(message.get("created_at"))
-            if not text.strip() or (since and (sent is None or sent < since)):
+            if not text.strip() or (since and (sent is None or sent < since)) or _skipped(skip, summary["id"], index):
+                continue
+            if match_roles and message.get("role") not in match_roles:
                 continue
             lines.append((summary, index, sent or _NO_TIME, _terms(text), str(message.get("role") or "")))
     weights = _weights(terms, [words for *_, words, _ in lines])
@@ -144,7 +161,11 @@ def _hit(chat: dict[str, Any], start: int, end: int, sent: datetime, score: floa
     return SearchHit(
         when=sent.astimezone(zone).strftime("%a %d %b %Y, %H:%M") if sent != _NO_TIME else "unknown time",
         chat=where,
-        lines=tuple(_line(chat["messages"][position], chat["partner"]) for position in range(start, end + 1)),
+        lines=tuple(
+            _line(chat["messages"][position], chat["partner"])
+            for position in range(start, end + 1)
+            if str(chat["messages"][position].get("content") or "").strip()
+        ),
         score=round(score, 2),
         conversation_id=str(summary["id"]),
         start=start,
@@ -166,6 +187,19 @@ def search_note(query: str, person: str | None, days: int | None, hits: list[Sea
         f"You searched past chats for {asked}{scope}. These are real lines, with who said them and when. "
         "Answer from them; lines from \"You (Omi)\" are your own earlier words, not facts. If they do not "
         "answer the question, say so instead of guessing."
+    ]
+    for hit in hits:
+        lines.append(f"[{hit.when} · {hit.chat}]")
+        lines.extend(f"  {line}" for line in hit.lines)
+    return "\n".join(lines)
+
+
+def recall_note(hits: list[SearchHit]) -> str:
+    """The reply context block: past lines that may fit this message."""
+    lines = [
+        "Lines from earlier chats that may fit this message, found by searching them. They are real, "
+        "with who said them and when. Use them when they answer; lines from \"You (Omi)\" are your own "
+        "earlier words, not facts. If they do not fit, ignore them."
     ]
     for hit in hits:
         lines.append(f"[{hit.when} · {hit.chat}]")
@@ -246,8 +280,47 @@ async def search_chats_hybrid(
     and in time order. Without vectors (off, failed, not built yet) it is the word search alone."""
     words = search_chats(user_id, query, person=person, days=days, now=now, limit=limit)
     meaning = await meaning_hits(user_id, query, person=person, days=days, now=now) if query.strip() else []
+    return _merged(words, meaning, limit)
+
+
+def recall_lines(
+    user_id: str,
+    user_text: str,
+    query_embedding: dict[str, Any] | None,
+    *,
+    conversation_id: str,
+    recent: int = RECALL_SKIP_RECENT,
+    limit: int = RECALL_HITS,
+) -> list[SearchHit]:
+    """Past lines that may answer this message, found by code before every reply.
+
+    The reply model does not always call search_chats, so the best few matches come in anyway:
+    words from the message, and meaning from the embedding the reply already made. The current
+    chat's last `recent` messages are skipped (the reply sees them). Nothing weak comes in.
+    """
+    current = get_conversation(conversation_id, user_id) or {}
+    skip = (conversation_id, max(0, len(current.get("messages") or []) - recent))
+    # Only distinctive words ("engaged", "shaadi"), so small talk ("hi", "kya kar rahe ho") finds
+    # nothing; a match is always the user's or the other person's line, never Omi's own words.
+    distinctive = " ".join(word for word in _WORD.findall(user_text.casefold()) if len(word) >= RECALL_WORD_LETTERS)
+    words = search_chats(user_id, distinctive, limit=limit, skip=skip, match_roles={"user", "other"}) if distinctive else []
+    # By meaning only uploaded chats, and only for a message with something in it ("hi" matches
+    # everything a little): Omi's own past replies must not come back as context.
+    substantial = sum(1 for word in _WORD.findall(user_text.casefold()) if len(word) > 3) >= RECALL_MIN_WORDS
+    meaning = (
+        meaning_hits_for_vector(
+            user_id, query_embedding, skip=skip, floor=RECALL_MEANING_FLOOR, limit=RECALL_MEANING_HITS, only_uploads=True
+        )
+        if query_embedding and substantial
+        else []
+    )
+    return _merged(words, meaning, limit)
+
+
+def _merged(words: list[SearchHit], meaning: list[SearchHit], limit: int) -> list[SearchHit]:
+    """Word hits first, then meaning hits that do not overlap them; in time order."""
     taken = [(hit.conversation_id, hit.start, hit.end) for hit in words]
-    merged = list(words)
+    merged = list(words[:limit])
     for hit in meaning:
         if len(merged) >= limit:
             break
@@ -256,6 +329,10 @@ async def search_chats_hybrid(
         merged.append(hit)
         taken.append((hit.conversation_id, hit.start, hit.end))
     return sorted(merged, key=lambda hit: hit.at or _NO_TIME)
+
+
+def _skipped(skip: tuple[str, int] | None, conversation_id: str, index: int) -> bool:
+    return bool(skip) and conversation_id == skip[0] and index >= skip[1]
 
 
 async def meaning_hits(
@@ -268,24 +345,46 @@ async def meaning_hits(
 ) -> list[SearchHit]:
     from .chat_index import embedding_target
 
-    target = embedding_target()
-    if target is None:
+    if embedding_target() is None:
         return []
     query_vector = await embed_memory_query(query)
-    if not query_vector:
+    return meaning_hits_for_vector(user_id, query_vector, person=person, days=days, now=now) if query_vector else []
+
+
+def meaning_hits_for_vector(
+    user_id: str,
+    query_vector: dict[str, Any] | None,
+    *,
+    person: str | None = None,
+    days: int | None = None,
+    now: datetime | None = None,
+    skip: tuple[str, int] | None = None,
+    floor: float = MEANING_FLOOR,
+    limit: int = MEANING_HITS,
+    only_uploads: bool = False,
+) -> list[SearchHit]:
+    """Chunks close in meaning to an already embedded query (same model only)."""
+    from .chat_index import embedding_target
+
+    target = embedding_target()
+    if target is None or not query_vector or (query_vector.get("provider"), query_vector.get("model")) != target:
         return []
     chats = load_chats(user_id, person)
+    if only_uploads:
+        chats = {cid: chat for cid, chat in chats.items() if chat["summary"].get("import_source_id")}
     rows = list_chunk_embeddings(user_id, *target, conversation_ids=set(chats)) if chats else []
     since = (now or utc_now()) - timedelta(days=days) if days and days > 0 else None
     zone = user_zone(get_user_timezone(user_id))
     scored = sorted(((_cosine(query_vector["values"], row["vector"]), row) for row in rows), key=lambda item: item[0], reverse=True)
     hits = []
     for similarity, row in scored:
-        if similarity < MEANING_FLOOR or len(hits) >= MEANING_HITS:
+        if similarity < floor or len(hits) >= limit:
             break
         chat = chats[row["conversation_id"]]
         end = min(row["end_index"], len(chat["messages"]) - 1)
-        if end < row["start_index"]:
+        if end < row["start_index"] or _skipped(skip, row["conversation_id"], row["start_index"]):
+            continue
+        if sum(len(str(m.get("content") or "").strip()) for m in chat["messages"][row["start_index"] : end + 1]) < MIN_CHUNK_CHARS:
             continue
         sent = parse_time(chat["messages"][row["start_index"]].get("created_at")) or _NO_TIME
         if since and sent < since:
@@ -302,4 +401,15 @@ def _cosine(left: list[float], right: list[float]) -> float:
     return dot / norm if norm else 0.0
 
 
-__all__ = ["SEARCH_TOOL", "SearchHit", "load_chats", "meaning_hits", "search_chats", "search_chats_hybrid", "search_note"]
+__all__ = [
+    "SEARCH_TOOL",
+    "SearchHit",
+    "load_chats",
+    "meaning_hits",
+    "meaning_hits_for_vector",
+    "recall_lines",
+    "recall_note",
+    "search_chats",
+    "search_chats_hybrid",
+    "search_note",
+]
