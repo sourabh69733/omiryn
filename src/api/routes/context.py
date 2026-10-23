@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent.config import agent_pipeline_config
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from agent.memory_engine.data_points.extraction.service import (
@@ -262,6 +263,7 @@ def create_whatsapp_context_source(
             },
         }
     )
+    keep_copy = payload.style_kind != "user_style" or agent_pipeline_config().memory_contract_version != 3
     whatsapp_import = save_whatsapp_import_bundle(
         {
             "user_id": _user_id(user),
@@ -274,7 +276,8 @@ def create_whatsapp_context_source(
                 **structured_memory.metadata,
                 "style_name": payload.style_name,
             },
-            "messages": [
+            # An own chat is stored whole in its hidden chat and searched there (v3); no second copy.
+            "messages": [] if not keep_copy else [
                 {
                     "message_index": index,
                     "sender": message.sender,
@@ -283,7 +286,7 @@ def create_whatsapp_context_source(
                 }
                 for index, message in enumerate(structured_memory.messages)
             ],
-            "chunks": [
+            "chunks": [] if not keep_copy else [
                 {
                     "chunk_index": chunk.chunk_index,
                     "start_message_index": chunk.start_message_index,
