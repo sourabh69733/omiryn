@@ -95,6 +95,16 @@ class RecallBeforeReplyTest(unittest.TestCase):
         self.assertEqual([hit.chat for hit in hits], ["WhatsApp chat with Farheen (uploaded)"])
         self.assertIn("Farheen: decided to do engagement next year", hits[0].lines)
 
+    def test_code_found_lines_never_carry_omis_own_words(self) -> None:
+        save_conversation(
+            {"id": "older", "status": "active", "messages": [_message("assistant", "she loves movies", 5), _message("user", "her engagement news made me happy", 5)]},
+            USER_ID,
+        )
+        hits = recall_lines(USER_ID, "engagement news", None, conversation_id="omi")
+        lines = [line for hit in hits for line in hit.lines]
+        self.assertIn("User: her engagement news made me happy", lines)
+        self.assertFalse(any(line.startswith("You (Omi)") for line in lines))
+
     def test_small_talk_and_omis_own_words_bring_nothing(self) -> None:
         self.assertEqual(recall_lines(USER_ID, "hi", None, conversation_id="omi"), [])
         self.assertEqual(recall_lines(USER_ID, "farheen loves movies", None, conversation_id="omi"), [])

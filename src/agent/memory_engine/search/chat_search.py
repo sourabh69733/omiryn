@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -23,6 +23,7 @@ from storage import get_conversation, get_user_timezone, list_conversations
 from storage.chat_embeddings import list_chunk_embeddings
 
 MAX_HITS = 8
+COMPANION_LABEL = "You (Omi)"
 # Meaning matches: chunks at least this similar (bge-m3 cosine; related text scored 0.48-0.63 and
 # unrelated up to 0.44 in the memory retrieval calibration), at most this many.
 MEANING_FLOOR = 0.5
@@ -209,7 +210,7 @@ def recall_note(hits: list[SearchHit]) -> str:
 
 def _line(message: dict[str, Any], partner: str | None) -> str:
     role = message.get("role")
-    who = "User" if role == "user" else "You (Omi)" if role == "assistant" else (message.get("speaker") or partner or "Them")
+    who = "User" if role == "user" else COMPANION_LABEL if role == "assistant" else (message.get("speaker") or partner or "Them")
     text = " ".join(str(message.get("content") or "").split())
     return f"{who}: {text[:LINE_CHARS]}{'…' if len(text) > LINE_CHARS else ''}"
 
@@ -245,7 +246,9 @@ def _weights(terms: set[str], documents: list[set[str]]) -> dict[str, float]:
     weights = {}
     for term in terms:
         found = sum(1 for words in documents if _matches(term, words))
-        weights[term] = math.log(1 + (total - found + 0.5) / (found + 0.5))
+        # A word no line has cannot help a match, so it does not count against one either.
+        if found:
+            weights[term] = math.log(1 + (total - found + 0.5) / (found + 0.5))
     return weights
 
 
@@ -275,11 +278,13 @@ async def search_chats_hybrid(
     days: int | None = None,
     now: datetime | None = None,
     limit: int = MAX_HITS,
+    skip: tuple[str, int] | None = None,
+    match_roles: set[str] | None = None,
 ) -> list[SearchHit]:
     """Word matches (names, dates, exact words) plus meaning matches over chunk vectors, merged
     and in time order. Without vectors (off, failed, not built yet) it is the word search alone."""
-    words = search_chats(user_id, query, person=person, days=days, now=now, limit=limit)
-    meaning = await meaning_hits(user_id, query, person=person, days=days, now=now) if query.strip() else []
+    words = search_chats(user_id, query, person=person, days=days, now=now, limit=limit, skip=skip, match_roles=match_roles)
+    meaning = await meaning_hits(user_id, query, person=person, days=days, now=now, skip=skip) if query.strip() else []
     return _merged(words, meaning, limit)
 
 
@@ -314,7 +319,18 @@ def recall_lines(
         if query_embedding and substantial
         else []
     )
-    return _merged(words, meaning, limit)
+    return without_companion_lines(_merged(words, meaning, limit))
+
+
+def without_companion_lines(hits: list[SearchHit]) -> list[SearchHit]:
+    """The hits with Omi's own lines taken out: found by code, they come in unasked, and Omi's
+    earlier words (sometimes wrong) must not come back as if they were evidence."""
+    kept = []
+    for hit in hits:
+        lines = tuple(line for line in hit.lines if not line.startswith(f"{COMPANION_LABEL}:"))
+        if lines:
+            kept.append(replace(hit, lines=lines))
+    return kept
 
 
 def _merged(words: list[SearchHit], meaning: list[SearchHit], limit: int) -> list[SearchHit]:
@@ -342,13 +358,14 @@ async def meaning_hits(
     person: str | None = None,
     days: int | None = None,
     now: datetime | None = None,
+    skip: tuple[str, int] | None = None,
 ) -> list[SearchHit]:
     from .chat_index import embedding_target
 
     if embedding_target() is None:
         return []
     query_vector = await embed_memory_query(query)
-    return meaning_hits_for_vector(user_id, query_vector, person=person, days=days, now=now) if query_vector else []
+    return meaning_hits_for_vector(user_id, query_vector, person=person, days=days, now=now, skip=skip) if query_vector else []
 
 
 def meaning_hits_for_vector(
@@ -412,4 +429,5 @@ __all__ = [
     "search_chats",
     "search_chats_hybrid",
     "search_note",
+    "without_companion_lines",
 ]
