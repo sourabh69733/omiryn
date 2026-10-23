@@ -9,6 +9,7 @@ from agent.memory_engine.processing.models import MemoryBatch
 from agent.memory_engine.memories.open_questions import OpenQuestionChanges, validate_open_questions
 from agent.memory_engine.memories.self_notes import SelfNoteChanges, validate_self_notes
 from agent.memory_engine.memories.user_card import validate_user_card
+from agent.memory_engine.memories.echo import without_companion_echoes
 from agent.memory_engine.memories.vibe import validate_vibe_updates
 from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.validation import validate_memory_analysis
@@ -69,10 +70,14 @@ def interpret_background_cognition(
         "handoff": raw.get("handoff"),
     }
     memory = (
-        validate_memory_analysis_v3(
-            memory_payload,
-            batch=batch,
-            existing_memory_ids=existing_memory_ids,
+        # Omi's own words never become facts about the user.
+        without_companion_echoes(
+            validate_memory_analysis_v3(
+                memory_payload,
+                batch=batch,
+                existing_memory_ids=existing_memory_ids,
+            ),
+            batch,
         )
         if memory_version == 3
         else validate_memory_analysis(
