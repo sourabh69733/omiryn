@@ -45,6 +45,7 @@ from storage.upload_digests import save_upload_digest
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card
 
+from .person_card import build_person_card
 from .service import _apply_vibe, _context_overlap, _existing_memory_context, _replaced_memory_ids, _timeout_seconds
 from .upload_notes import (
     Gathered,
@@ -126,6 +127,9 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
         state = get_processing_state(conversation_id, user_id) or MemoryProcessingState(conversation_id=conversation_id, user_id=user_id)
         save_processing_state(replace(state, processed_through_message_index=whole.new_end_message_index, last_batch_key=whole.batch_key))
         digest = build_digest(partner, merge, gathered, whole)
+        if partner:
+            # Facts about them from the whole chat, each with its real line (not only the newest part).
+            digest["person_card"] = await build_person_card(messages, partner, zone, conversation_id=conversation_id, model=upload_model())
         if source_id:
             save_upload_digest(source_id, user_id, conversation_id, partner, {**digest, "read_at": utc_now_iso()})
         await _save_after(whole, applied, operations, merge, gathered, context)
