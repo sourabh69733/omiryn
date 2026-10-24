@@ -58,6 +58,13 @@ class SharedChatsContextTest(unittest.TestCase):
         self.assertIn('Farheen: "some of them are fine yaar"', content)
         self.assertNotIn("Endless review cycles", content)
 
+    def test_her_after_naming_her_brings_her_card(self) -> None:
+        save_conversation({"id": "omi", "status": "active", "messages": [{"role": "user", "content": "farheen ko jaante ho?"}, {"role": "assistant", "content": "Haan"}]}, USER_ID)
+        [source] = uploaded_chat_sources(USER_ID, "what is her relationship status?", "omi")
+        self.assertIn("Summary: Two colleagues venting", source["content"])
+        [plain] = uploaded_chat_sources(USER_ID, "what is her relationship status?")
+        self.assertNotIn("Summary:", plain["content"])
+
     def test_no_uploads_no_block(self) -> None:
         self.assertEqual(uploaded_chat_sources("someone-else", "farheen?"), [])
 

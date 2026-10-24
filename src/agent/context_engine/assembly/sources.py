@@ -219,7 +219,7 @@ def build_reply_context_sources(
         past_lines = _past_lines_sources(user_id, conversation_id, user_text, memory_query_embedding)
         # A question about someone (or one with real past lines to answer it) gets no unrelated
         # memories to weave in: one subject at a time.
-        if not (past_lines or names_uploaded_person(user_id, user_text)):
+        if not (past_lines or names_uploaded_person(user_id, user_text, conversation_id)):
             durable_memory_sources += _might_fit_sources(conversation_id, user_id, durable_memory_sources)
     else:
         durable_memory_sources = _data_point_context_sources(user_id, user_text)
@@ -241,7 +241,7 @@ def build_reply_context_sources(
         + _self_note_sources(user_id, user_text)
         + _open_question_sources(conversation_id, user_id)
         + _reply_feedback_sources(user_id)
-        + (uploaded_chat_sources(user_id, user_text) if pipeline.memory_contract_version == 3 else [])
+        + (uploaded_chat_sources(user_id, user_text, conversation_id) if pipeline.memory_contract_version == 3 else [])
         + past_lines
     ) + conversation_thread_context_sources(
         conversation_id,

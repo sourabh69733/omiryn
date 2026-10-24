@@ -25,12 +25,13 @@ QUOTE_CHARS = 160
 _WORD = re.compile(r"[\w']+")
 
 
-def uploaded_chat_sources(user_id: str | None, user_text: str) -> list[dict[str, Any]]:
+def uploaded_chat_sources(user_id: str | None, user_text: str, conversation_id: str | None = None) -> list[dict[str, Any]]:
     if not user_id:
         return []
     digests = list_upload_digests(user_id)
     if not digests:
         return []
+    subject = subject_person(user_id, user_text, conversation_id, digests)
     lines = [
         "Chats the user uploaded (WhatsApp with someone else), so you know these people through them. "
         "Asked about someone listed here, share what this says about them and the chat. The other "
@@ -40,7 +41,7 @@ def uploaded_chat_sources(user_id: str | None, user_text: str) -> list[dict[str,
     for stored in digests:
         digest = stored["digest"]
         lines.append(f"- {_index(stored, digest)}")
-        named = _names(stored["partner_name"], user_text)
+        named = stored["partner_name"] == subject
         topics = matching_topics(digest.get("threads") or [], user_text, ignore=stored["partner_name"])
         if named:
             lines.extend(_about_chat(digest))
@@ -63,9 +64,41 @@ def uploaded_chat_sources(user_id: str | None, user_text: str) -> list[dict[str,
     ]
 
 
-def names_uploaded_person(user_id: str | None, user_text: str) -> bool:
-    """The message names someone from a chat the user uploaded."""
-    return bool(user_id) and any(_names(stored["partner_name"], user_text) for stored in list_upload_digests(user_id))
+def names_uploaded_person(user_id: str | None, user_text: str, conversation_id: str | None = None) -> bool:
+    """The message is about someone from a chat the user uploaded (by name, or "she" after them)."""
+    return bool(user_id) and subject_person(user_id, user_text, conversation_id) is not None
+
+
+# The last user messages a "she" or "her" can point back to.
+SUBJECT_LOOKBACK = 4
+
+
+def subject_person(
+    user_id: str,
+    user_text: str,
+    conversation_id: str | None = None,
+    digests: list[dict[str, Any]] | None = None,
+) -> str | None:
+    """Who from the uploaded chats this message is about: one it names, else the one the user's
+    last few messages named (so "what is her relationship status?" after "farheen?" is about her)."""
+    partners = [stored["partner_name"] for stored in (digests if digests is not None else list_upload_digests(user_id)) if stored["partner_name"]]
+    if not partners:
+        return None
+    named = [partner for partner in partners if _names(partner, user_text)]
+    if named:
+        return named[0]
+    if not conversation_id:
+        return None
+    recent = [
+        str(message.get("content") or "")
+        for message in (get_conversation(conversation_id, user_id) or {}).get("messages") or []
+        if message.get("role") == "user"
+    ][-SUBJECT_LOOKBACK:]
+    for text in reversed(recent):
+        found = [partner for partner in partners if _names(partner, text)]
+        if found:
+            return found[0]
+    return None
 
 
 def matching_topics(threads: list[dict[str, Any]], user_text: str, *, ignore: str | None = None) -> list[dict[str, Any]]:
@@ -172,4 +205,4 @@ def _overlap(left: set[str], right: set[str]) -> float:
     return len(left & right) / math.sqrt(len(left) * len(right)) if left and right else 0.0
 
 
-__all__ = ["SHARED_CHATS_SOURCE_TYPE", "matching_topics", "names_uploaded_person", "uploaded_chat_sources"]
+__all__ = ["SHARED_CHATS_SOURCE_TYPE", "matching_topics", "names_uploaded_person", "subject_person", "uploaded_chat_sources"]
