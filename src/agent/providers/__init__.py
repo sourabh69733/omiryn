@@ -45,6 +45,7 @@ from .extraction.service import (
     analyze_upload_part,
     check_reply_requests,
     rebuild_user_card_text,
+    write_search_queries,
     extract_deep_profile_facts,
     write_vibe_intro,
     extract_llm_data_point_candidates,
@@ -123,6 +124,7 @@ __all__ = [
     "generate_agent_reply",
     "provider_chat",
     "rebuild_user_card_text",
+    "write_search_queries",
     "review_llm_data_point_candidates",
     "write_vibe_intro",
 ]

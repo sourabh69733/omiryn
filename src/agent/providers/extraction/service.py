@@ -15,7 +15,12 @@ from agent.memory_engine.data_points.extraction.prompts import (
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
 from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
 from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.upload_prompt import PERSON_CARD_SYSTEM_PROMPT, UPLOAD_MERGE_SYSTEM_PROMPT, UPLOAD_PART_SYSTEM_PROMPT
+from agent.cognition.background.upload_prompt import (
+    PERSON_CARD_SYSTEM_PROMPT,
+    SEARCH_QUERIES_SYSTEM_PROMPT,
+    UPLOAD_MERGE_SYSTEM_PROMPT,
+    UPLOAD_PART_SYSTEM_PROMPT,
+)
 from agent.cognition.background.card_rebuild_prompt import CARD_REBUILD_SYSTEM_PROMPT
 from agent.cognition.background.vibe_prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
@@ -35,6 +40,7 @@ from agent.observability.usage import (
     REPLY_REQUEST_CHECK,
     CARD_REBUILD,
     PERSON_CARD,
+    SEARCH_QUERIES,
     UPLOAD_MERGE,
     UPLOAD_PART,
     VIBE_BACKFILL,
@@ -186,6 +192,17 @@ async def analyze_person_part(
 ) -> dict[str, Any]:
     """Facts about the other person in one part of an uploaded chat; {"facts": [...]}."""
     return await _upload_call(PERSON_CARD_SYSTEM_PROMPT, PERSON_CARD, text, conversation_id, model, timeout_seconds)
+
+
+async def write_search_queries(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 10,
+) -> dict[str, Any]:
+    """Short searches that would find the answer to a question in past chats; {"queries": [...]}."""
+    return await _upload_call(SEARCH_QUERIES_SYSTEM_PROMPT, SEARCH_QUERIES, text, conversation_id, model, timeout_seconds)
 
 
 async def rebuild_user_card_text(

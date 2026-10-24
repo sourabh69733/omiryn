@@ -124,4 +124,21 @@ plans (events, trips, goals with a time), likes, dislikes, other.
   returns {"facts": []}."""
 
 
-__all__ = ["PERSON_CARD_CATEGORIES", "PERSON_CARD_SYSTEM_PROMPT", "UPLOAD_MERGE_SYSTEM_PROMPT", "UPLOAD_PART_SYSTEM_PROMPT"]
+# Search terms for a question about the user's past chats: the words the answer would use, which are
+# often not the question's words ("relationship status" is answered by "engaged" or "shaadi").
+SEARCH_QUERIES_SYSTEM_PROMPT = """The user asked their companion something whose answer may be in their past
+chats (with the companion, or WhatsApp chats they uploaded, often in Hinglish). Write the short
+searches that would find the lines answering it. Return one JSON object only: {"queries": ["..."]}.
+
+Input: question, recent (the last few messages, to tell who "she" or "he" is), people (names in the
+uploaded chats).
+
+- At most 4 queries, 1-4 words each. Use the words the answer itself would contain, not the
+  question's words: the specific terms, their Hinglish forms and close variants. A question about
+  someone's relationship might search for engaged, shaadi, boyfriend; one about their job for job,
+  naukri, office, interview.
+- Put the person's first name in a query only when it would appear in the line itself.
+- Nothing to search (a greeting, small talk): {"queries": []}."""
+
+
+__all__ = ["PERSON_CARD_CATEGORIES", "SEARCH_QUERIES_SYSTEM_PROMPT", "PERSON_CARD_SYSTEM_PROMPT", "UPLOAD_MERGE_SYSTEM_PROMPT", "UPLOAD_PART_SYSTEM_PROMPT"]
