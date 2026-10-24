@@ -102,9 +102,13 @@ def _about_chat(digest: dict[str, Any]) -> list[str]:
     lines = []
     if digest.get("summary"):
         lines.append(f"  Summary: {digest['summary']}")
-    person = [item["text"] for item in digest.get("person") or [] if item.get("text")]
-    if person:
-        lines.append(f"  About {digest.get('chat_with') or 'them'}: " + " ".join(person[:8]))
+    card = digest.get("person_card") or {}
+    if card:
+        lines.extend(person_card_lines(card, digest.get("chat_with") or "them"))
+    else:
+        person = [item["text"] for item in digest.get("person") or [] if item.get("text")]
+        if person:
+            lines.append(f"  About {digest.get('chat_with') or 'them'}: " + " ".join(person[:8]))
     plans = [
         item["what"] + (" (" + str(item["when"])[:10] + ")" if item.get("when") else "")
         for item in digest.get("plans") or []
@@ -112,6 +116,19 @@ def _about_chat(digest: dict[str, Any]) -> list[str]:
     ]
     if plans:
         lines.append("  Plans mentioned: " + "; ".join(plans[:5]))
+    return lines
+
+
+def person_card_lines(card: dict[str, list[dict[str, Any]]], name: str) -> list[str]:
+    """What is known about them, by kind, newest first, each with the real line it came from."""
+    lines = [
+        f"  What the chat says about {name} (newest first; each with the exact line and its date). This "
+        "is all that is known about them: anything not here, say you don't know.",
+    ]
+    for category, facts in card.items():
+        for position, fact in enumerate(facts[:3]):
+            label = category.capitalize() if position == 0 else " " * len(category)
+            lines.append(f'  - {label}: {fact["fact"]} [{fact.get("date") or "date unknown"}, {fact["speaker"]}: "{fact["quote"]}"]')
     return lines
 
 
