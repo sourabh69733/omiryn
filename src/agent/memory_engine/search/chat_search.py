@@ -333,6 +333,14 @@ def without_companion_lines(hits: list[SearchHit]) -> list[SearchHit]:
     return kept
 
 
+def merge_hits(lists: list[list[SearchHit]], limit: int) -> list[SearchHit]:
+    """Hits from several searches, earlier lists first, without overlaps; in time order."""
+    merged: list[SearchHit] = []
+    for hits in lists:
+        merged = _merged(merged, hits, limit)
+    return merged
+
+
 def _merged(words: list[SearchHit], meaning: list[SearchHit], limit: int) -> list[SearchHit]:
     """Word hits first, then meaning hits that do not overlap them; in time order."""
     taken = [(hit.conversation_id, hit.start, hit.end) for hit in words]
@@ -424,6 +432,7 @@ __all__ = [
     "load_chats",
     "meaning_hits",
     "meaning_hits_for_vector",
+    "merge_hits",
     "recall_lines",
     "recall_note",
     "search_chats",

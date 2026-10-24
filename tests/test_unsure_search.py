@@ -52,6 +52,35 @@ class SearchWhenUnsureTest(unittest.IsolatedAsyncioTestCase):
         writer.assert_not_awaited()
 
 
+class SearchQueriesTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        reset_db()
+        set_user_timezone(USER_ID, "Asia/Kolkata")
+        save_conversation(
+            {"id": "upload", "status": "active", "import_source_id": "src", "messages": [{"role": "other", "speaker": "Farheen", "content": "ghar wale shaadi ki baat kar rahe hain", "created_at": "2026-10-08T16:36:00+00:00"}]},
+            USER_ID,
+        )
+        save_conversation({"id": "omi", "status": "active", "messages": []}, USER_ID)
+
+    async def test_written_searches_find_what_the_question_words_cannot(self) -> None:
+        writer = AsyncMock(return_value="Ghar wale uski shaadi ki baat kar rahe hain.")
+        with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}), patch("agent.runtime.orchestrator.generate_agent_reply", writer):
+            reply, info = await _search_when_unsure(
+                "I don't know.", user_id=USER_ID, conversation_id="omi", query="what is her relationship status",
+                message_count=0, reply_messages=[], generation_arguments={}, extra_queries=["shaadi", "engaged"],
+            )
+        self.assertEqual(info["hits"], 1)
+        self.assertIn("shaadi ki baat", writer.await_args.args[0][-1]["content"])
+
+    async def test_queries_come_from_the_fast_model_and_fail_quietly(self) -> None:
+        from agent.runtime.orchestrator import _search_queries
+
+        with patch("agent.runtime.orchestrator.write_search_queries", AsyncMock(return_value={"queries": ["engaged", "shaadi", "", 7]})):
+            self.assertEqual(await _search_queries("her status?", [], user_id=USER_ID, conversation_id="omi"), ["engaged", "shaadi"])
+        with patch("agent.runtime.orchestrator.write_search_queries", AsyncMock(side_effect=RuntimeError("busy"))):
+            self.assertEqual(await _search_queries("her status?", [], user_id=USER_ID, conversation_id="omi"), [])
+
+
 class OneSubjectTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_db()

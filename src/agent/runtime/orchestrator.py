@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -43,6 +44,7 @@ from agent.shared.clock import utc_now_iso
 from agent.providers import (
     AgentProviderError,
     check_reply_requests,
+    write_search_queries,
     AgentProviderTruncationError,
     _provider_messages,
     assess_user_message_quality,
@@ -51,7 +53,8 @@ from agent.providers import (
 from agent.providers.shared.messages import reply_window, summarized_through
 from agent.providers.gateway.clients import parse_tool_call
 from agent.memory_engine.search import SEARCH_TOOL, search_chats_hybrid, search_note
-from agent.memory_engine.search.chat_search import without_companion_lines
+from agent.memory_engine.search.chat_search import merge_hits, without_companion_lines
+from storage.upload_digests import list_upload_digests
 from agent.outputs.companion_response import structured_companion_reply
 from agent.context_engine.state.turn import assistant_turn_state
 from storage import (
@@ -284,6 +287,7 @@ async def run_agent_turn(
                     user_id=user_id,
                     conversation_id=conversation_id,
                     query=memory_query_text(user_text, messages),
+                    extra_queries=await _search_queries(user_text, messages, user_id=user_id, conversation_id=conversation_id),
                     message_count=len(messages),
                     reply_messages=reply_messages,
                     generation_arguments=generation_arguments,
@@ -510,6 +514,25 @@ async def _answer_with_search(
     return reply, {"tool": name, "query": query, "person": person, "days": days, "hits": len(hits)}
 
 
+async def _search_queries(user_text: str, messages: list[dict[str, Any]], *, user_id: str, conversation_id: str) -> list[str]:
+    """Searches written by a fast model: the words the answer would use ("relationship status" ->
+    engaged, shaadi, boyfriend). Empty when it fails; the plain question is searched anyway."""
+    from agent.cognition.background.upload_read import upload_model
+
+    people = [stored["partner_name"] for stored in list_upload_digests(user_id) if stored["partner_name"]]
+    recent = [f'{m.get("role")}: {str(m.get("content") or "")[:200]}' for m in messages[-4:]]
+    try:
+        raw = await write_search_queries(
+            json.dumps({"question": user_text, "recent": recent, "people": people}, ensure_ascii=False),
+            conversation_id=conversation_id,
+            model=upload_model(),
+        )
+    except Exception:
+        return []
+    queries = raw.get("queries") if isinstance(raw, dict) else None
+    return [query.strip()[:60] for query in queries or [] if isinstance(query, str) and query.strip()][:4]
+
+
 async def _search_when_unsure(
     draft: str,
     *,
@@ -519,6 +542,7 @@ async def _search_when_unsure(
     message_count: int,
     reply_messages: list[dict[str, Any]],
     generation_arguments: dict[str, Any],
+    extra_queries: list[str] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """The draft says Omi does not know: search the real lines once before sending that.
 
@@ -526,16 +550,13 @@ async def _search_when_unsure(
     user's or the other person's lines can match, so Omi's own earlier "I don't know" never counts.
     When the search finds nothing, the honest draft stands.
     """
+    skip = (conversation_id, max(0, message_count - 30))
     try:
-        hits = without_companion_lines(
-            await search_chats_hybrid(
-                user_id,
-                query[:300],
-                limit=6,
-                skip=(conversation_id, max(0, message_count - 30)),
-                match_roles={"user", "other"},
-            )
-        )
+        found = [
+            await search_chats_hybrid(user_id, text[:300], limit=4, skip=skip, match_roles={"user", "other"})
+            for text in [*(extra_queries or []), query]
+        ]
+        hits = without_companion_lines(merge_hits(found, 6))
     except Exception as error:
         return draft, {"tool": "unsure_search", "error": type(error).__name__}
     if not hits:
@@ -544,7 +565,7 @@ async def _search_when_unsure(
         "\nYour draft said you don't know; check these lines first and answer from them if they do."
     )
     reply = await generate_agent_reply(reply_messages + [{"role": "system", "content": note}], **generation_arguments)
-    return reply, {"tool": "unsure_search", "query": query[:120], "hits": len(hits)}
+    return reply, {"tool": "unsure_search", "query": query[:120], "queries": extra_queries or [], "hits": len(hits)}
 
 
 async def _follow_requests(
