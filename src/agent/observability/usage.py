@@ -18,6 +18,7 @@ REPLY_REQUEST_CHECK = "reply_request_check"
 UPLOAD_PART = "upload_part"
 UPLOAD_MERGE = "upload_merge"
 CARD_REBUILD = "card_rebuild"
+PERSON_CARD = "person_card"
 
 PROFILE_SIGNAL_EXTRACT = "profile_signal_extract"
 PROFILE_SIGNAL_BACKFILL = "profile_signal_backfill"

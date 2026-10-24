@@ -99,4 +99,29 @@ User card rules (current_user_card is the starting point; candidates are the new
 """ + USER_CARD_RULES
 
 
-__all__ = ["UPLOAD_MERGE_SYSTEM_PROMPT", "UPLOAD_PART_SYSTEM_PROMPT"]
+# Facts about the other person in an uploaded chat, read from the whole chat in parts. Each fact
+# points at one message by index; code copies that message as the quote, so a quote is never
+# written by the model.
+PERSON_CARD_CATEGORIES = ("relationship", "work", "study", "home", "family", "plans", "likes", "dislikes", "other")
+
+PERSON_CARD_SYSTEM_PROMPT = """You read part of a WhatsApp chat the user uploaded, between the user and
+chat_with. List what this part says about chat_with as a person. Return one JSON object only.
+
+Input: chat_with, and messages, each with i (its index), from ("user" or a name), at (date) and text.
+
+Output: {"facts": [{"category": "...", "fact": "one short sentence", "line": <i of the message that says it>}]}
+
+category is one of: relationship (partner, dating, engagement, marriage, single), work (job,
+profession, employer, role, money from work), study, home (city, where they live or move), family,
+plans (events, trips, goals with a time), likes, dislikes, other.
+
+- Only what a message in this part says about chat_with: their own words about themselves, or the
+  user's words about them. Not about the user, not about anyone else.
+- line is the one message that says it most directly. Never a fact the line does not say; nothing
+  guessed or inferred. When unsure, leave it out.
+- No judgments of their character and nothing about health.
+- Write the fact in plain English, keeping names, places and dates. A part with nothing about them
+  returns {"facts": []}."""
+
+
+__all__ = ["PERSON_CARD_CATEGORIES", "PERSON_CARD_SYSTEM_PROMPT", "UPLOAD_MERGE_SYSTEM_PROMPT", "UPLOAD_PART_SYSTEM_PROMPT"]
