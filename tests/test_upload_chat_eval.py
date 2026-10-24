@@ -24,6 +24,10 @@ class UploadChatEvalTest(unittest.TestCase):
     def test_reading_flags_a_friend_fact_saved_as_the_user(self) -> None:
         digest = {"index_line": "x", "threads": [{"title": "Crypto debate"}, {"title": "Sinhagad trek"}], "person": [{"text": "Lives in Indore, teaches maths, has a cat Mochi."}]}
         memories = ("thinks crypto is gambling.", "plays badminton weekly.", "chats with ananya on whatsapp.", "lives in indore.")
+        problems = check_reading({"state": "done"}, digest, memories)
+        self.assertIn("Ananya's fact saved as the user's memory (indore)", problems)
+        self.assertIn("the person card has no engagement under relationship", problems)
+        digest["person_card"] = {"relationship": [{"fact": "Engaged to Rohan."}]}
         self.assertEqual(check_reading({"state": "done"}, digest, memories), ["Ananya's fact saved as the user's memory (indore)"])
 
 

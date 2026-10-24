@@ -32,8 +32,12 @@ FRIEND = "Ananya"
 
 # Known facts. User: backend dev at Zentrix, thinks crypto is gambling, plays badminton, Sinhagad
 # trek on Sun 12 Oct. Ananya: lives in Indore, teaches maths, cat named Mochi, thinks crypto is the
-# future, recommended Atomic Habits. Never said: her favourite movie, birthday, siblings.
-EXPORT = """05/10/2026, 8:02 pm - Ananya: heyy how was your week
+# future, recommended Atomic Habits, engaged to Rohan (decided 28 Sep, wedding next year). Never
+# said: her favourite movie, birthday, siblings.
+EXPORT = """28/09/2026, 9:00 pm - Ananya: big news, decided to do engagement in december!
+28/09/2026, 9:01 pm - Sourabh: whattt congrats!! who is he
+28/09/2026, 9:02 pm - Ananya: Rohan, from college. shaadi next year, career first
+05/10/2026, 8:02 pm - Ananya: heyy how was your week
 05/10/2026, 8:04 pm - Sourabh: crazy yaar, release deadline at Zentrix, backend team is dying
 05/10/2026, 8:05 pm - Ananya: haha same energy, I had parent teacher meeting all day
 05/10/2026, 8:06 pm - Ananya: teaching maths to 40 kids is no joke
@@ -76,6 +80,8 @@ class Question:
     unknown: bool = False
     # None of these may appear (a "hi" must not dump the chat).
     forbidden: tuple[str, ...] = ()
+    # The user's earlier messages in this chat, so "she" can point back to someone.
+    before: tuple[str, ...] = ()
 
 
 DONT_KNOW = (
@@ -93,6 +99,9 @@ QUESTIONS: tuple[Question, ...] = (
     Question("her_cat", "ananya ki billi ka naam kya hai?", answer=((r"mochi",),)),
     Question("trek_date", "trek kab plan kiya tha?", answer=((r"12", r"sunday", r"ravivar"),)),
     Question("her_book", "ananya ne kaunsi book suggest ki thi?", answer=((r"atomic habits",),)),
+    Question("relationship", "ananya ka relationship status kya hai?", answer=((r"engag", r"rohan", r"fianc", r"shaadi", r"sagai"),)),
+    Question("she_is_single", "is she single?", answer=((r"engag", r"rohan", r"fianc", r"not single", r"single nahi"),), before=("ananya ko jaante ho?",)),
+    Question("her_job", "aur uska profession kya hai?", answer=((r"teach", r"math", r"teacher", r"padha"),), before=("ananya ko jaante ho?",)),
     Question("trap_movie", "ananya ki favourite movie kaunsi hai?", unknown=True),
     Question("trap_birthday", "ananya ka birthday kab hai?", unknown=True),
     Question("trap_brother", "ananya ke bhai ka naam kya hai?", unknown=True),
@@ -162,7 +171,10 @@ def check_reading(reading: dict[str, Any], digest: dict[str, Any], memories: tup
     if not digest:
         return problems + ["no digest"]
     topics = " ".join(f"{t.get('title')} {t.get('summary')}" for t in digest.get("threads") or []).lower()
-    person = " ".join(str(p.get("text")) for p in digest.get("person") or []).lower()
+    card = digest.get("person_card") or {}
+    person = " ".join(
+        [str(p.get("text")) for p in digest.get("person") or []] + [str(f.get("fact")) for facts in card.values() for f in facts]
+    ).lower()
     problems += [f"no topic about {pattern}" for pattern in DIGEST_TOPICS if not re.search(pattern, topics)]
     problems += [f"nothing about Ananya matching {pattern}" for pattern in DIGEST_PERSON if not re.search(pattern, person)]
     problems += [f"no memory about the user matching {pattern}" for pattern in USER_MEMORIES if not any(re.search(pattern, m) for m in memories)]
@@ -175,15 +187,21 @@ def check_reading(reading: dict[str, Any], digest: dict[str, Any], memories: tup
         problems.append("no memory about who the chat was with")
     if not digest.get("index_line"):
         problems.append("no index line")
+    relationship = " ".join(str(fact.get("fact")) for fact in card.get("relationship") or []).lower()
+    if not re.search(r"engag|rohan", relationship):
+        problems.append("the person card has no engagement under relationship")
     return problems
 
 
 async def ask(user_id: str, question: Question) -> AnswerResult:
     conversation_id = f"{user_id}-{question.id}-{uuid4().hex[:6]}"
-    save_conversation({"id": conversation_id, "status": "active", "messages": []}, user_id)
+    history: list[dict[str, Any]] = []
+    for text in question.before:
+        history += [{"role": "user", "content": text}, {"role": "assistant", "content": "Haan, tumhari chat se jaanta hoon."}]
+    save_conversation({"id": conversation_id, "status": "active", "messages": list(history)}, user_id)
     turn = await run_agent_turn(
         conversation_id=conversation_id,
-        messages=[],
+        messages=history,
         user_text=question.text,
         user_id=user_id,
         user_profile={"display_name": USER, "timezone": TIMEZONE},
@@ -193,7 +211,7 @@ async def ask(user_id: str, question: Question) -> AnswerResult:
         style_source_id=None,
         agent_name="Omi",
     )
-    reply = " ".join(str(m.get("content") or "") for m in turn.messages[1:] if m.get("role") == "assistant")
+    reply = " ".join(str(m.get("content") or "") for m in turn.messages[len(history) + 1:] if m.get("role") == "assistant")
     problem = check_answer(question, reply)
     return AnswerResult(question=question, reply=reply, passed=not problem, problem=problem)
 
