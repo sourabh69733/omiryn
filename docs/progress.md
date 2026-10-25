@@ -114,11 +114,12 @@ Portraits are 320 px WebP in `public/static/assets/people/`; source images stay 
 
 | # | Item | Why |
 |---|---|---|
-| 1 | Real-phone pass | Keyboard overlap, safe areas, tap sizes and home-screen use on a real iPhone and Android. |
-| 2 | Accessibility pass | Full keyboard, focus and contrast audit; screen reader labels. |
-| 3 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. Needs a small API; plan first. |
-| 4 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
-| 5 | Profile loads every visit | Profile refetches `/api/me/profile` and `/api/me/data-requests` one after the other on each visit. Keep the last profile in memory, refresh quietly, fetch in parallel; version and cache photo URLs. |
+| 1 | Real-phone pass | Keyboard overlap, safe areas, tap sizes, home-screen use and VoiceOver on a real iPhone and Android. |
+| 2 | Consent for private areas | Values, stories and deal-breakers are marked private. Left: an explicit opt-in for using beliefs in matching (DPDP Act), and matching code that never shows these to the other user. Needs a small API; plan first. |
+| 3 | Vibe lines in "You ..." (agent team) | Lines are written in the third person ("They ..."), which reads cold on the user's own Vibe page. Belongs to the background prompt, not UI. |
+| 4 | Photo caching (API) | Profile photos are served `no-store` and re-download each visit. Version the photo URLs and cache them long. |
+
+Done (2026-10-20 to 10-25): Profile opens at once on later visits (last profile kept in memory for the tab, cleared on sign-out; profile and data requests load in parallel); repeated CSS rules merged into their first file and 75 never-winning declarations dropped (same 0-difference check, also at 520, 900 and 1,100 px); accessibility pass (one `useKeyboardA11y` hook: menus focus their first item with arrow keys, Home and End; modal dialogs take focus, keep Tab inside and give it back; Escape closes every dialog; the Earlier chats drawer is a dialog; the hidden photo input left the tab order; darker "Confirmed" chips for 4.5:1 contrast; 24px minimum tap areas); no "You" placeholder avatar in chat (own photo only when there is one).
 
 Done (2026-10-14 to 10-17): typing state clears on other pages; Temporary Chat header, names and exits; Profile/Privacy tabs removed; unused CSS removed (PR #5: `legacy-app.css` about 10,200 to 3,200 lines, built CSS 231 KB to 108 KB, checked with 0 computed-style differences on 35 screen states); `legacy-app.css` deleted: its rules now live in `app-base.css`, `chat.css`, and at the top of `onboarding.css`, `memories.css` and `contact.css` (same check, 0 differences); first-run (sign-in steps, first-name prefill, first-chat welcome card); landing (one CTA at a time, no hero lead line, steady nav height, compact How it works on phones, PR #3).
 
