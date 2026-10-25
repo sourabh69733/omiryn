@@ -9,7 +9,12 @@ from agent.context_engine.conversation_engine.policy.freshness import (
     stale_reply_reason,
     trim_questions,
 )
-from agent.runtime.orchestrator import _freshen_reply, _turn_notes
+from agent.runtime.steps import ReplyJob, freshen_reply, turn_notes as _turn_notes
+
+
+async def _freshen_reply(reply, *, previous_replies, reply_messages, generation_arguments, generate, question_limit=1):
+    job = ReplyJob(reply_messages, generation_arguments, generate, question_limit=question_limit, previous_replies=previous_replies)
+    return await freshen_reply(reply, job)
 
 
 class StaleReplyTest(unittest.TestCase):
@@ -82,13 +87,13 @@ class StaleReplyTest(unittest.TestCase):
 
 class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
     async def _freshen(self, reply: str, generate: AsyncMock) -> tuple[str, dict | None]:
-        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
-            return await _freshen_reply(
-                reply,
-                previous_replies=[],
-                reply_messages=[{"role": "user", "content": "my manager praised my presentation"}],
-                generation_arguments={"system_prompt": "SYSTEM"},
-            )
+        return await _freshen_reply(
+            reply,
+            previous_replies=[],
+            reply_messages=[{"role": "user", "content": "my manager praised my presentation"}],
+            generation_arguments={"system_prompt": "SYSTEM"},
+            generate=generate,
+        )
 
     async def test_stale_draft_is_rewritten_once(self) -> None:
         generate = AsyncMock(return_value="your manager noticed, that's a big deal. what did they say?")
@@ -110,13 +115,13 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
             {"role": "assistant", "content": "what are you up to"},
             {"role": "user", "content": "hi"},
         ]
-        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
-            reply, freshness = await _freshen_reply(
-                greeting,
-                previous_replies=[greeting, "what are you up to"],
-                reply_messages=history,
-                generation_arguments={"system_prompt": "SYSTEM"},
-            )
+        reply, freshness = await _freshen_reply(
+            greeting,
+            previous_replies=[greeting, "what are you up to"],
+            reply_messages=history,
+            generation_arguments={"system_prompt": "SYSTEM"},
+            generate=generate,
+        )
         self.assertEqual(reply, "hi again!")
         sent = generate.await_args.args[0]
         self.assertNotIn(greeting, [message["content"] for message in sent])
@@ -151,28 +156,28 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_question_limit_breaks_trigger_a_rewrite(self) -> None:
         generate = AsyncMock(return_value="a week of launches, you've earned a quiet night")
-        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
-            reply, freshness = await _freshen_reply(
-                "hope it calms down, how's Bruno handling it?",
-                previous_replies=[],
-                reply_messages=[{"role": "user", "content": "work was hectic"}],
-                generation_arguments={"system_prompt": "SYSTEM"},
-                question_limit=0,
-            )
+        reply, freshness = await _freshen_reply(
+            "hope it calms down, how's Bruno handling it?",
+            previous_replies=[],
+            reply_messages=[{"role": "user", "content": "work was hectic"}],
+            generation_arguments={"system_prompt": "SYSTEM"},
+            generate=generate,
+            question_limit=0,
+        )
         self.assertEqual(reply, "a week of launches, you've earned a quiet night")
         self.assertIn("must not ask any", freshness["reason"])
         self.assertFalse(freshness["still_stale"])
 
     async def test_rewrite_that_still_asks_is_trimmed(self) -> None:
         generate = AsyncMock(return_value="which one?<next_message>was it any good?")
-        with patch("agent.runtime.orchestrator.generate_agent_reply", new=generate):
-            reply, freshness = await _freshen_reply(
-                "which one?<next_message>was it any good?",
-                previous_replies=[],
-                reply_messages=[{"role": "user", "content": "watched a movie"}],
-                generation_arguments={"system_prompt": "SYSTEM"},
-                question_limit=1,
-            )
+        reply, freshness = await _freshen_reply(
+            "which one?<next_message>was it any good?",
+            previous_replies=[],
+            reply_messages=[{"role": "user", "content": "watched a movie"}],
+            generation_arguments={"system_prompt": "SYSTEM"},
+            generate=generate,
+            question_limit=1,
+        )
         self.assertEqual(reply, "was it any good?")
         self.assertTrue(freshness["questions_trimmed"])
         self.assertFalse(freshness["still_stale"])

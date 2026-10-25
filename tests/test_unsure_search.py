@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.assembly.sources import build_reply_context_sources
 from agent.context_engine.conversation_engine.policy.unknown import says_unknown
-from agent.runtime.orchestrator import _search_when_unsure
+from agent.runtime.steps import ReplyJob, search_queries, search_when_unsure
 from storage import reset_db, save_conversation, set_user_timezone
 from storage.upload_digests import save_upload_digest
 
@@ -35,8 +35,9 @@ class SearchWhenUnsureTest(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, query: str):
         writer = AsyncMock(return_value="Haan, usne engagement decide kar li hai, next year.")
-        with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}), patch("agent.runtime.orchestrator.generate_agent_reply", writer):
-            result = await _search_when_unsure("I don't have information about that.", user_id=USER_ID, conversation_id="omi", query=query, message_count=1, reply_messages=[], generation_arguments={})
+        job = ReplyJob([], {}, writer, user_id=USER_ID, conversation_id="omi", user_text=query)
+        with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}):
+            result = await search_when_unsure("I don't have information about that.", job, extra_queries=[])
         return result, writer
 
     async def test_found_lines_rewrite_the_reply(self) -> None:
@@ -64,21 +65,18 @@ class SearchQueriesTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_written_searches_find_what_the_question_words_cannot(self) -> None:
         writer = AsyncMock(return_value="Ghar wale uski shaadi ki baat kar rahe hain.")
-        with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}), patch("agent.runtime.orchestrator.generate_agent_reply", writer):
-            reply, info = await _search_when_unsure(
-                "I don't know.", user_id=USER_ID, conversation_id="omi", query="what is her relationship status",
-                message_count=0, reply_messages=[], generation_arguments={}, extra_queries=["shaadi", "engaged"],
-            )
+        job = ReplyJob([], {}, writer, user_id=USER_ID, conversation_id="omi", user_text="what is her relationship status")
+        with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}):
+            reply, info = await search_when_unsure("I don't know.", job, extra_queries=["shaadi", "engaged"])
         self.assertEqual(info["hits"], 1)
         self.assertIn("shaadi ki baat", writer.await_args.args[0][-1]["content"])
 
     async def test_queries_come_from_the_fast_model_and_fail_quietly(self) -> None:
-        from agent.runtime.orchestrator import _search_queries
-
-        with patch("agent.runtime.orchestrator.write_search_queries", AsyncMock(return_value={"queries": ["engaged", "shaadi", "", 7]})):
-            self.assertEqual(await _search_queries("her status?", [], user_id=USER_ID, conversation_id="omi"), ["engaged", "shaadi"])
-        with patch("agent.runtime.orchestrator.write_search_queries", AsyncMock(side_effect=RuntimeError("busy"))):
-            self.assertEqual(await _search_queries("her status?", [], user_id=USER_ID, conversation_id="omi"), [])
+        job = ReplyJob([], {}, AsyncMock(), user_id=USER_ID, conversation_id="omi", user_text="her status?")
+        with patch("agent.runtime.steps.unsure_search.write_search_queries", AsyncMock(return_value={"queries": ["engaged", "shaadi", "", 7]})):
+            self.assertEqual(await search_queries(job), ["engaged", "shaadi"])
+        with patch("agent.runtime.steps.unsure_search.write_search_queries", AsyncMock(side_effect=RuntimeError("busy"))):
+            self.assertEqual(await search_queries(job), [])
 
 
 class OneSubjectTest(unittest.TestCase):

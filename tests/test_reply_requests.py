@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.conversation_engine.policy.requests import broken_requests, how_to_talk_requests
-from agent.runtime.orchestrator import _follow_requests
+from agent.runtime.steps import ReplyJob, follow_requests
 
 SOURCES = [
     {"source_type": "user_card", "content": "- Lives in Pune"},
@@ -32,15 +32,9 @@ class FollowRequestsTest(unittest.IsolatedAsyncioTestCase):
     async def _follow(self, check: object, rewrite: str = "Venus ka din uske saal se lamba hota hai.", requests=REQUESTS):
         checker = AsyncMock(side_effect=check) if isinstance(check, Exception) else AsyncMock(return_value=check)
         writer = AsyncMock(return_value=rewrite)
-        with patch("agent.runtime.orchestrator.check_reply_requests", checker), patch(
-            "agent.runtime.orchestrator.generate_agent_reply", writer
-        ):
-            result = await _follow_requests(
-                "Space is cool! Kya tumhe stars pasand hain?",
-                requests=requests,
-                reply_messages=[{"role": "user", "content": "space ke baare mein batao"}],
-                generation_arguments=ARGS,
-            )
+        job = ReplyJob([{"role": "user", "content": "space ke baare mein batao"}], ARGS, writer, requests=requests)
+        with patch("agent.runtime.steps.checks.check_reply_requests", checker):
+            result = await follow_requests("Space is cool! Kya tumhe stars pasand hain?", job)
         return result, checker, writer
 
     async def test_no_requests_no_check(self) -> None:
