@@ -51,8 +51,8 @@ from agent.providers import (
     generate_agent_reply,
 )
 from agent.providers.shared.messages import reply_window, summarized_through
-from agent.providers.gateway.clients import parse_tool_call
-from agent.memory_engine.search import SEARCH_TOOL, search_chats_hybrid, search_note
+from agent.memory_engine.search import search_chats_hybrid, search_note
+from agent.tools import ToolContext, chat_search_enabled, reply_with_tools, tool_arguments
 from agent.memory_engine.search.chat_search import merge_hits, without_companion_lines
 from storage.upload_digests import list_upload_digests
 from agent.outputs.companion_response import structured_companion_reply
@@ -272,16 +272,19 @@ async def run_agent_turn(
         }
         fallback_reason = None
         chat_search: dict[str, Any] | None = None
+        tool_calls: list[dict[str, Any]] = []
         try:
-            raw_reply = await generate_agent_reply(
-                reply_messages,
-                **generation_arguments,
-                **(_search_tool_arguments() if user_id and chat_search_enabled() else {}),
+            tool_context = ToolContext(user_id=user_id, conversation_id=conversation_id)
+            raw_reply = await generate_agent_reply(reply_messages, **generation_arguments, **tool_arguments(tool_context))
+            raw_reply, tool_calls = await reply_with_tools(
+                raw_reply,
+                context=tool_context,
+                generate=generate_agent_reply,
+                reply_messages=reply_messages,
+                generation_arguments=generation_arguments,
             )
-            raw_reply, chat_search = await _answer_with_search(
-                raw_reply, user_id=user_id, reply_messages=reply_messages, generation_arguments=generation_arguments
-            )
-            if chat_search is None and user_id and chat_search_enabled() and says_unknown(raw_reply):
+            searched = any(call.get("tool") == "search_chats" for call in tool_calls)
+            if not searched and user_id and chat_search_enabled() and says_unknown(raw_reply):
                 raw_reply, chat_search = await _search_when_unsure(
                     raw_reply,
                     user_id=user_id,
@@ -373,6 +376,7 @@ async def run_agent_turn(
                 "freshness": freshness,
                 "request_check": request_check,
                 "chat_search": chat_search,
+                "tool_calls": tool_calls,
             },
         }
     )
@@ -479,39 +483,6 @@ async def _freshen_reply(
         "questions_trimmed": trimmed,
         "still_stale": problem(rewritten) is not None,
     }
-
-
-def chat_search_enabled() -> bool:
-    return os.getenv("AGENT_CHAT_SEARCH", "true").strip().lower() != "false"
-
-
-def _search_tool_arguments() -> dict[str, Any]:
-    return {"tools": [SEARCH_TOOL], "tool_choice": "auto"}
-
-
-async def _answer_with_search(
-    raw_reply: str,
-    *,
-    user_id: str | None,
-    reply_messages: list[dict[str, Any]],
-    generation_arguments: dict[str, Any],
-) -> tuple[str, dict[str, Any] | None]:
-    """When the reply model asked to search past chats: run it, then reply from the real lines.
-
-    The search runs only when the model calls it, so other replies cost nothing extra. The second
-    call has no tools, so it always ends in a reply.
-    """
-    called = parse_tool_call(raw_reply)
-    if called is None or not user_id:
-        return raw_reply, None
-    name, arguments = called
-    query = str(arguments.get("query") or "").strip()[:200]
-    person = str(arguments.get("person") or "").strip()[:80] or None
-    days = arguments.get("days") if isinstance(arguments.get("days"), int) and arguments.get("days") > 0 else None
-    hits = await search_chats_hybrid(user_id, query, person=person, days=days) if name == SEARCH_TOOL["function"]["name"] else []
-    note = search_note(query, person, days, hits)
-    reply = await generate_agent_reply(reply_messages + [{"role": "system", "content": note}], **generation_arguments)
-    return reply, {"tool": name, "query": query, "person": person, "days": days, "hits": len(hits)}
 
 
 async def _search_queries(user_text: str, messages: list[dict[str, Any]], *, user_id: str, conversation_id: str) -> list[str]:

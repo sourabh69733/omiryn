@@ -384,12 +384,13 @@ def _groq_rate_limit_headers(response: httpx.Response) -> dict[str, str]:
     return {name: response.headers[name] for name in header_names if name in response.headers}
 
 
-# With tool_choice "auto" the model may answer or call a tool; a call comes back as this marker
-# plus {"name": ..., "arguments": {...}}, so the caller can tell it from a reply.
+# With tool_choice "auto" the model may answer or call tools; calls come back as this marker plus
+# {"calls": [{"name": ..., "arguments": {...}}]}, so the caller can tell them from a reply.
 TOOL_CALL_MARKER = "\u0000tool_call\u0000"
 
 
 def _called_tool(message: dict[str, Any]) -> str | None:
+    calls = []
     for tool_call in message.get("tool_calls") or []:
         function = tool_call.get("function") if isinstance(tool_call, dict) else None
         if not isinstance(function, dict) or not function.get("name"):
@@ -400,19 +401,32 @@ def _called_tool(message: dict[str, Any]) -> str | None:
                 arguments = json.loads(arguments or "{}")
             except ValueError:
                 arguments = {}
-        return TOOL_CALL_MARKER + json.dumps({"name": function["name"], "arguments": arguments if isinstance(arguments, dict) else {}})
-    return None
+        calls.append({"name": function["name"], "arguments": arguments if isinstance(arguments, dict) else {}})
+    return TOOL_CALL_MARKER + json.dumps({"calls": calls}) if calls else None
 
 
-def parse_tool_call(text: str) -> tuple[str, dict[str, Any]] | None:
-    """(name, arguments) when a reply call ended in a tool call, else None."""
+def parse_tool_calls(text: str) -> list[tuple[str, dict[str, Any]]]:
+    """Every (name, arguments) when a reply call ended in tool calls, else []."""
     if not isinstance(text, str) or not text.startswith(TOOL_CALL_MARKER):
-        return None
+        return []
     try:
         called = json.loads(text[len(TOOL_CALL_MARKER):])
     except ValueError:
-        return None
-    return str(called.get("name") or ""), dict(called.get("arguments") or {})
+        return []
+    if not isinstance(called, dict):
+        return []
+    calls = called.get("calls") if isinstance(called.get("calls"), list) else [called]
+    return [
+        (str(call.get("name") or ""), dict(call.get("arguments") or {}) if isinstance(call.get("arguments"), dict) else {})
+        for call in calls
+        if isinstance(call, dict) and call.get("name")
+    ]
+
+
+def parse_tool_call(text: str) -> tuple[str, dict[str, Any]] | None:
+    """The first (name, arguments) when a reply call ended in a tool call, else None."""
+    calls = parse_tool_calls(text)
+    return calls[0] if calls else None
 
 
 def _selected_tool_arguments(

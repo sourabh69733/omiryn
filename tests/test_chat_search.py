@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from agent.memory_engine.search import SEARCH_TOOL, recall_lines, search_chats, search_note
 from agent.providers.gateway.clients import TOOL_CALL_MARKER, parse_tool_call
-from agent.runtime.orchestrator import _answer_with_search
+from agent.tools import ToolContext, reply_with_tools
 from storage import reset_db, save_conversation, set_user_timezone
 
 USER_ID = "chat-search-user"
@@ -118,19 +118,24 @@ class SearchInReplyTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_search_call_is_run_and_the_reply_reads_its_lines(self) -> None:
         call = TOOL_CALL_MARKER + '{"name": "search_chats", "arguments": {"query": "shaadi", "person": "Farheen"}}'
         writer = AsyncMock(return_value="Haan, uski shaadi fix ho gayi hai.")
-        with patch("agent.runtime.orchestrator.generate_agent_reply", writer):
-            reply, info = await _answer_with_search(call, user_id=USER_ID, reply_messages=[{"role": "user", "content": "farheen ki shaadi?"}], generation_arguments={"model": "m"})
+        reply, trace = await reply_with_tools(
+            call,
+            context=ToolContext(USER_ID),
+            generate=writer,
+            reply_messages=[{"role": "user", "content": "farheen ki shaadi?"}],
+            generation_arguments={"model": "m"},
+        )
 
         self.assertEqual(reply, "Haan, uski shaadi fix ho gayi hai.")
-        self.assertEqual((info["query"], info["person"], info["hits"]), ("shaadi", "Farheen", 1))
+        [info] = trace
+        self.assertEqual((info["tool"], info["query"], info["person"], info["hits"]), ("search_chats", "shaadi", "Farheen", 1))
         note = writer.await_args.args[0][-1]
         self.assertEqual(note["role"], "system")
         self.assertIn("Farheen: my shaadi is fixed", note["content"])
-        self.assertNotIn("tools", writer.await_args.kwargs)
 
     async def test_a_plain_reply_passes_through(self) -> None:
-        reply, info = await _answer_with_search("Hey!", user_id=USER_ID, reply_messages=[], generation_arguments={})
-        self.assertEqual((reply, info), ("Hey!", None))
+        reply, trace = await reply_with_tools("Hey!", context=ToolContext(USER_ID), generate=AsyncMock(), reply_messages=[], generation_arguments={})
+        self.assertEqual((reply, trace), ("Hey!", []))
 
     def test_tool_calls_are_told_apart_from_replies(self) -> None:
         self.assertEqual(parse_tool_call(TOOL_CALL_MARKER + '{"name": "search_chats", "arguments": {"query": "x"}}'), ("search_chats", {"query": "x"}))
