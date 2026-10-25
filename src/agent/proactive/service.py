@@ -21,7 +21,7 @@ from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import _provider_messages, generate_agent_reply
 from agent.providers.shared.messages import reply_window, summarized_through
 from agent.providers.shared.model_catalog import preferred_reply_model
-from agent.runtime.orchestrator import _visible_companion_reply
+from agent.runtime.steps import visible_reply
 from agent.shared.clock import utc_now
 from agent.shared.timeline import day_part, humanize_gap, parse_time, user_zone
 from realtime import conversation_event, realtime_hub
@@ -428,7 +428,7 @@ async def _initiative_text(
             system_prompt=system_prompt,
             max_tokens=max_tokens,
         )
-        return _visible_companion_reply(raw, structured_companion_reply(raw))
+        return visible_reply(raw, structured_companion_reply(raw))
 
     text = await write(history)
     earlier = recent_assistant_replies(messages)
