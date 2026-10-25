@@ -6,7 +6,7 @@ from agent.context_engine.conversation_engine.understanding.rules import continu
 from agent.context_engine.engine import build_model_context_package
 from agent.providers.shared.config import CHAT_REPLY_WORD_LIMIT
 from agent.providers.shared.messages import _chat_reply_word_limit
-from agent.runtime.orchestrator import _turn_notes
+from agent.runtime.steps import turn_notes as _turn_notes
 from storage import reset_db, save_conversation
 
 STORY = [

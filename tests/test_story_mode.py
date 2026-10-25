@@ -9,7 +9,8 @@ import storage
 from agent.context_engine.conversation_engine.policy.replies import strip_story_end
 from agent.jobs.worker import JobWorker
 from agent.proactive.story import run_story_part_job
-from agent.runtime.orchestrator import _turn_notes, run_agent_turn
+from agent.runtime.orchestrator import run_agent_turn
+from agent.runtime.steps import turn_notes as _turn_notes
 from agent.runtime.story_mode import (
     STORY_PART_JOB,
     auto_parts_since_user,

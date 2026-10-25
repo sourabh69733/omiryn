@@ -9,7 +9,8 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from fastapi.testclient import TestClient
 
-from agent.runtime.orchestrator import AgentTurnResult, _turn_notes
+from agent.runtime.orchestrator import AgentTurnResult
+from agent.runtime.steps import turn_notes as _turn_notes
 from agent.shared.clock import utc_now
 from api.main import app, current_user
 from api.routes import telegram as telegram_routes

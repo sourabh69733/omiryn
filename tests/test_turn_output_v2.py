@@ -5,10 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.contracts.models import ModelContextPackage
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
-from agent.runtime.orchestrator import (
-    _visible_companion_reply,
-    run_agent_turn,
-)
+from agent.runtime.orchestrator import run_agent_turn
+from agent.runtime.steps import visible_reply as _visible_companion_reply
 from agent.memory_engine.data_points.extraction.inline import (
     TURN_OUTPUT_V2_TOOLS,
     parse_turn_output_v2,
