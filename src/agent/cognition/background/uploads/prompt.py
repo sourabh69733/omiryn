@@ -7,7 +7,7 @@ user, facts about the other person, plans and how the two talk. The merge joins 
 digest. Answers cite message indexes; code joins proof and dates, so the models write little.
 """
 
-from agent.cognition.background.prompt_v3 import USER_CARD_RULES
+from agent.cognition.background.memory_run.prompt_v3 import USER_CARD_RULES
 from agent.memory_engine.memories.taxonomy import V3_MEMORY_TAXONOMY_GUIDANCE, V3_MEMORY_VALUE_GUIDANCE
 from agent.memory_engine.memories.vibe import VIBE_LINE_RULES
 

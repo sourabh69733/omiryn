@@ -1,6 +1,6 @@
 """The prompt that rewrites the user card from all memories (see card_rebuild)."""
 
-from agent.cognition.background.prompt_v3 import USER_CARD_RULES
+from agent.cognition.background.memory_run.prompt_v3 import USER_CARD_RULES
 
 CARD_REBUILD_SYSTEM_PROMPT = """You write the user's card from scratch, from what their companion knows
 about them. Return one JSON object only: {"user_card": "one fact per line"}.

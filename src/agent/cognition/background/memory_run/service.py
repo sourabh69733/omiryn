@@ -16,7 +16,7 @@ from agent.context_engine.conversation_engine.state import (
     apply_validated_thread_proposal,
     background_thread_candidates,
 )
-from agent.cognition.background.prompt import background_cognition_prompt
+from agent.cognition.background.memory_run.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import (
     attach_agent_usage_result,
@@ -38,7 +38,7 @@ from storage.user_cards import set_user_card
 from agent.memory_engine.memories.focus import without_focus_lines
 from agent.memory_engine.memories.user_card import without_replaced_lines
 from storage.vibe_cards import get_vibe_card, update_vibe_card
-from agent.cognition.background.vibe_verify import stored_quote_lookup, verify_vibe_updates
+from agent.cognition.background.vibe.verify import stored_quote_lookup, verify_vibe_updates
 from agent.memory_engine.memories.vibe import with_current_proof
 from agent.memory_engine.memories.vibe import rejected_texts, vibe_texts
 from realtime import conversation_event, realtime_hub
@@ -77,7 +77,7 @@ from agent.memory_engine.processing.service import (
     save_processing_state,
 )
 from agent.memory_engine.processing.validation import MemoryAnalysis
-from .coordination import interpret_background_cognition
+from agent.cognition.background.memory_run.coordination import interpret_background_cognition
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.validation import validate_memory_analysis
 from agent.shared.utils import unknown_fields
 
-from .models import BackgroundCognitionAnalysis
+from agent.cognition.background.models import BackgroundCognitionAnalysis
 
 
 def interpret_background_cognition(

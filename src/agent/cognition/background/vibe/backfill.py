@@ -19,7 +19,7 @@ from agent.memory_engine.memories.vibe import (
     vibe_progress,
     with_current_proof,
 )
-from agent.cognition.background.vibe_verify import stored_quote_lookup, verify_vibe_updates
+from agent.cognition.background.vibe.verify import stored_quote_lookup, verify_vibe_updates
 from agent.providers import analyze_vibe_backfill
 from storage import get_vibe_card, list_conversations, update_vibe_card
 

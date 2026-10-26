@@ -23,7 +23,7 @@ from agent.shared.timeline import parse_time, user_zone
 from storage import get_user_card, get_user_timezone, list_agent_memories
 from storage.user_cards import card_rebuilt_at, set_user_card
 
-from .card_rebuild_prompt import CARD_REBUILD_SYSTEM_PROMPT
+from agent.cognition.background.cards.prompt import CARD_REBUILD_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

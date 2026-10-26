@@ -45,9 +45,9 @@ from storage.upload_digests import save_upload_digest
 from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card
 
-from .person_card import build_person_card
-from .service import _apply_vibe, _context_overlap, _existing_memory_context, _replaced_memory_ids, _timeout_seconds
-from .upload_notes import (
+from agent.cognition.background.uploads.person_card import build_person_card
+from agent.cognition.background.memory_run.service import _apply_vibe, _context_overlap, _existing_memory_context, _replaced_memory_ids, _timeout_seconds
+from agent.cognition.background.uploads.notes import (
     Gathered,
     PartNotes,
     build_digest,

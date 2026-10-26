@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from agent.providers import analyze_person_part
 from agent.shared.timeline import parse_time
 
-from .upload_prompt import PERSON_CARD_CATEGORIES
+from agent.cognition.background.uploads.prompt import PERSON_CARD_CATEGORIES
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from agent.memory_engine.processing import get_processing_state
 from storage import list_conversations, reset_memory_processing_state
 from storage.profile_facts import list_data_point_extraction_debug
 
-from .service import has_pending_background_cognition, run_background_cognition
+from agent.cognition.background.memory_run.service import has_pending_background_cognition, run_background_cognition
 
 V3_EXTRACTOR = "background_cognition_v3"
 # One run handles one bounded batch; a long chat needs several.

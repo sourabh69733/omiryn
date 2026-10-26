@@ -16,7 +16,7 @@ from ingestion.upload_chat import notes_upload_messages, whatsapp_upload_message
 from storage import get_user_timezone, save_conversation
 from storage.context_sources import update_context_source_metadata
 
-from .idle import request_flush_now
+from agent.cognition.background.idle import request_flush_now
 
 
 def learn_from_whatsapp_upload(user_id: str, source_id: str, export_text: str, user_sender: str | None) -> str:

@@ -17,11 +17,11 @@ from storage import get_conversation, list_conversations
 
 from agent.memory_engine.search import index_chat
 
-from .card_rebuild import schedule_card_rebuild
+from agent.cognition.background.cards.rebuild import schedule_card_rebuild
 from agent.shared.clock import utc_now_iso
 
-from .upload_read import mark_upload_progress, read_upload
-from .service import (
+from agent.cognition.background.uploads.read import mark_upload_progress, read_upload
+from agent.cognition.background.memory_run.service import (
     background_cognition_enabled,
     has_pending_background_cognition,
     run_background_cognition,

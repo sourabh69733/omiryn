@@ -23,7 +23,7 @@ from agent.memory_engine.memories.vibe import VIBE_AREAS, validate_vibe_updates
 from agent.memory_engine.processing.models import MemoryBatch
 from agent.shared.timeline import parse_time
 
-from .coordination import _user_message_resolver
+from agent.cognition.background.memory_run.coordination import _user_message_resolver
 
 MAX_THREADS = 12
 _TEXT_LIMITS = {"title": 80, "summary": 400, "user_view": 300, "other_view": 300, "fact": 240, "what": 200, "when": 40}
