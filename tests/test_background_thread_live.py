@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent.cognition.background.memory_run.service import run_background_cognition
-from agent.context_engine.conversation_engine.state import list_threads
+from agent.context_engine.threads import list_threads
 from agent.memory_engine.processing import get_processing_state
 from storage import reset_db, save_conversation
 

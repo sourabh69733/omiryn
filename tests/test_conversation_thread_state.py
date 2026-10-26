@@ -7,9 +7,9 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from agent.context_engine.engine import build_model_context_package
-from agent.context_engine.conversation_engine.state import context as thread_context
-from agent.context_engine.conversation_engine.state import shadow as thread_shadow
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.threads import context as thread_context
+from agent.context_engine.threads import shadow as thread_shadow
+from agent.context_engine.threads import (
     ConversationState,
     ConversationStateConflictError,
     ConversationStateValidationError,

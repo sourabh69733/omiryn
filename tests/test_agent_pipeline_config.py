@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from agent.config import agent_pipeline_config
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.threads import (
     conversation_state_shadow_enabled,
     conversation_state_v2_enabled,
 )

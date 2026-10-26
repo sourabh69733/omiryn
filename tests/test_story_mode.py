@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 import storage
-from agent.context_engine.conversation_engine.policy.replies import strip_story_end
+from agent.context_engine.policy.replies import strip_story_end
 from agent.jobs.worker import JobWorker
 from agent.proactive.story import run_story_part_job
 from agent.runtime.orchestrator import run_agent_turn
@@ -34,7 +34,7 @@ def _auto(part: int, content: str = "The boat came closer.") -> dict:
 
 class StoryPolicyTest(unittest.TestCase):
     def test_story_marker_is_found_and_removed(self) -> None:
-        from agent.context_engine.conversation_engine.policy.replies import strip_story_marker
+        from agent.context_engine.policy.replies import strip_story_marker
 
         self.assertEqual(strip_story_marker("<story>Once upon a time"), ("Once upon a time", True))
         self.assertEqual(strip_story_marker("[STORY] Once"), ("Once", True))
@@ -43,7 +43,7 @@ class StoryPolicyTest(unittest.TestCase):
         self.assertEqual(strip_story_marker("The end. <story_end>"), ("The end. <story_end>", False))
 
     def test_a_copied_time_note_is_hidden_but_a_time_in_the_text_stays(self) -> None:
-        from agent.context_engine.conversation_engine.policy import split_assistant_reply
+        from agent.context_engine.policy import split_assistant_reply
 
         self.assertEqual(split_assistant_reply("(9:00 am) Chalo, gym today?"), ["Chalo, gym today?"])
         self.assertEqual(

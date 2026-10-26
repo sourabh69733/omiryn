@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.context_engine.conversation_engine.policy.requests import broken_requests, how_to_talk_requests
+from agent.context_engine.policy.requests import broken_requests, how_to_talk_requests
 from agent.runtime.steps import ReplyJob, follow_requests
 
 SOURCES = [

@@ -3,11 +3,11 @@
 import unittest
 
 from agent.context_engine.contracts.models import ThreadGuidance, ThreadReference
-from agent.context_engine.conversation_engine.planning import (
+from agent.context_engine.planning import (
     build_conversation_plan,
     hold_old_topics_while_a_question_is_open,
 )
-from agent.context_engine.conversation_engine.understanding.rules.intent import context_query_intent
+from agent.context_engine.understanding.rules.intent import context_query_intent
 from agent.context_engine.prompt_engine.modules.conversation_flow import conversation_plan_prompt
 
 OLD_TOPIC = ThreadGuidance(

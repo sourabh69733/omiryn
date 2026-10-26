@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from agent.context_engine.engine import build_model_context_package
-from agent.context_engine.conversation_engine.planning import build_conversation_plan
+from agent.context_engine.planning import build_conversation_plan
 from agent.context_engine.contracts.models import ContextQueryIntent, ConversationalStance, EmotionState
 from agent.context_engine.assembly.matching import (
     MATCHING_DIMENSIONS,

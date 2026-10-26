@@ -3,8 +3,8 @@ import unittest
 from unittest.mock import patch
 
 from agent.context_engine.contracts.models import ConversationPlan
-from agent.context_engine.conversation_engine.planning import apply_question_cooldown
-from agent.context_engine.conversation_engine.planning.planner import recent_question_streak
+from agent.context_engine.planning import apply_question_cooldown
+from agent.context_engine.planning.planner import recent_question_streak
 from agent.context_engine.engine import build_model_context_package
 from storage import reset_db, save_conversation
 

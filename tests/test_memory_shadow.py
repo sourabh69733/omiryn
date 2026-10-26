@@ -7,7 +7,7 @@ import unittest
 import json
 from unittest.mock import AsyncMock, patch
 
-from agent.context_engine.conversation_engine.state import create_thread, get_thread
+from agent.context_engine.threads import create_thread, get_thread
 from agent.memory_engine.processing import MemoryHandoff, MemoryProcessingState, build_memory_batch
 from agent.cognition.background.memory_run.service import (
     run_background_cognition,

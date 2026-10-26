@@ -49,7 +49,7 @@ from agent.evals.behavior.reporting.writer import (
 )
 from agent.evals.behavior.simulation.runtime import RuntimeDriverConfig, RuntimeScenarioDriver
 from agent.evals.behavior.core.scenarios import COMPANION_BEHAVIOR_SCENARIOS
-from agent.context_engine.conversation_engine.policy import direct_turn_reply
+from agent.context_engine.policy import direct_turn_reply
 from storage import reset_db
 from storage import list_agent_eval_case_results, list_agent_eval_runs
 

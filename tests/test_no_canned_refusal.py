@@ -2,8 +2,8 @@
 
 import unittest
 
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
-from agent.context_engine.conversation_engine.policy.freshness import stale_reply_reason
+from agent.context_engine.policy import split_assistant_reply
+from agent.context_engine.policy.freshness import stale_reply_reason
 
 
 class NoCannedRefusalTest(unittest.TestCase):

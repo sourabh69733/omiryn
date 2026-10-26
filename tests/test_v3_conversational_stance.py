@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from agent.context_engine.conversation_engine.planning import build_conversation_plan
-from agent.context_engine.conversation_engine.understanding.rules import (
+from agent.context_engine.planning import build_conversation_plan
+from agent.context_engine.understanding.rules import (
     analyze_conversational_stance,
     context_query_intent,
 )

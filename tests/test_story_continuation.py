@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from agent.context_engine.conversation_engine.understanding.rules import continues_story
+from agent.context_engine.understanding.rules import continues_story
 from agent.context_engine.engine import build_model_context_package
 from agent.providers.shared.config import CHAT_REPLY_WORD_LIMIT
 from agent.providers.shared.messages import _chat_reply_word_limit

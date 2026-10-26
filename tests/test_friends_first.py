@@ -12,8 +12,8 @@ from agent.context_engine.contracts.models import (
     ThreadGuidance,
     ThreadReference,
 )
-from agent.context_engine.conversation_engine.planning import build_conversation_plan
-from agent.context_engine.conversation_engine.planning.planner import COMMON_STARTER_TOPIC_POLICY
+from agent.context_engine.planning import build_conversation_plan
+from agent.context_engine.planning.planner import COMMON_STARTER_TOPIC_POLICY
 from agent.context_engine.prompt_engine.modules.boredom_recovery import boredom_recovery_prompt
 from agent.context_engine.prompt_engine.modules.safety import safety_module_prompt
 from agent.context_engine.contracts.models import ConversationPlan

@@ -1,6 +1,6 @@
 import unittest
 
-from agent.context_engine.conversation_engine.policy.replies import (
+from agent.context_engine.policy.replies import (
     MAX_REPLY_PARTS,
     REPLY_PART_SEPARATOR,
     split_assistant_reply,

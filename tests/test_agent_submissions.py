@@ -36,7 +36,7 @@ from agent.providers import (
 )
 from agent.runtime.orchestrator import AgentTurnResult
 from agent.providers.shared.usage_events import _record_usage_event
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
+from agent.context_engine.policy import split_assistant_reply
 from agent.observability.usage import PROFILE_SIGNAL_BACKFILL
 from security.auth import CurrentUser
 from ingestion.whatsapp import (

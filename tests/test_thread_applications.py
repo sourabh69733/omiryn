@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import unittest
 
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.threads import (
     ConversationState,
     create_thread,
     evaluate_thread_operation_shadow,
@@ -297,7 +297,7 @@ class ThreadApplicationTest(unittest.TestCase):
 
     def _application_function(self):
         module = importlib.import_module(
-            "agent.context_engine.conversation_engine.state.application"
+            "agent.context_engine.threads.application"
         )
         function = getattr(module, "apply_validated_thread_proposal", None)
         self.assertTrue(callable(function), "apply_validated_thread_proposal is missing")

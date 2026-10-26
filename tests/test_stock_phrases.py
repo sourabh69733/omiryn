@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent.context_engine.conversation_engine.policy.freshness import stale_reply_reason
-from agent.context_engine.conversation_engine.policy.stock_phrases import (
+from agent.context_engine.policy.freshness import stale_reply_reason
+from agent.context_engine.policy.stock_phrases import (
     STOCK_PHRASES,
     find_stock_lines,
     learned_stock_phrases,

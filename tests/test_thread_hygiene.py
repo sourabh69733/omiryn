@@ -10,12 +10,12 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
-from agent.context_engine.conversation_engine.state import create_thread, get_thread, list_threads
-from agent.context_engine.conversation_engine.state.context import (
+from agent.context_engine.threads import create_thread, get_thread, list_threads
+from agent.context_engine.threads.context import (
     _carries_across_chats,
     conversation_thread_guidance,
 )
-from agent.context_engine.conversation_engine.state.shadow import evaluate_thread_operation_shadow
+from agent.context_engine.threads.shadow import evaluate_thread_operation_shadow
 from storage import (
     delete_conversation,
     prune_threads_from_missing_chats,

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import storage
-from agent.context_engine.conversation_engine.state.models import ConversationThread
+from agent.context_engine.threads.models import ConversationThread
 from agent.proactive import nudge_block_reason, pick_thread, run_proactive_pass
 from realtime import realtime_hub
 

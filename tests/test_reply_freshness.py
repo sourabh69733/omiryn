@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.context_engine.conversation_engine.policy.freshness import (
+from agent.context_engine.policy.freshness import (
     question_rule_reason,
     recent_assistant_replies,
     rewrite_instruction,

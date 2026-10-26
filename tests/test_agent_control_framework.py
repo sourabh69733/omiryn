@@ -27,12 +27,12 @@ from agent.context_engine.prompt_engine.builder import (
     build_companion_system_prompt,
     context_sources_text,
 )
-from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
+from agent.context_engine.personalization import style_adaptation_guide
 from agent.memory_engine.data_points.extraction.whatsapp_rules import (
     extract_whatsapp_data_point_candidates,
     extract_whatsapp_data_points,
 )
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
+from agent.context_engine.policy import split_assistant_reply
 from agent.providers import _deep_fact_extraction_text
 from api.main import app
 from ingestion.whatsapp import build_whatsapp_structured_memory

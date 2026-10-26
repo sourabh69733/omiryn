@@ -13,8 +13,8 @@ from agent.context_engine.contracts.models import (
     ThreadGuidance,
     ThreadReference,
 )
-from agent.context_engine.conversation_engine.planning import build_conversation_plan
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.planning import build_conversation_plan
+from agent.context_engine.threads import (
     ConversationState,
     create_thread,
     save_state,

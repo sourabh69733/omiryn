@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from agent.context_engine.conversation_engine.policy.replies import strip_voice_marker
+from agent.context_engine.policy.replies import strip_voice_marker
 from agent.context_engine.engine import build_model_context_package
 from agent.runtime.orchestrator import run_agent_turn
 from api.main import app, current_user
