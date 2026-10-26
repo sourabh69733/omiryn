@@ -13,16 +13,16 @@ from agent.memory_engine.data_points.extraction.prompts import (
     DEEP_FACT_EXTRACTION_SYSTEM_PROMPT,
 )
 from agent.memory_engine.processing.prompt import MEMORY_BACKGROUND_V2_SYSTEM_PROMPT
-from agent.cognition.background.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.upload_prompt import (
+from agent.cognition.background.memory_run.prompt import BACKGROUND_COGNITION_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.uploads.prompt import (
     PERSON_CARD_SYSTEM_PROMPT,
     SEARCH_QUERIES_SYSTEM_PROMPT,
     UPLOAD_MERGE_SYSTEM_PROMPT,
     UPLOAD_PART_SYSTEM_PROMPT,
 )
-from agent.cognition.background.card_rebuild_prompt import CARD_REBUILD_SYSTEM_PROMPT
-from agent.cognition.background.vibe_prompt import (
+from agent.cognition.background.cards.prompt import CARD_REBUILD_SYSTEM_PROMPT
+from agent.cognition.background.vibe.prompt import (
     VIBE_BACKFILL_SYSTEM_PROMPT,
     VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,

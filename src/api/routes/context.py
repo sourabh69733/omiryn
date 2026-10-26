@@ -14,7 +14,7 @@ from agent.memory_engine.data_points import normalize_data_point
 from agent.memory_engine.data_points.extraction.whatsapp_rules import extract_whatsapp_data_points
 from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_style_summary
 from security.auth import CurrentUser, require_user
-from agent.cognition.background.uploads import learn_from_notes_upload, learn_from_whatsapp_upload
+from agent.cognition.background.uploads.hidden_chat import learn_from_notes_upload, learn_from_whatsapp_upload
 from storage.context_sources import get_context_source_metadata
 from storage.upload_digests import delete_upload_digest
 from storage.conversations import delete_import_conversations

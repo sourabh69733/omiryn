@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from storage import (
     create_agent_memory,
     list_agent_memories,

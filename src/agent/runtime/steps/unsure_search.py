@@ -45,7 +45,7 @@ async def search_when_unsure(draft: str, job: ReplyJob, *, extra_queries: list[s
 async def search_queries(job: ReplyJob) -> list[str]:
     """Searches written by a fast model: the words the answer would use ("relationship status" ->
     engaged, shaadi, boyfriend). Empty when it fails; the plain question is searched anyway."""
-    from agent.cognition.background.upload_read import upload_model
+    from agent.cognition.background.uploads.read import upload_model
 
     people = [stored["partner_name"] for stored in list_upload_digests(str(job.user_id)) if stored["partner_name"]]
     recent = [f'{m.get("role")}: {str(m.get("content") or "")[:200]}' for m in job.history[-4:]]

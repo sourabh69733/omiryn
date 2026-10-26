@@ -5,7 +5,7 @@ The user's own lines are role "user" (the only lines that can prove a memory); e
 are role "other" with their name, as context only. Quick bursts from one person are merged into
 one message, and links, emails and phone numbers are masked. Up to MAX_UPLOAD_MESSAGES (the newest)
 are stored, so search can find things said months ago; reading the upload for memories and its
-digest covers only the newest part (see agent.cognition.background.upload_read).
+digest covers only the newest part (see agent.cognition.background.uploads.read).
 """
 
 from __future__ import annotations

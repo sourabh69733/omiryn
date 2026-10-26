@@ -10,8 +10,8 @@ from uuid import uuid4
 
 from agent.evals.behavior.core.events import EventSink, emit_event
 from agent.memory_engine.processing import MemoryProcessingState, build_memory_batch
-from agent.cognition.background.coordination import interpret_background_cognition
-from agent.cognition.background.prompt import background_cognition_prompt
+from agent.cognition.background.memory_run.coordination import interpret_background_cognition
+from agent.cognition.background.memory_run.prompt import background_cognition_prompt
 from agent.providers import analyze_background_cognition
 from storage import save_conversation
 

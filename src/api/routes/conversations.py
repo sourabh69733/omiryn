@@ -16,7 +16,7 @@ from agent.memory_engine.engine import (
 from agent.cognition.background.idle import request_flush_now, schedule_idle_flush
 from agent.feedback.rating_memory import sync_rating_memories
 from agent.providers.shared.model_catalog import preferred_reply_model
-from agent.cognition.background.service import (
+from agent.cognition.background.memory_run.service import (
     run_background_cognition,
     should_schedule_background_cognition,
     should_schedule_idle_background_cognition,

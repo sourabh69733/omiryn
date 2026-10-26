@@ -17,7 +17,7 @@ from datetime import timedelta
 from typing import Any, Callable
 from uuid import uuid4
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.runtime.orchestrator import run_agent_turn
 from agent.shared.clock import utc_now
 from storage import create_agent_memory, list_agent_memories, save_conversation, set_user_timezone

@@ -21,7 +21,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.memory_engine.processing.models import MemoryHandoff, MemoryProcessingState
 from agent.memory_engine.processing.service import get_processing_state, save_processing_state
 from agent.proactive.service import greet_on_return

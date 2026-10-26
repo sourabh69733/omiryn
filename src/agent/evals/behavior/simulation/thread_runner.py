@@ -19,7 +19,7 @@ from agent.evals.behavior.simulation.thread_scenario import (
     ExpectedThreadAction,
     ThreadManagementScenario,
 )
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.runtime.orchestrator import run_agent_turn
 from storage import (
     list_data_point_extraction_debug,

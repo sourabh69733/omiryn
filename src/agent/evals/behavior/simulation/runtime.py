@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from agent.evals.behavior.core.events import EventSink, emit_event
 from agent.evals.behavior.core.models import BehaviorScenario, ObservedTurn, ScenarioTurn
-from agent.cognition.background.service import (
+from agent.cognition.background.memory_run.service import (
     has_pending_background_cognition,
     run_background_cognition,
 )

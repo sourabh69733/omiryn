@@ -8,8 +8,8 @@ from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from agent.cognition.background.coordination import interpret_background_cognition
-from agent.cognition.background.prompt import background_cognition_prompt
+from agent.cognition.background.memory_run.coordination import interpret_background_cognition
+from agent.cognition.background.memory_run.prompt import background_cognition_prompt
 from agent.evals.behavior.core.events import EventSink, emit_event
 from agent.evals.memory.judge import MemoryEvidenceJudge, memory_evidence_judgment_payload
 from agent.memory_engine.memories.operations import (

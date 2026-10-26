@@ -20,7 +20,7 @@ from typing import Any
 from uuid import uuid4
 
 from agent.cognition.background.idle import run_memory_flush_job
-from agent.cognition.background.uploads import learn_from_whatsapp_upload
+from agent.cognition.background.uploads.hidden_chat import learn_from_whatsapp_upload
 from agent.runtime.orchestrator import run_agent_turn
 from storage import list_agent_memories, save_conversation, set_user_timezone
 from storage.context_sources import get_context_source_metadata, save_context_source
