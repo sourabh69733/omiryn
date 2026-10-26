@@ -2,7 +2,7 @@
 """Find companion lines repeated across many different chats: stock lines that fit any message.
 
 Prints what it finds; --write adds them to the reviewable list in
-src/agent/context_engine/conversation_engine/policy/stock_phrases.json, which the reply check
+src/agent/context_engine/policy/stock_phrases.json, which the reply check
 and the evals read. Only counts are computed; user messages are never read into the list.
 """
 
@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlalchemy import select  # noqa: E402
 
-from agent.context_engine.conversation_engine.policy.stock_phrases import (  # noqa: E402
+from agent.context_engine.policy.stock_phrases import (  # noqa: E402
     DEFAULT_MIN_CONVERSATIONS,
     STOCK_PHRASES,
     find_stock_lines,
