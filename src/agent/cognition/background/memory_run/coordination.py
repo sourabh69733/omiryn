@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.conversation_engine.state import evaluate_thread_operation_shadow
+from agent.context_engine.threads import evaluate_thread_operation_shadow
 from agent.memory_engine.processing.models import MemoryBatch
 from agent.memory_engine.memories.open_questions import OpenQuestionChanges, validate_open_questions
 from agent.memory_engine.memories.self_notes import SelfNoteChanges, validate_self_notes

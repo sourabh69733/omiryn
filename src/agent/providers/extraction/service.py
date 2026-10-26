@@ -27,7 +27,7 @@ from agent.cognition.background.vibe.prompt import (
     VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,
 )
-from agent.context_engine.conversation_engine.policy.requests import REQUEST_CHECK_SYSTEM_PROMPT
+from agent.context_engine.policy.requests import REQUEST_CHECK_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
 from agent.observability.usage import (

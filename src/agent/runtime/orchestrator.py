@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.config import agent_pipeline_config
-from agent.context_engine.conversation_engine.policy import direct_turn_reply
-from agent.context_engine.conversation_engine.policy.freshness import recent_assistant_replies
-from agent.context_engine.conversation_engine.policy.requests import how_to_talk_requests
+from agent.context_engine.policy import direct_turn_reply
+from agent.context_engine.policy.freshness import recent_assistant_replies
+from agent.context_engine.policy.requests import how_to_talk_requests
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.memory_engine.memories.embeddings import embed_memory_query, memory_query_text

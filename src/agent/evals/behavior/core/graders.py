@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from agent.context_engine.conversation_engine.policy.freshness import STOCK_PHRASES
+from agent.context_engine.policy.freshness import STOCK_PHRASES
 from agent.context_engine.shared.text import normalized_memory_text
 from agent.evals.behavior.core.models import (
     BehaviorScenario,

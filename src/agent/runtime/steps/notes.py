@@ -3,7 +3,7 @@ more reliably than rules in the prompt."""
 
 from __future__ import annotations
 
-from agent.context_engine.conversation_engine.policy.replies import STORY_END_MARKER, STORY_MARKER, STORY_NOTE_PREFIX
+from agent.context_engine.policy.replies import STORY_END_MARKER, STORY_MARKER, STORY_NOTE_PREFIX
 from agent.runtime.story_mode import story_autoplay_enabled
 
 _NO_QUESTION_NOTE = "For this reply: react to what the user said or share a thought. Do not ask any question."

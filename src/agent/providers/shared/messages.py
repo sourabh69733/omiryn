@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy.replies import (
+from agent.context_engine.policy.replies import (
     MAX_REPLY_PARTS,
     REPLY_PART_SEPARATOR,
     REPLY_PART_WORD_LIMIT,

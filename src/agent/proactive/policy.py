@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from agent.context_engine.conversation_engine.state.models import ConversationThread
+from agent.context_engine.threads.models import ConversationThread
 from agent.shared.timeline import session_gap
 
 

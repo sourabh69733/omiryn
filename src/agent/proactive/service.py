@@ -8,14 +8,14 @@ import os
 from datetime import datetime
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
-from agent.context_engine.conversation_engine.policy.freshness import (
+from agent.context_engine.policy import split_assistant_reply
+from agent.context_engine.policy.freshness import (
     recent_assistant_replies,
     rewrite_instruction,
     stale_reply_reason,
     without_copied_replies,
 )
-from agent.context_engine.conversation_engine.state.service import list_threads
+from agent.context_engine.threads.service import list_threads
 from agent.context_engine.engine import build_model_context_package
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import _provider_messages, generate_agent_reply

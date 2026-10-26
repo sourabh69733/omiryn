@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
-from agent.context_engine.conversation_engine.policy.replies import strip_story_end, strip_story_marker, strip_voice_marker
+from agent.context_engine.policy import split_assistant_reply
+from agent.context_engine.policy.replies import strip_story_end, strip_story_marker, strip_voice_marker
 from agent.context_engine.state.turn import assistant_turn_state
 
 

@@ -12,7 +12,7 @@ from typing import Any
 from agent.config import agent_pipeline_config
 from agent.shared.timeline import date_label, user_zone
 from agent.observability.usage import BACKGROUND_COGNITION, MEMORY_SHADOW_EXTRACT
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.threads import (
     apply_validated_thread_proposal,
     background_thread_candidates,
 )

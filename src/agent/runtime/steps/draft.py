@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy.unknown import says_unknown
+from agent.context_engine.policy.unknown import says_unknown
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import AgentProviderTruncationError
 from agent.tools import ToolContext, chat_search_enabled, reply_with_tools, tool_arguments

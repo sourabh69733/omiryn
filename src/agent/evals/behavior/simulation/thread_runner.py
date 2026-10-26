@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 from uuid import uuid4
 
-from agent.context_engine.conversation_engine.state import (
+from agent.context_engine.threads import (
     ConversationState,
     create_thread,
     save_state,

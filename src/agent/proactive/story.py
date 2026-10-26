@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy import split_assistant_reply
-from agent.context_engine.conversation_engine.policy.replies import (
+from agent.context_engine.policy import split_assistant_reply
+from agent.context_engine.policy.replies import (
     STORY_END_MARKER,
     strip_story_end,
     strip_story_marker,

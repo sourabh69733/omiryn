@@ -6,14 +6,14 @@ from __future__ import annotations
 import os
 from typing import Any, Awaitable, Callable
 
-from agent.context_engine.conversation_engine.policy.freshness import (
+from agent.context_engine.policy.freshness import (
     question_rule_reason,
     rewrite_instruction,
     stale_reply_reason,
     trim_questions,
     without_copied_replies,
 )
-from agent.context_engine.conversation_engine.policy.requests import (
+from agent.context_engine.policy.requests import (
     broken_requests,
     broken_requests_reason,
     request_check_input,
