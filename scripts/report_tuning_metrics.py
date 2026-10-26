@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlalchemy import select  # noqa: E402
 
-from agent.cognition.background.service import _timeout_seconds as background_timeout  # noqa: E402
+from agent.cognition.background.memory_run.service import _timeout_seconds as background_timeout  # noqa: E402
 from agent.context_engine.conversation_engine.policy.replies import MAX_REPLY_PARTS  # noqa: E402
 from agent.observability.tuning import (  # noqa: E402
     bubble_report,

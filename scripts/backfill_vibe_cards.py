@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agent.cognition.background.vibe_backfill import backfill_user_vibe, recheck_user_vibe  # noqa: E402
+from agent.cognition.background.vibe.backfill import backfill_user_vibe, recheck_user_vibe  # noqa: E402
 from storage import init_db, list_conversation_user_ids  # noqa: E402
 
 

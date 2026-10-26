@@ -21,7 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agent.cognition.background.reprocess import chats_needing_v3, reprocess_conversation  # noqa: E402
+from agent.cognition.background.memory_run.reprocess import chats_needing_v3, reprocess_conversation  # noqa: E402
 from storage import get_conversation, init_db, list_conversation_user_ids  # noqa: E402
 
 

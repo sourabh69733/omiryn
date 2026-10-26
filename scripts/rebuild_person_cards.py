@@ -20,8 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agent.cognition.background.person_card import build_person_card  # noqa: E402
-from agent.cognition.background.upload_read import upload_model  # noqa: E402
+from agent.cognition.background.uploads.person_card import build_person_card  # noqa: E402
+from agent.cognition.background.uploads.read import upload_model  # noqa: E402
 from agent.shared.timeline import user_zone  # noqa: E402
 from storage import get_conversation, get_user_timezone, init_db  # noqa: E402
 from storage.upload_digests import list_upload_digests, save_upload_digest  # noqa: E402
