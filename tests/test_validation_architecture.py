@@ -35,7 +35,7 @@ class ValidationArchitectureTest(unittest.TestCase):
         self.assertNotIn("storage", source)
 
     def test_background_service_owns_cross_domain_orchestration(self) -> None:
-        service = AGENT_ROOT / "cognition" / "background" / "service.py"
+        service = AGENT_ROOT / "cognition" / "background" / "memory_run" / "service.py"
         source = service.read_text(encoding="utf-8")
         api_source = (
             PROJECT_ROOT / "src" / "api" / "routes" / "conversations.py"

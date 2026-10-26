@@ -32,7 +32,7 @@ class BackgroundCognitionTest(unittest.TestCase):
         )
 
     def test_prompt_contains_one_shared_batch_with_memory_and_thread_candidates(self) -> None:
-        module = importlib.import_module("agent.cognition.background.prompt")
+        module = importlib.import_module("agent.cognition.background.memory_run.prompt")
         function = getattr(module, "background_cognition_prompt", None)
         self.assertTrue(callable(function), "background_cognition_prompt is missing")
         batch = self._batch()
@@ -67,7 +67,7 @@ class BackgroundCognitionTest(unittest.TestCase):
             summary="The user is considering changing careers.",
             origin="user_started",
         )
-        module = importlib.import_module("agent.cognition.background.coordination")
+        module = importlib.import_module("agent.cognition.background.memory_run.coordination")
         function = getattr(module, "interpret_background_cognition", None)
         self.assertTrue(
             callable(function), "interpret_background_cognition is missing"
@@ -85,7 +85,7 @@ class BackgroundCognitionTest(unittest.TestCase):
         self.assertEqual(result.thread_operation, "continue")
 
     def test_invalid_thread_lane_does_not_invalidate_valid_memory_lane(self) -> None:
-        module = importlib.import_module("agent.cognition.background.coordination")
+        module = importlib.import_module("agent.cognition.background.memory_run.coordination")
         function = getattr(module, "interpret_background_cognition", None)
         self.assertTrue(
             callable(function), "interpret_background_cognition is missing"

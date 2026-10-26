@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.memory_engine.memories.vibe import BASIC_AREA_IDS
 from storage import get_vibe_card, reset_db, save_conversation, update_vibe_card
 from storage.user_deletion import delete_user_private_data
@@ -70,11 +70,11 @@ class VibeFlowTest(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, vibe: object) -> tuple[AsyncMock, AsyncMock]:
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=_response(vibe),
         ) as provider, patch(
-            "agent.cognition.background.service.realtime_hub.publish", new_callable=AsyncMock
+            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
         ) as publish:
             result = await run_background_cognition(CONVERSATION_ID, USER_ID, MESSAGES)
         self.assertNotIn(result["status"], {"live_invalid", "live_error"}, result)

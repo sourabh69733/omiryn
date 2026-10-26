@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from agent.cognition.background.idle import run_memory_flush_job
-from agent.cognition.background.upload_notes import Gathered, check_part, merged_memories
-from agent.cognition.background.upload_read import card_lines, merge_vibe, upload_parts
-from agent.cognition.background.uploads import learn_from_whatsapp_upload
+from agent.cognition.background.uploads.notes import Gathered, check_part, merged_memories
+from agent.cognition.background.uploads.read import card_lines, merge_vibe, upload_parts
+from agent.cognition.background.uploads.hidden_chat import learn_from_whatsapp_upload
 from agent.memory_engine.memories.models import MemoryKind, MemoryPurpose, MemorySensitivity
 from agent.memory_engine.memories.operations import MemoryAddProposal, MemoryReinforceProposal
 from api.main import app, current_user
@@ -83,7 +83,7 @@ class BusyProviderTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_busy_model_is_retried_with_waits_then_the_background_model(self) -> None:
         from zoneinfo import ZoneInfo
 
-        from agent.cognition.background import upload_read
+        from agent.cognition.background.uploads import read as upload_read
 
         part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
         answer = {"threads": [{"title": "Trekking", "summary": "Loves treks.", "lines": [0]}]}
@@ -98,7 +98,7 @@ class BusyProviderTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_part_that_comes_back_empty_is_read_by_the_other_model(self) -> None:
         from zoneinfo import ZoneInfo
 
-        from agent.cognition.background import upload_read
+        from agent.cognition.background.uploads import read as upload_read
 
         part = upload_parts("c", "u", [{"role": "user", "content": "I live in Pune and love trekking"}])[0]
         reader = AsyncMock(side_effect=[{}, {"threads": [{"title": "Trekking", "summary": "x", "lines": [0]}]}])
@@ -125,7 +125,7 @@ class PartsTest(unittest.TestCase):
         self.assertEqual([part.new_start_message_index for part in parts], [0, 30, 60])
 
     def test_a_long_upload_is_read_from_its_newest_lines(self) -> None:
-        from agent.cognition.background import upload_read
+        from agent.cognition.background.uploads import read as upload_read
 
         messages = [{"role": "user", "content": f"line number {index} about my day"} for index in range(500)]
         with patch.object(upload_read, "READ_USER_LINES", 120):
@@ -154,7 +154,7 @@ class ReadUploadTest(unittest.IsolatedAsyncioTestCase):
         self.env.stop()
 
     async def test_both_sides_become_memories_and_a_digest(self) -> None:
-        with patch("agent.cognition.background.uploads.request_flush_now"):
+        with patch("agent.cognition.background.uploads.hidden_chat.request_flush_now"):
             hidden = learn_from_whatsapp_upload(USER_ID, self.source["id"], EXPORT, "Sourabh")
         self.assertEqual(get_context_source_metadata(self.source["id"], USER_ID)["reading"]["state"], "queued")
 
@@ -175,8 +175,8 @@ class ReadUploadTest(unittest.IsolatedAsyncioTestCase):
             "relationship": {"statement": "Chats with Farheen on WhatsApp, mostly about review work.", "from": ["t1"]},
             "user_card": "Distrusts finance influencers",
         }
-        with patch("agent.cognition.background.upload_read.analyze_upload_part", AsyncMock(side_effect=part_answer)) as reader, patch(
-            "agent.cognition.background.upload_read.analyze_upload_merge", AsyncMock(return_value=merge)
+        with patch("agent.cognition.background.uploads.read.analyze_upload_part", AsyncMock(side_effect=part_answer)) as reader, patch(
+            "agent.cognition.background.uploads.read.analyze_upload_merge", AsyncMock(return_value=merge)
         ):
             result = await run_memory_flush_job({"conversation_id": hidden, "user_id": USER_ID})
 

@@ -3,7 +3,7 @@
 import re
 import unittest
 
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
 
 # Subjects that once served as examples and were copied into a user's summary as facts.
 _ONCE_LEAKED = ("interview", "trip", "beagle", "bruno", "pune", "mumbai", "design studio", "long walks")

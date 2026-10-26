@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.reprocess import chats_needing_v3, reprocess_conversation
+from agent.cognition.background.memory_run.reprocess import chats_needing_v3, reprocess_conversation
 from agent.memory_engine.processing import MemoryProcessingState, get_processing_state, save_processing_state
 from storage import reset_db, save_conversation
 from storage.profile_facts import save_data_point_extraction_debug
@@ -82,7 +82,7 @@ class ReprocessTest(unittest.IsolatedAsyncioTestCase):
         chat("v2-era", processed_through=2)
         conversation = chats_needing_v3(USER)[0]
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=NO_CHANGE,
         ) as provider:
@@ -97,7 +97,7 @@ class ReprocessTest(unittest.IsolatedAsyncioTestCase):
         chat("v2-era", processed_through=2)
         conversation = chats_needing_v3(USER)[0]
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             side_effect=TimeoutError("slow"),
         ):

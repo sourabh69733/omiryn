@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.memory_engine.processing import get_processing_state
 from storage import (
     list_agent_memories,
@@ -44,7 +44,7 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
                 clear=True,
             ),
             patch(
-                "agent.cognition.background.service.embed_memory_query",
+                "agent.cognition.background.memory_run.service.embed_memory_query",
                 new_callable=AsyncMock,
                 return_value={
                     "provider": "deepinfra",
@@ -54,12 +54,12 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
                 },
             ) as embed_query,
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
             ) as provider,
             patch(
-                "agent.cognition.background.service.index_agent_memories",
+                "agent.cognition.background.memory_run.service.index_agent_memories",
                 new_callable=AsyncMock,
                 return_value=1,
             ) as index_memories,
@@ -105,7 +105,7 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3"}, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=response,
             ),
@@ -128,12 +128,12 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, environment, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
             ),
             patch(
-                "agent.cognition.background.service.save_processing_state",
+                "agent.cognition.background.memory_run.service.save_processing_state",
                 side_effect=RuntimeError("cursor write failed"),
             ),
         ):
@@ -146,7 +146,7 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, environment, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
             ),
@@ -169,12 +169,12 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, environment, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._valid_response(),
             ),
             patch(
-                "agent.cognition.background.service.save_processing_state",
+                "agent.cognition.background.memory_run.service.save_processing_state",
                 side_effect=RuntimeError("cursor write failed"),
             ),
         ):
@@ -182,7 +182,7 @@ class MemoryV3LiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, environment, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=changed,
             ),

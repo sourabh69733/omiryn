@@ -5,10 +5,10 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import run_background_cognition
-from agent.cognition.background.vibe_backfill import backfill_user_vibe
-from agent.cognition.background.vibe_prompt import VIBE_VERIFY_SYSTEM_PROMPT
-from agent.cognition.background.vibe_verify import verify_vibe_updates
+from agent.cognition.background.memory_run.service import run_background_cognition
+from agent.cognition.background.vibe.backfill import backfill_user_vibe
+from agent.cognition.background.vibe.prompt import VIBE_VERIFY_SYSTEM_PROMPT
+from agent.cognition.background.vibe.verify import verify_vibe_updates
 from storage import get_vibe_card, reset_db, save_conversation
 
 CONVERSATION_ID = "vibe-verify-chat"
@@ -38,7 +38,7 @@ def quote(evidence: dict) -> str | None:
 class VerifyVibeUpdatesTest(unittest.IsolatedAsyncioTestCase):
     async def _verify(self, response: object) -> tuple[dict, dict]:
         with patch(
-            "agent.cognition.background.vibe_verify.analyze_vibe_verification",
+            "agent.cognition.background.vibe.verify.analyze_vibe_verification",
             new_callable=AsyncMock,
             return_value=response,
         ) as checker:
@@ -111,11 +111,11 @@ class VerifiedWritesTest(unittest.IsolatedAsyncioTestCase):
             },
         }
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=response,
-        ), patch("agent.cognition.background.vibe_verify.analyze_vibe_verification", checker), patch(
-            "agent.cognition.background.service.realtime_hub.publish", new_callable=AsyncMock
+        ), patch("agent.cognition.background.vibe.verify.analyze_vibe_verification", checker), patch(
+            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
         ):
             await run_background_cognition(CONVERSATION_ID, USER_ID, MESSAGES)
 
@@ -134,11 +134,11 @@ class VerifiedWritesTest(unittest.IsolatedAsyncioTestCase):
     async def test_backfill_drops_lines_the_check_rejects(self) -> None:
         backfill = {"vibe": {"deal_breakers": {"line": "Can't stand dishonest people.", "evidence": ["m1"]}}}
         with patch(
-            "agent.cognition.background.vibe_backfill.analyze_vibe_backfill",
+            "agent.cognition.background.vibe.backfill.analyze_vibe_backfill",
             new_callable=AsyncMock,
             return_value=backfill,
         ), patch(
-            "agent.cognition.background.vibe_verify.analyze_vibe_verification",
+            "agent.cognition.background.vibe.verify.analyze_vibe_verification",
             new_callable=AsyncMock,
             return_value={"deal_breakers": []},
         ):

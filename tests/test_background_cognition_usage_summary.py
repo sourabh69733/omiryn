@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from storage import list_agent_usage_events, reset_db, save_agent_usage_event, save_conversation
 
 
@@ -78,7 +78,7 @@ class BackgroundCognitionUsageSummaryTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3"}, clear=True),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value={
                     "decision": "no_change",

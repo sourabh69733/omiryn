@@ -86,7 +86,7 @@ class OwnUploadRouteTest(unittest.TestCase):
 
     def test_own_upload_keeps_no_second_copy_but_keeps_style_numbers(self) -> None:
         conversation_id = self.client.post("/api/agent/conversations").json()["id"]
-        with patch("agent.cognition.background.uploads.request_flush_now"):
+        with patch("agent.cognition.background.uploads.hidden_chat.request_flush_now"):
             response = self.client.post(
                 f"/api/agent/conversations/{conversation_id}/whatsapp-import",
                 json={"title": "Riya", "content": EXPORT, "user_sender": "Me", "style_kind": "user_style"},

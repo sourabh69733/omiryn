@@ -4,8 +4,8 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import run_background_cognition
-from agent.cognition.background.vibe_backfill import recheck_user_vibe
+from agent.cognition.background.memory_run.service import run_background_cognition
+from agent.cognition.background.vibe.backfill import recheck_user_vibe
 from agent.memory_engine.memories.vibe import merge_vibe, with_current_proof
 from storage import delete_conversation, get_vibe_card, reset_db, save_conversation, update_vibe_card
 
@@ -78,11 +78,11 @@ class ReproveFlowTest(unittest.IsolatedAsyncioTestCase):
             }
 
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=response,
-        ), patch("agent.cognition.background.vibe_verify.analyze_vibe_verification", side_effect=checker), patch(
-            "agent.cognition.background.service.realtime_hub.publish", new_callable=AsyncMock
+        ), patch("agent.cognition.background.vibe.verify.analyze_vibe_verification", side_effect=checker), patch(
+            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
         ):
             await run_background_cognition(NEW_CHAT, USER, NEW_MESSAGES)
 
@@ -112,7 +112,7 @@ class ReproveFlowTest(unittest.IsolatedAsyncioTestCase):
             },
         )
         with patch(
-            "agent.cognition.background.vibe_verify.analyze_vibe_verification",
+            "agent.cognition.background.vibe.verify.analyze_vibe_verification",
             new_callable=AsyncMock,
             return_value={"interests": ["e1"], "values": []},
         ):

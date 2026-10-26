@@ -14,7 +14,7 @@ from agent.context_engine.conversation_engine.state import (
 )
 from agent.memory_engine.data_points.extraction.registry import data_point_capture_policy
 from agent.memory_engine.processing import memory_background_v2_live_writes_enabled
-from agent.cognition.background.service import background_cognition_enabled
+from agent.cognition.background.memory_run.service import background_cognition_enabled
 
 
 class AgentPipelineConfigTest(unittest.TestCase):

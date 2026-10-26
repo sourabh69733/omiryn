@@ -5,8 +5,8 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.context_engine.assembly.sources import build_reply_context_sources
 from agent.memory_engine.memories.user_card import MAX_USER_CARD_CHARS, validate_user_card, without_replaced_lines
 from storage import create_agent_memory, get_user_card, reset_db, save_conversation, set_user_card
@@ -88,7 +88,7 @@ class UserCardFlowTest(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, user_card: object, operations: list | None = None) -> AsyncMock:
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=_response(user_card, operations),
         ) as provider:

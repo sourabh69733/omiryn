@@ -238,7 +238,7 @@ class BackgroundConversationThreadScenarioTest(unittest.IsolatedAsyncioTestCase)
             }
 
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             side_effect=model_result,
         ) as analyze:

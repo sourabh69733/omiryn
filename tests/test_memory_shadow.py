@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 from agent.context_engine.conversation_engine.state import create_thread, get_thread
 from agent.memory_engine.processing import MemoryHandoff, MemoryProcessingState, build_memory_batch
-from agent.cognition.background.service import (
+from agent.cognition.background.memory_run.service import (
     run_background_cognition,
     should_schedule_background_cognition,
     should_schedule_idle_background_cognition,
@@ -126,7 +126,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
             ) as analyze,
         ):
@@ -260,7 +260,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ) as analyze,
@@ -320,7 +320,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 side_effect=analyze_once,
             ),
         ):
@@ -370,7 +370,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=raw,
                 create=True,
@@ -415,7 +415,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         )
         invalid = self._combined_analysis(evidence_indexes=[3])
         with patch.dict("os.environ", {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "shadow"}), patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=invalid,
         ):
@@ -441,7 +441,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", shadow_environment),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 side_effect=TimeoutError("provider timed out"),
             ),
@@ -464,7 +464,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", shadow_environment),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
@@ -488,7 +488,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
@@ -557,7 +557,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=raw,
             ),
@@ -580,12 +580,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._combined_analysis(evidence_indexes=[0, 2]),
             ),
             patch(
-                "agent.cognition.background.service.apply_validated_memory_analysis",
+                "agent.cognition.background.memory_run.service.apply_validated_memory_analysis",
                 side_effect=RuntimeError("database unavailable"),
                 create=True,
             ),
@@ -608,12 +608,12 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),
             patch(
-                "agent.cognition.background.service.save_processing_state",
+                "agent.cognition.background.memory_run.service.save_processing_state",
                 side_effect=RuntimeError("cursor unavailable"),
             ),
         ):
@@ -637,7 +637,7 @@ class MemoryShadowTest(unittest.IsolatedAsyncioTestCase):
                 {"AGENT_PIPELINE_VERSION": "v2", "AGENT_ROLLOUT": "live"},
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=analysis,
             ),

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.context_engine.sources.open_questions import OPEN_QUESTION_REPLIES_PER_SESSION, open_question_sources as _open_question_sources
 from agent.memory_engine.memories.open_questions import validate_open_questions
 from agent.memory_engine.processing import build_memory_batch
@@ -86,7 +86,7 @@ class BackgroundFlowTest(unittest.IsolatedAsyncioTestCase):
     async def _run(self, open_questions: object, messages: list[dict]) -> AsyncMock:
         save_conversation({"id": CHAT, "status": "active", "messages": messages}, USER_ID)
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=_response(open_questions),
         ) as provider:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.context_engine.conversation_engine.state import list_threads
 from agent.memory_engine.processing import get_processing_state
 from storage import reset_db, save_conversation
@@ -42,7 +42,7 @@ class BackgroundThreadLiveTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._thread_analysis(),
             ),
@@ -71,12 +71,12 @@ class BackgroundThreadLiveTest(unittest.IsolatedAsyncioTestCase):
                 },
             ),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._thread_analysis(),
             ),
             patch(
-                "agent.cognition.background.service.apply_validated_thread_proposal",
+                "agent.cognition.background.memory_run.service.apply_validated_thread_proposal",
                 side_effect=RuntimeError("thread database unavailable"),
                 create=True,
             ),
@@ -100,12 +100,12 @@ class BackgroundThreadLiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", environment),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._thread_analysis(),
             ),
             patch(
-                "agent.cognition.background.service.save_processing_state",
+                "agent.cognition.background.memory_run.service.save_processing_state",
                 side_effect=RuntimeError("cursor database unavailable"),
             ),
         ):
@@ -122,7 +122,7 @@ class BackgroundThreadLiveTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict("os.environ", environment),
             patch(
-                "agent.cognition.background.service.analyze_background_cognition",
+                "agent.cognition.background.memory_run.service.analyze_background_cognition",
                 new_callable=AsyncMock,
                 return_value=self._thread_analysis(),
             ),

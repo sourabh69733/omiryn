@@ -6,7 +6,7 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.card_rebuild import card_memories, card_rebuild_due, rebuild_user_card, schedule_card_rebuild
+from agent.cognition.background.cards.rebuild import card_memories, card_rebuild_due, rebuild_user_card, schedule_card_rebuild
 from agent.memory_engine.memories.echo import is_echo, without_companion_echoes
 from agent.memory_engine.memories.validation import validate_memory_analysis_v3
 from agent.memory_engine.processing.context import build_memory_batch
@@ -60,7 +60,7 @@ class CardRebuildTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_card_is_rewritten_from_memories_only(self) -> None:
         writer = AsyncMock(return_value={"user_card": ["Lives in Pune."]})
-        with patch("agent.cognition.background.card_rebuild.rebuild_user_card_text", writer):
+        with patch("agent.cognition.background.cards.rebuild.rebuild_user_card_text", writer):
             result = await rebuild_user_card(USER_ID, now=NOW)
 
         self.assertEqual(result, {"status": "rebuilt", "changed": True})
@@ -72,16 +72,16 @@ class CardRebuildTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(card_rebuild_due(USER_ID, now=datetime.now(UTC) + timedelta(days=1, minutes=1)))
 
     async def test_no_card_back_keeps_the_old_one(self) -> None:
-        with patch("agent.cognition.background.card_rebuild.rebuild_user_card_text", AsyncMock(return_value={})):
+        with patch("agent.cognition.background.cards.rebuild.rebuild_user_card_text", AsyncMock(return_value={})):
             self.assertEqual((await rebuild_user_card(USER_ID, now=NOW))["status"], "no_card")
         self.assertEqual(get_user_card(USER_ID), "Lives in Jaipur\nPlanning a move back to Jaipur")
 
     def test_rebuild_is_queued_once_a_day(self) -> None:
-        with patch("agent.cognition.background.card_rebuild.schedule_job") as schedule:
+        with patch("agent.cognition.background.cards.rebuild.schedule_job") as schedule:
             self.assertTrue(schedule_card_rebuild(USER_ID))
         schedule.assert_called_once()
         set_user_card(USER_ID, "Lives in Pune.", rebuilt=True)
-        with patch("agent.cognition.background.card_rebuild.schedule_job") as schedule:
+        with patch("agent.cognition.background.cards.rebuild.schedule_job") as schedule:
             self.assertFalse(schedule_card_rebuild(USER_ID))
         schedule.assert_not_called()
 

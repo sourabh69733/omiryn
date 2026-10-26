@@ -2,7 +2,7 @@
 
 import unittest
 
-from agent.cognition.background.service import memory_history
+from agent.cognition.background.memory_run.service import memory_history
 from agent.shared.timeline import user_zone
 
 

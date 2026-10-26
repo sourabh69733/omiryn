@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 
 from agent.cognition.background.idle import catch_up_pending, run_memory_flush_job
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.runtime.orchestrator import run_agent_turn
 from api.main import app, current_user
 from security.auth import CurrentUser

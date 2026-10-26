@@ -4,12 +4,12 @@ import json
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.vibe_backfill import (
+from agent.cognition.background.vibe.backfill import (
     TRANSCRIPT_CHAR_BUDGET,
     backfill_user_vibe,
     chat_transcript,
 )
-from agent.cognition.background.vibe_prompt import VIBE_BACKFILL_SYSTEM_PROMPT
+from agent.cognition.background.vibe.prompt import VIBE_BACKFILL_SYSTEM_PROMPT
 from storage import (
     get_vibe_card,
     list_conversation_user_ids,
@@ -45,7 +45,7 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, vibe: object, **kwargs) -> tuple[dict, AsyncMock]:
         with patch(
-            "agent.cognition.background.vibe_backfill.analyze_vibe_backfill",
+            "agent.cognition.background.vibe.backfill.analyze_vibe_backfill",
             new_callable=AsyncMock,
             return_value={"vibe": vibe},
         ) as provider:
@@ -99,7 +99,7 @@ class VibeBackfillTest(unittest.IsolatedAsyncioTestCase):
     async def test_user_without_messages_is_not_sent_to_the_model(self) -> None:
         save_conversation({"id": "empty-chat", "status": "active", "messages": []}, "quiet-user")
         with patch(
-            "agent.cognition.background.vibe_backfill.analyze_vibe_backfill", new_callable=AsyncMock
+            "agent.cognition.background.vibe.backfill.analyze_vibe_backfill", new_callable=AsyncMock
         ) as provider:
             result = await backfill_user_vibe("quiet-user", apply=True)
         self.assertEqual(result["status"], "no_messages")

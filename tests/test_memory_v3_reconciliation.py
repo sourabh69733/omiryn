@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from agent.cognition.background.service import _existing_memory_context
+from agent.cognition.background.memory_run.service import _existing_memory_context
 from agent.memory_engine.memories.reconciliation import select_reconciliation_candidates
 
 
@@ -127,11 +127,11 @@ def test_cognition_context_loads_matching_memory_embedding_versions() -> None:
 
     with (
         patch(
-            "agent.cognition.background.service.list_agent_memories",
+            "agent.cognition.background.memory_run.service.list_agent_memories",
             return_value=memories,
         ),
         patch(
-            "agent.cognition.background.service.list_agent_memory_embeddings",
+            "agent.cognition.background.memory_run.service.list_agent_memory_embeddings",
             return_value=stored_embeddings,
         ),
     ):
@@ -159,7 +159,7 @@ def test_cognition_context_uses_related_candidates_instead_of_first_rows() -> No
     )
 
     with patch(
-        "agent.cognition.background.service.list_agent_memories",
+        "agent.cognition.background.memory_run.service.list_agent_memories",
         return_value=[*unrelated, related],
     ):
         context = _existing_memory_context(
@@ -180,7 +180,7 @@ def test_cognition_context_marks_only_active_memories_as_targetable() -> None:
     ]
 
     with patch(
-        "agent.cognition.background.service.list_agent_memories",
+        "agent.cognition.background.memory_run.service.list_agent_memories",
         return_value=memories,
     ):
         context = _existing_memory_context(

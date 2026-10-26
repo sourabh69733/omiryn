@@ -4,7 +4,7 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
 from agent.context_engine.assembly.sources import build_reply_context_sources
 from agent.memory_engine.memories.validation import (
     MAX_CONVERSATION_SUMMARY_CHARS,

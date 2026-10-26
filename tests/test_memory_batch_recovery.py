@@ -6,7 +6,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.service import MAX_BATCH_CONTENT_FAILURES, run_background_cognition
+from agent.cognition.background.memory_run.service import MAX_BATCH_CONTENT_FAILURES, run_background_cognition
 from agent.memory_engine.processing import get_processing_state
 from storage import delete_conversation, list_agent_memories, reset_db, save_conversation
 
@@ -33,7 +33,7 @@ class BatchRecoveryTest(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, **provider) -> dict:
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             **provider,
         ):
@@ -75,7 +75,7 @@ class BatchRecoveryTest(unittest.IsolatedAsyncioTestCase):
             return VALID
 
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             side_effect=delete_then_answer,
         ):
             result = await run_background_cognition(CHAT, USER, MESSAGES)

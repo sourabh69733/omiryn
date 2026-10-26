@@ -5,8 +5,8 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.cognition.background.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.prompt_v3 import BACKGROUND_COGNITION_V3_SYSTEM_PROMPT
+from agent.cognition.background.memory_run.service import run_background_cognition
 from agent.context_engine.assembly.sources import build_reply_context_sources
 from agent.memory_engine.memories.self_notes import validate_self_notes
 from agent.memory_engine.processing import build_memory_batch
@@ -111,7 +111,7 @@ class SelfNotesFlowTest(unittest.IsolatedAsyncioTestCase):
             "self_notes": self_notes,
         }
         with patch(
-            "agent.cognition.background.service.analyze_background_cognition",
+            "agent.cognition.background.memory_run.service.analyze_background_cognition",
             new_callable=AsyncMock,
             return_value=response,
         ) as provider:

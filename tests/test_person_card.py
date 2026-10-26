@@ -3,7 +3,7 @@
 import unittest
 from zoneinfo import ZoneInfo
 
-from agent.cognition.background.person_card import checked_facts, merge_facts
+from agent.cognition.background.uploads.person_card import checked_facts, merge_facts
 from agent.context_engine.sources.shared_chats import person_card_lines
 
 ZONE = ZoneInfo("Asia/Kolkata")

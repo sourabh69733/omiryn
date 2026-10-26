@@ -82,7 +82,7 @@ class UploadRouteTest(unittest.TestCase):
         self.env.stop()
 
     def _upload(self):
-        with patch("agent.cognition.background.uploads.request_flush_now") as flush:
+        with patch("agent.cognition.background.uploads.hidden_chat.request_flush_now") as flush:
             response = self.client.post(
                 f"/api/agent/conversations/{self.chat}/whatsapp-import",
                 json={"title": "Riya", "content": EXPORT, "user_sender": "Sourabh"},

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import update
 
-from agent.cognition.background.service import run_background_cognition
+from agent.cognition.background.memory_run.service import run_background_cognition
 from storage import get_vibe_card, reset_db, save_conversation, update_vibe_card
 from storage import vibe_cards
 from storage.database import ENGINE
@@ -58,7 +58,7 @@ class UserLeaseTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_second_chat_waits_while_the_first_is_running(self) -> None:
         token = claim_user_background_lease(USER_ID, FIRST, lease_seconds=60)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_BACKGROUND_V2_THRESHOLD": "1"}), patch(
-            "agent.cognition.background.service.analyze_background_cognition", new_callable=AsyncMock
+            "agent.cognition.background.memory_run.service.analyze_background_cognition", new_callable=AsyncMock
         ) as provider:
             busy = await run_background_cognition(SECOND, USER_ID, MESSAGES)
             release_user_background_lease(USER_ID, token)
