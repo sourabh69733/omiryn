@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from agent.context_engine.conversation_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
+from agent.context_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
 from agent.memory_engine.memories import BROAD_RECALL_MEMORY_LIMIT, retrieve_agent_memories_for_reply
 from agent.memory_engine.memories.focus import focus_state
 from agent.shared.clock import utc_now

@@ -7,8 +7,8 @@ from typing import Any
 
 from agent.config import agent_pipeline_config
 from agent.context_engine.contracts.models import AgentContext, ContextQueryIntent, ThreadGuidance
-from agent.context_engine.conversation_engine.state import conversation_thread_context_sources, conversation_thread_guidance
-from agent.context_engine.conversation_engine.understanding.rules.intent import context_query_intent
+from agent.context_engine.threads import conversation_thread_context_sources, conversation_thread_guidance
+from agent.context_engine.understanding.rules.intent import context_query_intent
 from agent.context_engine.shared.text import source_identity
 from agent.context_engine.sources.attached import (
     STYLE_CONTEXT_SOURCE_TYPES,

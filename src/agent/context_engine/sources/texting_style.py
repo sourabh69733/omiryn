@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.context_engine.conversation_engine.personalization import texting_style_note
+from agent.context_engine.personalization import texting_style_note
 from storage.context_sources import list_whatsapp_imports, list_whatsapp_style_profiles
 
 TEXTING_STYLE_SOURCE_TYPE = "texting_style"

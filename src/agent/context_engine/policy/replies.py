@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 
-from agent.context_engine.conversation_engine.policy.script import normalize_assistant_script
+from agent.context_engine.policy.script import normalize_assistant_script
 
 REPLY_PART_SEPARATOR = "<next_message>"
 # Normal replies use 1-3 bubbles by prompt; 7 leaves room for a story or scene told in one go.

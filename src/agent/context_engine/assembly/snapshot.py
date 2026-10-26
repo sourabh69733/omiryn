@@ -13,7 +13,7 @@ from agent.context_engine.contracts.models import (
     EmotionState,
     MatchingUnderstanding,
 )
-from agent.context_engine.conversation_engine.understanding.contract import TurnUnderstanding
+from agent.context_engine.understanding.contract import TurnUnderstanding
 
 SNAPSHOT_PREVIEW_CHARS = 500
 

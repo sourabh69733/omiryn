@@ -6,15 +6,15 @@ from dataclasses import replace
 from typing import Any
 
 from agent.context_engine.assembly.snapshot import build_context_snapshot, build_context_snapshot_v2
-from agent.context_engine.conversation_engine.planning import (
+from agent.context_engine.planning import (
     apply_question_cooldown,
     build_conversation_plan,
     hold_old_topics_while_a_question_is_open,
 )
-from agent.context_engine.conversation_engine.planning.planner import recent_question_streak
-from agent.context_engine.conversation_engine.understanding import interpret_turn
-from agent.context_engine.conversation_engine.understanding.rules.stance import explicit_constraints
-from agent.context_engine.conversation_engine.understanding.rules import (
+from agent.context_engine.planning.planner import recent_question_streak
+from agent.context_engine.understanding import interpret_turn
+from agent.context_engine.understanding.rules.stance import explicit_constraints
+from agent.context_engine.understanding.rules import (
     context_query_intent,
     continues_story,
     detect_emotion_state,

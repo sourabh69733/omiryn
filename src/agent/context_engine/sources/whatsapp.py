@@ -6,8 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from agent.context_engine.contracts.models import ContextQueryIntent
-from agent.context_engine.conversation_engine.personalization import style_adaptation_guide
-from agent.context_engine.conversation_engine.understanding.rules.intent import RECENCY_QUERY_TERMS
+from agent.context_engine.personalization import style_adaptation_guide
+from agent.context_engine.understanding.rules.intent import RECENCY_QUERY_TERMS
 from agent.context_engine.shared.text import memory_terms, normalized_memory_text, source_identity
 from agent.memory_engine.data_points.retrieval.whatsapp import retrieve_whatsapp_imports, retrieve_whatsapp_memory
 from text_vectors import build_text_embedding, cosine_similarity

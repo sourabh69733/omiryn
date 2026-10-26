@@ -6,11 +6,11 @@ import os
 from dataclasses import replace
 from typing import Any
 
-from agent.context_engine.conversation_engine.understanding.contract import (
+from agent.context_engine.understanding.contract import (
     TurnInterpreter,
     TurnUnderstanding,
 )
-from agent.context_engine.conversation_engine.understanding.interpreters.legacy_en_hi import (
+from agent.context_engine.understanding.interpreters.legacy_en_hi import (
     LegacyEnglishHindiInterpreter,
 )
 
