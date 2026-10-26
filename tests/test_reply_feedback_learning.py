@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from agent.context_engine.assembly.sources import _reply_feedback_sources
+from agent.context_engine.sources.reply_feedback import reply_feedback_sources as _reply_feedback_sources
 from agent.feedback import normalize_message_feedback
 from agent.runtime.orchestrator import run_agent_turn
 from api.main import app, current_user

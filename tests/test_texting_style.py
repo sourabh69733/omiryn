@@ -2,7 +2,7 @@
 
 import unittest
 
-from agent.context_engine.assembly.sources import _texting_style_sources
+from agent.context_engine.sources.texting_style import texting_style_sources as _texting_style_sources
 from agent.context_engine.conversation_engine.personalization import texting_style_note
 from storage import reset_db, save_conversation
 from storage.context_sources import save_whatsapp_import_bundle

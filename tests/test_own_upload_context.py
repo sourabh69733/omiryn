@@ -6,7 +6,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from agent.context_engine.assembly.sources import _own_upload, build_reply_context_sources
+from agent.context_engine.assembly.sources import build_reply_context_sources
+from agent.context_engine.sources.whatsapp import own_upload as _own_upload
 from api.main import app, current_user
 from security.auth import CurrentUser
 from storage import reset_db, save_conversation

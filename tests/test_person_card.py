@@ -4,7 +4,7 @@ import unittest
 from zoneinfo import ZoneInfo
 
 from agent.cognition.background.person_card import checked_facts, merge_facts
-from agent.context_engine.assembly.uploaded_chats import person_card_lines
+from agent.context_engine.sources.shared_chats import person_card_lines
 
 ZONE = ZoneInfo("Asia/Kolkata")
 MESSAGES = [
