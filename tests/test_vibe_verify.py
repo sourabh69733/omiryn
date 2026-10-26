@@ -115,7 +115,7 @@ class VerifiedWritesTest(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
             return_value=response,
         ), patch("agent.cognition.background.vibe.verify.analyze_vibe_verification", checker), patch(
-            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
+            "agent.cognition.background.memory_run.apply.realtime_hub.publish", new_callable=AsyncMock
         ):
             await run_background_cognition(CONVERSATION_ID, USER_ID, MESSAGES)
 

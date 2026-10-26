@@ -74,7 +74,7 @@ class VibeFlowTest(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
             return_value=_response(vibe),
         ) as provider, patch(
-            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
+            "agent.cognition.background.memory_run.apply.realtime_hub.publish", new_callable=AsyncMock
         ) as publish:
             result = await run_background_cognition(CONVERSATION_ID, USER_ID, MESSAGES)
         self.assertNotIn(result["status"], {"live_invalid", "live_error"}, result)

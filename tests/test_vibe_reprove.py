@@ -82,7 +82,7 @@ class ReproveFlowTest(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
             return_value=response,
         ), patch("agent.cognition.background.vibe.verify.analyze_vibe_verification", side_effect=checker), patch(
-            "agent.cognition.background.memory_run.service.realtime_hub.publish", new_callable=AsyncMock
+            "agent.cognition.background.memory_run.apply.realtime_hub.publish", new_callable=AsyncMock
         ):
             await run_background_cognition(NEW_CHAT, USER, NEW_MESSAGES)
 
