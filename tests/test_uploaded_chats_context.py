@@ -2,7 +2,7 @@
 
 import unittest
 
-from agent.context_engine.assembly.uploaded_chats import matching_topics, uploaded_chat_sources
+from agent.context_engine.sources.shared_chats import matching_topics, uploaded_chat_sources
 from agent.context_engine.prompt_engine.blocks import _grouped_sources
 from storage import reset_db, save_conversation
 from storage.upload_digests import save_upload_digest

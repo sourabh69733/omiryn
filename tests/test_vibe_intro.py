@@ -106,7 +106,7 @@ class VibeIntroApiTest(unittest.TestCase):
         self.assertEqual(sent["user_wording"], {"intro": "I build robots for fun.", "chips": ["Robots"]})
 
     def test_companion_sees_the_users_own_words(self) -> None:
-        from agent.context_engine.assembly.sources import _self_description
+        from agent.context_engine.sources.user_card import self_description as _self_description
 
         self.assertEqual(_self_description(USER_ID), "")
         self.client.put("/api/me/intro", json={"intro": "I build robots for fun.", "chips": ["Robots", "Chai"]})

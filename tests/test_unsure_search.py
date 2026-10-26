@@ -88,7 +88,7 @@ class OneSubjectTest(unittest.TestCase):
 
     def test_a_question_about_someone_gets_no_unrelated_memories(self) -> None:
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}), patch(
-            "agent.context_engine.assembly.sources._might_fit_sources", return_value=[{"source_type": "might_fit", "content": "Likes Harry Potter"}]
+            "agent.context_engine.assembly.sources.might_fit_sources", return_value=[{"source_type": "might_fit", "content": "Likes Harry Potter"}]
         ) as might_fit:
             build_reply_context_sources("chat", None, "what is farheen doing these days?", USER_ID)
             might_fit.assert_not_called()
