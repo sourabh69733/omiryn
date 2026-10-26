@@ -3,7 +3,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from agent.context_engine.assembly.sources import _memory_time_note
+from agent.context_engine.sources.memories import memory_time_note as _memory_time_note
 from agent.memory_engine.memories.focus import focus_state, without_focus_lines
 from agent.memory_engine.memories.retrieval import _reply_eligible, might_fit_memories
 from agent.memory_engine.memories.validation import _validate_add, _ADD_FIELDS

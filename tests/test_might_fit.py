@@ -5,7 +5,7 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-from agent.context_engine.assembly.sources import _might_fit_sources
+from agent.context_engine.sources.might_fit import might_fit_sources as _might_fit_sources
 from agent.memory_engine.memories.retrieval import might_fit_memories
 from storage import create_agent_memory, reset_db, save_conversation
 

@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
-from agent.context_engine.assembly.sources import _memory_time_note
+from agent.context_engine.sources.memories import memory_time_note as _memory_time_note
 from agent.memory_engine.memories.application import _trusted_evidence
 from agent.memory_engine.memories.prompt import V3_MEMORY_OUTPUT_SHAPE
 from agent.memory_engine.processing.context import build_memory_batch
