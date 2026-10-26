@@ -46,7 +46,9 @@ from storage.user_cards import set_user_card
 from storage.vibe_cards import get_vibe_card
 
 from agent.cognition.background.uploads.person_card import build_person_card
-from agent.cognition.background.memory_run.service import _apply_vibe, _context_overlap, _existing_memory_context, _replaced_memory_ids, _timeout_seconds
+from agent.cognition.background.memory_run.apply import apply_vibe, replaced_memory_ids
+from agent.cognition.background.memory_run.inputs import existing_memory_context
+from agent.cognition.background.memory_run.settings import context_overlap, timeout_seconds
 from agent.cognition.background.uploads.notes import (
     Gathered,
     PartNotes,
@@ -82,7 +84,7 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
     conversation_id = str(conversation["id"])
     source_id = str(conversation.get("import_source_id") or "")
     messages = list(conversation.get("messages") or [])
-    lease = claim_user_lease(user_id, conversation_id, lease_seconds=_timeout_seconds() * 2 + 60)
+    lease = claim_user_lease(user_id, conversation_id, lease_seconds=timeout_seconds() * 2 + 60)
     if lease is None:
         return {"status": "already_processing", "operation_count": 0}
     started = monotonic()
@@ -179,7 +181,7 @@ def upload_parts(conversation_id: str, user_id: str, messages: list[dict[str, An
             user_id=user_id,
             messages=messages,
             state=MemoryProcessingState(conversation_id=conversation_id, user_id=user_id, processed_through_message_index=cursor),
-            context_overlap=_context_overlap(),
+            context_overlap=context_overlap(),
             max_meaningful_user_messages=per_part,
         )
         if batch is None:
@@ -264,7 +266,7 @@ async def _save_after(whole: MemoryBatch, applied: Any, operations: tuple[Any, .
         except Exception as error:
             logger.warning("agent.upload_read.index_failed error_type=%s", type(error).__name__)
     card = validate_user_card(card_lines(merge.get("user_card")))
-    replaced_ids = _replaced_memory_ids(operations)
+    replaced_ids = replaced_memory_ids(operations)
     if card or replaced_ids:
         memories = list_agent_memories(user_id)
         focus = [memory for memory in memories if memory.get("focus") and memory.get("status") == "active"]
@@ -274,7 +276,7 @@ async def _save_after(whole: MemoryBatch, applied: Any, operations: tuple[Any, .
             set_user_card(user_id, new_card)
     updates = merge_vibe(merge.get("vibe"), gathered.vibe, memory_proof(whole, gathered.candidates))
     if updates and context["vibe"] is not None:
-        await _apply_vibe(whole, context["vibe"], updates)
+        await apply_vibe(whole, context["vibe"], updates)
 
 
 def card_lines(card: Any) -> Any:
@@ -331,7 +333,7 @@ def _shared_context(user_id: str, whole: MemoryBatch) -> dict[str, Any]:
     """What the merge sees: existing memories, the card and the vibe card, read once."""
     user_text = " ".join(message.content for message in whole.new_messages if message.role == "user")
     return {
-        "memories": _existing_memory_context(user_id, 3, user_text),
+        "memories": existing_memory_context(user_id, 3, user_text),
         "timezone": get_user_timezone(user_id),
         "card": get_user_card(user_id) or "",
         "vibe": get_vibe_card(user_id),
