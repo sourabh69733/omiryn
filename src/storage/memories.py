@@ -129,6 +129,18 @@ def list_agent_memories(user_id: str) -> list[dict[str, Any]]:
         return [_memory_from_row(connection, row) for row in rows]
 
 
+def mark_agent_memory_followed_up(memory_id: str, user_id: str, at: datetime) -> bool:
+    """Record that Omi asked how this plan went (or chose not to), so it is never asked twice."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            agent_memories.update()
+            .where(agent_memories.c.id == memory_id, agent_memories.c.user_id == owner_id)
+            .values(followed_up_at=at)
+        )
+    return bool(result.rowcount)
+
+
 def update_agent_memory_allowed_uses(
     memory_id: str,
     user_id: str,
@@ -702,6 +714,7 @@ def _memory_from_row(connection, row) -> dict[str, Any]:
         "valid_until": _isoformat_utc(row["valid_until"]),
         "focus": bool(row.get("focus")),
         "last_reinforced_at": _isoformat_utc(row["last_reinforced_at"]),
+        "followed_up_at": _isoformat_utc(row.get("followed_up_at")),
         "supersedes_memory_id": row["supersedes_memory_id"],
         "extractor": row["extractor"],
         "extractor_model": row["extractor_model"],
@@ -780,5 +793,6 @@ __all__ = [
     "delete_agent_memory",
     "get_agent_memory",
     "list_agent_memories",
+    "mark_agent_memory_followed_up",
     "update_agent_memory_allowed_uses",
 ]

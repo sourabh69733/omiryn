@@ -107,6 +107,15 @@ def channel_link_for_user(user_id: str, channel: str) -> dict[str, Any] | None:
     return _link(row)
 
 
+def list_channel_links(channel: str) -> list[dict[str, Any]]:
+    """Every account linked on this channel; Omi can reach these users there while they are away."""
+    with ENGINE.begin() as connection:
+        rows = connection.execute(
+            select(channel_links).where(channel_links.c.channel == channel)
+        ).mappings().all()
+    return [link for row in rows if (link := _link(row))]
+
+
 def unlink_channel(user_id: str, channel: str) -> dict[str, Any] | None:
     """Remove the link; returns the removed link so the caller can say goodbye in that chat."""
     link = channel_link_for_user(user_id, channel)
@@ -168,5 +177,6 @@ __all__ = [
     "consume_channel_link_code",
     "create_channel_link_code",
     "link_channel_chat",
+    "list_channel_links",
     "unlink_channel",
 ]

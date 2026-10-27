@@ -178,6 +178,8 @@ agent_memories = Table(
     # Something the user is into for a while (studying a topic, a project); it fades when not mentioned.
     Column("focus", Boolean, nullable=False, server_default="false"),
     Column("last_reinforced_at", DateTime(timezone=True), nullable=True),
+    # When Omi asked how a dated plan went (or chose not to); a plan is followed up once.
+    Column("followed_up_at", DateTime(timezone=True), nullable=True),
     Column("supersedes_memory_id", String, nullable=True),
     Column("extractor", String, nullable=True),
     Column("extractor_model", String, nullable=True),
