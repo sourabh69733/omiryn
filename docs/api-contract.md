@@ -146,3 +146,5 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `DELETE /api/me/context-sources/{source_id}` | Delete an upload and what Omi learned only from it. |
 | `GET /api/me/profile` uploads (`memory_sources`, `style_sources`) | Each read upload also has `digest`: `summary`, `chat_dates`, `topics` (title, started, ended). No quoted lines. |
 | `GET /api/me/context-sources/{source_id}/reading` | How far Omi got reading an upload: `state` (`queued`, `reading`, `merging`, `done`, `failed`, or `none` for older uploads), `parts`, `parts_done`, `learned`, `seconds`. The same object is in the upload's `metadata.reading`. |
+| `GET /api/me/consent` | Whether matching may use the private vibe areas (values, stories, deal-breakers): `private_matching`, `asked` (false means never asked, which counts as no), `at`. Also returned as `consent` in `GET /api/me/vibe`. |
+| `PUT /api/me/consent` | `{"private_matching": true|false}`: allow or stop it; takes effect at once. Stored as `_consent` on the vibe card. Matching must check `storage.private_matching_allowed(card)` before using a private area, and never shows or quotes one to the other user. |
