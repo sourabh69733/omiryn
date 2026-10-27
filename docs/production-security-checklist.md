@@ -57,6 +57,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off in production.
 - [x] Telegram webhook accepts only requests with the configured secret header; link codes are one-time, expire in 15 minutes and are stored hashed. Telegram is off unless `TELEGRAM_ENABLED=true`.
 - [ ] Set a long random `TELEGRAM_WEBHOOK_SECRET` in production and keep the bot token in the secret manager.
+- [ ] Plan follow-ups sent to Telegram while the user is away can name a sensitive plan (for example a date) in the phone's lock-screen preview. Highly sensitive plans are never raised; decide whether sensitive ones should stay in the app only.
 - [x] Admin UI is deployed separately and the API no longer serves admin frontend assets.
 - [ ] Add `https://admin.omiryn.com` to Supabase production redirect URLs.
 - [ ] If overriding `CORS_ALLOWED_ORIGINS`, include `https://admin.omiryn.com`.
