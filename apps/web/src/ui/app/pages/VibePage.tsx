@@ -2,7 +2,7 @@ import { Check, Lock, MessageCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { Notice, StateView } from "../StateView";
-import { VIBE_AREA_LABELS, VIBE_STEPS, type Vibe, type VibeArea, confidenceLevel, evidenceChatPath, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
+import { VIBE_AREA_LABELS, VIBE_STEPS, type Consent, type Vibe, type VibeArea, confidenceLevel, evidenceChatPath, privateLine, proofSummary, strengthLabel, vibeStepIndex } from "../vibe";
 
 // The user's vibe: what Omi has understood about who they'd get along with.
 // Everything here is learned in chat; the user can only remove a line that is wrong.
@@ -12,6 +12,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [openWhy, setOpenWhy] = useState<string | null>(null);
+  const [savingConsent, setSavingConsent] = useState(false);
 
   function load() {
     setLoadError("");
@@ -35,6 +36,18 @@ export function VibePage({ onChat }: { onChat: () => void }) {
     setRemoving(null);
   }
 
+  async function chooseConsent(allowed: boolean) {
+    setSavingConsent(true);
+    const response = await apiFetch("/api/me/consent", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ private_matching: allowed }) });
+    if (response.ok) {
+      const consent = (await response.json()) as Consent;
+      setVibe((current) => (current ? { ...current, consent } : current));
+    } else setNotice({ tone: "error", text: await apiErrorMessage(response, "Could not save your choice.") });
+    setSavingConsent(false);
+  }
+
+  // Asked once, when Omi has learned something private; the answer can change on the Privacy page.
+  const askConsent = Boolean(vibe && !vibe.consent?.asked && vibe.areas.some((area) => area.private && area.text));
   const reachedStep = vibe ? vibeStepIndex(vibe.milestone) : -1;
   const ready = vibe ? vibeStepIndex(vibe.milestone) >= vibeStepIndex("ready_to_match") : false;
   const nextStep = vibe?.next_milestone ? VIBE_STEPS.find((step) => step.id === vibe.next_milestone) : null;
@@ -83,6 +96,17 @@ export function VibePage({ onChat }: { onChat: () => void }) {
             return (
             <section className="vibe-group" key={stage}>
               <h2>{stage === "basics" ? "The basics" : "Going deeper"}</h2>
+              {stage === "deeper" && askConsent ? (
+                <div className="vibe-consent" role="group" aria-labelledby="vibe-consent-title">
+                  <p id="vibe-consent-title"><Lock aria-hidden="true" /><strong>Your private topics</strong></p>
+                  <p>Your beliefs, stories and deal-breakers are never shown to anyone. Can Omi use them to find people you'd click with?</p>
+                  <div className="vibe-consent-actions">
+                    <button type="button" onClick={() => void chooseConsent(true)} disabled={savingConsent}>Allow</button>
+                    <button type="button" className="is-quiet" onClick={() => void chooseConsent(false)} disabled={savingConsent}>Not now</button>
+                  </div>
+                  <small>You can change this any time in Profile, under How Omi uses your data.</small>
+                </div>
+              ) : null}
               {known.length ? (
               <div className="vibe-cards">
                 {known.map((area) => (
@@ -105,7 +129,7 @@ export function VibePage({ onChat }: { onChat: () => void }) {
                     {area.private ? (
                       <p className="vibe-private">
                         <Lock aria-hidden="true" />
-                        Private. Helps find your matches, never shown to them.
+                        {privateLine(vibe.consent)}
                       </p>
                     ) : null}
                     {area.text && openWhy === area.id ? (

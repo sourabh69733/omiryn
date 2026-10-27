@@ -242,6 +242,64 @@
   color: #fff;
 }
 
+/* Asked once: may matching use the private areas? */
+.vibe-consent {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid #e6defc;
+  border-radius: 16px;
+  background: #faf8ff;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vibe-consent p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.vibe-consent p:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.vibe-consent p:first-child svg {
+  width: 15px;
+  height: 15px;
+  color: var(--brand-violet);
+}
+
+.vibe-consent-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vibe-consent-actions button {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.vibe-consent-actions button.is-quiet {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.vibe-consent-actions button.is-quiet:hover {
+  background: #f5f1ff;
+}
+
+.vibe-consent small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 .vibe-card p.vibe-private {
   display: flex;
   align-items: center;

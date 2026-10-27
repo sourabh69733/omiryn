@@ -21,7 +21,15 @@ export type Vibe = {
   known: number;
   total: number;
   areas: VibeArea[];
+  consent?: Consent;
 };
+
+// Whether matching may weigh private areas (values, stories, deal-breakers). Not asked counts as no.
+export type Consent = { private_matching: boolean; asked: boolean; at: string | null };
+
+export function privateLine(consent?: Consent): string {
+  return consent?.private_matching ? "Private. Used for matching, never shown to anyone." : "Private. Not used for matching, never shown to anyone.";
+}
 
 export const VIBE_AREA_LABELS: Record<string, string> = {
   friend_wish: "What you want in a friend",
