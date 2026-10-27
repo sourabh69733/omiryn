@@ -23,7 +23,7 @@ from agent.providers.shared.messages import reply_window, summarized_through
 from agent.providers.shared.model_catalog import preferred_reply_model
 from agent.runtime.steps import visible_reply
 from agent.shared.clock import utc_now
-from agent.shared.timeline import day_part, humanize_gap, parse_time, user_zone
+from agent.shared.timeline import day_part, humanize_gap, parse_time, relative_day, user_zone
 from realtime import conversation_event, realtime_hub
 from storage import (
     get_conversation,
@@ -31,11 +31,19 @@ from storage import (
     get_user_profile,
     get_user_timezone,
     list_active_self_notes,
+    list_agent_memories,
+    mark_agent_memory_followed_up,
     resolve_self_notes,
     save_conversation,
 )
 
-from .policy import due_promise, nudge_block_reason, pick_thread, return_greeting_block_reason
+from .policy import (
+    due_event,
+    due_promise,
+    nudge_block_reason,
+    pick_thread,
+    return_greeting_block_reason,
+)
 
 logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL_SECONDS = 300.0
@@ -76,6 +84,20 @@ Earlier you promised the user: "{promise}". It is due now. Write ONE short messa
 sentences) that follows up on it naturally, the way a friend who remembered would. No pressure,
 and do not mention reminders, timers, notes or being automated.
 """
+
+_EVENT_INSTRUCTIONS = """
+
+PLAN FOLLOW-UP
+Before it happened, the user told you about this: "{event}" ({when}). It has passed now. If the
+recent chat shows they already told you how it went, that it was called off, or it is not
+something a friend would ask about, reply with exactly: SKIP
+Otherwise write ONE short message (one or two sentences) asking how it went, the way a friend
+who remembered would. Name it concretely. No pressure, and do not mention reminders, memory,
+notes or being automated.
+"""
+_EVENT_IN_GREETING = """Before it happened, they told you about this: "{event}" ({when}). It has passed. Unless they
+already told you how it went, ask about it in the greeting.
+"""
 # Lets the user type first; the greeting only goes out if they are still quiet.
 DEFAULT_RETURN_GREETING_DELAY_SECONDS = 8.0
 _pending_greetings: set[tuple[str, str]] = set()
@@ -89,14 +111,19 @@ def proactive_messaging_enabled() -> bool:
 
 async def run_proactive_pass(*, now: datetime | None = None) -> int:
     """Try one nudge per live conversation and return how many were sent."""
+    # Imported here: the away pass builds on this module.
+    from .away import run_away_follow_ups
+
+    now = now or utc_now()
     sent = 0
-    for user_id, conversation_id in await realtime_hub.live_conversations():
+    live = await realtime_hub.live_conversations()
+    for user_id, conversation_id in live:
         try:
-            if await _nudge(user_id, conversation_id, now or utc_now()):
+            if await _nudge(user_id, conversation_id, now):
                 sent += 1
         except Exception:
             logger.exception("agent.proactive.failed conversation_id=%s", conversation_id)
-    return sent
+    return sent + await run_away_follow_ups({user_id for user_id, _ in live}, now)
 
 
 def schedule_return_greeting(user_id: str, conversation_id: str) -> None:
@@ -144,6 +171,9 @@ async def greet_on_return(user_id: str, conversation_id: str, now: datetime) -> 
     )
     if promise:
         instructions += _PROMISE_IN_GREETING.format(promise=promise["text"])
+    event = _due_event(user_id, now)
+    if event:
+        instructions += _EVENT_IN_GREETING.format(**_event_facts(event, user_id, now))
     reply = await _generate(
         conversation,
         user_id,
@@ -160,7 +190,12 @@ async def greet_on_return(user_id: str, conversation_id: str, now: datetime) -> 
         "proactive_kind": "return_greeting",
         "created_at": now.isoformat(),
     }
-    return await _deliver_keeping_promise(user_id, conversation_id, len(messages), message, promise)
+    if event:
+        message["event_memory_id"] = event["id"]
+    delivered = await _deliver_keeping_promise(user_id, conversation_id, len(messages), message, promise)
+    if delivered and event:
+        mark_agent_memory_followed_up(event["id"], user_id, now)
+    return delivered
 
 
 async def _deliver_keeping_promise(
@@ -216,6 +251,9 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
     promise = due_promise(list_active_self_notes(user_id), now)
     if promise:
         return await _follow_up_promise(user_id, conversation, promise, now)
+    event = _due_event(user_id, now)
+    if event:
+        return await follow_up_event(user_id, conversation, event, now) is not None
     already_nudged = {m.get("thread_id") for m in messages if m.get("proactive")}
     thread = pick_thread(
         list_threads(user_id, statuses=("open",)), exclude_ids=already_nudged
@@ -272,6 +310,55 @@ async def _follow_up_promise(
     return await _deliver_keeping_promise(
         user_id, conversation["id"], len(conversation["messages"]), message, promise
     )
+
+
+def _due_event(user_id: str, now: datetime) -> dict[str, Any] | None:
+    return due_event(list_agent_memories(user_id), now, user_zone(get_user_timezone(user_id)))
+
+
+def _event_facts(event: dict[str, Any], user_id: str, now: datetime) -> dict[str, str]:
+    zone = user_zone(get_user_timezone(user_id))
+    occurred = parse_time(event.get("occurred_at")) or now
+    text = event.get("statement") or str(event.get("value") or "")
+    return {
+        "event": text,
+        "when": relative_day(occurred.astimezone(zone).date(), now.astimezone(zone).date()),
+    }
+
+
+async def follow_up_event(
+    user_id: str, conversation: dict[str, Any], event: dict[str, Any], now: datetime
+) -> dict[str, Any] | None:
+    """Ask how a plan went; returns the delivered message, or None when nothing went out.
+
+    The plan is marked once asked, and also when the model declines, so it is weighed only once.
+    """
+    facts = _event_facts(event, user_id, now)
+    reply = await _generate(
+        conversation,
+        user_id,
+        user_text=facts["event"],
+        instructions=_EVENT_INSTRUCTIONS.format(**facts),
+        cue=_CUE,
+        show_typing=False,
+    )
+    if not reply:
+        mark_agent_memory_followed_up(event["id"], user_id, now)
+        return None
+    message = {
+        "role": "assistant",
+        "content": reply,
+        "proactive": True,
+        "proactive_kind": "event_follow_up",
+        "event_memory_id": event["id"],
+        "created_at": now.isoformat(),
+    }
+    if not await _deliver(
+        user_id, conversation["id"], expected_count=len(conversation["messages"]), message=message
+    ):
+        return None
+    mark_agent_memory_followed_up(event["id"], user_id, now)
+    return message
 
 
 async def _deliver(

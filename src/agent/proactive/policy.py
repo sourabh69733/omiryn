@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from agent.context_engine.threads.models import ConversationThread
 from agent.shared.timeline import session_gap
@@ -110,6 +111,60 @@ def due_promise(notes: list[dict[str, Any]], now: datetime) -> dict[str, Any] | 
         and now - due_at <= PROMISE_FOLLOW_UP_MAX_AGE
     ]
     return min(due, key=lambda item: item[0])[1] if due else None
+
+
+# A plan is asked about a few hours after it happens. One with no time of day is stored at 12:00,
+# so it is asked about the next morning instead of in the middle of that day.
+EVENT_FOLLOW_UP_DELAY = timedelta(hours=3)
+EVENT_NEXT_MORNING = time(9)
+# Past this the question would feel late rather than caring.
+EVENT_FOLLOW_UP_WINDOW = timedelta(days=3)
+# At most one plan follow-up a day, across all chats.
+EVENT_FOLLOW_UP_GAP = timedelta(hours=24)
+# Local hours in which Omi may message a user who is away (Telegram); never at night.
+REACH_OUT_HOURS = range(10, 21)
+
+
+def event_follow_up_from(occurred_at: datetime, zone: ZoneInfo) -> datetime:
+    local = occurred_at.astimezone(zone)
+    if (local.hour, local.minute) == (12, 0):
+        return datetime.combine(local.date() + timedelta(days=1), EVENT_NEXT_MORNING, tzinfo=zone)
+    return occurred_at + EVENT_FOLLOW_UP_DELAY
+
+
+def due_event(memories: list[dict[str, Any]], now: datetime, zone: ZoneInfo) -> dict[str, Any] | None:
+    """The oldest plan the user told Omi about beforehand whose follow-up time has come, if any.
+
+    Only plans said before they happened count; an event told afterwards was already talked
+    about. Highly sensitive ones are left for the user to bring up.
+    """
+    if any(
+        (asked := _parse_time(memory.get("followed_up_at"))) and now - asked < EVENT_FOLLOW_UP_GAP
+        for memory in memories
+    ):
+        return None
+    due = []
+    for memory in memories:
+        occurred = _parse_time(memory.get("occurred_at"))
+        told = _parse_time(memory.get("created_at"))
+        if (
+            occurred is None
+            or told is None
+            or told >= occurred
+            or memory.get("followed_up_at")
+            or memory.get("status") != "active"
+            or memory.get("sensitivity") == "highly_sensitive"
+            or "reply_context" not in (memory.get("allowed_uses") or [])
+        ):
+            continue
+        start = event_follow_up_from(occurred, zone)
+        if start <= now <= start + EVENT_FOLLOW_UP_WINDOW:
+            due.append((start, memory))
+    return min(due, key=lambda item: item[0])[1] if due else None
+
+
+def reach_out_hours(now: datetime, zone: ZoneInfo) -> bool:
+    return now.astimezone(zone).hour in REACH_OUT_HOURS
 
 
 def pick_thread(
