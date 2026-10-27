@@ -23,11 +23,15 @@ WRITE_ATTEMPTS = 5
 REJECTED_KEY = "_rejected"
 # The intro Omi wrote from the non-private lines: {"text", "chips", "source"} (source = the lines it used).
 INTRO_KEY = "_intro"
+# The user's choice about private areas (values, stories, deal-breakers) in matching:
+# {"private_matching": bool, "at": iso time}. Absent means never asked, which counts as no.
+CONSENT_KEY = "_consent"
 
 
 def get_vibe_card(user_id: str) -> dict[str, Any]:
     """{"areas": {area_id: {"text", "evidence"}}, "rejected": {area_id: {"text", "evidence", "at"}},
-    "intro": {"text", "chips", "source"} | None, "milestone": id, "milestone_reached_at": datetime | None}."""
+    "intro": {"text", "chips", "source"} | None, "consent": {"private_matching", "at"} | None,
+    "milestone": id, "milestone_reached_at": datetime | None}."""
     return _read(_require_user_id(user_id, "agent vibe card"))[0]
 
 
@@ -38,13 +42,15 @@ def _read(owner_id: str) -> tuple[dict[str, Any], str | None]:
             select(agent_vibe_cards).where(agent_vibe_cards.c.user_id == owner_id)
         ).mappings().first()
     if not row:
-        return {"areas": {}, "rejected": {}, "intro": None, "milestone": "starting", "milestone_reached_at": None}, None
+        return {"areas": {}, "rejected": {}, "intro": None, "consent": None, "milestone": "starting", "milestone_reached_at": None}, None
     stored = _stored(owner_id, row["card"])
     intro = stored.get(INTRO_KEY)
+    consent = stored.get(CONSENT_KEY)
     return {
         "areas": merge_vibe(stored, {}),
         "rejected": _rejected(stored),
         "intro": intro if isinstance(intro, dict) else None,
+        "consent": consent if isinstance(consent, dict) else None,
         "milestone": row["milestone"],
         "milestone_reached_at": row["milestone_reached_at"],
     }, row["card"]
@@ -106,7 +112,7 @@ def _write(
         else now or utc_now()
     )
     values = {
-        "card": _card_text(owner_id, areas, rejected, current.get("intro")),
+        "card": _card_text(owner_id, areas, rejected, current.get("intro"), current.get("consent")),
         "milestone": milestone,
         "milestone_reached_at": reached_at,
     }
@@ -199,10 +205,37 @@ def prune_vibe_proof_from_missing_chats(user_id: str, existing_conversation_ids:
 
 def set_vibe_intro(user_id: str, intro: dict[str, Any]) -> None:
     """Save the intro; the lines and milestone stay as they are. Skipped if the card keeps changing."""
+    _replace_extra(user_id, intro=intro)
+
+
+def set_private_matching_consent(user_id: str, allowed: bool) -> dict[str, Any]:
+    """Record whether matching may weigh the user's private areas; returns the saved choice."""
+    consent = {"private_matching": bool(allowed), "at": utc_now().isoformat()}
+    _replace_extra(user_id, consent=consent)
+    return consent
+
+
+def private_matching_allowed(card: dict[str, Any]) -> bool:
+    """True only after the user said yes. Matching must check this before using a private area."""
+    consent = card.get("consent")
+    return bool(isinstance(consent, dict) and consent.get("private_matching") is True)
+
+
+_KEEP = object()
+
+
+def _replace_extra(user_id: str, *, intro: Any = _KEEP, consent: Any = _KEEP) -> None:
+    """Replace the intro or the consent; everything else on the card stays. Skipped if it keeps changing."""
     owner_id = _require_user_id(user_id, "agent vibe card")
     for _ in range(WRITE_ATTEMPTS):
         current, version = _read(owner_id)
-        card = _card_text(owner_id, current["areas"], current["rejected"], intro)
+        card = _card_text(
+            owner_id,
+            current["areas"],
+            current["rejected"],
+            current["intro"] if intro is _KEEP else intro,
+            current["consent"] if consent is _KEEP else consent,
+        )
         try:
             with ENGINE.begin() as connection:
                 if version is None:
@@ -227,8 +260,13 @@ def _card_text(
     areas: dict[str, Any],
     rejected: dict[str, Any],
     intro: dict[str, Any] | None,
+    consent: dict[str, Any] | None = None,
 ) -> str:
-    extra = {**({REJECTED_KEY: rejected} if rejected else {}), **({INTRO_KEY: intro} if intro else {})}
+    extra = {
+        **({REJECTED_KEY: rejected} if rejected else {}),
+        **({INTRO_KEY: intro} if intro else {}),
+        **({CONSENT_KEY: consent} if consent else {}),
+    }
     return _protect_text(owner_id, json.dumps({**areas, **extra}, ensure_ascii=False))
 
 
@@ -252,7 +290,9 @@ def _rejected(stored: dict[str, Any]) -> dict[str, dict[str, Any]]:
 __all__ = [
     "drop_vibe_proof_from_conversation",
     "get_vibe_card",
+    "private_matching_allowed",
     "prune_vibe_proof_from_missing_chats",
+    "set_private_matching_consent",
     "set_vibe_intro",
     "update_vibe_card",
     "vibe_deletion_impact",

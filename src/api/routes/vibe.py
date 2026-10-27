@@ -21,7 +21,9 @@ from storage import (
     get_conversation,
     get_vibe_card,
     list_conversation_ids,
+    private_matching_allowed,
     prune_vibe_proof_from_missing_chats,
+    set_private_matching_consent,
     set_vibe_intro,
     update_vibe_card,
 )
@@ -60,6 +62,36 @@ async def delete_vibe_area(area_id: str, user: CurrentUser = Depends(require_use
     if area_id not in {item_id for item_id, _, _ in VIBE_AREAS}:
         raise HTTPException(status_code=404, detail="Unknown vibe area.")
     return _vibe_payload(update_vibe_card(user.id, {}, reject=(area_id,)), user.id)
+
+
+class ConsentChoice(BaseModel):
+    private_matching: bool
+
+
+@router.get("/api/me/consent")
+async def get_consent(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """Whether matching may weigh the user's private areas. Never asked counts as no."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return _consent_payload(get_vibe_card(user.id))
+
+
+@router.put("/api/me/consent")
+async def put_consent(payload: ConsentChoice, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """The user allows or stops matching on private areas. Takes effect at once."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    saved = set_private_matching_consent(user.id, payload.private_matching)
+    return {"private_matching": saved["private_matching"], "asked": True, "at": saved["at"]}
+
+
+def _consent_payload(card: dict[str, object]) -> dict[str, object]:
+    consent = card.get("consent") if isinstance(card.get("consent"), dict) else None
+    return {
+        "private_matching": private_matching_allowed(card),
+        "asked": consent is not None,
+        "at": consent.get("at") if consent else None,
+    }
 
 
 class IntroEdit(BaseModel):
@@ -182,6 +214,7 @@ def _vibe_payload(card: dict[str, object], user_id: str) -> dict[str, object]:
         "milestone_reached_at": reached_at.isoformat() if reached_at else None,
         "known": len(progress.known),
         "total": len(VIBE_AREAS),
+        "consent": _consent_payload(card),
         "areas": [
             {
                 "id": area_id,
