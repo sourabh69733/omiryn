@@ -768,13 +768,13 @@ button.pf-model-option.is-checked {
   color: var(--brand-violet);
 }
 
-.pf-telegram-state {
+.pf-channel-state {
   display: inline-flex;
   align-items: center;
   gap: 12px;
 }
 
-button.pf-telegram-action {
+button.pf-channel-action {
   padding: 0;
   border: 0;
   background: transparent;
@@ -786,24 +786,24 @@ button.pf-telegram-action {
   cursor: pointer;
 }
 
-button.pf-telegram-action:hover {
+button.pf-channel-action:hover {
   background: transparent;
   color: #b42318;
 }
 
-.pf-telegram-note {
+.pf-channel-note {
   margin: 0;
   padding: 0 0 12px;
   border-bottom: 1px solid var(--line);
 }
 
-.pf-telegram-label {
+.pf-channel-label {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 
-.pf-telegram-icon {
+.pf-channel-icon {
   width: 24px;
   height: 24px;
   flex: none;

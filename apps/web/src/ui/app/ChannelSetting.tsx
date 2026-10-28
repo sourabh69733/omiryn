@@ -1,29 +1,37 @@
-// Profile > Account: chat with Omi on Telegram. Connecting opens the bot with a one-time code;
-// tapping Start there finishes it. Hidden when Telegram isn't switched on for this account.
+// Profile > Account: chat with Omi on a messaging app (Telegram, WhatsApp). Connecting opens the
+// app with a one-time code; Start (Telegram) or send (WhatsApp) there finishes it. Hidden when
+// that app isn't switched on for this account.
 import { useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { Notice } from "./StateView";
 
-type TelegramStatus = { available: boolean; connected: boolean; bot_username: string | null };
+type ChannelStatus = { available: boolean; connected: boolean };
+type Channel = "telegram" | "whatsapp";
 
-// Omi as a chat bubble: Omi's own chat on Telegram.
-function TelegramIcon() {
-  return <img className="pf-telegram-icon" src="/assets/agent/omi-chat-bubble-48.webp" srcSet="/assets/agent/omi-chat-bubble-48.webp 1x, /assets/agent/omi-chat-bubble-96.webp 2x" width={24} height={24} alt="" />;
+const CHANNEL_COPY: Record<Channel, { name: string; finish: string }> = {
+  telegram: { name: "Telegram", finish: "Tap Start in Telegram to finish." },
+  whatsapp: { name: "WhatsApp", finish: "Send the message that opens in WhatsApp to finish." },
+};
+
+// Omi as a chat bubble: Omi's own chat in that app.
+function ChannelIcon() {
+  return <img className="pf-channel-icon" src="/assets/agent/omi-chat-bubble-48.webp" srcSet="/assets/agent/omi-chat-bubble-48.webp 1x, /assets/agent/omi-chat-bubble-96.webp 2x" width={24} height={24} alt="" />;
 }
 
-export function TelegramSetting() {
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
+export function ChannelSetting({ channel }: { channel: Channel }) {
+  const copy = CHANNEL_COPY[channel];
+  const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [busy, setBusy] = useState(false);
-  // Set while waiting for the user to tap Start in Telegram.
+  // Set while waiting for the user to finish in the app.
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function refresh() {
     try {
-      const response = await apiFetch("/api/channels/telegram");
+      const response = await apiFetch(`/api/channels/${channel}`);
       if (!response.ok) return;
-      const next = (await response.json()) as TelegramStatus;
+      const next = (await response.json()) as ChannelStatus;
       setStatus(next);
       if (next.connected) setPendingUrl(null);
     } catch {
@@ -33,7 +41,7 @@ export function TelegramSetting() {
 
   useEffect(() => { void refresh(); }, []);
 
-  // Coming back from Telegram after tapping Start shows "Connected" without a reload.
+  // Coming back from the app after finishing shows "Connected" without a reload.
   useEffect(() => {
     if (!pendingUrl) return;
     const onReturn = () => { if (document.visibilityState === "visible") void refresh(); };
@@ -53,7 +61,7 @@ export function TelegramSetting() {
     setBusy(true);
     setError("");
     try {
-      const response = await apiFetch("/api/channels/telegram/link", { method: "POST" });
+      const response = await apiFetch(`/api/channels/${channel}/link`, { method: "POST" });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Couldn't start connecting."));
       const { url } = (await response.json()) as { url: string };
       setPendingUrl(url);
@@ -70,7 +78,7 @@ export function TelegramSetting() {
     setBusy(true);
     setError("");
     try {
-      const response = await apiFetch("/api/channels/telegram", { method: "DELETE" });
+      const response = await apiFetch(`/api/channels/${channel}`, { method: "DELETE" });
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Couldn't disconnect."));
       await refresh();
     } catch (caught) {
@@ -84,21 +92,21 @@ export function TelegramSetting() {
     <>
       {status.connected ? (
         <div className="pf-row">
-          <span className="pf-telegram-label"><TelegramIcon />Telegram</span>
-          <span className="pf-telegram-state">
+          <span className="pf-channel-label"><ChannelIcon />{copy.name}</span>
+          <span className="pf-channel-state">
             <span className="pf-muted">Connected</span>
-            <button type="button" className="pf-telegram-action" onClick={() => void disconnect()} disabled={busy}>Disconnect</button>
+            <button type="button" className="pf-channel-action" onClick={() => void disconnect()} disabled={busy}>Disconnect</button>
           </span>
         </div>
       ) : (
         <button type="button" className="pf-row is-action" onClick={() => void connect()} disabled={busy}>
-          <span className="pf-telegram-label"><TelegramIcon />Chat with Omi on Telegram</span>
+          <span className="pf-channel-label"><ChannelIcon />Chat with Omi on {copy.name}</span>
           <span className="pf-muted pf-model-current">{busy ? "Opening…" : "Connect"}<ChevronRight aria-hidden="true" /></span>
         </button>
       )}
       {pendingUrl && !status.connected ? (
-        <p className="pf-model-note pf-telegram-note">
-          Tap Start in Telegram to finish. The link works for 15 minutes. <a href={pendingUrl} target="_blank" rel="noreferrer">Open Telegram</a>
+        <p className="pf-model-note pf-channel-note">
+          {copy.finish} The link works for 15 minutes. <a href={pendingUrl} target="_blank" rel="noreferrer">Open {copy.name}</a>
         </p>
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
