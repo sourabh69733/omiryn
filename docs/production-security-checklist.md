@@ -55,6 +55,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Admin routes allow only configured admin emails or user IDs.
 - [x] Unauthenticated admin dev bypass is disabled in production.
 - [x] Interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are off in production.
+- [x] WhatsApp webhook accepts only bodies signed with the Meta app secret (`X-Hub-Signature-256`); verification needs `WHATSAPP_VERIFY_TOKEN`. Off unless `WHATSAPP_ENABLED=true`. The user's WhatsApp number is stored as the chat ID in `channel_links` and deleted with the account.
+- [ ] Keep the WhatsApp access token, app secret and verify token in Secret Manager; use a permanent system-user token in production.
 - [x] Telegram webhook accepts only requests with the configured secret header; link codes are one-time, expire in 15 minutes and are stored hashed. Telegram is off unless `TELEGRAM_ENABLED=true`.
 - [ ] Set a long random `TELEGRAM_WEBHOOK_SECRET` in production and keep the bot token in the secret manager.
 - [ ] Plan follow-ups sent to Telegram while the user is away can name a sensitive plan (for example a date) in the phone's lock-screen preview. Highly sensitive plans are never raised; decide whether sensitive ones should stay in the app only.
@@ -72,7 +74,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Run `scripts/data_ops/assign-legacy-data-to-user.sh --dry-run` and backfill/delete legacy anonymous rows before deployment.
 - [ ] Daily backups are enabled.
 - [ ] Restore process is tested.
-- [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, Telegram links, and public leads where applicable.
+- [x] User deletion process covers profile, chats, memories, photos, learned signals, usage logs, app events, feedback, data requests, Telegram and WhatsApp links, and public leads where applicable.
 - [x] Add admin/internal view for deletion and export requests.
 - [x] Raw chat/import text is not written to application logs or provider error usage metadata.
 - [x] Production startup requires profile photos to use GCS instead of ephemeral local disk.

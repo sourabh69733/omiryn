@@ -175,6 +175,13 @@ Telegram v1 (`src/api/routes/telegram.py`, `src/channels/telegram.py`):
 - Test plan: 10-20 users for 2 weeks; compare messages per day and return rate on Telegram against the web (user messages carry `channel`).
 - Before opening Telegram to everyone: a database lock so two instances never save the same chat at once (until then, one Cloud Run instance), and story parts sent to Telegram (autoplay now needs the web chat open).
 
+WhatsApp v1 (built 2026-10-28, `src/api/routes/whatsapp.py`, `src/channels/whatsapp.py`, WhatsApp Cloud API):
+- Same as Telegram: Profile > "Chat with Omi on WhatsApp" opens `wa.me/<number>?text=connect <code>`; sending it links the number. Its own chat (`channel: whatsapp`), shared memories and vibe, grouped quick messages, short bubbles, "typing…" (WhatsApp's read + typing indicator), "disconnect" or Disconnect in Profile. Message grouping and replies live in `src/api/routes/channel_replies.py`, shared with Telegram.
+- Webhook: Meta's GET verification (`WHATSAPP_VERIFY_TOKEN`) and `X-Hub-Signature-256` checked with the app secret. Meta wants an answer at once, so the reply runs in the background after the 200; repeated deliveries are skipped by message ID (in memory, per process).
+- Limits: replies only inside WhatsApp's 24-hour window (no plan follow-ups or nudges there yet); text only; the user's WhatsApp number is stored as the chat ID. Meta's policy on general AI chatbots can get a real number banned; test on Meta's test number first.
+- On Cloud Run the background reply needs CPU after the response: keep CPU always allocated (or min 1 instance) when WhatsApp is on.
+- Locally Meta needs a public HTTPS URL: `cloudflared tunnel --url http://127.0.0.1:8001`, then set `<tunnel>/api/channels/whatsapp/webhook` in the Meta app.
+
 Discord (planned, not started; chosen 2026-10-21 because students use it more than Telegram):
 - Discord delivers normal messages only over a live connection (the Gateway), not webhooks, so it needs an always-on process. Options: A) API on Cloud Run with min 1 instance and CPU always on; B) a small separate bot worker that holds the connection and calls the API (recommended); C) slash command only (`/omi ...`), serverless but clunky.
 - Users can DM a bot only when they share a server with it, so an Omiryn Discord server comes with it; it can grow into the community (match drops, events).
