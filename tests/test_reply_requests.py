@@ -64,3 +64,34 @@ class FollowRequestsTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecentRequestsTest(unittest.IsolatedAsyncioTestCase):
+    """A request made in this session holds before it is saved (seen live: one question asked 5 times)."""
+
+    HISTORY = [
+        {"role": "user", "content": "hi", "created_at": "2026-10-28T08:00:00+00:00"},
+        {"role": "assistant", "content": "Kya kar rahe ho abhi?", "created_at": "2026-10-28T08:00:05+00:00"},
+        {"role": "user", "content": "do not ask stupid questions", "created_at": "2026-10-28T08:01:00+00:00"},
+    ]
+
+    def test_session_user_messages_are_read_newest_last(self) -> None:
+        from agent.context_engine.policy.requests import recent_user_requests
+
+        old = {"role": "user", "content": "yesterday's chat", "created_at": "2026-10-27T08:00:00+00:00"}
+        self.assertEqual(
+            recent_user_requests([old, *self.HISTORY], "english?"),
+            ["hi", "do not ask stupid questions", "english?"],
+        )
+
+    async def test_a_request_from_this_session_is_checked_without_saved_ones(self) -> None:
+        checker = AsyncMock(return_value={"broken": ["do not ask stupid questions"]})
+        writer = AsyncMock(return_value="Theek hai, chill karte hain.")
+        job = ReplyJob(list(self.HISTORY), ARGS, writer, history=list(self.HISTORY), user_text="ok")
+        with patch("agent.runtime.steps.checks.check_reply_requests", checker):
+            reply, info = await follow_requests("Acha, toh kya kar rahe ho abhi?", job)
+
+        self.assertEqual(reply, "Theek hai, chill karte hain.")
+        self.assertEqual(info["broken"], ["do not ask stupid questions"])
+        self.assertIn('"recent_user_messages": ["hi", "do not ask stupid questions", "ok"]', checker.await_args.args[0])
+        self.assertIn("do not ask stupid questions", writer.await_args.args[0][-1]["content"])
