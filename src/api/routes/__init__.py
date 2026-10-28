@@ -14,6 +14,7 @@ from . import (
     public,
     realtime,
     telegram,
+    whatsapp,
     usage,
     vibe,
 )
@@ -33,5 +34,6 @@ router.include_router(drafts.router)
 router.include_router(demo.router)
 router.include_router(vibe.router)
 router.include_router(telegram.router)
+router.include_router(whatsapp.router)
 
 __all__ = ["router", "run_agent_turn"]
