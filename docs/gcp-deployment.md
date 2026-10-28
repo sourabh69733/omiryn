@@ -191,6 +191,15 @@ Grouping quick messages works within one instance. With several instances, two m
 burst can be handled at once and their saves can overwrite each other, so keep the service at
 one instance (`--max-instances 1`) during the Telegram test, or add a database lock first.
 
+### WhatsApp (optional)
+
+Same service. In `.gcp.env`: `WHATSAPP_ENABLED=true`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_PHONE_NUMBER`,
+`WHATSAPP_ALLOWED_EMAILS`, the secret names `WHATSAPP_ACCESS_TOKEN_SECRET`, `WHATSAPP_APP_SECRET_SECRET`,
+`WHATSAPP_VERIFY_TOKEN_SECRET` and their values; then sync secrets and deploy. In the Meta app, set the
+webhook to `https://<service-url>/api/channels/whatsapp/webhook` with the same verify token and subscribe
+to `messages`. Replies run after the webhook returns, so set CPU to always allocated
+(`gcloud run services update <service> --no-cpu-throttling`) while WhatsApp is on.
+
 ## 8. Encrypt Existing Data
 
 Dry run first:
