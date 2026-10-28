@@ -13,6 +13,7 @@ from agent.runtime.orchestrator import AgentTurnResult
 from agent.runtime.steps import turn_notes as _turn_notes
 from agent.shared.clock import utc_now
 from api.main import app, current_user
+from api.routes import channel_replies
 from api.routes import telegram as telegram_routes
 from security.auth import CurrentUser
 from storage import (
@@ -61,8 +62,8 @@ class _TelegramTestBase(unittest.TestCase):
         self.patches = [
             patch.object(telegram_routes, "send_telegram_message", self.sent),
             patch.object(telegram_routes, "send_telegram_typing", AsyncMock()),
-            patch.object(telegram_routes, "_BUBBLE_PAUSE_SECONDS", 0),
-            patch.object(telegram_routes, "_QUIET_SECONDS", 0),
+            patch.object(channel_replies, "BUBBLE_PAUSE_SECONDS", 0),
+            patch.object(channel_replies, "QUIET_SECONDS", 0),
         ]
         for item in self.patches:
             item.start()
@@ -308,7 +309,7 @@ class TelegramBurstTest(_TelegramTestBase):
         self.sent.reset_mock()
         turn = _FakeTurn()
 
-        with patch.object(telegram_routes, "_QUIET_SECONDS", 0.2), patch("api.main.run_agent_turn", turn):
+        with patch.object(channel_replies, "QUIET_SECONDS", 0.2), patch("api.main.run_agent_turn", turn):
             asyncio.run(self._send_all(["hey", "listen", "I got the job!"], gap=0.02))
 
         self.assertEqual(len(turn.calls), 1)
@@ -338,7 +339,7 @@ class TelegramBurstTest(_TelegramTestBase):
         self._connect()
         self.sent.reset_mock()
 
-        with patch.object(telegram_routes, "_QUIET_SECONDS", 0.2), patch(
+        with patch.object(channel_replies, "QUIET_SECONDS", 0.2), patch(
             "api.main.run_agent_turn", AsyncMock(side_effect=RuntimeError("model down"))
         ):
             asyncio.run(self._send_all(["hey", "you there?"], gap=0.02))
