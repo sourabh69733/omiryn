@@ -12,10 +12,12 @@ from agent.context_engine.policy.freshness import (
     stale_reply_reason,
     trim_questions,
     without_copied_replies,
+    without_repeated_questions,
 )
 from agent.context_engine.policy.requests import (
     broken_requests,
     broken_requests_reason,
+    recent_user_requests,
     request_check_input,
 )
 from agent.providers import check_reply_requests
@@ -59,20 +61,25 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
         # The model tends to copy the questions in its own history, even when asked not to.
         rewritten = trim_questions(rewritten, job.question_limit)
         trimmed = True
+    # Same for a question it already asked: the rewrite often brings it back.
+    rewritten = without_repeated_questions(rewritten, job.previous_replies)
     return rewritten, {"reason": reason, "rewritten": True, "questions_trimmed": trimmed, "still_stale": problem(rewritten) is not None}
 
 
 async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
-    """One rewrite when the draft breaks how the user asked to be talked to. Runs only for users
-    with saved how-to-talk requests."""
-    if not job.requests or not request_check_enabled():
+    """One rewrite when the draft breaks how the user asked to be talked to: their saved requests,
+    and what they asked earlier in this session, which is saved only once the chat goes quiet."""
+    recent = recent_user_requests(job.history, job.user_text)
+    if not (job.requests or recent) or not request_check_enabled():
         return reply, None
     conversation_id = str(job.generation_arguments.get("conversation_id") or "")
     try:
-        raw = await check_reply_requests(request_check_input(reply, job.requests), conversation_id=conversation_id)
+        raw = await check_reply_requests(
+            request_check_input(reply, job.requests, recent), conversation_id=conversation_id
+        )
     except Exception as error:
         return reply, {"checked": False, "error": type(error).__name__}
-    broken = broken_requests(raw, job.requests)
+    broken = broken_requests(raw, [*job.requests, *recent])
     if not broken:
         return reply, {"checked": True, "broken": []}
     try:

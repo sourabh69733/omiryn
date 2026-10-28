@@ -192,3 +192,33 @@ class FreshenReplyTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepeatedQuestionTest(unittest.TestCase):
+    """Seen live: "kya kar rahe ho abhi?" five times in 20 minutes, each inside a new reply."""
+
+    PREVIOUS = ["Arre wah! Toh kya kar rahe ho abhi?", "Sahi hai."]
+
+    def test_a_question_asked_before_is_caught_inside_a_new_reply(self) -> None:
+        from agent.context_engine.policy.freshness import stale_reply_reason
+
+        reason = stale_reply_reason("Theek hai, no worries. Waise abhi kya kar rahe ho?", self.PREVIOUS)
+        self.assertIn("a question you already asked", reason)
+
+    def test_new_and_short_questions_are_fine(self) -> None:
+        from agent.context_engine.policy.freshness import repeated_questions
+
+        self.assertEqual(repeated_questions("Kal ka match dekha tumne?", self.PREVIOUS), [])
+        self.assertEqual(repeated_questions("Haha, and you?", ["Same here, and you?"]), [])
+
+    def test_last_resort_drops_the_repeated_question_but_never_empties_the_reply(self) -> None:
+        from agent.context_engine.policy.freshness import without_repeated_questions
+
+        reply = "Theek hai, no worries.<next_message>Waise kya kar rahe ho abhi?"
+        self.assertEqual(without_repeated_questions(reply, self.PREVIOUS), "Theek hai, no worries.")
+        self.assertEqual(without_repeated_questions("Kya kar rahe ho abhi?", self.PREVIOUS), "Kya kar rahe ho abhi?")
+
+    def test_a_different_question_with_shared_words_is_fine(self) -> None:
+        from agent.context_engine.policy.freshness import repeated_questions
+
+        self.assertEqual(repeated_questions("What are you doing this weekend?", ["What are you doing now?"]), [])

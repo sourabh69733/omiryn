@@ -40,12 +40,49 @@ def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
     for earlier in earlier_replies:
         if _copies(reply, earlier):
             return "it nearly repeats a reply you already sent in this chat"
+    asked = repeated_questions(reply, earlier_replies)
+    if asked:
+        return (
+            f'it asks again "{asked[0]}", a question you already asked in this chat; '
+            "do not ask it again in any words"
+        )
     opening = _opening(flat)
     if opening:
         same_opening = sum(1 for earlier in earlier_replies if _opening(earlier) == opening)
         if same_opening >= _OPENING_REPEAT_LIMIT:
             return f'it opens with "{opening}" again, as {same_opening} recent replies did'
     return None
+
+
+def repeated_questions(reply: str, previous_replies: list[str]) -> list[str]:
+    """Questions in the draft that nearly match one asked in an earlier reply.
+
+    The whole-reply check misses a question that comes back inside new replies (seen live:
+    "kya kar rahe ho abhi?" five times in 20 minutes, each time with new words around it).
+    """
+    earlier = [question for text in previous_replies[-_RECENT_REPLIES:] for question in _questions(text)]
+    return [
+        question
+        for question in _questions(reply)
+        if any(_same_question(_normalize(question), _normalize(other)) for other in earlier)
+    ]
+
+
+def without_repeated_questions(reply: str, previous_replies: list[str]) -> str:
+    """Last resort when a rewrite still repeats: drop the repeated question sentences.
+
+    A bubble left empty goes; a reply is never emptied, so one made only of them is kept.
+    """
+    repeated = repeated_questions(reply, previous_replies)
+    if not repeated:
+        return reply
+    bubbles = []
+    for bubble in reply.split(REPLY_PART_SEPARATOR):
+        for question in repeated:
+            bubble = bubble.replace(question, "")
+        if bubble.strip():
+            bubbles.append(" ".join(bubble.split()))
+    return REPLY_PART_SEPARATOR.join(bubbles) if bubbles else reply
 
 
 def question_rule_reason(reply: str, question_limit: int) -> str | None:
@@ -138,13 +175,38 @@ def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True, ke
 def _copies(draft: str, earlier: str) -> bool:
     """The draft, or one of its bubbles, nearly copies the earlier reply or one of its bubbles;
     a copy with one new bubble added is still a copy."""
-    return any(
-        part == other
-        or _similarity(part, other) >= _NEAR_COPY_SIMILARITY
-        or _word_overlap(part, other) >= _SAME_WORDS_SIMILARITY
-        for part in _parts(draft)
-        for other in _parts(earlier)
+    return any(_same_text(part, other) for part in _parts(draft) for other in _parts(earlier))
+
+
+def _same_text(left: str, right: str) -> bool:
+    return (
+        left == right
+        or _similarity(left, right) >= _NEAR_COPY_SIMILARITY
+        or _word_overlap(left, right) >= _SAME_WORDS_SIMILARITY
     )
+
+
+def _same_question(left: str, right: str) -> bool:
+    """Same text, or the same words with a filler added ("toh", "waise") in any order. "What are
+    you doing now?" and "...this weekend?" share most words but are different questions."""
+    if _same_text(left, right):
+        return True
+    left_words, right_words = set(left.split()), set(right.split())
+    shared = len(left_words & right_words)
+    return (
+        shared / min(len(left_words), len(right_words)) >= _SAME_WORDS_SIMILARITY
+        and _word_overlap(left, right) >= _NEAR_COPY_SIMILARITY
+    )
+
+
+def _questions(text: str) -> list[str]:
+    """Question sentences long enough to be a real question ("you?" is fine to repeat)."""
+    found = re.findall(r"[^.!?\u0964\n]*\?+", text.replace(REPLY_PART_SEPARATOR, "\n"))
+    return [
+        question.strip()
+        for question in found
+        if len(_normalize(question).split()) >= _MIN_WORDS_FOR_REPEAT_CHECK
+    ]
 
 
 def _word_overlap(left: str, right: str) -> float:
@@ -191,8 +253,10 @@ __all__ = [
     "STOCK_PHRASES",
     "question_rule_reason",
     "recent_assistant_replies",
+    "repeated_questions",
     "rewrite_instruction",
     "stale_reply_reason",
     "trim_questions",
     "without_copied_replies",
+    "without_repeated_questions",
 ]
