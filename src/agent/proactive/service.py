@@ -34,7 +34,7 @@ from storage import (
     list_agent_memories,
     mark_agent_memory_followed_up,
     resolve_self_notes,
-    save_conversation,
+    update_conversation,
 )
 
 from .policy import (
@@ -377,12 +377,22 @@ async def deliver_messages(
     new_messages: list[dict[str, Any]],
 ) -> bool:
     """Append agent-initiated bubbles and push them live, unless the chat moved on meanwhile."""
-    # The user may have written while the model was thinking; re-read and never talk over them.
-    latest = get_conversation(conversation_id, user_id)
-    if not latest or len(latest["messages"]) != expected_count or not new_messages:
+    # The user may have written while the model was thinking; the count is checked under the
+    # row lock, so Omi never talks over them and never overwrites a reply saved meanwhile.
+    if not new_messages:
         return False
-    latest["messages"] = [*latest["messages"], *new_messages]
-    save_conversation(latest, user_id)
+
+    added = False
+
+    def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        nonlocal added
+        if len(messages) != expected_count:
+            return None
+        added = True
+        return [*messages, *new_messages]
+
+    if not update_conversation(conversation_id, user_id, add) or not added:
+        return False
     for index, message in enumerate(new_messages, start=expected_count):
         await realtime_hub.publish(
             conversation_event(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 import sys
+from collections.abc import Callable, Iterable
 from typing import Any
 from uuid import uuid4
 
@@ -44,6 +45,7 @@ from storage import (
     clear_agent_message_feedback,
     replace_agent_message_feedback,
     save_conversation,
+    update_conversation,
     save_draft,
     set_conversation_archived,
 )
@@ -116,6 +118,42 @@ def _run_agent_turn_callable():
     return getattr(main_module, "run_agent_turn", run_agent_turn)
 
 
+def _change_messages(
+    conversation: AgentConversation,
+    user: CurrentUser,
+    change: Callable[[list[dict[str, Any]]], list[dict[str, Any]] | None] | None,
+    *,
+    fields: dict[str, Any] | None = None,
+) -> None:
+    """Change the stored messages under the database lock and refresh `conversation` from what
+    is stored now. A reply, a nudge or a second instance may have written meanwhile; the change
+    works on the newest list, so no message is lost."""
+    stored = update_conversation(conversation.id, _user_id(user), change, fields=fields)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Agent conversation not found.")
+    conversation.messages = stored["messages"]
+    for key, value in (fields or {}).items():
+        setattr(conversation, key, value)
+
+
+def _same_message(stored: dict[str, Any], sent: dict[str, Any]) -> bool:
+    return (
+        stored.get("role") == sent.get("role")
+        and stored.get("created_at") == sent.get("created_at")
+        and stored.get("content") == sent.get("content")
+    )
+
+
+def _find_message(messages: list[dict[str, Any]], index: int, sent: dict[str, Any]) -> int | None:
+    """Where `sent` sits now: at its old index, unless messages were added or removed meanwhile."""
+    if index < len(messages) and _same_message(messages[index], sent):
+        return index
+    for position in range(len(messages) - 1, -1, -1):
+        if _same_message(messages[position], sent):
+            return position
+    return None
+
+
 @router.post("/api/agent/conversations", status_code=201)
 async def create_agent_conversation(
     payload: AgentConversationCreate | None = None,
@@ -182,10 +220,12 @@ async def _publish_new_messages(
     start_index: int,
 ) -> None:
     """Notify subscribed clients after durable message storage succeeds."""
-    for message_index, message in enumerate(
-        conversation.messages[start_index:],
-        start=start_index,
-    ):
+    await _publish_messages(conversation, range(start_index, len(conversation.messages)))
+
+
+async def _publish_messages(conversation: AgentConversation, indexes: Iterable[int]) -> None:
+    for message_index in indexes:
+        message = conversation.messages[message_index]
         await realtime_hub.publish(
             conversation_event(
                 "message.created",
@@ -389,7 +429,19 @@ def update_agent_conversation_settings(
         style_source_id = payload.agent_style_source_id or None
         _validate_style_source(conversation_id, style_source_id, _user_id(user))
         conversation.agent_style_source_id = style_source_id
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    # Only the settings columns: a reply being written meanwhile keeps its messages.
+    _change_messages(
+        conversation,
+        user,
+        None,
+        fields={
+            field: getattr(conversation, field)
+            for field in (
+                "agent_provider", "agent_model", "agent_mode", "agent_tone",
+                "agent_voice", "agent_name", "agent_style_source_id",
+            )
+        },
+    )
     return conversation
 
 
@@ -426,25 +478,28 @@ async def post_user_message(
     if conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat came from an upload; it can't be replied to.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
-    # A new message answers for any earlier one whose reply failed: the reply covers both.
-    for message in conversation.messages:
-        if message.get("role") == "user" and _reply_failed(message):
-            message["delivery_status"] = "read"
-    prior_messages = list(conversation.messages)
     pending = {
         "role": "user",
         "content": text,
         "created_at": utc_now_iso(),
         "delivery_status": "sending",
-        **({"reply_to": _reply_quote(prior_messages, reply_to_index)} if reply_to_index is not None else {}),
+        **({"reply_to": _reply_quote(conversation.messages, reply_to_index)} if reply_to_index is not None else {}),
         **({"channel": channel} if channel else {}),
     }
+
+    def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # A new message answers for any earlier one whose reply failed: the reply covers both.
+        for message in messages:
+            if message.get("role") == "user" and _reply_failed(message):
+                message["delivery_status"] = "read"
+        messages.append(dict(pending))
+        return messages
+
     # Saved before the model runs, so a failed reply never loses what the user wrote.
-    conversation.messages = [*prior_messages, pending]
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    _change_messages(conversation, user, add)
     # Writing in an archived chat brings it back to the main list.
     set_conversation_archived(conversation.id, _user_id(user), False)
-    return await _reply_to_pending(conversation, user, prior_messages, pending, background_tasks)
+    return await _reply_to_pending(conversation, user, conversation.messages[:-1], pending, background_tasks)
 
 
 @router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/retry")
@@ -468,11 +523,18 @@ async def retry_agent_message(
         raise HTTPException(status_code=409, detail="This message has nothing to retry.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     _remember_user_timezone(user, timezone_header)
-    pending = messages[message_index]
-    pending["delivery_status"] = "sending"
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    pending = dict(messages[message_index])
+
+    def mark_sending(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        index = _find_message(stored, message_index, pending)
+        if index is None:
+            return None
+        stored[index]["delivery_status"] = "sending"
+        return stored
+
+    _change_messages(conversation, user, mark_sending)
     return await _reply_to_pending(
-        conversation, user, messages[:message_index], pending, background_tasks
+        conversation, user, conversation.messages[:message_index], pending, background_tasks
     )
 
 
@@ -506,37 +568,59 @@ async def _reply_to_pending(
     pending: dict[str, Any],
     background_tasks: BackgroundTasks,
 ) -> AgentConversation:
+    """Reply to `pending` (stored at index `len(prior_messages)` when this started) and save the
+    reply after whatever the chat holds now: the user may have written again meanwhile."""
+    pending_index = len(prior_messages)
+    placed: dict[str, int | None] = {"user": None, "start": None}
     try:
         turn = await _run_turn(conversation, user, prior_messages, pending)
     except (AgentProviderError, Exception) as error:
         logger.warning(
             "agent.reply.failed conversation_id=%s error=%s", conversation.id, type(error).__name__
         )
-        pending["delivery_status"] = REPLY_FAILED
-        save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+
+        def mark_failed(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+            placed["user"] = _find_message(stored, pending_index, pending)
+            if placed["user"] is None:
+                return None
+            stored[placed["user"]]["delivery_status"] = REPLY_FAILED
+            return stored
+
+        _change_messages(conversation, user, mark_failed)
         raise HTTPException(
             status_code=502,
             detail={
                 "code": REPLY_FAILED_CODE,
                 "message": "Couldn't reply right now. Your message is saved; tap Retry.",
-                "message_index": len(prior_messages),
+                "message_index": placed["user"] if placed["user"] is not None else pending_index,
             },
         ) from error
 
-    previous_message_count = len(prior_messages)
-    conversation.messages = turn.messages
-    if getattr(turn, "agent_voice", None):
-        conversation.agent_voice = turn.agent_voice
-    user_message = conversation.messages[previous_message_count]
-    # Keep when the user actually wrote it, even when this reply came from a retry.
-    user_message["created_at"] = pending["created_at"]
-    for key in ("reply_to", "channel"):
-        if pending.get(key):
-            user_message[key] = pending[key]
-    user_message["delivery_status"] = "read"
-    _stamp_new_messages(conversation.messages, previous_message_count)
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
-    await _publish_new_messages(conversation, previous_message_count)
+    answered = turn.messages[pending_index]
+    replies = [dict(message) for message in turn.messages[pending_index + 1 :]]
+
+    def commit(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        # The stored message keeps when the user wrote it, the quote and the channel.
+        placed["user"] = _find_message(stored, pending_index, pending)
+        if placed["user"] is None:
+            return None
+        if answered.get("quality"):
+            stored[placed["user"]]["quality"] = answered["quality"]
+        stored[placed["user"]]["delivery_status"] = "read"
+        placed["start"] = len(stored)
+        stored.extend(replies)
+        _stamp_new_messages(stored, placed["start"])
+        return stored
+
+    voice = getattr(turn, "agent_voice", None)
+    _change_messages(conversation, user, commit, fields={"agent_voice": voice} if voice else None)
+    if placed["user"] is None or placed["start"] is None:
+        # The message was deleted while Omi wrote; the reply no longer fits the chat.
+        logger.warning("agent.reply.dropped conversation_id=%s", conversation.id)
+        return conversation
+    await _publish_messages(
+        conversation, [placed["user"], *range(placed["start"], len(conversation.messages))]
+    )
     _learn_after_reply(conversation, user, turn.quality_valid, background_tasks)
     return conversation
 
@@ -635,19 +719,24 @@ async def save_unanswered_message(user: CurrentUser, text: str, channel: str) ->
     if conversation.status != "active" or conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat can't be replied to.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
-    index = len(conversation.messages)
-    conversation.messages.append(
-        {
-            "role": "user",
-            "content": text,
-            "created_at": utc_now_iso(),
-            "delivery_status": "sending",
-            "channel": channel,
-        }
-    )
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    placed: dict[str, int] = {}
+
+    def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        placed["index"] = len(messages)
+        messages.append(
+            {
+                "role": "user",
+                "content": text,
+                "created_at": utc_now_iso(),
+                "delivery_status": "sending",
+                "channel": channel,
+            }
+        )
+        return messages
+
+    _change_messages(conversation, user, add)
     set_conversation_archived(conversation.id, _user_id(user), False)
-    await _publish_new_messages(conversation, index)
+    await _publish_new_messages(conversation, placed["index"])
     return conversation
 
 
@@ -673,34 +762,43 @@ async def commit_reply(
 ) -> list[dict[str, Any]]:
     """Save a draft's replies after the messages it answered; returns the reply messages."""
     conversation = _get_existing_conversation(draft.conversation_id, user)
-    stored = conversation.messages
     answered = draft.answered_through
-    if len(stored) <= answered or stored[answered].get("role") != "user":
-        # Messages were deleted while Omi wrote; the reply no longer fits the chat.
-        return []
     quality = draft.turn.messages[answered].get("quality")
-    if quality:
-        stored[answered]["quality"] = quality
-    first_unanswered = _mark_answered(stored, answered)
     replies = [dict(message) for message in draft.turn.messages[answered + 1 :]]
-    start = len(stored)
-    conversation.messages = [*stored, *replies]
-    if getattr(draft.turn, "agent_voice", None):
-        conversation.agent_voice = draft.turn.agent_voice
-    _stamp_new_messages(conversation.messages, start)
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    placed: dict[str, int | None] = {"first": None, "start": None}
+
+    def commit(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        if len(stored) <= answered or stored[answered].get("role") != "user":
+            # Messages were deleted while Omi wrote; the reply no longer fits the chat.
+            return None
+        if quality:
+            stored[answered]["quality"] = quality
+        placed["first"] = _mark_answered(stored, answered)
+        placed["start"] = len(stored)
+        stored.extend(replies)
+        _stamp_new_messages(stored, placed["start"])
+        return stored
+
+    voice = getattr(draft.turn, "agent_voice", None)
+    _change_messages(conversation, user, commit, fields={"agent_voice": voice} if voice else None)
+    if placed["first"] is None or placed["start"] is None:
+        return []
     # From the first answered message, so the web chat also sees them marked read.
-    await _publish_new_messages(conversation, first_unanswered)
+    await _publish_new_messages(conversation, placed["first"])
     _learn_after_reply(conversation, user, draft.turn.quality_valid, background_tasks)
-    return conversation.messages[start:]
+    return conversation.messages[placed["start"] :]
 
 
 def mark_unanswered_failed(user: CurrentUser, conversation_id: str) -> None:
     """The reply failed: the web chat shows these messages with a Retry."""
     conversation = _get_existing_conversation(conversation_id, user)
-    for index in _unanswered_indexes(conversation.messages):
-        conversation.messages[index]["delivery_status"] = REPLY_FAILED
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+
+    def mark(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for index in _unanswered_indexes(messages):
+            messages[index]["delivery_status"] = REPLY_FAILED
+        return messages
+
+    _change_messages(conversation, user, mark)
 
 
 def _unanswered_indexes(messages: list[dict[str, Any]]) -> list[int]:
@@ -810,8 +908,7 @@ async def extract_agent_conversation(
         DraftProfile(id=draft_id, status="draft", submission=submission).model_dump(mode="json"),
         _user_id(user),
     )
-    conversation.status = "extracted"
-    save_conversation(conversation.model_dump(mode="json"), _user_id(user))
+    _change_messages(conversation, user, None, fields={"status": "extracted"})
     request_flush_now(conversation.id, _user_id(user))
     return {
         "draft_id": draft_id,

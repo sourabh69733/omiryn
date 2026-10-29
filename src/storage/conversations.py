@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import func, select
 
@@ -149,6 +149,10 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         row = connection.execute(statement).mappings().first()
     if not row:
         return None
+    return _conversation_from_row(row)
+
+
+def _conversation_from_row(row: Any, messages: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "id": row["id"],
         "user_id": row["user_id"],
@@ -164,8 +168,60 @@ def get_conversation(conversation_id: str, user_id: str | None = None) -> dict[s
         "temporary": bool(row.get("temporary")),
         "import_source_id": row.get("import_source_id"),
         "channel": row.get("channel"),
-        "messages": _unprotect_messages(row["user_id"], row["messages_json"]),
+        "messages": messages if messages is not None else _unprotect_messages(row["user_id"], row["messages_json"]),
     }
+
+
+MessageChange = Callable[[list[dict[str, Any]]], list[dict[str, Any]] | None]
+
+
+def update_conversation(
+    conversation_id: str,
+    user_id: str | None,
+    change: MessageChange | None = None,
+    *,
+    fields: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Change one chat in place, under a row lock, and return it as it is stored afterwards.
+
+    `change` gets the messages as stored right now and returns the list to save (None keeps
+    them as they are). Every writer that holds an older copy of the chat (a reply drafted while
+    the user wrote again, a nudge, another server instance) reads the newest list inside the
+    lock and adds to it, so nothing saved in between is lost. `save_conversation` writes the
+    whole list and is for creating a chat or seeding one; message changes go through here.
+    `fields` sets other columns (agent_voice, status, the settings). None when the chat does
+    not exist or belongs to someone else.
+    """
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        row = connection.execute(
+            select(agent_conversations)
+            .where(
+                agent_conversations.c.id == conversation_id,
+                agent_conversations.c.user_id == owner_id,
+            )
+            .with_for_update()
+        ).mappings().first()
+        if row is None:
+            return None
+        values = {key: value for key, value in (fields or {}).items() if key not in {"id", "user_id"}}
+        messages = _unprotect_messages(owner_id, row["messages_json"])
+        if change is not None:
+            changed = change(messages)
+            if changed is not None:
+                messages = changed
+                values["messages_json"] = _protect_messages(owner_id, messages)
+        if values:
+            connection.execute(
+                agent_conversations.update()
+                .where(
+                    agent_conversations.c.id == conversation_id,
+                    agent_conversations.c.user_id == owner_id,
+                )
+                .values(**values, updated_at=func.now())
+            )
+    stored = {**row, **{key: value for key, value in values.items() if key != "messages_json"}}
+    return _conversation_from_row(stored, messages)
 
 
 def set_conversation_archived(conversation_id: str, user_id: str, archived: bool) -> tuple[bool, str | None]:
