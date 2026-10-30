@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -40,6 +41,11 @@ class InMemoryRealtimeHub:
         self._rooms: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
         self._heartbeat: asyncio.Task[None] | None = None
+        self._fanout: Any = None
+
+    def attach_fanout(self, fanout: Any) -> None:
+        """Events published here also go to the other instances through `fanout`."""
+        self._fanout = fanout
 
     async def register(self, socket: WebSocket, user_id: str) -> RealtimeConnection:
         connection = RealtimeConnection(id=str(uuid4()), user_id=user_id, socket=socket)
@@ -89,6 +95,13 @@ class InMemoryRealtimeHub:
             await self._write_presence()
 
     async def publish(self, event: RealtimeEvent) -> int:
+        """Send to this instance's sockets, then to the other instances' through the fan-out."""
+        delivered = await self.publish_local(event)
+        if self._fanout is not None:
+            await self._fanout.publish(event)
+        return delivered
+
+    async def publish_local(self, event: RealtimeEvent) -> int:
         room = _room(event.scope, event.scope_id)
         async with self._lock:
             targets = [
