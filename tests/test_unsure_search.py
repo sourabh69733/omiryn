@@ -44,7 +44,10 @@ class SearchWhenUnsureTest(unittest.IsolatedAsyncioTestCase):
         (reply, info), writer = await self._run("is she going to get engaged?")
         self.assertEqual(reply, "Haan, usne engagement decide kar li hai, next year.")
         self.assertEqual(info["hits"], 1)
-        self.assertIn("Farheen: decided to do engagement next year", writer.await_args.args[0][-1]["content"])
+        # The found lines are a tool result before the final system note, never a system message.
+        found = writer.await_args.args[0][-2]
+        self.assertEqual(found["role"], "tool")
+        self.assertIn("Farheen: decided to do engagement next year", found["content"])
 
     async def test_nothing_found_keeps_the_honest_draft(self) -> None:
         (reply, info), writer = await self._run("what is her favourite movie")
@@ -69,7 +72,7 @@ class SearchQueriesTest(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"MEMORY_EMBEDDING_MODEL": "off"}):
             reply, info = await search_when_unsure("I don't know.", job, extra_queries=["shaadi", "engaged"])
         self.assertEqual(info["hits"], 1)
-        self.assertIn("shaadi ki baat", writer.await_args.args[0][-1]["content"])
+        self.assertIn("shaadi ki baat", writer.await_args.args[0][-2]["content"])
 
     async def test_queries_come_from_the_fast_model_and_fail_quietly(self) -> None:
         job = ReplyJob([], {}, AsyncMock(), user_id=USER_ID, conversation_id="omi", user_text="her status?")

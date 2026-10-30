@@ -81,8 +81,12 @@ class ToolsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply, "Done.")
         self.assertEqual([(entry["round"], entry["chars"]) for entry in trace], [(1, 3), (1, 3), (2, 6)])
         first, second = writer.await_args_list
-        self.assertIn("echo one", first.args[0][-1]["content"])
-        self.assertIn("echo two", first.args[0][-1]["content"])
+        # The results follow the model's call as tool messages, never as a system note.
+        call_message, one, two = first.args[0][-3:]
+        self.assertEqual([call["name"] for call in call_message["tool_calls"]], ["echo", "echo"])
+        self.assertEqual((one["role"], one["content"]), ("tool", "echo one"))
+        self.assertEqual((two["role"], two["content"], two["tool_call_id"]), ("tool", "echo two", call_message["tool_calls"][1]["id"]))
+        self.assertFalse(any(message["role"] == "system" for message in first.args[0]))
         self.assertIn("tools", first.kwargs)
         self.assertIn("echo second", second.args[0][-1]["content"])
 
