@@ -87,7 +87,10 @@ class RecentRequestsTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_request_from_this_session_is_checked_without_saved_ones(self) -> None:
         checker = AsyncMock(return_value={"broken": ["do not ask stupid questions"]})
         writer = AsyncMock(return_value="Theek hai, chill karte hain.")
-        job = ReplyJob(list(self.HISTORY), ARGS, writer, history=list(self.HISTORY), user_text="ok")
+        # As the orchestrator does: the asked questions carry what the user said to each.
+        from agent.context_engine.policy.asked_questions import asked_questions
+
+        job = ReplyJob(list(self.HISTORY), ARGS, writer, history=list(self.HISTORY), user_text="ok", asked=asked_questions(self.HISTORY))
         with patch("agent.runtime.steps.checks.check_reply_requests", checker):
             reply, info = await follow_requests("Acha, toh kya kar rahe ho abhi?", job)
 

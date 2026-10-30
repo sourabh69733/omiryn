@@ -105,8 +105,9 @@ class LiveTurnTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_prompt_and_the_checker_see_the_questions(self) -> None:
         reset_db()
+        # The mock reply asks nothing, so the gate would skip the checker; "always" shows its input.
         env = {"AGENT_PROVIDER": "mock", "AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off",
-               "AGENT_FRESHNESS_CHECK": "false", "DATA_POINT_EXTRACTOR": "rules"}
+               "AGENT_FRESHNESS_CHECK": "false", "DATA_POINT_EXTRACTOR": "rules", "AGENT_REQUEST_CHECK": "always"}
         save_conversation({"id": "c", "status": "active", "messages": THE_6C_CHAT}, USER_ID)
         checker = AsyncMock(return_value={"broken": []})
         with patch.dict(os.environ, env), patch("agent.runtime.steps.checks.check_reply_requests", checker):
