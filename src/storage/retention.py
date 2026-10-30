@@ -27,6 +27,7 @@ from .schema import (
     channel_bursts,
     channel_seen_messages,
     live_presence,
+    realtime_events,
     data_point_extraction_debug,
     memory_batch_failures,
 )
@@ -63,6 +64,7 @@ def purge_expired_records() -> dict[str, int]:
             ("channel_bursts", channel_bursts, now - timedelta(days=1), ()),
             ("channel_seen_messages", channel_seen_messages, now - timedelta(days=2), ()),
             ("live_presence", live_presence, now - timedelta(days=1), ()),
+            ("realtime_events", realtime_events, now - timedelta(hours=1), ()),
         ):
             deleted[name] = connection.execute(
                 table.delete().where(table.c.created_at < cutoff, *extra)

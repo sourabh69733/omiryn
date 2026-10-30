@@ -761,6 +761,18 @@ live_presence = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# Realtime events every instance appends, so the instance holding a user's socket can push an
+# event another instance produced. Rows are read once by each other instance and purged within
+# the hour. On Postgres an insert also sends NOTIFY, so readers wake at once instead of polling.
+realtime_events = Table(
+    "realtime_events",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("instance_id", String, nullable=False),
+    Column("event_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # A short "who this user is" note across all chats, rewritten by background cognition
 # and shown to the companion on every reply. Encrypted like other user content.
 agent_user_cards = Table(

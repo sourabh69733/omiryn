@@ -12,6 +12,7 @@ from .user_settings import *
 from .channel_links import *
 from .channel_bursts import *
 from .presence import *
+from .realtime_events import *
 from .user_cards import *
 from .vibe_cards import *
 from .self_notes import *
