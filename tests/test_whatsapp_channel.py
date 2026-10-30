@@ -75,7 +75,6 @@ class WhatsAppChannelTest(unittest.TestCase):
         ]
         for item in self.patches:
             item.start()
-        whatsapp_routes._seen_ids.clear()
 
     def tearDown(self) -> None:
         for item in self.patches:

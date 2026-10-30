@@ -258,23 +258,25 @@ def test_periodic_pass_greets_a_returning_user_instead_of_a_topic_nudge() -> Non
     assert generate.await_args.kwargs["cue"] == proactive_service._RETURN_CUE
 
 
-def test_scheduled_greeting_waits_and_skips_when_the_user_left(monkeypatch) -> None:
+def test_scheduled_greeting_is_a_job_that_skips_when_the_user_left(monkeypatch) -> None:
+    from agent.jobs.worker import JobWorker
+
     monkeypatch.setenv("PROACTIVE_RETURN_GREETING_DELAY_SECONDS", "0")
     _seed([_msg("user", 2 * 24 * HOUR)])
     greet = AsyncMock(return_value=True)
 
-    async def scenario(watching: bool) -> None:
+    async def scenario(watching: bool) -> int:
         await realtime_hub.reset()
         if watching:
             await _connect(_Socket())
         with patch("agent.proactive.service.greet_on_return", greet):
             proactive_service.schedule_return_greeting(USER_ID, CONVERSATION_ID)
-            proactive_service.schedule_return_greeting(USER_ID, CONVERSATION_ID)  # deduped
-            await asyncio.gather(*proactive_service._greeting_tasks)
+            proactive_service.schedule_return_greeting(USER_ID, CONVERSATION_ID)  # one job, time moved
+            return await JobWorker().run_once()
 
-    asyncio.run(scenario(watching=False))
+    assert asyncio.run(scenario(watching=False)) == 1
     assert greet.await_count == 0
-    asyncio.run(scenario(watching=True))
+    assert asyncio.run(scenario(watching=True)) == 1
     assert greet.await_count == 1
 
 
