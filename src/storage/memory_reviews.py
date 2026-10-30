@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from agent.memory_engine.memories import MemoryStatus
+from agent.shared.memory_models import MemoryStatus
 
 from .database import ENGINE
 from .memories import get_agent_memory

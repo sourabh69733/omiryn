@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from agent.memory_engine.memories.vibe import line_evidence, line_text, merge_vibe, proof_after_rejection, vibe_progress
+from agent.shared.vibe import line_evidence, line_text, merge_vibe, proof_after_rejection, vibe_progress
 from agent.shared.clock import utc_now
 
 from .database import ENGINE

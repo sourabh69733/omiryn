@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from sqlalchemy import func, or_, select
 
-from agent.memory_engine.memories import (
+from agent.shared.memory_models import (
     MEMORY_SCHEMA_VERSION,
     MemoryEvidence,
     MemoryKind,
