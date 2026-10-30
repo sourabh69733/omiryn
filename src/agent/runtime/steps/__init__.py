@@ -8,7 +8,7 @@
 Every step gets the same ReplyJob, which carries the history and how to call the model.
 """
 
-from .checks import REPLY_CHECKS, follow_requests, freshen_reply, freshness_check_enabled, request_check_enabled
+from .checks import REPLY_CHECKS, follow_requests, freshen_reply, freshness_check_enabled, request_check_enabled, request_check_mode
 from .draft import Draft, write_draft
 from .finish import FinishedReply, assistant_messages, finish_reply
 from .job import Generate, ReplyJob
@@ -29,6 +29,7 @@ __all__ = [
     "freshness_check_enabled",
     "looks_like_model_transport",
     "request_check_enabled",
+    "request_check_mode",
     "search_queries",
     "search_when_unsure",
     "turn_notes",

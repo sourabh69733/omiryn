@@ -47,6 +47,36 @@ Return JSON only: {"broken": ["<the request, or the user message holding it, cop
 or {"broken": []}."""
 
 
+def request_check_reason(
+    reply: str,
+    requests: list[str],
+    recent_user_messages: list[str],
+    asked: list[AskedQuestion],
+) -> str | None:
+    """Why this draft is worth one checker call, or None when no code fact says it could break a
+    request. The check costs a model call on every reply it runs for, so it runs when:
+
+    - the user has saved how-to-talk requests (the checker judges every one of them);
+    - the draft asks a question and a question Omi asked this session already got an answer or a
+      brush-off, so the draft may be asking a closed one again in other words;
+    - a message in this session matches the explicit constraint or feedback phrases the turn
+      understanding already recognises (no questions, no advice, just listen, "you keep asking").
+
+    Not caught, by design: a request made this session in words none of those phrases cover, when
+    the draft has no question. It holds once the background run saves it as a how-to-talk memory.
+    AGENT_REQUEST_CHECK=always restores the check on every reply.
+    """
+    if requests:
+        return "saved_requests"
+    if "?" in reply and any(any(said for said in item.user_said) for item in asked):
+        return "question_after_asked"
+    from agent.context_engine.understanding.rules.stance import explicit_constraints, feedback_kind
+
+    if any(explicit_constraints(text) or feedback_kind(text) for text in recent_user_messages):
+        return "request_in_session"
+    return None
+
+
 def how_to_talk_requests(context_sources: list[dict[str, Any]]) -> list[str]:
     """The saved requests that reached this reply, one per line of the how-to-talk source."""
     requests: list[str] = []
@@ -113,4 +143,5 @@ __all__ = [
     "how_to_talk_requests",
     "recent_user_requests",
     "request_check_input",
+    "request_check_reason",
 ]

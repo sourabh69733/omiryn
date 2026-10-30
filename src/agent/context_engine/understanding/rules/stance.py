@@ -239,6 +239,11 @@ def _explicit_constraints(normalized: str) -> tuple[str, ...]:
     return tuple(constraints)
 
 
+def feedback_kind(text: str) -> str | None:
+    """Feedback about how the companion talks: question_overload, not_listening, or None."""
+    return _feedback_kind(normalized_memory_text(text))
+
+
 def _feedback_kind(normalized: str) -> str | None:
     if _contains_any(normalized, QUESTION_OVERLOAD_PHRASES):
         return "question_overload"

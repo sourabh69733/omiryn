@@ -20,6 +20,7 @@ from agent.context_engine.policy.requests import (
     broken_requests_reason,
     recent_user_requests,
     request_check_input,
+    request_check_reason,
 )
 from agent.providers import check_reply_requests
 
@@ -33,7 +34,16 @@ def freshness_check_enabled() -> bool:
 
 
 def request_check_enabled() -> bool:
-    return os.getenv("AGENT_REQUEST_CHECK", "true").strip().lower() != "false"
+    return request_check_mode() != "false"
+
+
+def request_check_mode() -> str:
+    """auto (default): run the checker only when a code fact says the draft could break a request.
+    always: every reply, as before. false: off."""
+    value = os.getenv("AGENT_REQUEST_CHECK", "auto").strip().lower()
+    if value in {"false", "0", "off"}:
+        return "false"
+    return "always" if value in {"always", "true"} else "auto"
 
 
 async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
@@ -74,6 +84,9 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     recent = recent_user_requests(job.history, job.user_text)
     if not (job.requests or recent) or not request_check_enabled():
         return reply, None
+    reason = "always" if request_check_mode() == "always" else request_check_reason(reply, job.requests, recent, job.asked)
+    if reason is None:
+        return reply, {"checked": False, "skipped": "no_signal"}
     conversation_id = str(job.generation_arguments.get("conversation_id") or "")
     try:
         raw = await check_reply_requests(
@@ -83,7 +96,7 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
         return reply, {"checked": False, "error": type(error).__name__}
     broken = broken_requests(raw, [*job.requests, *recent, *asked_question_requests(job.asked)])
     if not broken:
-        return reply, {"checked": True, "broken": []}
+        return reply, {"checked": True, "reason": reason, "broken": []}
     try:
         rewritten = await job.rewrite(rewrite_instruction(reply, broken_requests_reason(broken), keep_length=False))
     except Exception as error:
@@ -92,7 +105,7 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
         return reply, {"checked": True, "broken": broken, "rewritten": False}
     if question_rule_reason(rewritten, job.question_limit):
         rewritten = trim_questions(rewritten, job.question_limit)
-    return rewritten, {"checked": True, "broken": broken, "rewritten": True}
+    return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True}
 
 
 # In order; the name is the key of its result in the turn trace.
@@ -101,4 +114,4 @@ REPLY_CHECKS: tuple[tuple[str, Check], ...] = (
     ("request_check", follow_requests),
 )
 
-__all__ = ["REPLY_CHECKS", "follow_requests", "freshen_reply", "freshness_check_enabled", "request_check_enabled"]
+__all__ = ["REPLY_CHECKS", "follow_requests", "freshen_reply", "freshness_check_enabled", "request_check_enabled", "request_check_mode"]
