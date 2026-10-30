@@ -98,13 +98,17 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     if not broken:
         return reply, {"checked": True, "reason": reason, "broken": []}
     try:
-        rewritten = await job.rewrite(rewrite_instruction(reply, broken_requests_reason(broken), keep_length=False))
+        # Like the freshness rewrite: the replies the draft copied leave the history, so the
+        # rewrite cannot copy them back, and a question it already asked is dropped if it returns.
+        history = without_copied_replies(job.reply_messages, reply)
+        rewritten = await job.rewrite(rewrite_instruction(reply, broken_requests_reason(broken), keep_length=False), history)
     except Exception as error:
         return reply, {"checked": True, "broken": broken, "rewritten": False, "error": type(error).__name__}
     if not rewritten.strip():
         return reply, {"checked": True, "broken": broken, "rewritten": False}
     if question_rule_reason(rewritten, job.question_limit):
         rewritten = trim_questions(rewritten, job.question_limit)
+    rewritten = without_repeated_questions(rewritten, job.previous_replies)
     return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True}
 
 

@@ -32,7 +32,10 @@ class FollowRequestsTest(unittest.IsolatedAsyncioTestCase):
     async def _follow(self, check: object, rewrite: str = "Venus ka din uske saal se lamba hota hai.", requests=REQUESTS):
         checker = AsyncMock(side_effect=check) if isinstance(check, Exception) else AsyncMock(return_value=check)
         writer = AsyncMock(return_value=rewrite)
-        job = ReplyJob([{"role": "user", "content": "space ke baare mein batao"}], ARGS, writer, requests=requests)
+        job = ReplyJob(
+            [{"role": "user", "content": "space ke baare mein batao"}], ARGS, writer, requests=requests,
+            previous_replies=["Haan! Kya tumhe stars pasand hain?"],
+        )
         with patch("agent.runtime.steps.checks.check_reply_requests", checker):
             result = await follow_requests("Space is cool! Kya tumhe stars pasand hain?", job)
         return result, checker, writer
@@ -54,6 +57,14 @@ class FollowRequestsTest(unittest.IsolatedAsyncioTestCase):
         note = writer.await_args.args[0][-1]
         self.assertEqual(note["role"], "system")
         self.assertIn("Wants no questions from the companion.", note["content"])
+
+    async def test_a_request_rewrite_drops_a_question_already_asked(self) -> None:
+        """The rewrite often brings back a question from its own history; it is dropped like after a freshness rewrite."""
+        (reply, info), _, _ = await self._follow(
+            {"broken": ["Wants no questions from the companion."]},
+            rewrite="Venus ka din lamba hai. Kya tumhe stars pasand hain?",
+        )
+        self.assertEqual(reply, "Venus ka din lamba hai.")
 
     async def test_a_failed_check_keeps_the_draft(self) -> None:
         (reply, info), _, writer = await self._follow(RuntimeError("down"))
