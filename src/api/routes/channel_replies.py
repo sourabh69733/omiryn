@@ -13,7 +13,9 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import BackgroundTasks, HTTPException
 
+from agent.shared.clock import utc_now
 from security.auth import CurrentUser
+from storage import burst_state, finish_burst, join_burst, release_burst
 
 from .conversations import (
     commit_reply,
@@ -32,6 +34,11 @@ QUIET_SECONDS = 1.5
 MAX_WAIT_SECONDS = 6.0
 # Times a draft is thrown away because more messages came in before any bubble was sent.
 MAX_RESTARTS = 2
+# How long one instance may hold a chat's burst; a crashed replier's lease runs out and the next
+# message's instance takes over.
+BURST_LEASE_SECONDS = 600.0
+# While waiting for quiet, the burst row is re-read this often for messages that reached another instance.
+_QUIET_POLL_SECONDS = 0.25
 
 REPLY_FAILED = "Couldn't reply right now. Send your message again in a bit."
 
@@ -47,15 +54,17 @@ class ChannelSender:
 
 @dataclass
 class _Burst:
-    """Messages one chat sent since Omi last replied. Only the first one's handler replies."""
+    """Messages one chat sent since Omi last replied, as counted in the database (`channel_bursts`),
+    so messages that reach another server instance join the same burst. Only the holder of the
+    replier lease answers."""
 
+    channel: str
+    chat_id: str
     conversation_id: str
-    arrivals: int = 0
-    last_at: float = 0.0
-    replying: bool = False
+    token: str
 
-
-_bursts: dict[tuple[str, str], _Burst] = {}
+    def state(self) -> dict[str, Any] | None:
+        return burst_state(self.channel, self.chat_id)
 
 
 async def handle_channel_message(
@@ -74,17 +83,14 @@ async def handle_channel_message(
     except HTTPException as error:
         await sender.send_text(chat_id, failure_text(error))
         return
-    key = (sender.channel, chat_id)
-    burst = _bursts.setdefault(key, _Burst(conversation_id=conversation.id))
-    burst.arrivals += 1
-    burst.last_at = asyncio.get_running_loop().time()
-    if burst.replying:
+    joined = join_burst(sender.channel, chat_id, conversation.id, now=utc_now(), lease_seconds=BURST_LEASE_SECONDS)
+    if not joined["token"]:
         return
-    burst.replying = True
+    burst = _Burst(sender.channel, chat_id, conversation.id, joined["token"])
     try:
         await _reply_to_burst(sender, chat_id, user, burst, background_tasks)
     finally:
-        _bursts.pop(key, None)
+        release_burst(burst.channel, burst.chat_id, burst.token)
 
 
 def failure_text(error: HTTPException) -> str:
@@ -100,16 +106,17 @@ async def _reply_to_burst(
     burst: _Burst,
     background_tasks: BackgroundTasks,
 ) -> None:
-    answered = 0
     restarts = 0
-    while burst.arrivals > answered:
-        await _wait_for_quiet(burst)
-        seen = burst.arrivals
+    while True:
+        seen = await _wait_for_quiet(burst)
+        if seen is None:
+            return  # the burst was closed under us (lease taken over)
         await sender.send_typing(chat_id)
         typing = asyncio.create_task(_keep_typing(sender, chat_id))
         try:
             draft = await draft_reply_to_unanswered(user, burst.conversation_id)
-            if burst.arrivals > seen and restarts < MAX_RESTARTS:
+            state = burst.state()
+            if state and state["arrivals"] > seen and restarts < MAX_RESTARTS:
                 # More came in while Omi wrote: start over so the reply covers those too.
                 restarts += 1
                 continue
@@ -124,19 +131,24 @@ async def _reply_to_burst(
             typing.cancel()
             with suppress(asyncio.CancelledError):
                 await typing
-        answered = seen
         restarts = 0
         await _send_bubbles(sender, chat_id, replies)
-
-
-async def _wait_for_quiet(burst: _Burst) -> None:
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + MAX_WAIT_SECONDS
-    while True:
-        wait = min(burst.last_at + QUIET_SECONDS, deadline) - loop.time()
-        if wait <= 0:
+        # Closes the burst only if nothing arrived since `seen`; otherwise go round again.
+        if finish_burst(burst.channel, burst.chat_id, burst.token, answered=seen):
             return
-        await asyncio.sleep(wait)
+
+
+async def _wait_for_quiet(burst: _Burst) -> int | None:
+    """Wait for the chat to go quiet; returns how many messages the burst then holds."""
+    deadline = utc_now().timestamp() + MAX_WAIT_SECONDS
+    while True:
+        state = burst.state()
+        if state is None:
+            return None
+        wait = min(state["last_at"].timestamp() + QUIET_SECONDS, deadline) - utc_now().timestamp()
+        if wait <= 0:
+            return state["arrivals"]
+        await asyncio.sleep(min(wait, _QUIET_POLL_SECONDS))
 
 
 async def _send_bubbles(sender: ChannelSender, chat_id: str, replies: list[dict[str, Any]]) -> None:

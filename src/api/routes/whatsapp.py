@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections import deque
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
@@ -30,6 +29,7 @@ from security.auth import CurrentUser, require_user
 from storage import (
     channel_link_for_chat,
     channel_link_for_user,
+    claim_channel_message,
     consume_channel_link_code,
     create_channel_link_code,
     link_channel_chat,
@@ -50,10 +50,9 @@ _TEXT_ONLY = "I can only read text here for now."
 _REPLY_FAILED = REPLY_FAILED
 _DISCONNECT_WORDS = {"disconnect", "stop"}
 
-# The newest message from each chat, which WhatsApp needs to show "typing…" there.
+# The newest message from each chat, which WhatsApp needs to show "typing…" there. Per process
+# on purpose: a stale id only means the typing indicator is skipped.
 _last_message_ids: dict[str, str] = {}
-# Meta may deliver a message more than once; recent message IDs are answered once.
-_seen_ids: deque[str] = deque(maxlen=1000)
 # Background work started by the webhook, kept so it is not garbage-collected mid-run.
 _pending: set[asyncio.Task] = set()
 
@@ -128,11 +127,9 @@ async def whatsapp_webhook(
     except ValueError:
         return {"ok": True}
     for message in _incoming_messages(payload):
-        message_id = str(message.get("id") or "")
-        if message_id in _seen_ids:
+        # Meta may deliver a message more than once, to any instance; each is answered once.
+        if not claim_channel_message(CHANNEL, str(message.get("id") or "")):
             continue
-        if message_id:
-            _seen_ids.append(message_id)
         task = asyncio.create_task(_handle(message))
         _pending.add(task)
         task.add_done_callback(_pending.discard)
