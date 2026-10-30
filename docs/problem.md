@@ -1,52 +1,76 @@
-# The problem Omiryn solves
+# The problem Omiryn solves first
 
-Written 30 October 2026. One page, so every piece of work can be checked against it. The idea itself is locked in [progress.md](progress.md); this page says what problem it answers and how we know it is working.
+Written 30 October 2026, rewritten the same day around one niche. One page, so every piece of work can be checked against it. The idea itself is locked in [progress.md](progress.md): an AI you talk to that finds friends you would get along with. This page says who that is for first, what their problem is, and how we know it is working. The niche is an internal choice; it stays out of the mission and the product copy.
 
-## The problem
+## Who
 
-Many people have no one they can really talk to. Moving cities, starting college, working remote: the old ways of meeting people stop working, and the apps that promise new ones hand over a pile of strangers and a swipe. People do not want more strangers. They want one person they click with, and some sign that the click is real before they put themselves out there.
+Someone who moved to one city (Pune first) alone for work in the last two months and took a room in a PG or co-living. Usually 22 to 30, first or second job, knows nobody in the city except colleagues.
 
-## What Omiryn is
+## Their problem
 
-An AI you talk to that finds friends you would get along with.
+For the first two months they have no one to get dinner with, go for a walk with, or ask where the good chai is. Weekends are the worst. The options they have all fail them:
 
-- The AI, Omi, is the doorway. People talk to it because it is good company and it remembers them.
-- The human match is the product. The thing a user is looking to see is: "I talked to this for a week and it introduced me to someone I still message."
-- Friends first. Dating, marriage and family are fine to talk about; matches are friends, and Omi never flirts.
+- Dating apps have the wrong intent, and saying "just friends" there does not work.
+- Meetup and Bumble BFF offer strangers across the whole city; most never show up, and one bad evening ends the attempt.
+- Colleagues are colleagues. Talking to them is work.
+- ChatGPT can talk, but it cannot introduce them to anyone.
 
-Vibe means who you can accept in your life: humour, beliefs, values, the stories you relate to, the differences you can live with. Not people who are merely similar.
+So they wait. Many go home every weekend, and some move out of the city inside a year. The operator loses a resident; the person loses a year.
+
+## What Omiryn does for them
+
+Gets each new resident one person in or near their building to do one small thing with, inside their first month.
+
+How it works for the resident: they message a WhatsApp number from the building's group. Omi talks with them over a few days, not a form. On match day it introduces them to one person nearby with two or three real reasons, suggests a place and a time (the places tool), reminds both the day before, and asks afterwards how it went. If there is no good pair that week, it says so and asks for one more week.
+
+Omi is the host. It is useful the way a friend who knows everyone is useful. It is not sold as a companion, and it does not need to be famous to be used: the reason to message the number is the person, not the AI.
+
+## Why this niche
+
+- The need is acute and dated: the first eight weeks.
+- The pool exists before we do: the building and the two next to it. No cold start, no citywide promise.
+- Meeting is easy: a chai downstairs, not a cross-city trip.
+- Reach is one conversation: the operator, who wants residents to stay longer and already runs a WhatsApp group per building.
+- Nothing else does this, and the model is not the moat. The pool and the trust of "one of us in this building" are.
 
 ## The one measure
 
-Of the pairs Omi introduces, how many are still talking a week later.
+Of new residents who message the number, how many meet one person within 30 days; and of those pairs, how many are still in touch at day 30.
 
-Everything else (messages per day, return rate, memory accuracy) is a means to that number. A change that does not move it, or unblock something that moves it, waits.
+Everything else (messages per day, return rate, memory accuracy, card completeness) is a means to those two numbers.
+
+## The promise, and how it stays honest
+
+- A building is opened only once 20 or more residents have messaged. Nobody outside an opened building can join.
+- Matching happens on a fixed day each week, so everyone who joined that week is in the same pool.
+- The first pairs are picked by hand from Omi's vibe notes. Matching code is built only when hand-picking stops scaling.
+- Thin week: small groups of three or four for a chai instead of pairs.
+- The promise is "you will hear from me by Sunday", never "today".
 
 ## The loop, and what exists
 
 | Part | What it means | State |
 |---|---|---|
-| 1. Know enough | After a few days of chat Omi holds what matters for compatibility, each line with proof from what the user said. | Mostly built: memories with evidence, the vibe card, the user card. Needs a check of what matching still lacks. |
-| 2. Find a candidate | Compare two vibe cards and say why these two would click: two or three reasons and one accepted difference. | Not built. Product list item "friend compatibility check". |
-| 3. Introduce | Both sides accept. Omi opens a shared chat with an icebreaker and leaves once the talk flows. Whether they keep talking after it leaves is the signal. | Not built. Product list items "matching" and "match screens". |
-| 4. Learn from it | A check-in at day 3 and day 7. Outcomes feed back into what "clicking" means for the next match. | Not built. |
-
-The doorway (parts 0: chat, memory, channels, running on more than one server) is solid as of this date and is written up in progress.md items 6d to 6j.
+| 1. Know enough | Over the week Omi learns how they talk, what they do with free time, what they cannot stand, a few values, plus the plain facts for a meet (area, free evenings, veg or not, budget). Each line with proof. | Mostly built: memories with evidence, vibe card, user card, WhatsApp channel, nudges and follow-ups. Missing: a "ready for match day" mark from how many areas have proof, and the plain-facts asks. |
+| 2. Pick | A person reads the vibe notes of the building's pool and picks pairs or small groups; later, code compares two cards and says why. | Not built. Needs an operator view of the pool: who is ready, their notes. |
+| 3. Introduce and host | Omi tells both, with the reasons, suggests place and time, reminds the day before. | Not built. The pieces exist: places tool, promise follow-ups, WhatsApp sends. |
+| 4. Learn from it | Day 3 and day 30 check-ins; outcomes recorded per pair. | Not built. |
 
 ## What this changes
 
-- The next work is the loop, parts 2 to 4, for a small closed group of real users, end to end, before any of it is polished.
-- Agent work continues only when it blocks a match or a demo of one. The test for any task: does it bring us closer to two real people talking because of Omi?
-- The first proof is small: ten to twenty users, a handful of introductions, and the day-7 number, however low. A low number we can see beats a high number we guess.
+- The next work is parts 1 to 4 for one building, end to end, before any of it is polished. Agent work continues only when it blocks a match day.
+- The product's front door is a WhatsApp number in a building's group, not an app store listing. The web app stays for the operator view and for residents who want more.
+- The first proof is one building, one match day, five to ten pairs, and the day-30 numbers, however low.
 
 ## Not the problem
 
-- Being the best AI companion. Omi has to be good enough that people come back for a week; it does not have to win at that.
-- Being on every channel. Channels help reach, not the match.
-- Who the first users are. The launch audience is an internal go-to-market choice and stays out of the mission and the product copy.
+- Being the best AI companion. Omi has to be good enough that people answer it for a week.
+- Being on every channel. WhatsApp is where these residents already are.
+- Citywide or nationwide matching. That comes building by building, if at all.
 
-## Open questions this page does not settle
+## Open questions
 
-- Where candidates come from before there are many users (the vibe check by link and "Omi as host" ideas in progress.md).
-- Whether an introduction needs both sides to accept first, or Omi can open the shared chat and let either leave.
-- What a match card shows and how much of the vibe reasoning is visible to the two people.
+- Which operator first, and what they get: a report per building (how many met), or a cut of a paid tier later.
+- Both sides accept before the intro, or Omi opens a three-way chat and lets either leave.
+- What a resident sees of the reasons, and whether the other person's vibe notes are ever shown.
+- Safety: a report and block path, and what happens when a pair goes badly.
