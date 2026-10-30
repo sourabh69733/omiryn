@@ -18,7 +18,7 @@ from . import (
     usage,
     vibe,
 )
-from .conversations import run_agent_turn
+from ..chat_service import run_agent_turn
 
 router = APIRouter()
 router.include_router(core.router)

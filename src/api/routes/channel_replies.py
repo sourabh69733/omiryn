@@ -17,7 +17,7 @@ from agent.shared.clock import utc_now
 from security.auth import CurrentUser
 from storage import burst_state, finish_burst, join_burst, release_burst
 
-from .conversations import (
+from ..chat_service import (
     commit_reply,
     draft_reply_to_unanswered,
     mark_unanswered_failed,
