@@ -13,7 +13,7 @@ import httpx
 from agent.observability.usage import CHAT_REPLY
 
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
-from agent.providers.shared.messages import _compact_chat_reply, _provider_messages
+from agent.providers.shared.messages import _compact_chat_reply, _provider_messages, flatten_tool_messages, has_tool_messages
 from agent.outputs.companion_response import textual_tool_arguments
 from .retry import post_with_retry
 from .registry import (
@@ -47,9 +47,12 @@ async def _openai_compatible_chat(
     tools: list[dict[str, Any]] | None = None,
     tool_choice: dict[str, Any] | str | None = None,
     max_tokens: int | None = None,
+    plain_tool_results: bool = False,
 ) -> str:
     config = _openai_compatible_provider_config(provider, model)
     provider_messages = _provider_messages(messages)
+    if plain_tool_results:
+        provider_messages = flatten_tool_messages(provider_messages)
     payload = {
         "model": config["model"],
         "messages": [{"role": "system", "content": system_prompt}] + provider_messages,
@@ -170,6 +173,19 @@ async def _openai_compatible_chat(
                 raw_usage=raw_usage,
                 error=str(error),
             )
+            if (
+                error.response is not None
+                and error.response.status_code == 400
+                and not plain_tool_results
+                and has_tool_messages(provider_messages)
+            ):
+                # Some chat templates reject tool messages; the results go once more as plain
+                # data blocks (still never as a system note). AGENT_TOOL_RESULTS=plain skips this.
+                logger.warning("agent.%s.tool_messages_rejected model=%s detail=%s", provider, config["model"], detail[:120])
+                return await _openai_compatible_chat(
+                    provider, system_prompt, messages, temperature, conversation_id, request_kind, model,
+                    timeout_seconds, response_format, tools, tool_choice, max_tokens, plain_tool_results=True,
+                )
             if detail:
                 raise AgentProviderError(
                     f"{provider} returned HTTP {error.response.status_code}: {detail}"
