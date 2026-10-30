@@ -15,6 +15,7 @@ from agent.context_engine.policy.freshness import (
     without_repeated_questions,
 )
 from agent.context_engine.policy.requests import (
+    asked_question_requests,
     broken_requests,
     broken_requests_reason,
     recent_user_requests,
@@ -68,18 +69,19 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
 
 async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
     """One rewrite when the draft breaks how the user asked to be talked to: their saved requests,
-    and what they asked earlier in this session, which is saved only once the chat goes quiet."""
+    what they asked earlier in this session (saved only once the chat goes quiet), and a question
+    already asked here that they turned down or answered."""
     recent = recent_user_requests(job.history, job.user_text)
     if not (job.requests or recent) or not request_check_enabled():
         return reply, None
     conversation_id = str(job.generation_arguments.get("conversation_id") or "")
     try:
         raw = await check_reply_requests(
-            request_check_input(reply, job.requests, recent), conversation_id=conversation_id
+            request_check_input(reply, job.requests, recent, job.asked), conversation_id=conversation_id
         )
     except Exception as error:
         return reply, {"checked": False, "error": type(error).__name__}
-    broken = broken_requests(raw, [*job.requests, *recent])
+    broken = broken_requests(raw, [*job.requests, *recent, *asked_question_requests(job.asked)])
     if not broken:
         return reply, {"checked": True, "broken": []}
     try:

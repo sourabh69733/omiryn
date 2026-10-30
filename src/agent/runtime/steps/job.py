@@ -27,6 +27,8 @@ class ReplyJob:
     history: list[dict[str, Any]] = field(default_factory=list)
     previous_replies: list[str] = field(default_factory=list)
     requests: list[str] = field(default_factory=list)
+    # Omi's questions in this session with what the user said next (policy.asked_questions).
+    asked: list[Any] = field(default_factory=list)
 
     async def ask(self, note: str, messages: list[dict[str, Any]] | None = None) -> str:
         """The raw model output for the history plus one system note at the end."""

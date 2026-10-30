@@ -8,6 +8,7 @@ from typing import Any
 
 from agent.config import agent_pipeline_config
 from agent.context_engine.policy import direct_turn_reply
+from agent.context_engine.policy.asked_questions import asked_questions
 from agent.context_engine.policy.freshness import recent_assistant_replies
 from agent.context_engine.policy.requests import how_to_talk_requests
 from agent.context_engine.engine import build_model_context_package
@@ -186,6 +187,8 @@ async def run_agent_turn(
         history=messages,
         previous_replies=recent_assistant_replies(messages),
         requests=how_to_talk_requests(context_package.context_sources),
+        # With the current message included, the latest question shows what the user just said to it.
+        asked=asked_questions(updated_messages),
     )
     try:
         draft = await write_draft(job)

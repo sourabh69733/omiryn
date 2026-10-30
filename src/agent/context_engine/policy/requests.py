@@ -13,7 +13,11 @@ from typing import Any
 
 from agent.shared.timeline import current_session_start
 
+from .asked_questions import AskedQuestion
+
 HOW_TO_TALK_SOURCE_TYPE = "how_to_talk"
+# The request the checker names when a reply asks a closed question again.
+DO_NOT_ASK_AGAIN = 'do not ask again: "{question}"'
 # The user's latest messages in this session the checker reads, newest last.
 RECENT_USER_MESSAGES = 8
 _MAX_MESSAGE_CHARS = 300
@@ -21,12 +25,15 @@ _MAX_MESSAGE_CHARS = 300
 REQUEST_CHECK_SYSTEM_PROMPT = """You check one chat reply against requests the user made about how the
 companion should talk to them.
 
-Input JSON: {"requests": ["..."], "recent_user_messages": ["..."], "reply": "..."}. requests are
-saved ones. recent_user_messages are the user's latest messages in this chat, newest last; a request
-they made there counts too, such as a language to use or something to stop. A question they turned
-down (called it pointless, refused to answer, asked you to stop asking) is a request not to ask it
-again in any words. Plain chat in those messages is not a request. Bubbles in the reply are
-separated by <next_message>.
+Input JSON: {"requests": ["..."], "recent_user_messages": ["..."], "asked_questions": [...],
+"reply": "..."}. requests are saved ones. recent_user_messages are the user's latest messages in
+this chat, newest last; a request they made there counts too, such as a language to use or
+something to stop. Plain chat in those messages is not a request. asked_questions are questions
+the companion already asked in this chat, each with how many times and what the user said right
+after each time ("user_said", null when nothing came yet). A question the user turned down (called
+it pointless, refused, asked to stop), did not answer twice, or already answered is closed: if the
+reply asks it again in any words, report it as the request `do not ask again: "<question>"`, copied
+exactly with the question as given. Bubbles in the reply are separated by <next_message>.
 
 A request is broken when the reply goes against it, for example:
 - "no questions": any question at all, including "did you know ...?" or "right?".
@@ -61,11 +68,28 @@ def recent_user_requests(history: list[dict[str, Any]], user_text: str) -> list[
     return [text.strip()[:_MAX_MESSAGE_CHARS] for text in texts[-RECENT_USER_MESSAGES:] if text.strip()]
 
 
-def request_check_input(reply: str, requests: list[str], recent_user_messages: list[str] | None = None) -> str:
+def request_check_input(
+    reply: str,
+    requests: list[str],
+    recent_user_messages: list[str] | None = None,
+    asked: list[AskedQuestion] | None = None,
+) -> str:
     return json.dumps(
-        {"requests": requests, "recent_user_messages": recent_user_messages or [], "reply": reply},
+        {
+            "requests": requests,
+            "recent_user_messages": recent_user_messages or [],
+            "asked_questions": [
+                {"question": item.question, "times": item.times, "user_said": item.user_said} for item in asked or []
+            ],
+            "reply": reply,
+        },
         ensure_ascii=False,
     )
+
+
+def asked_question_requests(asked: list[AskedQuestion]) -> list[str]:
+    """The request strings the checker may name for the asked questions."""
+    return [DO_NOT_ASK_AGAIN.format(question=item.question) for item in asked]
 
 
 def broken_requests(raw: Any, requests: list[str]) -> list[str]:
@@ -80,7 +104,9 @@ def broken_requests_reason(broken: list[str]) -> str:
 
 
 __all__ = [
+    "DO_NOT_ASK_AGAIN",
     "HOW_TO_TALK_SOURCE_TYPE",
+    "asked_question_requests",
     "REQUEST_CHECK_SYSTEM_PROMPT",
     "broken_requests",
     "broken_requests_reason",
