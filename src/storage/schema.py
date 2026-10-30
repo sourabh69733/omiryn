@@ -723,6 +723,44 @@ channel_link_codes = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# State that used to live in one server process, kept here so several instances agree.
+
+# A burst: quick messages one messaging-app chat sent since Omi last replied. Whoever holds the
+# replier lease answers them together; the others only count their message in.
+channel_bursts = Table(
+    "channel_bursts",
+    metadata,
+    Column("channel", String, primary_key=True),
+    Column("external_chat_id", String, primary_key=True),
+    Column("conversation_id", String, nullable=False),
+    Column("arrivals", Integer, nullable=False),
+    Column("last_at", DateTime(timezone=True), nullable=False),
+    Column("replier_token", String, nullable=True),
+    Column("replier_until", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Message IDs a messaging app already delivered (Meta retries deliveries); answered once.
+channel_seen_messages = Table(
+    "channel_seen_messages",
+    metadata,
+    Column("channel", String, primary_key=True),
+    Column("message_id", String, primary_key=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Which chats have a web socket open right now, and on which server instance. Refreshed by a
+# heartbeat; a row nobody refreshed is stale after a minute.
+live_presence = Table(
+    "live_presence",
+    metadata,
+    Column("instance_id", String, primary_key=True),
+    Column("user_id", String, primary_key=True),
+    Column("conversation_id", String, primary_key=True),
+    Column("seen_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # A short "who this user is" note across all chats, rewritten by background cognition
 # and shown to the companion on every reply. Encrypted like other user content.
 agent_user_cards = Table(

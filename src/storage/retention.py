@@ -24,6 +24,9 @@ from .schema import (
     agent_trace_steps,
     agent_traces,
     audit_events,
+    channel_bursts,
+    channel_seen_messages,
+    live_presence,
     data_point_extraction_debug,
     memory_batch_failures,
 )
@@ -56,6 +59,10 @@ def purge_expired_records() -> dict[str, int]:
             ),
             ("finished_jobs", agent_jobs, job_cutoff, (agent_jobs.c.status.in_([JOB_DONE, JOB_FAILED]),)),
             ("audit_events", audit_events, now - timedelta(days=AUDIT_DAYS), ()),
+            # Per-instance state nobody closed: a crashed replier, old delivery IDs, a gone instance.
+            ("channel_bursts", channel_bursts, now - timedelta(days=1), ()),
+            ("channel_seen_messages", channel_seen_messages, now - timedelta(days=2), ()),
+            ("live_presence", live_presence, now - timedelta(days=1), ()),
         ):
             deleted[name] = connection.execute(
                 table.delete().where(table.c.created_at < cutoff, *extra)

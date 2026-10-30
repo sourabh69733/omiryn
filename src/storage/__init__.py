@@ -10,6 +10,8 @@ from .agent_runtime import *
 from .users import *
 from .user_settings import *
 from .channel_links import *
+from .channel_bursts import *
+from .presence import *
 from .user_cards import *
 from .vibe_cards import *
 from .self_notes import *
