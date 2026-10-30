@@ -37,6 +37,8 @@ SOURCE_TYPE_PRIORITY = {
     "might_fit": 105,
     # One short doubt to clear up when it fits.
     "open_questions": 117,
+    # Questions Omi already asked here and what the user said next; needed to not re-ask them.
+    "asked_questions": 117,
     "agent_self_notes": 112,
     "agent_behavior_rules": 115,
     "data_points": 100,
@@ -61,6 +63,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "shared_chats": 3500,
     "past_lines": 2800,
     "open_questions": 600,
+    "asked_questions": 1000,
     "might_fit": 800,
     "agent_behavior_rules": 1400,
     "data_points": 1200,

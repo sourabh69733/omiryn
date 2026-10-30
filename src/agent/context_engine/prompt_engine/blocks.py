@@ -35,6 +35,7 @@ _SOURCE_BLOCKS = {
     "how_to_talk": "how_to_talk",
     "reply_feedback": "how_to_talk",
     "texting_style": "how_to_talk",
+    "asked_questions": "how_to_talk",
     "shared_chats": "shared_chats",
     "past_lines": "past_lines",
     "open_questions": "open_questions",
@@ -59,7 +60,7 @@ BLOCK_CHAR_LIMITS = {
     "attached": 4000,
     "might_fit": 800,
     "open_questions": 700,
-    "how_to_talk": 2000,
+    "how_to_talk": 3000,
     "this_turn": 2000,
     "goal": 1200,
 }
