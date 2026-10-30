@@ -52,7 +52,7 @@ class TemporaryChatTest(unittest.TestCase):
 
     def _send(self, chat: str, text: str):
         with patch("api.main.run_agent_turn", run_agent_turn), patch(
-            "api.routes.conversations.schedule_idle_flush"
+            "api.chat_service.schedule_idle_flush"
         ) as idle, patch("api.routes.conversations.request_flush_now") as now:
             response = self.client.post(f"/api/agent/conversations/{chat}/messages", json={"message": text})
         return response, idle, now

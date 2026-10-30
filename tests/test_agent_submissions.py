@@ -3716,7 +3716,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 },
             ),
             patch("api.main.run_agent_turn", new=AsyncMock(return_value=turn_result)),
-            patch("api.routes.conversations.schedule_idle_flush") as schedule,
+            patch("api.chat_service.schedule_idle_flush") as schedule,
         ):
             response = self.client.post(
                 f"/api/agent/conversations/{conversation['id']}/messages",
