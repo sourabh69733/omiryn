@@ -215,6 +215,7 @@ Discord (planned, not started; chosen 2026-10-21 because students use it more th
 
 ## Related docs
 
+- [problem.md](problem.md): the problem Omiryn solves, the one measure (pairs still talking after a week), the match loop and what exists of it.
 - [production-plan.md](production-plan.md): the end-to-end launch list (core loop, growth, safety, privacy, infra, metrics) and the launch gate.
 - [agent-roadmap.md](agent-roadmap.md): the phase plan for time, memory, persona and initiative.
 - [friends-first-audit.md](friends-first-audit.md): where the old dating idea lived and how each piece moved.
