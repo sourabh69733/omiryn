@@ -9,6 +9,7 @@ from agent.memory_engine.memories.embeddings import memory_query_text
 from agent.memory_engine.search import search_chats_hybrid, search_note
 from agent.memory_engine.search.chat_search import merge_hits, without_companion_lines
 from agent.providers import write_search_queries
+from agent.tools import ToolCall, ToolResult, tool_result_messages
 from storage.upload_digests import list_upload_digests
 
 from .job import ReplyJob
@@ -35,10 +36,15 @@ async def search_when_unsure(draft: str, job: ReplyJob, *, extra_queries: list[s
         return draft, {"tool": "unsure_search", "error": type(error).__name__}
     if not hits:
         return draft, {"tool": "unsure_search", "query": query[:120], "hits": 0}
-    note = search_note(query[:120], None, None, hits) + (
-        "\nYour draft said you don't know; check these lines first and answer from them if they do."
+    # The lines come back as the result of a search_chats call made for the model, so what people
+    # wrote in those chats is data it reads, not a system instruction.
+    found_messages = tool_result_messages(
+        [ToolCall("search_chats", {"query": query[:120]})],
+        [ToolResult(search_note(query[:120], None, None, hits))],
+        round_number=0,
     )
-    reply = await job.ask(note)
+    note = {"role": "system", "content": "Your draft said you don't know; check the lines the search found first and answer from them if they do."}
+    reply = await job.generate([*job.reply_messages, *found_messages, note], **job.generation_arguments)
     return reply, {"tool": "unsure_search", "query": query[:120], "queries": extra_queries, "hits": len(hits)}
 
 
