@@ -40,10 +40,16 @@ def _job_handlers() -> dict[str, JobHandler]:
     # Imported here so storage and the worker load without pulling in cognition code.
     from agent.cognition.background.cards.rebuild import CARD_REBUILD_JOB, run_card_rebuild_job
     from agent.cognition.background.idle import MEMORY_FLUSH_JOB, run_memory_flush_job
+    from agent.proactive.service import RETURN_GREETING_JOB, run_return_greeting_job
     from agent.proactive.story import run_story_part_job
     from agent.runtime.story_mode import STORY_PART_JOB
 
-    return {MEMORY_FLUSH_JOB: run_memory_flush_job, STORY_PART_JOB: run_story_part_job, CARD_REBUILD_JOB: run_card_rebuild_job}
+    return {
+        MEMORY_FLUSH_JOB: run_memory_flush_job,
+        STORY_PART_JOB: run_story_part_job,
+        CARD_REBUILD_JOB: run_card_rebuild_job,
+        RETURN_GREETING_JOB: run_return_greeting_job,
+    }
 
 
 def jobs_enabled() -> bool:

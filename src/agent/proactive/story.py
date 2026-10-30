@@ -13,16 +13,16 @@ from agent.context_engine.policy.replies import (
 )
 from agent.runtime.story_mode import (
     STORY_CHECK_IN_EVERY,
+    STORY_PART_JOB,
     auto_parts_since_user,
     schedule_story_part,
     story_autoplay_enabled,
     story_part_block_reason,
 )
 from agent.shared.clock import utc_now
-from realtime import realtime_hub
 from storage import get_conversation
 
-from .service import deliver_messages, generate_initiative_text
+from .service import deliver_messages, generate_initiative_text, hand_over, watching
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,12 @@ async def run_story_part_job(job: dict[str, Any]) -> bool:
     messages = conversation["messages"]
     if story_part_block_reason(messages):
         return False
-    if (user_id, conversation_id) not in await realtime_hub.live_conversations():
+    where = await watching(user_id, conversation_id)
+    if where == "elsewhere":
+        # The user's socket is on another instance; it pushes the part when it runs the job.
+        hand_over(STORY_PART_JOB, user_id, conversation_id)
+        return False
+    if where is None:
         return False  # paused: "continue" from the user picks it up again
     part = auto_parts_since_user(messages) + 1
     check_in = part >= STORY_CHECK_IN_EVERY

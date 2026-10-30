@@ -100,8 +100,10 @@ already told you how it went, ask about it in the greeting.
 """
 # Lets the user type first; the greeting only goes out if they are still quiet.
 DEFAULT_RETURN_GREETING_DELAY_SECONDS = 8.0
-_pending_greetings: set[tuple[str, str]] = set()
-_greeting_tasks: set[asyncio.Task[None]] = set()
+RETURN_GREETING_JOB = "return_greeting"
+# A job that finds the user watching on another instance goes back to the queue this soon, so
+# the instance holding their socket picks it up and can push the message to them.
+_HAND_OVER_SECONDS = 3.0
 
 
 def proactive_messaging_enabled() -> bool:
@@ -127,14 +129,16 @@ async def run_proactive_pass(*, now: datetime | None = None) -> int:
 
 
 def schedule_return_greeting(user_id: str, conversation_id: str) -> None:
-    """Called when a user opens a chat: greet them shortly if they come back after a long gap."""
-    key = (user_id, conversation_id)
-    if not proactive_messaging_enabled() or key in _pending_greetings:
+    """Called when a user opens a chat: greet them shortly if they come back after a long gap.
+
+    A durable job, not an in-process timer: it survives a restart, and on Cloud Run it runs
+    while the open socket keeps the CPU on. Opening the chat again only moves its time.
+    """
+    if not proactive_messaging_enabled():
         return
-    _pending_greetings.add(key)
-    task = asyncio.create_task(_greet_after_delay(user_id, conversation_id))
-    _greeting_tasks.add(task)
-    task.add_done_callback(_greeting_tasks.discard)
+    from agent.jobs.queue import schedule_job
+
+    schedule_job(RETURN_GREETING_JOB, user_id, conversation_id, delay_seconds=_return_greeting_delay())
 
 
 def _return_greeting_delay() -> float:
@@ -144,15 +148,37 @@ def _return_greeting_delay() -> float:
         return DEFAULT_RETURN_GREETING_DELAY_SECONDS
 
 
-async def _greet_after_delay(user_id: str, conversation_id: str) -> None:
+async def run_return_greeting_job(job: dict[str, Any]) -> bool:
+    """Greet if the user is still watching here; hand over if they are watching elsewhere."""
+    user_id, conversation_id = str(job["user_id"]), str(job["conversation_id"])
+    where = await watching(user_id, conversation_id)
+    if where == "elsewhere":
+        hand_over(RETURN_GREETING_JOB, user_id, conversation_id)
+        return False
+    if where is None:
+        return False
+    return await greet_on_return(user_id, conversation_id, utc_now())
+
+
+async def watching(user_id: str, conversation_id: str) -> str | None:
+    """"here" when this instance holds a socket on the chat, "elsewhere" when only another one
+    does, None when nobody is watching."""
+    key = (user_id, conversation_id)
+    if key in await realtime_hub.live_conversations():
+        return "here"
     try:
-        await asyncio.sleep(_return_greeting_delay())
-        if (user_id, conversation_id) in await realtime_hub.live_conversations():
-            await greet_on_return(user_id, conversation_id, utc_now())
+        live = await realtime_hub.live_everywhere()
     except Exception:
-        logger.exception("agent.proactive.return_greeting_failed conversation_id=%s", conversation_id)
-    finally:
-        _pending_greetings.discard((user_id, conversation_id))
+        logger.warning("agent.proactive.presence_read_failed", exc_info=True)
+        return None
+    return "elsewhere" if live.get(key) else None
+
+
+def hand_over(kind: str, user_id: str, conversation_id: str) -> None:
+    """Put a job back for another instance, the one with the user's socket, to run shortly."""
+    from agent.jobs.queue import schedule_job
+
+    schedule_job(kind, user_id, conversation_id, delay_seconds=_HAND_OVER_SECONDS)
 
 
 async def greet_on_return(user_id: str, conversation_id: str, now: datetime) -> bool:
