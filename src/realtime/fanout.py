@@ -88,6 +88,12 @@ class RealtimeFanout:
 
     async def _poll_loop(self) -> None:
         interval = self._poll_seconds or (POLL_SECONDS_WITH_LISTEN if _postgres_dsn() else POLL_SECONDS_WITHOUT_LISTEN)
+        # Mark where this instance starts now, not on the first wake-up: a marker set after an
+        # event arrived would sit past that event and skip it.
+        try:
+            await self.drain()
+        except Exception:
+            logger.warning("realtime.fanout.start_failed", exc_info=True)
         while True:
             try:
                 await asyncio.wait_for(self._wake.wait(), timeout=interval)

@@ -1,5 +1,6 @@
 """An event published on one instance reaches a socket open on another."""
 
+import asyncio
 import os
 import unittest
 from unittest.mock import patch
@@ -50,6 +51,27 @@ class FanoutTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await fanout_b.drain(), 0)
         self.assertEqual(await fanout_a.drain(), 0)
         self.assertEqual(len(socket_a.received), 1)
+
+    async def test_a_started_reader_delivers_the_first_event_after_it_started(self) -> None:
+        """The reader marks its start when it starts, so the first event is never skipped."""
+        hub_a = InMemoryRealtimeHub("a")
+        hub_a.attach_fanout(RealtimeFanout(hub_a))
+        hub_b = InMemoryRealtimeHub("b")
+        fanout_b = RealtimeFanout(hub_b, poll_seconds=0.05)
+        hub_b.attach_fanout(fanout_b)
+        socket_b = _Socket()
+        connection = await hub_b.register(socket_b, USER_ID)
+        await hub_b.subscribe(connection, "conversation", CHAT)
+        fanout_b.start()
+        await asyncio.sleep(0.02)
+
+        await hub_a.publish(conversation_event("message.created", CHAT, sequence=5))
+        for _ in range(40):
+            if socket_b.received:
+                break
+            await asyncio.sleep(0.05)
+        await fanout_b.stop()
+        self.assertEqual([event["sequence"] for event in socket_b.received], [5])
 
     async def test_events_before_an_instance_started_are_not_replayed(self) -> None:
         append_realtime_event("old-instance", conversation_event("message.created", CHAT, sequence=1).as_dict())

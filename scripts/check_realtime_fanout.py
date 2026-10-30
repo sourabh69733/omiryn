@@ -14,6 +14,7 @@ The table is created if missing; the one test row is deleted at the end. Prints 
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 import time
@@ -43,6 +44,8 @@ class _Socket:
 
 
 async def main() -> int:
+    # The reader's own lines show whether LISTEN connected or why it could not.
+    logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s", stream=sys.stderr)
     init_db()
     postgres = _postgres_dsn() is not None
     print(f"database: {'postgres (LISTEN/NOTIFY expected)' if postgres else 'sqlite (poll only)'}")
