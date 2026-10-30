@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from .privacy import blocked_for_privacy
 from .registry import Tool, ToolContext, ToolResult, register_tool
 
 TAVILY_URL = "https://api.tavily.com/search"
@@ -45,6 +46,8 @@ async def _run(arguments: dict[str, Any], context: ToolContext) -> ToolResult:
     query = " ".join(str(arguments.get("query") or "").split())[:QUERY_CHARS]
     if not query:
         return ToolResult("web_search needs a query. Answer without it.", {"results": 0})
+    if blocked := blocked_for_privacy("web_search", query, context):
+        return blocked
     days = arguments.get("recent_days")
     days = days if isinstance(days, int) and not isinstance(days, bool) and days > 0 else None
     results = await search_web(query, days=days)

@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from .privacy import blocked_for_privacy
 from .registry import Tool, ToolContext, ToolResult, register_tool
 
 PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -65,6 +66,8 @@ async def _run(arguments: dict[str, Any], context: ToolContext) -> ToolResult:
     query = " ".join(str(arguments.get("query") or "").split())[:QUERY_CHARS]
     if not query:
         return ToolResult("find_places needs a query with the area. Ask the user where, if you do not know.", {"results": 0})
+    if blocked := blocked_for_privacy("find_places", query, context):
+        return blocked
     open_now = arguments.get("open_now") is True
     rating = arguments.get("min_rating")
     rating = float(rating) if isinstance(rating, (int, float)) and not isinstance(rating, bool) and 0 < rating <= 5 else None
