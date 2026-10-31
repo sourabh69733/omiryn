@@ -103,7 +103,7 @@ Plain HTML with GSAP and ScrollTrigger, light theme. Fonts Geist, with Fraunces 
 
 | Section | State |
 |---|---|
-| Hero | "Talk to Omi. Meet your people." plus one button, next to a live chat: Omi asks, you answer, a phrase lights up and lands in "Your vibe", then a match pops. Loops; still final state with reduced motion. |
+| Hero | The conversation is the hero: one short line ("Talk to Omi. Meet your people.") and one button, then the chat itself at full size with no phone frame. Omi asks, you answer, a phrase lights up and sticks to the side as a vibe sticker; after three, a match card lands under the chat. Loops; still final state with reduced motion. |
 | How it works | Left-aligned: "No forms. No swiping. Just talk." and three numbered steps in a row. |
 | Matches | The one dark section: "Every match comes with a reason.", the draggable match card stack, and the early-access form ("Matches roll out in waves. Want in early?"). |
 | Final CTA | "Your people are out there." and the button. |
