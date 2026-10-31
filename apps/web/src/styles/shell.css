@@ -820,12 +820,12 @@ button.omi-drawer-close:hover {
 
 .message-row.is-selectable:hover,
 .message-row.is-selectable:focus-visible {
-  background: rgba(255, 79, 43, 0.05);
+  background: rgba(248, 68, 31, 0.05);
   outline: none;
 }
 
 .message-row.is-selected {
-  background: rgba(255, 79, 43, 0.1);
+  background: rgba(248, 68, 31, 0.1);
 }
 
 .message-row.is-selectable .chat-avatar.agent {
@@ -890,7 +890,7 @@ button.omi-drawer-close:hover {
 
 .message-select-toolbar button.select-toolbar-icon:hover,
 .message-select-toolbar button.select-toolbar-text:hover {
-  background: rgba(255, 79, 43, 0.08);
+  background: rgba(248, 68, 31, 0.08);
 }
 
 .message-select-toolbar button.select-toolbar-text {
@@ -950,7 +950,7 @@ button.omi-drawer-close:hover {
 
   .message-menu button.message-menu-trigger:hover,
   .message-menu button.message-menu-trigger.is-open {
-    background: rgba(255, 79, 43, 0.08);
+    background: rgba(248, 68, 31, 0.08);
   }
 }
 
@@ -997,7 +997,7 @@ button.omi-drawer-close:hover {
 }
 
 .message-menu-list button:hover {
-  background: rgba(255, 79, 43, 0.08);
+  background: rgba(248, 68, 31, 0.08);
 }
 
 .message-menu-list button.is-danger {
@@ -1036,7 +1036,7 @@ button.omi-drawer-close:hover {
   padding: 6px 10px;
   border-left: 3px solid var(--ember-deep);
   border-radius: 8px;
-  background: rgba(255, 79, 43, 0.08);
+  background: rgba(248, 68, 31, 0.08);
   color: inherit;
   font-size: 13px;
   font-weight: 400;
@@ -1049,7 +1049,7 @@ button.omi-drawer-close:hover {
 }
 
 .message button.message-quote:hover {
-  background: rgba(255, 79, 43, 0.12);
+  background: rgba(248, 68, 31, 0.12);
 }
 
 .message.user button.message-quote:hover {
@@ -1105,7 +1105,7 @@ button.omi-drawer-close:hover {
 }
 
 .reply-preview button:hover {
-  background: rgba(255, 79, 43, 0.1);
+  background: rgba(248, 68, 31, 0.1);
 }
 
 .reply-preview button svg {
@@ -1246,7 +1246,7 @@ button.omi-drawer-close:hover {
 
 .chat-upload-names button.is-active {
   border-color: var(--brand-violet);
-  background: rgba(255, 79, 43, 0.08);
+  background: rgba(248, 68, 31, 0.08);
   color: var(--brand-violet);
 }
 
@@ -1333,7 +1333,7 @@ button.omi-drawer-close:hover {
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 79, 43, 0.12);
+  background: rgba(248, 68, 31, 0.12);
 }
 
 .upload-progress-bar span {

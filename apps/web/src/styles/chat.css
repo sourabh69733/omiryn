@@ -14,7 +14,7 @@ button:not(:where(.epr-btn)) {
 
 button:not(:where(.epr-btn)):hover {
   color: #fff;
-  background: var(--ember);
+  background: var(--ember-deep);
 }
 
 button:not(:where(.epr-btn)):disabled {
@@ -57,7 +57,7 @@ button:not(:where(.epr-btn)):disabled {
   z-index: 0;
   border-radius: inherit;
   background:
-    linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(255, 79, 43, 0.08) 54%, transparent 76%);
+    linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(248, 68, 31, 0.08) 54%, transparent 76%);
   content: none;
   pointer-events: none;
 }
@@ -98,7 +98,7 @@ button:not(:where(.epr-btn)):disabled {
 }
 
 .history-item:hover {
-  border-color: rgba(255, 79, 43, 0.3);
+  border-color: rgba(248, 68, 31, 0.3);
   color: var(--ink);
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(21, 18, 14, 0.08);
@@ -112,7 +112,7 @@ button:not(:where(.epr-btn)):disabled {
 }
 
 .history-item:focus-visible {
-  outline: 3px solid rgba(255, 79, 43, 0.2);
+  outline: 3px solid rgba(248, 68, 31, 0.2);
   outline-offset: 2px;
 }
 
@@ -224,7 +224,7 @@ button.history-menu-button {
 
 button.history-menu-button:hover,
 button.history-menu-button[aria-expanded="true"] {
-  background: rgba(255, 79, 43, 0.12);
+  background: rgba(248, 68, 31, 0.12);
   color: var(--primary-dark);
 }
 
@@ -433,14 +433,14 @@ button.history-archived-toggle:hover {
 .model-picker select:focus,
 .model-picker input:focus {
   border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(255, 79, 43, 0.18);
+  box-shadow: 0 0 0 3px rgba(248, 68, 31, 0.18);
 }
 
 .agentic-chat .chat-log {
   position: relative;
   z-index: 1;
   background:
-    radial-gradient(circle at 96% 0%, rgba(214, 58, 23, 0.08), transparent 32%),
+    radial-gradient(circle at 96% 0%, rgba(188, 46, 15, 0.08), transparent 32%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.08));
 }
 
@@ -458,7 +458,7 @@ button.history-archived-toggle:hover {
   width: 36px;
   height: 36px;
   overflow: hidden;
-  border: 1px solid rgba(214, 58, 23, 0.16);
+  border: 1px solid rgba(188, 46, 15, 0.16);
   border-radius: 999px;
   background: #ffffff;
   box-shadow:
@@ -514,7 +514,7 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .secondary-button:hover {
   color: var(--ink);
-  background: rgba(255, 79, 43, 0.3);
+  background: rgba(248, 68, 31, 0.3);
 }
 
 .chat-log {
@@ -638,7 +638,7 @@ button.history-archived-toggle:hover {
 }
 
 .chat-avatar.agent {
-  border-color: rgba(214, 58, 23, 0.18);
+  border-color: rgba(188, 46, 15, 0.18);
   background: #ffffff;
 }
 
@@ -694,7 +694,7 @@ button.history-archived-toggle:hover {
   position: absolute;
   inset: 6%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 79, 43, 0.45), rgba(214, 58, 23, 0.28) 55%, transparent 72%);
+  background: radial-gradient(circle, rgba(248, 68, 31, 0.45), rgba(188, 46, 15, 0.28) 55%, transparent 72%);
   filter: blur(6px);
   opacity: 0;
 }
@@ -839,7 +839,7 @@ button.history-archived-toggle:hover {
   background: var(--primary);
   /* background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
-    linear-gradient(135deg, var(--ember-soft), rgba(214, 58, 23, 0.15), rgba(255, 79, 43, 0.13)),
+    linear-gradient(135deg, var(--ember-soft), rgba(188, 46, 15, 0.15), rgba(248, 68, 31, 0.13)),
     rgba(255, 255, 255, 0.92); */
   /* box-shadow:
     0 12px 30px rgba(21, 18, 14, 0.1),
@@ -854,13 +854,13 @@ button.history-archived-toggle:hover {
 .agentic-chat .message.evidence-highlight {
   outline: 2px solid var(--ember);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgba(255, 79, 43, 0.12);
+  box-shadow: 0 0 0 6px rgba(248, 68, 31, 0.12);
 }
 
 .agentic-chat .message-row.evidence-highlight .message {
   outline: 2px solid var(--ember);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgba(255, 79, 43, 0.12);
+  box-shadow: 0 0 0 6px rgba(248, 68, 31, 0.12);
 }
 
 .message-feedback {
@@ -1027,7 +1027,7 @@ button.history-archived-toggle:hover {
 .message-feedback-comment:focus {
   border-color: var(--mint);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 79, 43, 0.18);
+  box-shadow: 0 0 0 2px rgba(248, 68, 31, 0.18);
 }
 
 .message-feedback-loading {
@@ -1093,7 +1093,7 @@ button.history-archived-toggle:hover {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(255, 79, 43, 0.13);
+  background: rgba(248, 68, 31, 0.13);
   font-size: 10.5px;
   font-weight: 560;
   letter-spacing: 0;
@@ -1158,7 +1158,7 @@ button.history-archived-toggle:hover {
 }
 
 .agentic-chat .composer.is-paused {
-  border-top-color: rgba(214, 58, 23, 0.2);
+  border-top-color: rgba(188, 46, 15, 0.2);
 }
 
 .composer > input,
@@ -1401,7 +1401,7 @@ button.history-archived-toggle:hover {
 .composer > input:focus,
 .composer > textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 79, 43, 0.12);
+  box-shadow: 0 0 0 3px rgba(248, 68, 31, 0.12);
 }
 
 .agentic-chat .composer > input:focus,
@@ -1413,7 +1413,7 @@ button.history-archived-toggle:hover {
 .agentic-chat .composer:focus-within {
   border-color: var(--primary);
   box-shadow:
-    0 0 0 3px rgba(255, 79, 43, 0.12);
+    0 0 0 3px rgba(248, 68, 31, 0.12);
 }
 
 .usage-summary {

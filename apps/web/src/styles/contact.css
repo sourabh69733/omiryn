@@ -102,7 +102,7 @@
 
 .contact-category-row label:hover,
 .contact-category-row label:focus-within {
-  border-color: rgba(255, 79, 43, 0.44);
+  border-color: rgba(248, 68, 31, 0.44);
   color: var(--ink);
   background: rgba(255, 255, 255, 0.88);
 }
@@ -134,7 +134,7 @@
 }
 
 .contact-message-field textarea:focus {
-  border-color: rgba(255, 79, 43, 0.56);
+  border-color: rgba(248, 68, 31, 0.56);
   box-shadow: 0 0 0 3px var(--line);
 }
 
@@ -189,7 +189,7 @@
   border-radius: 8px;
   color: #ffffff;
   background: var(--ink);
-  box-shadow: 0 16px 34px rgba(255, 79, 43, 0.24);
+  box-shadow: 0 16px 34px rgba(248, 68, 31, 0.24);
   padding: 0 22px;
   font: inherit;
   font-weight: 780;
@@ -292,7 +292,7 @@
 }
 
 .contact-connect-row em {
-  border: 1px solid rgba(255, 79, 43, 0.28);
+  border: 1px solid rgba(248, 68, 31, 0.28);
   border-radius: 8px;
   color: var(--primary-dark);
   background: rgba(255, 255, 255, 0.7);

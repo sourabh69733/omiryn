@@ -25,7 +25,7 @@
   gap: 14px;
   min-height: 44px;
   width: 100%;
-  border: 1px solid rgba(255, 79, 43, 0.12);
+  border: 1px solid rgba(248, 68, 31, 0.12);
   border-radius: 999px;
   padding: 0 18px 0 16px;
   color: var(--muted);
@@ -46,7 +46,7 @@
 }
 
 .choice-pill:hover {
-  border-color: rgba(255, 79, 43, 0.32);
+  border-color: rgba(248, 68, 31, 0.32);
   color: var(--ink);
   background: #ffffff;
   transform: translateY(-1px);
@@ -54,12 +54,12 @@
 
 .choice-pill.is-selected,
 .choice-pill.selected {
-  border-color: rgba(255, 79, 43, 0.8);
+  border-color: rgba(248, 68, 31, 0.8);
   color: #ffffff;
   background: linear-gradient(145deg, #237a74, #12615b);
   box-shadow:
-    0 18px 42px rgba(255, 79, 43, 0.22),
-    0 0 0 5px rgba(255, 79, 43, 0.13),
+    0 18px 42px rgba(248, 68, 31, 0.22),
+    0 0 0 5px rgba(248, 68, 31, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
@@ -257,17 +257,17 @@
 .choice-card:hover {
   transform: translateY(-1px);
   border-color: var(--purple-2);
-  box-shadow: 0 8px 18px rgba(255, 79, 43, 0.09);
+  box-shadow: 0 8px 18px rgba(248, 68, 31, 0.09);
 }
 
 .choice-card:focus-visible {
-  box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.14);
+  box-shadow: 0 0 0 4px rgba(248, 68, 31, 0.14);
 }
 
 .choice-card.selected {
   border-color: var(--purple);
   color: var(--ember-deep);
-  background: linear-gradient(135deg, rgba(255, 79, 43, 0.1), rgba(214, 58, 23, 0.05));
+  background: linear-gradient(135deg, rgba(248, 68, 31, 0.1), rgba(188, 46, 15, 0.05));
 }
 
 .choice-card i {
@@ -306,8 +306,8 @@
   place-items: center;
   padding: clamp(18px, 4vw, 56px);
   background:
-    radial-gradient(circle at 15% 18%, rgba(255, 79, 43, 0.16), transparent 28%),
-    radial-gradient(circle at 88% 82%, rgba(255, 79, 43, 0.13), transparent 26%),
+    radial-gradient(circle at 15% 18%, rgba(248, 68, 31, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 82%, rgba(248, 68, 31, 0.13), transparent 26%),
     linear-gradient(145deg, #fff, var(--paper-2));
 }
 
@@ -407,7 +407,7 @@
   border-radius: 14px;
   color: #fff;
   background: var(--ink);
-  box-shadow: 0 7px 20px rgba(255, 79, 43, 0.18);
+  box-shadow: 0 7px 20px rgba(248, 68, 31, 0.18);
 }
 
 .agent-avatar {
@@ -573,8 +573,8 @@
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 94% 4%, rgba(214, 58, 23, 0.09), transparent 28%),
-    radial-gradient(circle at 10% 96%, rgba(255, 79, 43, 0.09), transparent 30%),
+    radial-gradient(circle at 94% 4%, rgba(188, 46, 15, 0.09), transparent 28%),
+    radial-gradient(circle at 10% 96%, rgba(248, 68, 31, 0.09), transparent 30%),
     linear-gradient(145deg, #fff 0%, var(--paper-2) 52%, var(--paper-2) 100%);
   font-family: var(--font-ui);
 }
@@ -648,7 +648,7 @@
 
 .quick-setup-input:focus {
   border-color: var(--ink);
-  box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.11);
+  box-shadow: 0 0 0 4px rgba(248, 68, 31, 0.11);
 }
 
 .quick-setup-location {
@@ -748,7 +748,7 @@
 }
 
 .quick-setup-submit:hover {
-  background: var(--ember);
+  background: var(--ember-deep);
   transform: translateY(-1px);
 }
 

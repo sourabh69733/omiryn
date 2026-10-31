@@ -95,7 +95,7 @@
 }
 
 .vibe-callout.is-ready {
-  border-color: rgba(255, 79, 43, 0.22);
+  border-color: rgba(248, 68, 31, 0.22);
   background: var(--ember-soft);
 }
 
@@ -516,7 +516,7 @@
   margin: 10px 0 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(214, 58, 23, 0.08);
+  background: rgba(188, 46, 15, 0.08);
   color: var(--ink);
   font-size: 13px;
   line-height: 1.45;

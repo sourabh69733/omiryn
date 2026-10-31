@@ -7,9 +7,9 @@
   --paper-3: #e2d9c8;
   --ink: #15120e;
   --ink-2: #4a443b;
-  --ember: #ff4f2b;
-  --ember-deep: #d63a17;
-  --ember-soft: rgba(255, 79, 43, 0.12);
+  --ember: #f8441f;
+  --ember-deep: #bc2e0f;
+  --ember-soft: rgba(248, 68, 31, 0.12);
   --hover: rgba(21, 18, 14, 0.06);
 
   --brand-bg: var(--paper);
@@ -59,7 +59,7 @@
   --soft: var(--paper-2);
   --panel: #ffffff;
   --primary: var(--ink);
-  --primary-dark: var(--ember);
+  --primary-dark: var(--ember-deep);
   --accent: var(--ember-deep);
   --success: #2f7a5f;
   --warning: #c88a1d;
