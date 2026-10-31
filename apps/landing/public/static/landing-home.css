@@ -452,16 +452,18 @@
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .page .page-hero h1 {
   max-width: 18ch;
   margin-bottom: 20px;
-  font-family: var(--font-sans);
-  font-size: clamp(40px, 5.6vw, 72px);
-  font-weight: 600;
-  line-height: 1.02;
-  letter-spacing: -0.045em;
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(44px, 6vw, 84px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 .page .page-hero p { max-width: 60ch; margin: 0; color: var(--fg-2); font-size: 18px; line-height: 1.6; }
@@ -488,7 +490,7 @@
 .page .content-panel h2,
 .page .content-panel h3,
 .page .step-card h3,
-.page .lead-form h3 { margin-bottom: 10px; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.page .lead-form h3 { margin-bottom: 10px; font-family: var(--font-serif); font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
 .page .content-panel p,
 .page .content-panel li,
 .page .step-card p { color: var(--fg-2); font-size: 15.5px; line-height: 1.65; }
