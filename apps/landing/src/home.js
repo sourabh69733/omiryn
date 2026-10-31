@@ -50,11 +50,10 @@ $$('a[href^="#"]').forEach((link) => {
 });
 
 /* ─────────── Hero: a live chat with Omi ─────────── */
-// Omi asks, you answer, a phrase lights up and lands in "Your vibe"; after three, a match pops.
-// Every element is in the DOM from the start (hidden, keeping its space), so the phone never
-// changes size while the loop runs.
+// The conversation is the hero: Omi asks, you answer, a phrase lights up and sticks to the side
+// as part of your vibe; after three, a match lands. Every element is in the DOM from the start
+// (hidden, keeping its space), so the stage never changes size while the loop runs.
 const demo = $("#o-demo");
-const demoPhone = $(".o-phone", demo);
 const bots = $$("[data-bot]", demo);
 const mes = $$("[data-me]", demo);
 const chips = $$("[data-chip]", demo);
@@ -74,13 +73,14 @@ function demoReset() {
   marks.forEach((mark) => mark.classList.remove("is-on"));
   gsap.set([...bots, ...mes, ...chips], { autoAlpha: 0, y: 10, scale: 1 });
   gsap.set(matchPop, { autoAlpha: 0, y: 24, scale: 0.9 });
-  demoPhone.classList.remove("is-thinking");
+  demo.classList.remove("is-thinking");
 }
 
 function demoFinal() {
   bots.forEach((bot) => bot.classList.remove("is-typing"));
   marks.forEach((mark) => mark.classList.add("is-on"));
   gsap.set([...bots, ...mes, ...chips, matchPop], { autoAlpha: 1, y: 0, scale: 1 });
+  demo.classList.add("is-thinking");
 }
 
 function demoCycle() {
@@ -98,11 +98,11 @@ function demoCycle() {
       .to({}, { duration: 0.5 })
       // The phrase lights up and lands in your vibe.
       .call(() => marks[i].classList.add("is-on"))
-      .fromTo(chips[i], { autoAlpha: 0, scale: 0.6, y: 6 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.45, ease: "back.out(2)" }, "+=0.35");
+      .fromTo(chips[i], { autoAlpha: 0, scale: 0.5, y: 14 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.5, ease: "back.out(2.2)" }, "+=0.35");
   });
   demoLoop
     // Someone who fits.
-    .call(() => demoPhone.classList.add("is-thinking"), null, "+=0.6")
+    .call(() => demo.classList.add("is-thinking"), null, "+=0.6")
     .fromTo(matchPop, { autoAlpha: 0, y: 24, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, "+=0.5")
     .to({}, { duration: 4 })
     // Fade out, then start over with a fresh chat.
@@ -229,12 +229,11 @@ else window.addEventListener("load", () => idle(runNextStep, { timeout: 1000 }),
 
 if (!reduce) {
   demoReset();
-  // Hero intro: words rise, then the button, then the phone; the chat starts a beat later.
+  // Hero intro: the line rises, then the button; the conversation starts right after.
   gsap.timeline({ defaults: { ease: "expo.out" } })
-    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.07 })
-    .from("[data-intro]", { y: 20, autoAlpha: 0, duration: 0.8 }, "-=0.6")
-    .from(demoPhone, { y: 40, autoAlpha: 0, duration: 1.1 }, 0.35)
-    .add(demoCycle, 1.1);
+    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.8, stagger: 0.05 })
+    .from("[data-intro]", { y: 16, autoAlpha: 0, duration: 0.7 }, "-=0.5")
+    .add(demoCycle, 0.7);
 
   // Background blobs drift.
   $$(".o-blob").forEach((blob, i) => {
@@ -290,11 +289,12 @@ if (!reduce && finePointer) {
     btn.addEventListener("pointerleave", () => { mx(0); my(0); });
   });
 
-  // The phone leans toward the cursor a little.
-  const dx = gsap.quickTo(demo, "x", { duration: 1.2, ease: "power3" });
-  const dy = gsap.quickTo(demo, "y", { duration: 1.2, ease: "power3" });
+  // The stickers and the match card lean toward the cursor a little.
+  const lean = [$(".o-stickers"), matchPop];
+  const lx = gsap.quickTo(lean, "x", { duration: 1.2, ease: "power3" });
+  const ly = gsap.quickTo(lean, "y", { duration: 1.2, ease: "power3" });
   $("#hero").addEventListener("pointermove", (e) => {
-    dx((e.clientX / window.innerWidth - 0.5) * 18);
-    dy((e.clientY / window.innerHeight - 0.5) * 12);
+    lx((e.clientX / window.innerWidth - 0.5) * 14);
+    ly((e.clientY / window.innerHeight - 0.5) * 10);
   });
 }
