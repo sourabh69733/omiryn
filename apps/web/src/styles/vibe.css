@@ -95,8 +95,8 @@
 }
 
 .vibe-callout.is-ready {
-  border-color: rgba(124, 58, 237, 0.22);
-  background: #f7f2ff;
+  border-color: rgba(255, 79, 43, 0.22);
+  background: var(--ember-soft);
 }
 
 .vibe-callout div {
@@ -148,7 +148,10 @@
 .vibe-group h2 {
   color: var(--ink);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 500;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72;
+  letter-spacing: -0.02em;
 }
 
 .vibe-cards {
@@ -172,7 +175,7 @@
 .vibe-card.is-known {
   border-style: solid;
   background: var(--panel);
-  box-shadow: 0 6px 20px rgba(64, 45, 118, 0.05);
+  box-shadow: 0 6px 20px rgba(21, 18, 14, 0.05);
 }
 
 .vibe-card h3 {
@@ -248,9 +251,9 @@
   gap: 8px;
   margin: 0 0 12px;
   padding: 14px 16px;
-  border: 1px solid #e6defc;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #faf8ff;
+  background: var(--paper-2);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -292,7 +295,7 @@
 }
 
 .vibe-consent-actions button.is-quiet:hover {
-  background: #f5f1ff;
+  background: var(--hover);
 }
 
 .vibe-consent small {
@@ -394,7 +397,7 @@
   padding: 10px 12px;
   color: var(--ink);
   font-size: 12px;
-  box-shadow: 0 8px 24px rgba(24, 24, 27, 0.04);
+  box-shadow: 0 8px 24px rgba(21, 18, 14, 0.04);
 }
 
 .vibe-milestone-note .vibe-milestone-icon {
@@ -513,7 +516,7 @@
   margin: 10px 0 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(217, 95, 145, 0.08);
+  background: rgba(214, 58, 23, 0.08);
   color: var(--ink);
   font-size: 13px;
   line-height: 1.45;
