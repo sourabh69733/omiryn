@@ -1,6 +1,7 @@
-// The agent's face: an ember drop drawn in CSS (see .agent-orb in chat.css), not a photo of a
-// person, since Omiryn is not a person. Only "thinking" (writing a reply) moves; every other
-// state holds a slightly different shape and is still.
+// The agent's face: a glossy "vibe" blob, not a photo of a person, since
+// Omiryn is not a person. Each state has its own image (the ember set, recolored
+// from the originals by design-assets/agent-src/recolor_ember.py). Only "thinking"
+// (writing a reply) moves; every other state is still.
 export type AgentOrbState = "idle" | "thinking" | "listening" | "happy";
 
 type AgentOrbProps = {
@@ -14,7 +15,14 @@ export function AgentOrb({ state, active = false }: AgentOrbProps) {
   return (
     <span className={`agent-orb is-${current}`} aria-hidden="true">
       <span className="agent-orb-glow" />
-      <span className="agent-orb-blob" />
+      <img
+        className="agent-orb-blob"
+        src={`/assets/agent/agent-${current}-ember-128.webp`}
+        srcSet={`/assets/agent/agent-${current}-ember-128.webp 1x, /assets/agent/agent-${current}-ember-256.webp 2x`}
+        alt=""
+        draggable={false}
+        decoding="async"
+      />
     </span>
   );
 }
