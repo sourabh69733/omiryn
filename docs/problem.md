@@ -51,10 +51,10 @@ Everything else (messages per day, return rate, memory accuracy, card completene
 
 | Part | What it means | State |
 |---|---|---|
-| 1. Know enough | Over the week Omi learns how they talk, what they do with free time, what they cannot stand, a few values, plus the plain facts for a meet (area, free evenings, veg or not, budget). Each line with proof. | Mostly built: memories with evidence, vibe card, user card, WhatsApp channel, nudges and follow-ups. Missing: a "ready for match day" mark from how many areas have proof, and the plain-facts asks. |
-| 2. Pick | A person reads the vibe notes of the building's pool and picks pairs or small groups; later, code compares two cards and says why. | Not built. Needs an operator view of the pool: who is ready, their notes. |
-| 3. Introduce and host | Omi tells both, with the reasons, suggests place and time, reminds the day before. | Not built. The pieces exist: places tool, promise follow-ups, WhatsApp sends. |
-| 4. Learn from it | Day 3 and day 30 check-ins; outcomes recorded per pair. | Not built. |
+| 1. Know enough | Over the week Omi learns how they talk, what they do with free time, what they cannot stand, a few values, plus the plain facts for a meet (area, free evenings, veg or not, budget). Each line with proof. | Built: memories with evidence, vibe card, user card, WhatsApp channel, nudges and follow-ups, the readiness mark and the missing meet facts given to Omi as a goal (progress 7a). |
+| 2. Pick | A person reads the vibe notes of the building's pool and picks pairs or small groups; later, code compares two cards and says why. | Built (progress 7a, 7b): pool with join code, operator view with readiness and non-private lines, suggested pairs, compatibility reasons. API only, no web page yet. |
+| 3. Introduce and host | Omi tells both, with the reasons, suggests place and time, reminds the day before. | Built (progress 7c), not yet used live: the operator sets place and time, Omi introduces both in their own chat (WhatsApp when linked) and reminds them. Missing: both sides confirming to each other, and sharing numbers with consent. |
+| 4. Learn from it | Day 3 and day 30 check-ins; outcomes recorded per pair. | Built (progress 7c): Omi asks at day 3 and day 30; what the user says is recorded on the pair through a tool, and the operator sees the status. Not yet used live. |
 
 ## What this changes
 
