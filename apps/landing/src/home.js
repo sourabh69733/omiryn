@@ -54,15 +54,24 @@ $$('a[href^="#"]').forEach((link) => {
 const shelf = $("#o-shelf");
 const threadPath = $("#o-thread-path");
 const threadLabel = $("#o-thread-label");
-const THREAD_PAIR = [1, 3];
-const visibleCards = () => $$(".o-polaroid", shelf).filter((card) => card.offsetParent !== null);
+const threadWhy = $("#o-thread-why");
+const prints = $$(".o-polaroid", shelf);
+// Who the thread ties together, and why. Card numbers match data-card in the HTML.
+const PAIRS = [
+  { a: 0, b: 2, why: "both up at 2am" },
+  { a: 1, b: 3, why: "same goofy energy" },
+  { a: 4, b: 5, why: "would argue, happily" },
+];
+const visiblePairs = () => PAIRS.filter(({ a, b }) => prints[a].offsetParent && prints[b].offsetParent);
+let pair = visiblePairs()[0] ?? PAIRS[0];
+let threadDrawn = reduce;
+let heroVisible = true;
+let threadLoop = null;
 
 // A curve from one photo to the other, in the shelf's own coordinates, with the label at its middle.
 function drawThread() {
-  const cards = visibleCards();
-  const a = cards[THREAD_PAIR[0]];
-  const b = cards[THREAD_PAIR[1]] ?? cards[cards.length - 1];
-  if (!a || !b || a === b) return;
+  const a = prints[pair.a];
+  const b = prints[pair.b];
   const box = shelf.getBoundingClientRect();
   const center = (el) => {
     const r = el.getBoundingClientRect();
@@ -70,27 +79,50 @@ function drawThread() {
   };
   const p = center(a);
   const q = center(b);
-  const lift = Math.min(90, Math.abs(q.x - p.x) * 0.35);
+  const lift = Math.min(120, 40 + Math.abs(q.x - p.x) * 0.4);
   const c1 = { x: p.x + (q.x - p.x) * 0.3, y: Math.min(p.y, q.y) - lift };
   const c2 = { x: p.x + (q.x - p.x) * 0.7, y: Math.min(p.y, q.y) - lift };
   threadPath.setAttribute("d", `M ${p.x} ${p.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${q.x} ${q.y}`);
   threadPath.style.strokeDasharray = threadPath.getTotalLength();
-  if (reduce || threadDrawn) threadPath.style.strokeDashoffset = 0;
+  if (threadDrawn) threadPath.style.strokeDashoffset = 0;
   // Bezier midpoint (t = 0.5).
   const mid = { x: (p.x + 3 * c1.x + 3 * c2.x + q.x) / 8, y: (p.y + 3 * c1.y + 3 * c2.y + q.y) / 8 };
   threadLabel.style.left = `${mid.x}px`;
   threadLabel.style.top = `${mid.y}px`;
+  threadWhy.textContent = pair.why;
+  prints.forEach((print, i) => print.classList.toggle("is-linked", i === pair.a || i === pair.b));
 }
-let threadDrawn = reduce;
-window.addEventListener("resize", drawThread);
+window.addEventListener("resize", () => {
+  if (!visiblePairs().includes(pair)) pair = visiblePairs()[0] ?? PAIRS[0];
+  drawThread();
+});
+
+// Every few seconds the thread lets go and ties the next two people together.
+function threadCycle() {
+  const pairs = visiblePairs();
+  if (pairs.length < 2) return;
+  const next = pairs[(pairs.indexOf(pair) + 1) % pairs.length] ?? pairs[0];
+  threadLoop = gsap.timeline({ paused: !heroVisible, onComplete: threadCycle, defaults: { ease: "power2.inOut" } })
+    .to({}, { duration: 3.2 })
+    .to(threadLabel, { autoAlpha: 0, scale: 0.6, duration: 0.3, ease: "power2.in" })
+    .to(threadPath, { strokeDashoffset: () => threadPath.getTotalLength(), duration: 0.5 }, "<")
+    .call(() => { pair = next; drawThread(); })
+    // immediateRender off: these must not reset the thread the moment the loop is created.
+    .fromTo(threadPath, { strokeDashoffset: () => threadPath.getTotalLength() }, { strokeDashoffset: 0, duration: 0.9, immediateRender: false })
+    .fromTo(threadLabel, { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: "back.out(2)", immediateRender: false }, "-=0.25");
+}
+// The thread rests while the hero is off screen.
+new IntersectionObserver(([entry]) => {
+  heroVisible = entry.isIntersecting;
+  if (threadLoop) heroVisible ? threadLoop.resume() : threadLoop.pause();
+}).observe($("#hero"));
 
 function heroIntro() {
-  const cards = $$(".o-polaroid", shelf);
   const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
   tl.from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.06 })
     .from("[data-intro]", { y: 16, autoAlpha: 0, duration: 0.7 }, "-=0.55")
     // Photos land on the table one by one.
-    .from(cards, {
+    .from(prints, {
       y: 90,
       autoAlpha: 0,
       rotation: (i) => [-18, 14, -10, 16, -14, 10][i],
@@ -102,12 +134,13 @@ function heroIntro() {
     // The thread ties two of them together, then the label pops.
     .call(() => { threadDrawn = true; drawThread(); }, null, "-=0.2")
     .fromTo(threadPath, { strokeDashoffset: () => threadPath.getTotalLength() }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" })
-    .fromTo(threadLabel, { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, "-=0.25");
+    .fromTo(threadLabel, { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, "-=0.25")
+    .call(threadCycle);
 
   // Then they breathe: each photo drifts a little, forever.
   tl.call(() => {
-    cards.forEach((card, i) => {
-      gsap.to(card, { y: i % 2 ? 7 : -7, duration: 2.6 + i * 0.3, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    prints.forEach((print, i) => {
+      gsap.to(print, { y: i % 2 ? 7 : -7, duration: 2.6 + i * 0.3, repeat: -1, yoyo: true, ease: "sine.inOut" });
     });
   });
   return tl;
@@ -335,7 +368,7 @@ if (!reduce && finePointer) {
   });
 
   // The shelf leans toward the cursor a little, each photo by a different amount.
-  const layers = $$(".o-polaroid", shelf).map((card, i) => ({
+  const layers = prints.map((card, i) => ({
     x: gsap.quickTo(card, "x", { duration: 1.1, ease: "power3" }),
     depth: 6 + (i % 3) * 5,
   }));
