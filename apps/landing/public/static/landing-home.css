@@ -16,9 +16,9 @@
   --fg-3: #7a7266;
   --line: rgba(21, 18, 14, 0.12);
   --line-strong: rgba(21, 18, 14, 0.24);
-  --ember: #ff4f2b;
-  --ember-deep: #d63a17;
-  --ember-soft: rgba(255, 79, 43, 0.16);
+  --ember: #f8441f;
+  --ember-deep: #bc2e0f;
+  --ember-soft: rgba(248, 68, 31, 0.16);
   --accent: var(--ember-deep);
   --accent-hover: var(--ember);
   --accent-soft: var(--ember-soft);
@@ -111,7 +111,7 @@
 .o-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.25s; }
 .o-btn:hover svg { transform: translateX(4px); }
 .o-btn-primary { background: var(--ink); color: var(--paper); }
-.o-btn-primary:hover { background: var(--ember); color: #fff; }
+.o-btn-primary:hover { background: var(--ember-deep); color: #fff; }
 .o-btn-lg { min-height: 64px; padding: 0 34px; font-size: 18px; }
 
 /* ─────────── NAV (overrides landing.css) ─────────── */
@@ -209,7 +209,7 @@
   line-height: 1;
   white-space: nowrap;
   transform: translate(-50%, -50%) rotate(-2deg);
-  box-shadow: 0 6px 18px rgba(255, 79, 43, 0.35);
+  box-shadow: 0 6px 18px rgba(248, 68, 31, 0.35);
   opacity: 0;
 }
 .o-thread-label em { font-family: var(--font-serif); font-style: italic; font-size: 17px; }
@@ -319,7 +319,7 @@
 }
 .o-form textarea { resize: vertical; min-height: 72px; }
 .o-form input::placeholder, .o-form textarea::placeholder { color: rgba(243, 238, 228, 0.4); }
-.o-form input:focus, .o-form textarea:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.25); }
+.o-form input:focus, .o-form textarea:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 4px rgba(248, 68, 31, 0.25); }
 .o-dark .o-btn-primary { background: var(--ember); color: #fff; }
 .o-dark .o-btn-primary:hover { background: var(--paper); color: var(--ink); }
 .o-form .o-btn { width: 100%; margin-top: 2px; }

@@ -14,7 +14,7 @@ MIN_W = 3.4         # thinnest point
 NIB_ANGLE = math.radians(38)
 N = 260
 INK = "#15120e"
-EMBER = "#ff4f2b"
+EMBER = "#f8441f"
 
 
 def lem(t):
