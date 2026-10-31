@@ -773,6 +773,45 @@ realtime_events = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# A match pool: the people one operator matches among (a building, a batch). Members join with
+# the pool's code; pairs are what the operator proposed and what came of them.
+match_pools = Table(
+    "match_pools",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("name", String, nullable=False),
+    Column("join_code", String, nullable=False, unique=True),
+    # 0 = Monday ... 6 = Sunday: the fixed day each week pairs are made.
+    Column("match_weekday", Integer, nullable=False, server_default="6"),
+    Column("created_by", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+match_pool_members = Table(
+    "match_pool_members",
+    metadata,
+    Column("pool_id", String, primary_key=True),
+    Column("user_id", String, primary_key=True),
+    Column("joined_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("left_at", DateTime(timezone=True), nullable=True),
+)
+# One proposed pair and what came of it. The compatibility check (reasons, score) is encrypted
+# under the first user's key; the operator reads it through the admin view only.
+match_pairs = Table(
+    "match_pairs",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("pool_id", String, nullable=False),
+    Column("user_a", String, nullable=False),
+    Column("user_b", String, nullable=False),
+    # proposed, introduced, met, no_show, declined, still_talking
+    Column("status", String, nullable=False, server_default="proposed"),
+    Column("check_json", JSON, nullable=True),
+    Column("created_by", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_match_pairs_pool", match_pairs.c.pool_id)
+
 # A short "who this user is" note across all chats, rewritten by background cognition
 # and shown to the companion on every reply. Encrypted like other user content.
 agent_user_cards = Table(

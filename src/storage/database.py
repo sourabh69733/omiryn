@@ -40,6 +40,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "agent_open_questions",
     "channel_links",
     "channel_link_codes",
+    "match_pool_members",
 )
 
 
