@@ -204,6 +204,7 @@ button.omi-contact.is-active {
   font-size: 14.5px;
   line-height: 1.55;
   box-shadow: var(--shadow-sm);
+  border-color: transparent;
 }
 
 .omi-welcome h3 {
@@ -970,7 +971,8 @@ button.omi-drawer-close:hover {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
-  box-shadow: 0 12px 28px rgba(21, 18, 14, 0.14);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .message-menu-list.opens-up {
@@ -1197,7 +1199,8 @@ button.omi-drawer-close:hover {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--card);
-  box-shadow: 0 16px 36px rgba(21, 18, 14, 0.16);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .chat-upload-head {

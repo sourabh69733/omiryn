@@ -188,6 +188,8 @@
   border-radius: 22px;
   background: var(--card);
   text-align: center;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 button.pf-portrait {
@@ -434,6 +436,8 @@ button.pf-photo-remove {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--card);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .pf-edit {

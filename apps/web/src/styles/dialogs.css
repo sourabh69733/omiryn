@@ -6,7 +6,8 @@
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: 0 24px 60px rgba(21, 18, 14, 0.18);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .legacy-react-shell .confirm-dialog .eyebrow,

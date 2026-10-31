@@ -131,6 +131,7 @@ p {
   background: var(--card);
   box-shadow: var(--shadow-md);
   padding: 7px;
+  border-color: transparent;
 }
 
 .account-menu[hidden] {

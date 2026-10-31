@@ -84,7 +84,8 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
-  box-shadow: 0 24px 80px rgba(21, 18, 14, 0.28);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .evidence-dialog-header {
@@ -272,6 +273,8 @@
   border-radius: 8px;
   background: var(--card);
   padding: 10px;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .memory-item strong,
@@ -554,6 +557,8 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--card);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .mem-row {
@@ -742,6 +747,8 @@ a.mem-link:hover {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--card);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .match-example-tag {

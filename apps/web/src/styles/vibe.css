@@ -325,6 +325,8 @@
   border-radius: 10px;
   background: var(--soft);
   list-style: none;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .vibe-quotes li {
@@ -397,7 +399,8 @@
   padding: 10px 12px;
   color: var(--ink);
   font-size: 12px;
-  box-shadow: 0 8px 24px rgba(21, 18, 14, 0.04);
+  box-shadow: var(--shadow-sm);
+  border-color: transparent;
 }
 
 .vibe-milestone-note .vibe-milestone-icon {

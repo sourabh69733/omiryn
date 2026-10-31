@@ -26,7 +26,8 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
+  border-color: transparent;
 }
 
 .contact-feedback-panel {
