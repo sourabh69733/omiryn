@@ -37,6 +37,7 @@ _SOURCE_BLOCKS = {
     "texting_style": "how_to_talk",
     "asked_questions": "how_to_talk",
     "meet_facts": "friend_vibe",
+    "match_hosting": "friend_vibe",
     "shared_chats": "shared_chats",
     "past_lines": "past_lines",
     "open_questions": "open_questions",
