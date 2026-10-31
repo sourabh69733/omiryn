@@ -748,12 +748,13 @@ button.history-archived-toggle:hover {
   background: var(--card);
 }
 
+/* Both sides are flat shapes with no outline: Omi's is a white card on the paper, yours is ink.
+   The border stays, transparent, so both bubbles keep the same geometry. */
 .agentic-chat .message.agent {
   position: relative;
-  border-color: var(--brand-line);
+  border-color: transparent;
   color: var(--brand-ink);
   background: var(--card);
-  /* background: #f5f3f9; */
   box-shadow: none;
 }
 
@@ -823,7 +824,7 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .message.user {
   position: relative;
-  border-color: var(--primary);
+  border-color: transparent;
   color: var(--paper);
   background: var(--primary);
   /* background: var(--card); */
