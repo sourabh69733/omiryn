@@ -14,12 +14,12 @@ function conversationIdFromUrl() {
 }
 
 function AppLoader() {
-  const loaderLogo = `${import.meta.env.BASE_URL}assets/omiryn-logo-neon-light.png`;
+  const loaderMark = `${import.meta.env.BASE_URL}assets/omiryn-mark.svg`;
   return (
     <main className="boot-loader" aria-label="Loading Omiryn" role="status">
       <div className="boot-mark-card" aria-hidden="true">
-        <span className="boot-logo-glow" />
-        <img className="boot-logo-image" src={loaderLogo} alt="" />
+        <img className="boot-logo-image" src={loaderMark} alt="" />
+        <span className="boot-word">Omiryn</span>
       </div>
     </main>
   );

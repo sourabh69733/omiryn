@@ -5,8 +5,9 @@
 .legacy-react-shell .evidence-dialog {
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 24px 60px rgba(39, 33, 64, 0.18);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .legacy-react-shell .confirm-dialog .eyebrow,
@@ -19,8 +20,8 @@
   height: 40px;
   border: 0;
   border-radius: 999px;
-  background: #fef0ee;
-  color: #b42318;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .legacy-react-shell .confirm-icon svg {
@@ -53,7 +54,7 @@
 .legacy-react-shell .confirm-session {
   border: 0;
   border-radius: 999px;
-  background: #f4f4f5;
+  background: var(--paper-2);
   color: var(--muted) !important;
   padding: 4px 10px;
   font-family: inherit;
@@ -84,23 +85,23 @@
 
 .legacy-react-shell .confirm-actions .secondary-button {
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
 }
 
 .legacy-react-shell .confirm-actions .secondary-button:hover {
   border-color: var(--line-strong);
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 .legacy-react-shell .confirm-actions .danger-button {
   border: 0;
-  background: #d92d20;
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--on-ember);
 }
 
 .legacy-react-shell .confirm-actions .danger-button:hover {
-  background: #b42318;
+  background: var(--danger);
 }
 
 /* Review and usage popups: one column, a short title, choices as soft cards. */
@@ -115,13 +116,13 @@
 .legacy-react-shell .signal-toggle-row {
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--card);
   padding: 12px 14px;
 }
 
 .legacy-react-shell .signal-feedback-options label.selected {
   border-color: var(--brand-violet);
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 .legacy-react-shell .signal-feedback-options strong,
@@ -139,16 +140,16 @@
   min-height: 0;
   padding: 6px 12px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
   font-size: 12.5px;
   font-weight: 500;
 }
 
 .legacy-react-shell .signal-review-reasons button.selected {
-  border-color: #fda29b;
-  background: #fef3f2;
-  color: #b42318;
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .legacy-react-shell .signal-review-form textarea {
@@ -159,7 +160,7 @@
 
 .legacy-react-shell .signal-review-form textarea:focus {
   border-color: var(--brand-violet);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 0 3px rgba(248, 68, 31, 0.12);
 }
 
 .legacy-react-shell .signal-review-form .privacy-note {
@@ -191,7 +192,7 @@
 }
 
 .legacy-react-shell .evidence-close:hover {
-  background: #f1ecff;
+  background: var(--ember-soft);
 }
 
 .legacy-react-shell .evidence-summary {
@@ -241,7 +242,7 @@
 
 .legacy-react-shell .evidence-empty {
   border-radius: 14px;
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 @media (max-width: 760px) {

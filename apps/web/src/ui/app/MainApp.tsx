@@ -135,7 +135,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       <aside className="omi-rail">
         <div className="omi-rail-top">
           <button className="omi-brand" type="button" onClick={openOmi} aria-label="Omiryn home">
-            <img src={assetUrl("omiryn-logo-neon.png")} alt="" />
+            <img src={assetUrl("omiryn-mark.svg")} alt="" />
             <strong>Omiryn</strong>
           </button>
           <nav className="omi-rail-nav" aria-label="Main navigation">

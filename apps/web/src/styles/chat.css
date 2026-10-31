@@ -3,16 +3,18 @@
 button:not(:where(.epr-btn)) {
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
-  padding: 0 16px;
-  color: #ffffff;
-  background: var(--primary);
+  border-radius: 999px;
+  padding: 0 18px;
+  color: var(--paper);
+  background: var(--ink);
   cursor: pointer;
-  font-weight: 560;
+  font-weight: 500;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 button:not(:where(.epr-btn)):hover {
-  background: var(--primary-dark);
+  color: var(--on-ember);
+  background: var(--ember-deep);
 }
 
 button:not(:where(.epr-btn)):disabled {
@@ -35,11 +37,9 @@ button:not(:where(.epr-btn)):disabled {
 .chat-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.74), transparent 30%),
-    var(--glass-bg);
+  background: var(--card);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
@@ -54,8 +54,7 @@ button:not(:where(.epr-btn)):disabled {
   inset: 0;
   z-index: 0;
   border-radius: inherit;
-  background:
-    linear-gradient(130deg, rgba(255, 255, 255, 0.52), transparent 22%, rgba(94, 234, 212, 0.08) 54%, transparent 76%);
+  background: var(--card);
   content: none;
   pointer-events: none;
 }
@@ -81,7 +80,7 @@ button:not(:where(.epr-btn)):disabled {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--card);
   padding: 12px;
   cursor: pointer;
   text-align: left;
@@ -91,26 +90,26 @@ button:not(:where(.epr-btn)):disabled {
 /* Rows are plain white; the open chat gets the brand tint, a solid border and a left bar. */
 .history-item.active {
   border-color: var(--primary);
-  background: #efe9ff;
+  background: var(--ember-soft);
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .history-item:hover {
-  border-color: rgba(127, 103, 216, 0.3);
+  border-color: rgba(248, 68, 31, 0.3);
   color: var(--ink);
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(16, 24, 32, 0.08);
+  background: var(--card);
+  box-shadow: 0 10px 24px rgba(21, 18, 14, 0.08);
   transform: translateY(-1px);
 }
 
 .history-item.active:hover {
   border-color: var(--primary);
-  background: #efe9ff;
-  box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(16, 24, 32, 0.08);
+  background: var(--ember-soft);
+  box-shadow: inset 3px 0 0 var(--primary), 0 10px 24px rgba(21, 18, 14, 0.08);
 }
 
 .history-item:focus-visible {
-  outline: 3px solid rgba(31, 95, 91, 0.2);
+  outline: 3px solid rgba(248, 68, 31, 0.2);
   outline-offset: 2px;
 }
 
@@ -152,7 +151,7 @@ button:not(:where(.epr-btn)):disabled {
   padding: 0 7px;
   border-radius: 999px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-ink);
   font-size: 10.5px;
   font-weight: 650;
   line-height: 16px;
@@ -190,7 +189,7 @@ button:not(:where(.epr-btn)):disabled {
 
 .history-item-copy small {
   margin-top: 4px;
-  color: #839099;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 450;
 }
@@ -222,7 +221,7 @@ button.history-menu-button {
 
 button.history-menu-button:hover,
 button.history-menu-button[aria-expanded="true"] {
-  background: rgba(127, 103, 216, 0.12);
+  background: rgba(248, 68, 31, 0.12);
   color: var(--primary-dark);
 }
 
@@ -241,8 +240,9 @@ button.history-menu-button[aria-expanded="true"] {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #ffffff;
-  box-shadow: 0 12px 32px rgba(37, 32, 53, 0.14);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .history-menu button {
@@ -266,11 +266,11 @@ button.history-menu-button[aria-expanded="true"] {
 }
 
 .history-menu button.is-danger {
-  color: #b42318;
+  color: var(--danger);
 }
 
 .history-menu button.is-danger:hover {
-  background: #fef0ee;
+  background: var(--danger-bg);
 }
 
 .history-menu svg {
@@ -313,7 +313,7 @@ button.history-archived-toggle:hover {
 }
 
 .history-item.is-archived:not(.active) {
-  background: #faf9fc;
+  background: var(--paper-2);
 }
 
 .history-item.is-archived:not(.active) .history-item-copy strong {
@@ -342,15 +342,14 @@ button.history-archived-toggle:hover {
 }
 
 .agentic-chat {
-  border-color: rgba(180, 154, 255, 0.16);
+  border-color: var(--line);
   color: var(--ink);
-  background:
-    #fff;
+  background: var(--card);
   font-family: var(--font-chat);
   font-variant-ligatures: none;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  box-shadow: 0 8px 30px rgba(24, 24, 27, 0.05);
+  box-shadow: 0 8px 30px rgba(21, 18, 14, 0.05);
 }
 
 .card-heading {
@@ -366,11 +365,9 @@ button.history-archived-toggle:hover {
   position: relative;
   z-index: 12;
   padding: 16px 18px;
-  border-bottom-color: rgba(180, 154, 255, 0.12);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.28)),
-    rgba(255, 255, 255, 0.46);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  border-bottom-color: var(--line);
+  background: var(--card);
+  box-shadow: inset 0 1px 0 var(--card-highlight);
 }
 
 .agentic-chat.conversation-empty .card-heading {
@@ -408,12 +405,11 @@ button.history-archived-toggle:hover {
 .model-picker input {
   width: 100%;
   min-height: 34px;
-  border: 1px solid rgba(180, 154, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: var(--card);
+  box-shadow: inset 0 1px 0 var(--card-highlight);
   font-family: var(--font-ui);
   font-size: 11px;
   outline: none;
@@ -431,15 +427,13 @@ button.history-archived-toggle:hover {
 .model-picker select:focus,
 .model-picker input:focus {
   border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18);
+  box-shadow: 0 0 0 3px rgba(248, 68, 31, 0.18);
 }
 
 .agentic-chat .chat-log {
   position: relative;
   z-index: 1;
-  background:
-    radial-gradient(circle at 96% 0%, rgba(255, 126, 179, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(251, 248, 255, 0.56), rgba(255, 255, 255, 0.08));
+  background: var(--card);
 }
 
 .chat-title-lockup {
@@ -456,12 +450,12 @@ button.history-archived-toggle:hover {
   width: 36px;
   height: 36px;
   overflow: hidden;
-  border: 1px solid rgba(255, 126, 179, 0.16);
+  border: 1px solid rgba(188, 46, 15, 0.16);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--card);
   box-shadow:
-    0 10px 22px rgba(64, 45, 118, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    0 10px 22px rgba(21, 18, 14, 0.09),
+    inset 0 1px 0 var(--card-highlight);
 }
 
 .terminal-mark img {
@@ -480,9 +474,11 @@ button.history-archived-toggle:hover {
 .agentic-chat .card-heading h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 17px;
-  font-weight: 580;
-  letter-spacing: 0;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48;
 }
 
 .agent-status {
@@ -501,16 +497,16 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .secondary-button {
   min-height: 34px;
-  border: 1px solid rgba(180, 154, 255, 0.14);
+  border: 1px solid var(--line);
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--card);
   font-size: 12px;
   letter-spacing: 0;
 }
 
 .agentic-chat .secondary-button:hover {
-  color: #2f294a;
-  background: rgba(94, 234, 212, 0.3);
+  color: var(--ink);
+  background: rgba(248, 68, 31, 0.3);
 }
 
 .chat-log {
@@ -588,7 +584,7 @@ button.history-archived-toggle:hover {
   box-sizing: border-box;
   min-height: 16px;
   padding: 0;
-  color: #171326;
+  color: var(--ink);
   background: transparent;
   font-size: 11px;
   font-weight: 400;
@@ -601,7 +597,7 @@ button.history-archived-toggle:hover {
 }
 
 .chat-time-separator span {
-  color: #171326;
+  color: var(--ink);
   font-size: 11px;
   font-weight: 400;
 }
@@ -613,15 +609,13 @@ button.history-archived-toggle:hover {
   width: 31px;
   height: 31px;
   overflow: hidden;
-  border: 1px solid rgba(180, 154, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  color: #2f294a;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58)),
-    rgba(251, 248, 255, 0.92);
+  color: var(--ink);
+  background: var(--card);
   box-shadow:
-    0 8px 18px rgba(64, 45, 118, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    0 8px 18px rgba(21, 18, 14, 0.08),
+    inset 0 1px 0 var(--card-highlight);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 700;
@@ -634,8 +628,8 @@ button.history-archived-toggle:hover {
 }
 
 .chat-avatar.agent {
-  border-color: rgba(255, 126, 179, 0.18);
-  background: #ffffff;
+  border-color: rgba(188, 46, 15, 0.18);
+  background: var(--card);
 }
 
 .chat-avatar.agent img {
@@ -646,11 +640,11 @@ button.history-archived-toggle:hover {
 }
 
 .chat-avatar.user {
-  border-color: rgba(106, 70, 255, 0.14);
-  color: #ffffff;
+  border-color: transparent;
+  color: var(--paper);
   background:
     radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.36), transparent 32%),
-    linear-gradient(135deg, #6a46ff, #b49aff 52%, #ff7eb3);
+    var(--ink);
 }
 
 /* A photo that fails to load leaves the circle empty: hide it rather than show a blank badge. */
@@ -690,7 +684,7 @@ button.history-archived-toggle:hover {
   position: absolute;
   inset: 6%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(240, 98, 168, 0.45), rgba(124, 58, 237, 0.28) 55%, transparent 72%);
+  background: radial-gradient(circle, rgba(248, 68, 31, 0.45), rgba(188, 46, 15, 0.28) 55%, transparent 72%);
   filter: blur(6px);
   opacity: 0;
 }
@@ -738,29 +732,30 @@ button.history-archived-toggle:hover {
 }
 
 .message-content.user {
-  color: white;
+  color: var(--paper);
 }
 
 .message.agent {
   padding: 0.5em 1em;
   align-self: flex-start;
-  border: 1px solid #e8e1f5;
-  background: #f7f2ff;
+  border: 1px solid var(--line);
+  background: var(--ember-soft);
 }
 
 .message.user {
   padding: 0.5em 1em;
   align-self: flex-end;
-  border: 1px solid #e8e1f5;
-  background: #ffffff;
+  border: 1px solid var(--line);
+  background: var(--card);
 }
 
+/* Both sides are flat shapes with no outline: Omi's is a white card on the paper, yours is ink.
+   The border stays, transparent, so both bubbles keep the same geometry. */
 .agentic-chat .message.agent {
   position: relative;
-  border-color: var(--brand-line);
+  border-color: transparent;
   color: var(--brand-ink);
-  background: #ffffff;
-  /* background: #f5f3f9; */
+  background: var(--card);
   box-shadow: none;
 }
 
@@ -815,41 +810,28 @@ button.history-archived-toggle:hover {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: var(--lavender);
-  box-shadow: 0 0 10px rgba(180, 154, 255, 0.34);
+  background: var(--ember);
   opacity: 0.4;
   animation: typing-dot-pulse 1.05s ease-in-out infinite;
 }
 
-.typing-dots span:nth-child(1) {
-  background: var(--lavender);
-  box-shadow: 0 0 10px rgba(180, 154, 255, 0.34);
-}
-
 .typing-dots span:nth-child(2) {
-  background: var(--rose);
-  box-shadow: 0 0 10px rgba(255, 126, 179, 0.34);
   animation-delay: 140ms;
 }
 
 .typing-dots span:nth-child(3) {
-  background: var(--amber);
-  box-shadow: 0 0 10px rgba(251, 191, 36, 0.32);
   animation-delay: 280ms;
 }
 
 .agentic-chat .message.user {
   position: relative;
-  border-color: var(--primary);
-  color: #ffffff;
+  border-color: transparent;
+  color: var(--paper);
   background: var(--primary);
-  /* background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.28)),
-    linear-gradient(135deg, rgba(180, 154, 255, 0.34), rgba(255, 126, 179, 0.15), rgba(94, 234, 212, 0.13)),
-    rgba(247, 241, 255, 0.92); */
+  /* background: var(--card); */
   /* box-shadow:
-    0 12px 30px rgba(64, 45, 118, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.66); */
+    0 12px 30px rgba(21, 18, 14, 0.1),
+    inset 0 1px 0 var(--card-highlight); */
   box-shadow: none;
 }
 
@@ -858,15 +840,15 @@ button.history-archived-toggle:hover {
 }
 
 .agentic-chat .message.evidence-highlight {
-  outline: 2px solid #74e0d3;
+  outline: 2px solid var(--ember);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgba(100, 216, 203, 0.12);
+  box-shadow: 0 0 0 6px rgba(248, 68, 31, 0.12);
 }
 
 .agentic-chat .message-row.evidence-highlight .message {
-  outline: 2px solid #74e0d3;
+  outline: 2px solid var(--ember);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgba(100, 216, 203, 0.12);
+  box-shadow: 0 0 0 6px rgba(248, 68, 31, 0.12);
 }
 
 .message-feedback {
@@ -905,11 +887,11 @@ button.history-archived-toggle:hover {
   width: 28px;
   height: 28px;
   min-height: 28px;
-  border: 1px solid rgba(180, 154, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 28px rgba(22, 52, 50, 0.14);
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(21, 18, 14, 0.14);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -927,14 +909,14 @@ button.history-archived-toggle:hover {
 
 .message-feedback-trigger:hover,
 .message-feedback-trigger:focus-visible {
-  border-color: rgba(180, 154, 255, 0.28);
-  background: #ffffff;
+  border-color: var(--ember-soft);
+  background: var(--card);
   outline: none;
   transform: translateY(-1px);
 }
 
 .message-feedback-trigger.saved {
-  border-color: rgba(180, 154, 255, 0.3);
+  border-color: var(--ember-soft);
   color: var(--primary);
 }
 
@@ -950,11 +932,11 @@ button.history-archived-toggle:hover {
   position: absolute;
   right: 34px;
   min-width: max-content;
-  border: 1px solid rgba(180, 154, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 28px rgba(22, 52, 50, 0.14);
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(21, 18, 14, 0.14);
   font-size: 10px;
   font-weight: 560;
   padding: 4px 8px;
@@ -970,16 +952,15 @@ button.history-archived-toggle:hover {
   max-height: min(300px, calc(100vh - 140px));
   overflow-y: auto;
   gap: 10px;
-  border: 1px solid rgba(180, 154, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.78), transparent 36%),
-    var(--glass-bg);
-  box-shadow: var(--glass-shadow);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(20px) saturate(1.18);
   -webkit-backdrop-filter: blur(20px) saturate(1.18);
   padding: 12px;
   pointer-events: auto;
+  border-color: transparent;
 }
 
 .message-feedback-title {
@@ -998,10 +979,10 @@ button.history-archived-toggle:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(180, 154, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(238, 248, 245, 0.9);
+  background: var(--paper-2);
   cursor: pointer;
   font-size: 10px;
   font-weight: 560;
@@ -1016,10 +997,10 @@ button.history-archived-toggle:hover {
   width: 100%;
   /* min-height: 72px; */
   resize: vertical;
-  border: 1px solid rgba(180, 154, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--card);
   font: inherit;
   font-size: 11px;
   line-height: 1.35;
@@ -1027,13 +1008,13 @@ button.history-archived-toggle:hover {
 }
 
 .message-feedback-comment::placeholder {
-  color: #8aa09b;
+  color: var(--muted-2);
 }
 
 .message-feedback-comment:focus {
   border-color: var(--mint);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.18);
+  box-shadow: 0 0 0 2px rgba(248, 68, 31, 0.18);
 }
 
 .message-feedback-loading {
@@ -1083,9 +1064,9 @@ button.history-archived-toggle:hover {
 }
 
 .message-feedback-cancel {
-  border: 1px solid rgba(180, 154, 255, 0.16);
+  border: 1px solid var(--line);
   color: var(--primary);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--card);
 }
 
 .message-chips {
@@ -1096,10 +1077,10 @@ button.history-archived-toggle:hover {
 }
 
 .message-chips span {
-  border: 1px solid rgba(180, 154, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--primary);
-  background: rgba(94, 234, 212, 0.13);
+  background: rgba(248, 68, 31, 0.13);
   font-size: 10.5px;
   font-weight: 560;
   letter-spacing: 0;
@@ -1112,7 +1093,7 @@ button.history-archived-toggle:hover {
   gap: 10px;
   padding: 16px;
   border-top: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--card);
 }
 
 .agentic-chat .composer {
@@ -1122,18 +1103,16 @@ button.history-archived-toggle:hover {
   gap: 0;
   margin: 10px 14px 14px;
   padding: 2px;
-  border: 1px solid #e1d9f3;
+  border: 1px solid var(--line);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 8px 24px rgba(64, 45, 118, 0.08),
-    0 0 0 4px rgba(180, 154, 255, 0.08);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
 .composer-pause-note {
   margin: 0;
   padding: 10px 18px 0;
-  color: #bd3760;
+  color: var(--danger);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.45;
@@ -1146,27 +1125,27 @@ button.history-archived-toggle:hover {
   height: 24px;
   margin-left: 6px;
   place-items: center;
-  border: 1px solid rgba(189, 55, 96, 0.18);
+  border: 1px solid var(--danger-line);
   border-radius: 999px;
-  color: #8f2c4d;
-  background: rgba(255, 246, 249, 0.9);
+  color: var(--danger);
+  background: var(--danger-bg);
   font-size: 12px;
 }
 
 .composer-pause-note.is-monthly {
-  color: #7c3d1c;
+  color: var(--warning-text);
 }
 
 .composer-pause-note.is-monthly span {
-  border-color: rgba(181, 103, 28, 0.2);
-  color: #7c3d1c;
-  background: rgba(255, 249, 237, 0.94);
+  border-color: var(--warning-line);
+  color: var(--warning-text);
+  background: var(--warning-bg);
   /* top | right | bottom | left */
   padding: 4px 10px 6px 10px;
 }
 
 .agentic-chat .composer.is-paused {
-  border-top-color: rgba(255, 126, 179, 0.2);
+  border-top-color: rgba(188, 46, 15, 0.2);
 }
 
 .composer > input,
@@ -1175,7 +1154,7 @@ button.history-archived-toggle:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background: #ffffff;
+  background: var(--card);
   outline: none;
   min-width: 0;
   min-height: 46px;
@@ -1202,7 +1181,7 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .composer > input::placeholder,
 .agentic-chat .composer > textarea::placeholder {
-  color: #9189a6;
+  color: var(--muted-2);
 }
 
 .agentic-chat .composer.is-near-limit > textarea {
@@ -1213,7 +1192,7 @@ button.history-archived-toggle:hover {
   position: absolute;
   right: 49px;
   bottom: 7px;
-  color: #817a92;
+  color: var(--muted);
   font-family: var(--font-chat);
   font-size: 10px;
   font-weight: 400;
@@ -1229,11 +1208,11 @@ button.history-archived-toggle:hover {
   width: max-content;
   max-width: calc(100% - 24px);
   padding: 10px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  color: #ffffff;
-  background: rgba(35, 35, 39, 0.94);
-  box-shadow: 0 10px 28px rgba(25, 22, 34, 0.2);
+  color: var(--paper);
+  background: var(--ink);
+  box-shadow: 0 10px 28px rgba(21, 18, 14, 0.2);
   font-family: var(--font-chat);
   font-size: 14px;
   font-weight: 500;
@@ -1253,10 +1232,11 @@ button.history-archived-toggle:hover {
   max-height: 294px;
   overflow-y: auto;
   padding: 6px;
-  border: 1px solid #e4deef;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 16px 38px rgba(50, 39, 85, 0.16);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
 }
 
 .emoji-shortcode-option {
@@ -1268,7 +1248,7 @@ button.history-archived-toggle:hover {
   min-height: 46px;
   border: 0;
   border-radius: 8px;
-  color: #2f294a;
+  color: var(--ink);
   background: transparent;
   box-shadow: none;
   padding: 5px 8px;
@@ -1277,8 +1257,8 @@ button.history-archived-toggle:hover {
 
 .emoji-shortcode-option:hover,
 .emoji-shortcode-option[aria-selected="true"] {
-  color: #2f294a;
-  background: #f1eef9;
+  color: var(--ink);
+  background: var(--hover);
   box-shadow: none;
   transform: none;
 }
@@ -1310,7 +1290,7 @@ button.history-archived-toggle:hover {
 }
 
 .emoji-shortcode-copy small {
-  color: #817a92;
+  color: var(--muted);
   font-family: var(--font-chat);
   font-size: 11px;
   font-weight: 400;
@@ -1328,7 +1308,7 @@ button.history-archived-toggle:hover {
   max-height: 42px;
   border: 0;
   border-radius: 999px;
-  color: #7764f6;
+  color: var(--ember-deep);
   background: transparent;
   box-shadow: none;
   font-size: 12px;
@@ -1339,7 +1319,7 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .composer > button:hover,
 .agentic-chat .composer .emoji-trigger-button:hover {
-  background: #f0ecfb;
+  background: var(--hover);
   box-shadow: none;
 }
 
@@ -1349,7 +1329,7 @@ button.history-archived-toggle:hover {
 }
 
 .agentic-chat .composer .emoji-trigger-button {
-  color: #77718d;
+  color: var(--muted);
   background: transparent;
   box-shadow: none;
 }
@@ -1364,8 +1344,8 @@ button.history-archived-toggle:hover {
 
 .agentic-chat .composer .emoji-trigger-button:hover,
 .agentic-chat .composer .emoji-trigger-button[aria-expanded="true"] {
-  color: #5f5872;
-  background: #f0edf6;
+  color: var(--ink-2);
+  background: var(--hover);
 }
 
 .emoji-picker-popover {
@@ -1381,7 +1361,7 @@ button.history-archived-toggle:hover {
   display: grid;
   min-height: 180px;
   place-items: center;
-  color: #6f6685;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 620;
 }
@@ -1409,7 +1389,7 @@ button.history-archived-toggle:hover {
 .composer > input:focus,
 .composer > textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(31, 95, 91, 0.12);
+  box-shadow: 0 0 0 3px rgba(248, 68, 31, 0.12);
 }
 
 .agentic-chat .composer > input:focus,
@@ -1421,7 +1401,7 @@ button.history-archived-toggle:hover {
 .agentic-chat .composer:focus-within {
   border-color: var(--primary);
   box-shadow:
-    0 0 0 3px rgba(124, 58, 237, 0.12);
+    0 0 0 3px rgba(248, 68, 31, 0.12);
 }
 
 .usage-summary {
@@ -1430,7 +1410,7 @@ button.history-archived-toggle:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--muted);
-  background: #f8faf9;
+  background: var(--paper-2);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -1654,7 +1634,7 @@ button.history-archived-toggle:hover {
 }
 
 .message-status-text {
-  color: #c2410c;
+  color: var(--danger);
 }
 
 button.message-retry-button {
@@ -1667,13 +1647,13 @@ button.message-retry-button {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #c2410c;
+  color: var(--danger);
   cursor: pointer;
   transition: background 120ms ease;
 }
 
 button.message-retry-button:hover {
-  background: rgba(194, 65, 12, 0.1);
+  background: var(--danger-bg);
 }
 
 .message-retry-button svg {
@@ -1682,7 +1662,7 @@ button.message-retry-button:hover {
 }
 
 .message-retry-button:focus-visible {
-  outline: 2px solid #c2410c;
+  outline: 2px solid var(--danger);
   outline-offset: 1px;
 }
 

@@ -65,7 +65,7 @@
 /* A disabled button still reads as a button. */
 .contact-send-button:disabled,
 .quick-setup-submit:disabled {
-  background: #e4e4e7;
-  color: #52525b;
+  background: var(--paper-3);
+  color: var(--muted);
   opacity: 1;
 }

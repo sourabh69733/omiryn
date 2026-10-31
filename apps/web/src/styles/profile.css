@@ -24,7 +24,7 @@
   font-weight: 600;
   cursor: pointer;
 }
-.pf-back:hover { color: var(--brand-violet); background: #f5f1ff; }
+.pf-back:hover { color: var(--brand-violet); background: var(--hover); }
 .pf-back svg { width: 18px; height: 18px; }
 
 /* Same centered column as Profile. */
@@ -38,7 +38,7 @@
 }
 
 .privacy-intro { margin: 20px 0 8px; }
-.privacy-intro h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 36px); letter-spacing: -0.04em; line-height: 1.15; }
+.privacy-intro h1 { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: clamp(32px, 4vw, 40px); font-weight: 500; font-variation-settings: "opsz" 144; letter-spacing: -0.02em; line-height: 1.05; }
 .privacy-intro > p:last-child { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
 
 /* The private-topics switch: the one choice on this page. */
@@ -47,15 +47,19 @@
   align-items: center;
   gap: 16px;
   padding: 16px 18px;
-  border: 1px solid #e6defc;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 .privacy-consent h2 {
   margin: 0 0 4px;
   color: var(--ink);
   font-size: 16px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variation-settings: "opsz" 72;
+  letter-spacing: -0.02em;
 }
 
 .privacy-consent p {
@@ -87,7 +91,7 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: #d4d4d8;
+  background: var(--paper-3);
   transition: background 0.15s ease;
   pointer-events: none;
 }
@@ -100,7 +104,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
@@ -124,29 +128,29 @@
 
 .privacy-path {
   padding: 22px 24px;
-  border: 1px solid #ded5f6;
+  border: 1px solid var(--line);
   border-radius: 20px;
-  background: #f8f5ff;
+  background: var(--ember-soft);
 }
 .privacy-path h2,
-.privacy-details h2 { margin: 0; color: var(--ink); font-size: 17px; letter-spacing: -0.02em; }
+.privacy-details h2 { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: 19px; font-weight: 500; letter-spacing: -0.01em; }
 .privacy-path ol { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
-.privacy-path li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid #e6def7; border-radius: 14px; background: #fff; }
-.privacy-path li > svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: #7256c7; }
+.privacy-path li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.privacy-path li > svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--ember-deep); }
 .privacy-path li div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .privacy-path li strong { color: var(--ink); font-size: 14px; line-height: 1.4; }
 .privacy-path li span { color: var(--muted); font-size: 13px; line-height: 1.5; }
 
 .privacy-details { display: grid; gap: 12px; }
-.privacy-details section { padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.privacy-details section { padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
 .privacy-details p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
-.privacy-action { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 999px; background: #eee8ff; color: #5d42a6; font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; cursor: pointer; }
-.privacy-action:hover { background: #e4d9ff; }
+.privacy-action { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 999px; background: var(--ember-soft); color: var(--ember-deep); font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; cursor: pointer; }
+.privacy-action:hover { background: rgba(248, 68, 31, 0.2); }
 .privacy-action svg { width: 15px; height: 15px; }
 .privacy-footer { padding: 6px 4px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .privacy-footer p { margin: 0; }
 .privacy-footer a,
-.privacy-footer button { color: #5d42a6; text-decoration: underline; text-underline-offset: 3px; }
+.privacy-footer button { color: var(--ember-deep); text-decoration: underline; text-underline-offset: 3px; }
 .privacy-footer button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
 
 @media (max-width: 650px) {
@@ -182,8 +186,10 @@
   padding: 26px 20px 20px;
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--card);
   text-align: center;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 button.pf-portrait {
@@ -212,7 +218,7 @@ button.pf-portrait:hover {
 }
 
 .pf-ring-outer {
-  fill: #f1ecff;
+  fill: var(--ember-soft);
   stroke: var(--brand-violet);
   stroke-width: 1.4;
   opacity: 0.9;
@@ -232,7 +238,8 @@ button.pf-portrait:hover {
   height: 96px;
   border-radius: 999px;
   object-fit: cover;
-  box-shadow: 0 0 0 3px #ffffff;
+  box-shadow: 0 0 0 3px var(--card);
+  color: var(--on-ink);
 }
 
 .pf-initial {
@@ -252,10 +259,10 @@ button.pf-portrait:hover {
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--card);
   border-radius: 999px;
   background: var(--ink);
-  color: #ffffff;
+  color: var(--on-ink);
 }
 
 .pf-portrait-edit svg {
@@ -275,9 +282,11 @@ button.pf-portrait:hover {
 .pf-card h1 {
   margin: 4px 0 0;
   color: var(--ink);
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72;
 }
 
 .pf-place {
@@ -298,7 +307,7 @@ button.pf-portrait:hover {
   max-width: 420px;
   margin: 10px 0 0;
   color: var(--ink);
-  font-family: "Instrument Serif", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 21px;
   font-style: italic;
   line-height: 1.35;
@@ -335,15 +344,15 @@ button.pf-portrait:hover {
 .pf-chips li {
   padding: 5px 11px;
   border-radius: 999px;
-  background: #f1ecff;
-  color: #5b21b6;
+  background: var(--ember-soft);
+  color: var(--ember-deep);
   font-size: 12.5px;
   font-weight: 500;
 }
 
 .pf-chips li:nth-child(even) {
-  background: #fdeef5;
-  color: #9d174d;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .pf-photos {
@@ -369,7 +378,7 @@ button.pf-portrait:hover {
   overflow: hidden;
   border: 1.5px dashed var(--line-strong);
   border-radius: 14px;
-  background: #faf8ff;
+  background: var(--paper-2);
   color: var(--muted);
   cursor: pointer;
 }
@@ -380,7 +389,7 @@ button.pf-portrait:hover {
 }
 
 .pf-photo > button:first-child:hover {
-  background: #f1ecff;
+  background: var(--ember-soft);
 }
 
 .pf-photo img {
@@ -406,7 +415,7 @@ button.pf-photo-remove {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(24, 24, 27, 0.65);
+  background: rgba(21, 18, 14, 0.65);
   color: #ffffff;
 }
 
@@ -426,7 +435,9 @@ button.pf-photo-remove {
 .pf-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--card);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 .pf-edit {
@@ -449,7 +460,7 @@ button.pf-photo-remove {
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 15px;
@@ -500,7 +511,7 @@ button.pf-row:hover {
 
 button.pf-row.is-danger,
 button.pf-row.is-danger:hover {
-  color: #b42318;
+  color: var(--danger);
 }
 
 .pf-row svg {
@@ -561,7 +572,7 @@ button.pf-row.is-danger:hover {
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
   font-size: 13.5px;
   font-weight: 550;
@@ -569,7 +580,7 @@ button.pf-row.is-danger:hover {
 
 .pf-card-actions button.secondary-button:hover {
   border-color: var(--brand-violet);
-  background: #faf8ff;
+  background: var(--paper-2);
   color: var(--brand-violet);
 }
 
@@ -619,7 +630,7 @@ button.pf-link svg {
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   color: var(--ink);
-  font-family: "Instrument Serif", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 19px;
   font-style: italic;
   line-height: 1.35;
@@ -641,8 +652,8 @@ button.pf-link svg {
   gap: 2px;
   padding: 4px 4px 4px 10px;
   border-radius: 999px;
-  background: #f1ecff;
-  color: #5b21b6;
+  background: var(--ember-soft);
+  color: var(--ember-deep);
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -661,7 +672,7 @@ button.pf-link svg {
 }
 
 .pf-chip button:hover {
-  background: rgba(91, 33, 182, 0.12);
+  background: rgba(248, 68, 31, 0.12);
 }
 
 .pf-chip svg {
@@ -738,12 +749,12 @@ button.pf-model-option {
 }
 
 button.pf-model-option:hover {
-  background: rgba(124, 58, 237, 0.05);
+  background: rgba(248, 68, 31, 0.05);
 }
 
 button.pf-model-option.is-checked {
   border-color: var(--brand-violet);
-  background: rgba(124, 58, 237, 0.06);
+  background: rgba(248, 68, 31, 0.06);
 }
 
 .pf-model-option span {
@@ -788,7 +799,7 @@ button.pf-channel-action {
 
 button.pf-channel-action:hover {
   background: transparent;
-  color: #b42318;
+  color: var(--danger);
 }
 
 .pf-channel-note {

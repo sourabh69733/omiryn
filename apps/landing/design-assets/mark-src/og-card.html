@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Source for public/static/assets/omiryn-og.png (1200x630). Serve this file next to the mark
+     (it loads /assets/omiryn-mark.svg and Google Fonts), call window.drawOg() in the console and
+     save the returned PNG data URL. Regenerate whenever the headline or palette changes. -->
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Bricolage+Grotesque:opsz,wght@12..96,400..700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#888}canvas{display:block}</style></head>
+<body>
+<canvas id="c" width="1200" height="630"></canvas>
+<script>
+// Draws the Open Graph card on a canvas so it can be exported as a PNG from the browser pane.
+window.drawOg = async function () {
+  await document.fonts.load('500 120px "Fraunces"');
+  await document.fonts.load('italic 400 120px "Fraunces"');
+  await document.fonts.load('500 30px "Bricolage Grotesque"');
+  const c = document.getElementById("c"), ctx = c.getContext("2d");
+  ctx.fillStyle = "#f3eee4"; ctx.fillRect(0, 0, 1200, 630);
+  const mark = new Image(); mark.src = "/assets/omiryn-mark.svg";
+  await mark.decode();
+  // mark top-left, wordmark beside it
+  ctx.drawImage(mark, 80, 76, 112, 56);
+  ctx.fillStyle = "#15120e";
+  ctx.font = '500 44px "Fraunces"'; ctx.fontVariationSettings = '"opsz" 144';
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("Omiryn", 210, 122);
+  // headline
+  ctx.font = '500 118px "Fraunces"';
+  ctx.fillText("Talk to Omi.", 80, 352);
+  ctx.fillStyle = "#f8441f";
+  ctx.font = 'italic 400 118px "Fraunces"';
+  ctx.fillText("Meet your people.", 80, 472);
+  // footer line
+  ctx.fillStyle = "#6b6257";
+  ctx.font = '500 28px "Bricolage Grotesque"';
+  ctx.fillText("An AI you talk to that finds friends you'd actually get along with.", 80, 560);
+  return c.toDataURL("image/png");
+};
+</script>
+</body></html>
