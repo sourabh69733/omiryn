@@ -6,7 +6,7 @@
   <title>Omiryn | Talk to Omi. Meet your people.</title>
   <meta name="description" content="Chat with Omiryn. It learns your vibe and introduces you to people you'll actually click with.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#fbfaf8">
+  <meta name="theme-color" content="#f3eee4">
   <meta name="color-scheme" content="light">
   <meta name="application-name" content="Omiryn">
   <meta name="apple-mobile-web-app-title" content="Omiryn">
@@ -31,20 +31,13 @@
   <link rel="apple-touch-icon" href="/static/assets/omiryn-app-icon-light.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/landing.css?v=20260929-alive">
-  <link rel="stylesheet" href="/static/landing-home.css?v=20261031-talk">
+  <link rel="stylesheet" href="/static/landing-home.css?v=20261031-paper">
   <meta name="google-site-verification" content="jBIn27lEwG0VeMqASv7lFumMd9wHr84EMcxop2bxQ5g" />
 </head>
 <body class="home">
-  <!-- Ambient background: drifting brand-color blobs, grain and a cursor glow -->
-  <div class="o-bg" aria-hidden="true">
-    <span class="o-blob b1"></span>
-    <span class="o-blob b2"></span>
-    <span class="o-blob b3"></span>
-    <span class="o-grain"></span>
-  </div>
-  <div class="o-cursor" aria-hidden="true"></div>
+  <div class="o-grain" aria-hidden="true"></div>
 
   <!-- ═══════════ NAV ═══════════ -->
   <nav class="nav" id="nav-main">
@@ -60,85 +53,89 @@
   </nav>
 
   <main>
-    <!-- ═══════════ 1. HERO: the conversation is the hero ═══════════ -->
+    <!-- ═══════════ 1. HERO: six words, one button, and the people ═══════════ -->
     <section class="o-hero" id="hero">
       <div class="o-container">
-        <div class="o-hero-top">
-          <h1 class="o-h1" aria-label="Talk to Omi. Meet your people.">
-            <span class="w"><span>Talk</span></span>
-            <span class="w"><span>to</span></span>
-            <span class="w"><span>Omi.</span></span>
-            <span class="w"><span>Meet</span></span>
-            <span class="w"><span><em>your</em></span></span>
-            <span class="w"><span><em>people.</em></span></span>
-          </h1>
-          <div data-intro>
-            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary magnetic">
-              <span>Start talking</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            </a>
-          </div>
+        <h1 class="o-h1" aria-label="Talk to Omi. Meet your people.">
+          <span class="o-line1"><span class="w"><span>Talk</span></span> <span class="w"><span>to</span></span> <span class="w"><span>Omi.</span></span></span>
+          <span class="o-line2"><span class="w"><span>Meet</span></span> <span class="w"><span><em>your</em></span></span> <span class="w"><span><em>people.</em></span></span></span>
+        </h1>
+        <div class="o-hero-cta" data-intro>
+          <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary o-btn-lg magnetic">
+            <span>Start talking</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <span class="o-hero-note">Free. Private by default.</span>
         </div>
+      </div>
 
-        <!-- Live demo: Omi chats, picks up the vibe, and a match lands. Loops. -->
-        <div class="o-demo" id="o-demo" role="img" aria-label="Example chat: Omi asks a few questions, learns your vibe, and introduces someone you'd click with">
-          <span class="o-stage-glow" aria-hidden="true"></span>
-          <div class="o-feed">
-            <div class="o-msg bot" data-bot="0"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Hey! What's something you'll defend forever?</span></span></div>
-            <div class="o-msg me" data-me="0"><span class="o-bubble">Chai beats coffee. <mark>Always.</mark></span></div>
-            <div class="o-msg bot" data-bot="1"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Respect. What made you laugh this week?</span></span></div>
-            <div class="o-msg me" data-me="1"><span class="o-bubble">My friend's <mark>2am voice notes</mark> 😂</span></div>
-            <div class="o-msg bot" data-bot="2"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">And what can you not stand?</span></span></div>
-            <div class="o-msg me" data-me="2"><span class="o-bubble"><mark>Small talk.</mark> Say the real thing.</span></div>
-          </div>
-          <div class="o-stickers">
-            <span class="o-vtag c1" data-chip="0">Chai loyalist</span>
-            <span class="o-vtag c2" data-chip="1">Night owl</span>
-            <span class="o-vtag c3" data-chip="2">No small talk</span>
+      <!-- The people: photos Omi would introduce, one pair tied together with a thread. -->
+      <div class="o-shelf" id="o-shelf" role="img" aria-label="Photos of people with what Omi noticed about each, and two of them tied together because they would click">
+        <div class="o-shelf-row">
+          <figure class="o-polaroid" data-card="0"><div class="o-print" style="--r:-7deg"><span data-avatar="0"></span><figcaption>Night owl</figcaption></div></figure>
+          <figure class="o-polaroid" data-card="1"><div class="o-print" style="--r:4deg"><span data-avatar="1"></span><figcaption>Bad puns</figcaption></div></figure>
+          <figure class="o-polaroid" data-card="2"><div class="o-print" style="--r:-3deg"><span data-avatar="2"></span><figcaption>Chai loyalist</figcaption></div></figure>
+          <figure class="o-polaroid" data-card="3"><div class="o-print" style="--r:6deg"><span data-avatar="3"></span><figcaption>No small talk</figcaption></div></figure>
+          <figure class="o-polaroid" data-card="4"><div class="o-print" style="--r:-5deg"><span data-avatar="4"></span><figcaption>Side quests</figcaption></div></figure>
+          <figure class="o-polaroid" data-card="5"><div class="o-print" style="--r:3deg"><span data-avatar="7"></span><figcaption>2am thinker</figcaption></div></figure>
+        </div>
+        <svg class="o-thread" id="o-thread" aria-hidden="true"><path id="o-thread-path" d=""/></svg>
+        <span class="o-thread-label" id="o-thread-label" aria-hidden="true">would click</span>
+      </div>
+    </section>
+
+    <!-- A band of things people told Omi. -->
+    <div class="o-band" aria-hidden="true">
+      <div class="o-band-track">
+        <span>Chai loyalist</span><span>Night owl</span><span>No small talk</span><span>Side quest person</span><span>Overthinks at 2am</span><span>Bad movie connoisseur</span><span>Says the real thing</span><span>Street food map</span><span>Believes in second chances</span><span>Cricket over football</span>
+        <span>Chai loyalist</span><span>Night owl</span><span>No small talk</span><span>Side quest person</span><span>Overthinks at 2am</span><span>Bad movie connoisseur</span><span>Says the real thing</span><span>Street food map</span><span>Believes in second chances</span><span>Cricket over football</span>
+      </div>
+    </div>
+
+    <!-- ═══════════ 2. HOW IT WORKS: the conversation, set big ═══════════ -->
+    <section class="o-section o-how" id="how">
+      <div class="o-container o-how-grid">
+        <header class="o-head o-how-copy" data-rv>
+          <p class="o-eyebrow">How it works</p>
+          <h2 class="o-h2">No forms. No swiping. You just <em>talk.</em></h2>
+          <ol class="o-steps">
+            <li><span>01</span>Talk to Omi about your week, your takes, what bugs you.</li>
+            <li><span>02</span>It picks up your vibe. You can see and correct it any time.</li>
+            <li><span>03</span>A few real introductions, each with a reason.</li>
+          </ol>
+        </header>
+
+        <!-- Live demo: Omi asks, you answer, a phrase gets stamped as part of your vibe. After three, a match lands. Loops. -->
+        <div class="o-convo" id="o-demo" role="img" aria-label="Example chat: Omi asks a few questions, learns your vibe, and introduces someone you'd click with">
+          <div class="o-say bot" data-bot="0"><span class="o-who">Omi</span><p><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">What's something you'll defend forever?</span></p></div>
+          <div class="o-say me" data-me="0"><span class="o-who">You</span><p>Chai beats coffee. <mark>Always.</mark></p></div>
+          <div class="o-say bot" data-bot="1"><span class="o-who">Omi</span><p><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Respect. What made you laugh this week?</span></p></div>
+          <div class="o-say me" data-me="1"><span class="o-who">You</span><p>My friend's <mark>2am voice notes</mark>, honestly.</p></div>
+          <div class="o-say bot" data-bot="2"><span class="o-who">Omi</span><p><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">And what can you not stand?</span></p></div>
+          <div class="o-say me" data-me="2"><span class="o-who">You</span><p><mark>Small talk.</mark> Say the real thing.</p></div>
+          <div class="o-stamps">
+            <span class="o-stamp" data-chip="0" style="--r:-6deg">Chai loyalist</span>
+            <span class="o-stamp" data-chip="1" style="--r:3deg">Night owl</span>
+            <span class="o-stamp" data-chip="2" style="--r:-2deg">No small talk</span>
           </div>
           <div class="o-matchpop" id="o-matchpop">
-            <div class="o-matchpop-faces"><span data-avatar="0"></span><span class="o-heart">✦</span><span data-avatar="3"></span></div>
-            <strong>You &amp; Riya would click</strong>
-            <p>Same goofy humor. Both night owls. No small talk.</p>
+            <div class="o-matchpop-faces"><span data-avatar="0"></span><span data-avatar="3"></span></div>
+            <div>
+              <strong>You &amp; Riya would click</strong>
+              <p>Same goofy humor. Both night owls. No small talk.</p>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════ 2. HOW IT WORKS: three steps, left-aligned ═══════════ -->
-    <section class="o-section o-how" id="how">
-      <div class="o-container">
-        <header class="o-head" data-rv>
-          <p class="o-eyebrow">How it works</p>
-          <h2 class="o-h2">No forms. No swiping. Just talk.</h2>
-        </header>
-        <ol class="o-steps">
-          <li data-rv>
-            <span class="o-step-num">1</span>
-            <h3>Talk to Omi</h3>
-            <p>About your week, what you love, what bugs you. Like texting a friend who actually listens.</p>
-          </li>
-          <li data-rv>
-            <span class="o-step-num">2</span>
-            <h3>Omi learns your vibe</h3>
-            <p>What makes you laugh, what you believe, what you can live with. You can see and correct it any time.</p>
-          </li>
-          <li data-rv>
-            <span class="o-step-num">3</span>
-            <h3>Meet people who click</h3>
-            <p>A few real introductions, each with a reason. Say hi if it clicks. No swiping, no feed.</p>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <!-- ═══════════ 3. MATCHES: the one dark section ═══════════ -->
+    <!-- ═══════════ 3. MATCHES: the one ink section ═══════════ -->
     <section class="o-section o-dark" id="match">
       <div class="o-container o-dark-grid">
         <div class="o-dark-copy">
           <header class="o-head" data-rv>
             <p class="o-eyebrow">Matches</p>
-            <h2 class="o-h2">Every match comes with a reason.</h2>
+            <h2 class="o-h2">Every match comes with a <em>reason.</em></h2>
             <p class="o-sub">No awkward "hi". Omi tells you both why you'd get along, and gives you something to start with.</p>
           </header>
           <form class="o-form" id="landing-lead-form" data-form="lead" data-rv>
