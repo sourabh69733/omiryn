@@ -40,6 +40,7 @@ from agent.observability.usage import (
     REPLY_REQUEST_CHECK,
     CARD_REBUILD,
     PERSON_CARD,
+    MATCH_REASONS,
     SEARCH_QUERIES,
     UPLOAD_MERGE,
     UPLOAD_PART,
@@ -203,6 +204,20 @@ async def write_search_queries(
 ) -> dict[str, Any]:
     """Short searches that would find the answer to a question in past chats; {"queries": [...]}."""
     return await _upload_call(SEARCH_QUERIES_SYSTEM_PROMPT, SEARCH_QUERIES, text, conversation_id, model, timeout_seconds)
+
+
+async def write_match_reasons(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 30,
+) -> dict[str, Any]:
+    """Why two people would get along, from their vibe lines; {"fit", "reasons", "difference", ...}."""
+    from agent.matching.compatibility import MATCH_REASONS_SYSTEM_PROMPT
+
+    model = model or os.getenv("MATCH_REASONS_MODEL", "").strip() or request_check_model(_provider_name())
+    return await _upload_call(MATCH_REASONS_SYSTEM_PROMPT, MATCH_REASONS, text, conversation_id, model, timeout_seconds)
 
 
 async def rebuild_user_card_text(
