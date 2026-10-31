@@ -60,21 +60,20 @@
   </nav>
 
   <main>
-    <!-- ═══════════ 1. HERO: the product itself, a chat with Omi ═══════════ -->
+    <!-- ═══════════ 1. HERO: the conversation is the hero ═══════════ -->
     <section class="o-hero" id="hero">
-      <div class="o-container o-hero-grid">
-        <div class="o-hero-copy">
+      <div class="o-container">
+        <div class="o-hero-top">
           <h1 class="o-h1" aria-label="Talk to Omi. Meet your people.">
             <span class="w"><span>Talk</span></span>
             <span class="w"><span>to</span></span>
             <span class="w"><span>Omi.</span></span>
-            <br>
             <span class="w"><span>Meet</span></span>
             <span class="w"><span><em>your</em></span></span>
             <span class="w"><span><em>people.</em></span></span>
           </h1>
           <div data-intro>
-            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary o-btn-lg magnetic">
+            <a href="#" data-app-link data-track="hero_start_talking" class="o-btn o-btn-primary magnetic">
               <span>Start talking</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </a>
@@ -83,30 +82,19 @@
 
         <!-- Live demo: Omi chats, picks up the vibe, and a match lands. Loops. -->
         <div class="o-demo" id="o-demo" role="img" aria-label="Example chat: Omi asks a few questions, learns your vibe, and introduces someone you'd click with">
-          <div class="o-phone">
-            <div class="o-phone-head">
-              <span class="o-phone-logo"><span class="o-mark"></span></span>
-              <div>
-                <strong>Omi</strong>
-                <small><span class="o-live"></span>getting to know you</small>
-              </div>
-            </div>
-            <div class="o-feed">
-              <div class="o-msg bot" data-bot="0"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Hey! What's something you'll defend forever?</span></div>
-              <div class="o-msg me" data-me="0">Chai beats coffee. <mark>Always.</mark></div>
-              <div class="o-msg bot" data-bot="1"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Respect. What made you laugh this week?</span></div>
-              <div class="o-msg me" data-me="1">My friend's <mark>2am voice notes</mark> 😂</div>
-              <div class="o-msg bot" data-bot="2"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">And what can you not stand?</span></div>
-              <div class="o-msg me" data-me="2"><mark>Small talk.</mark> Say the real thing.</div>
-            </div>
-            <div class="o-vibe">
-              <small>Your vibe</small>
-              <div class="o-vibe-slots">
-                <span class="o-vtag c1" data-chip="0">Chai loyalist</span>
-                <span class="o-vtag c2" data-chip="1">Night owl</span>
-                <span class="o-vtag c3" data-chip="2">No small talk</span>
-              </div>
-            </div>
+          <span class="o-stage-glow" aria-hidden="true"></span>
+          <div class="o-feed">
+            <div class="o-msg bot" data-bot="0"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Hey! What's something you'll defend forever?</span></span></div>
+            <div class="o-msg me" data-me="0"><span class="o-bubble">Chai beats coffee. <mark>Always.</mark></span></div>
+            <div class="o-msg bot" data-bot="1"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">Respect. What made you laugh this week?</span></span></div>
+            <div class="o-msg me" data-me="1"><span class="o-bubble">My friend's <mark>2am voice notes</mark> 😂</span></div>
+            <div class="o-msg bot" data-bot="2"><span class="o-omi" aria-hidden="true"></span><span class="o-bubble"><span class="o-dots"><i></i><i></i><i></i></span><span class="o-text">And what can you not stand?</span></span></div>
+            <div class="o-msg me" data-me="2"><span class="o-bubble"><mark>Small talk.</mark> Say the real thing.</span></div>
+          </div>
+          <div class="o-stickers">
+            <span class="o-vtag c1" data-chip="0">Chai loyalist</span>
+            <span class="o-vtag c2" data-chip="1">Night owl</span>
+            <span class="o-vtag c3" data-chip="2">No small talk</span>
           </div>
           <div class="o-matchpop" id="o-matchpop">
             <div class="o-matchpop-faces"><span data-avatar="0"></span><span class="o-heart">✦</span><span data-avatar="3"></span></div>
