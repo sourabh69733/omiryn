@@ -153,15 +153,20 @@
 @keyframes nav-cta-in { from { opacity: 0; transform: translateY(-4px); } }
 
 .home .nav-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+/* The mark: one calligraphic infinity, drawn in apps/landing/design-assets/mark-src/make_mark.py.
+   A mask, so it takes the text color and goes ember with the wordmark on hover. */
 .o-mark {
   display: inline-block;
-  width: 40px;
-  height: 18px;
-  background: url("/static/assets/omiryn-logo-mark.webp") no-repeat;
-  background-size: 74px auto;
-  background-position: -17px -4px;
+  width: 44px;
+  height: 22px;
+  background: currentColor;
+  color: var(--fg);
+  mask: url("/static/assets/omiryn-mark.svg") center / contain no-repeat;
+  -webkit-mask: url("/static/assets/omiryn-mark.svg") center / contain no-repeat;
+  transition: color 0.25s;
 }
-.o-word { color: var(--fg); font-family: var(--font-serif); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variation-settings: "opsz" 48; }
+.home .nav-logo:hover .o-mark, .home .nav-logo:hover .o-word { color: var(--ember-deep); }
+.o-word { color: var(--fg); font-family: var(--font-serif); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variation-settings: "opsz" 48; transition: color 0.25s; }
 
 /* ─────────── HERO ─────────── */
 .o-hero { position: relative; padding: 150px 0 0; min-height: 100svh; display: flex; flex-direction: column; justify-content: space-between; }
