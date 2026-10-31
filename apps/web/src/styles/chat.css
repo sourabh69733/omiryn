@@ -681,42 +681,26 @@ button.history-archived-toggle:hover {
   height: 100%;
 }
 
-/* Omi's "face": an ember drop, glossy, a little off-round. It morphs only while Omi is writing. */
 .agent-orb-blob {
-  position: absolute;
-  inset: 5%;
+  position: relative;
   display: block;
-  border-radius: 58% 42% 55% 45% / 50% 60% 40% 50%;
-  background:
-    radial-gradient(circle at 30% 26%, rgba(255, 255, 255, 0.55), transparent 36%),
-    radial-gradient(circle at 36% 32%, #ff9d80 0%, var(--ember) 46%, var(--ember-deep) 100%);
-  box-shadow:
-    inset -3px -5px 9px rgba(110, 22, 4, 0.26),
-    0 2px 6px rgba(214, 58, 23, 0.22);
-  transition: border-radius 0.6s ease, transform 0.6s ease;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
 }
 
 .agent-orb-glow {
   position: absolute;
-  inset: 0;
+  inset: 6%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 79, 43, 0.5), transparent 70%);
+  background: radial-gradient(circle, rgba(255, 79, 43, 0.45), rgba(214, 58, 23, 0.28) 55%, transparent 72%);
   filter: blur(6px);
   opacity: 0;
 }
 
-.agent-orb.is-listening .agent-orb-blob {
-  border-radius: 50% 50% 44% 56% / 56% 56% 44% 44%;
-  transform: rotate(-6deg);
-}
-
-.agent-orb.is-happy .agent-orb-blob {
-  border-radius: 50%;
-  transform: scale(1.04);
-}
-
-.agent-orb.is-thinking .agent-orb-blob {
-  animation: agent-orb-morph 3.2s ease-in-out infinite;
+.agent-orb.is-thinking {
+  animation: agent-orb-breathe 2.4s ease-in-out infinite;
 }
 
 .agent-orb.is-thinking .agent-orb-glow {
@@ -733,7 +717,7 @@ button.history-archived-toggle:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-orb.is-thinking .agent-orb-blob,
+  .agent-orb.is-thinking,
   .agent-orb.is-thinking .agent-orb-glow {
     animation: none;
   }
@@ -1705,9 +1689,9 @@ button.message-retry-button:hover {
   to { opacity: 1; transform: none; }
 }
 
-@keyframes agent-orb-morph {
-  0%, 100% { border-radius: 58% 42% 55% 45% / 50% 60% 40% 50%; transform: rotate(0deg) scale(0.98); }
-  50% { border-radius: 44% 56% 42% 58% / 60% 44% 56% 40%; transform: rotate(10deg) scale(1.05); }
+@keyframes agent-orb-breathe {
+  0%, 100% { transform: scale(0.96); }
+  50% { transform: scale(1.04); }
 }
 
 @keyframes agent-orb-glow {
