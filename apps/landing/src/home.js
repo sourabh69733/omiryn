@@ -57,6 +57,7 @@ const threadLabel = $("#o-thread-label");
 const threadWhy = $("#o-thread-why");
 const prints = $$(".o-polaroid", shelf);
 // Who the thread ties together, and why. Card numbers match data-card in the HTML.
+// Friends first: one pair is two women, one is two men, one is mixed.
 const PAIRS = [
   { a: 0, b: 2, why: "both up at 2am" },
   { a: 1, b: 3, why: "same goofy energy" },
