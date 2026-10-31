@@ -16,7 +16,7 @@
   min-width: 0;
   padding: 16px 12px 12px;
   border-right: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--paper);
 }
 
 .omi-rail-top {
@@ -50,8 +50,10 @@ button.omi-brand {
   border-radius: 10px;
   background: transparent;
   color: var(--ink);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 button.omi-brand:hover {
@@ -59,8 +61,8 @@ button.omi-brand:hover {
 }
 
 .omi-brand img {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 17px;
   object-fit: contain;
 }
 
@@ -98,11 +100,11 @@ button.omi-brand:hover {
 }
 
 .omi-rail-links a:hover {
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 .omi-rail-links a.is-active {
-  background: #f1ecff;
+  background: var(--ember-soft);
   color: var(--brand-violet);
 }
 
@@ -127,7 +129,7 @@ button.omi-brand:hover {
 
 .omi-rail-nav a:hover,
 .omi-rail-nav a.is-active {
-  background: #f1ecff;
+  background: var(--ember-soft);
   color: var(--brand-violet);
 }
 
@@ -151,12 +153,13 @@ button.omi-contact {
 }
 
 button.omi-contact:hover {
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 button.omi-contact.is-active {
-  border-color: var(--line-strong);
-  background: #f4f0ff;
+  border-color: transparent;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }
 
 .omi-contact-avatar {
@@ -194,12 +197,13 @@ button.omi-contact.is-active {
   width: min(460px, 100%);
   margin: 12px auto 6px;
   padding: 18px 20px;
-  border: 1px solid #e6defc;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: #faf8ff;
+  background: #fff;
   color: var(--ink);
   font-size: 14.5px;
   line-height: 1.55;
+  box-shadow: var(--shadow-sm);
 }
 
 .omi-welcome h3 {
@@ -207,8 +211,10 @@ button.omi-contact.is-active {
   align-items: center;
   gap: 10px;
   margin: 0 0 8px;
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 500;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 .omi-welcome h3 .agent-orb {
@@ -284,7 +290,7 @@ button.omi-account-button {
 }
 
 button.omi-account-button:hover {
-  background: #faf8ff;
+  background: var(--paper-2);
 }
 
 .omi-account-avatar {
@@ -350,7 +356,7 @@ button.omi-account-button:hover {
   min-height: 60px;
   padding: 10px max(16px, calc((100% - 792px) / 2));
   border-bottom: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -392,7 +398,7 @@ button.omi-back {
 }
 
 button.omi-back:hover {
-  background: #f1ecff;
+  background: var(--hover);
 }
 
 .omi-back svg {
@@ -420,7 +426,7 @@ button.omi-menu-button {
 
 button.omi-menu-button:hover,
 button.omi-menu-button[aria-expanded="true"] {
-  background: #f1ecff;
+  background: var(--hover);
 }
 
 .omi-menu-button svg {
@@ -452,7 +458,7 @@ button.omi-menu-button[aria-expanded="true"] {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #faf8ff;
+  background: var(--paper-2);
   color: var(--muted);
   font-size: 13.5px;
 }
@@ -482,7 +488,7 @@ button.omi-menu-button[aria-expanded="true"] {
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1.5px dashed #c4b5fd;
+  border: 1.5px dashed var(--ember);
   border-radius: 50%;
   color: var(--brand-violet);
 }
@@ -508,12 +514,12 @@ button.omi-menu-button[aria-expanded="true"] {
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: rgba(24, 24, 27, 0.18);
+  background: rgba(21, 18, 14, 0.18);
   cursor: default;
 }
 
 button.omi-drawer-backdrop:hover {
-  background: rgba(24, 24, 27, 0.18);
+  background: rgba(21, 18, 14, 0.18);
 }
 
 .omi-drawer {
@@ -530,7 +536,7 @@ button.omi-drawer-backdrop:hover {
   overflow-y: auto;
   border-left: 1px solid var(--line);
   background: #ffffff;
-  box-shadow: -18px 0 50px rgba(39, 33, 64, 0.12);
+  box-shadow: -18px 0 50px rgba(21, 18, 14, 0.12);
   animation: omi-drawer-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -538,7 +544,9 @@ button.omi-drawer-backdrop:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 16px;
+  font-size: 18px;
+  font-family: var(--font-display);
+  font-weight: 500;
 }
 
 button.omi-drawer-close {
@@ -555,7 +563,7 @@ button.omi-drawer-close {
 }
 
 button.omi-drawer-close:hover {
-  background: #f1ecff;
+  background: var(--hover);
   color: var(--ink);
 }
 
@@ -587,7 +595,7 @@ button.omi-drawer-close:hover {
   inset: 0;
   width: 100%;
   border: 0;
-  background: rgba(24, 24, 27, 0.32);
+  background: rgba(21, 18, 14, 0.32);
 }
 
 .omi-mobile-navigation-panel {
@@ -598,8 +606,8 @@ button.omi-drawer-close:hover {
   gap: 4px;
   width: min(320px, 88vw);
   padding: max(16px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
-  background: #fff;
-  box-shadow: 18px 0 48px rgba(24, 24, 27, 0.12);
+  background: var(--paper);
+  box-shadow: 18px 0 48px rgba(21, 18, 14, 0.12);
 }
 
 .omi-mobile-navigation-heading {
@@ -608,7 +616,9 @@ button.omi-drawer-close:hover {
   justify-content: space-between;
   margin-bottom: 16px;
   padding: 0 8px;
-  font-size: 18px;
+  font-size: 20px;
+  font-family: var(--font-display);
+  font-weight: 500;
 }
 
 .omi-mobile-navigation-heading button {
@@ -640,7 +650,7 @@ button.omi-drawer-close:hover {
 
 .omi-mobile-navigation-panel a:hover,
 .omi-mobile-navigation-panel > button:hover {
-  background: #f4f0ff;
+  background: var(--hover);
 }
 
 .omi-mobile-navigation-panel svg {
@@ -810,12 +820,12 @@ button.omi-drawer-close:hover {
 
 .message-row.is-selectable:hover,
 .message-row.is-selectable:focus-visible {
-  background: rgba(124, 58, 237, 0.05);
+  background: rgba(255, 79, 43, 0.05);
   outline: none;
 }
 
 .message-row.is-selected {
-  background: rgba(124, 58, 237, 0.1);
+  background: rgba(255, 79, 43, 0.1);
 }
 
 .message-row.is-selectable .chat-avatar.agent {
@@ -840,8 +850,8 @@ button.omi-drawer-close:hover {
 }
 
 .message-row.is-selected .message-select-mark {
-  border-color: #7c3aed;
-  background: #7c3aed;
+  border-color: var(--ember-deep);
+  background: var(--ember-deep);
 }
 
 .message-select-mark svg {
@@ -870,7 +880,7 @@ button.omi-drawer-close:hover {
   padding: 0 10px;
   border-radius: 10px;
   background: transparent;
-  color: var(--ink, #1d1d1f);
+  color: var(--ink, var(--ink));
 }
 
 .message-select-toolbar button.select-toolbar-icon {
@@ -880,11 +890,11 @@ button.omi-drawer-close:hover {
 
 .message-select-toolbar button.select-toolbar-icon:hover,
 .message-select-toolbar button.select-toolbar-text:hover {
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(255, 79, 43, 0.08);
 }
 
 .message-select-toolbar button.select-toolbar-text {
-  color: #7c3aed;
+  color: var(--ember-deep);
   font-weight: 650;
 }
 
@@ -927,7 +937,7 @@ button.omi-drawer-close:hover {
     padding: 0;
     border-radius: 50%;
     background: transparent;
-    color: var(--muted, #6b7280);
+    color: var(--muted, var(--muted));
     opacity: 0;
     transition: opacity 0.15s ease;
   }
@@ -940,7 +950,7 @@ button.omi-drawer-close:hover {
 
   .message-menu button.message-menu-trigger:hover,
   .message-menu button.message-menu-trigger.is-open {
-    background: rgba(124, 58, 237, 0.08);
+    background: rgba(255, 79, 43, 0.08);
   }
 }
 
@@ -960,7 +970,7 @@ button.omi-drawer-close:hover {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 12px 28px rgba(38, 53, 59, 0.14);
+  box-shadow: 0 12px 28px rgba(21, 18, 14, 0.14);
 }
 
 .message-menu-list.opens-up {
@@ -981,13 +991,13 @@ button.omi-drawer-close:hover {
   padding: 8px 10px;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink, #1d1d1f);
+  color: var(--ink, var(--ink));
   font-weight: 500;
   text-align: left;
 }
 
 .message-menu-list button:hover {
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(255, 79, 43, 0.08);
 }
 
 .message-menu-list button.is-danger {
@@ -1024,9 +1034,9 @@ button.omi-drawer-close:hover {
   min-height: 0;
   margin-bottom: 6px;
   padding: 6px 10px;
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid var(--ember-deep);
   border-radius: 8px;
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(255, 79, 43, 0.08);
   color: inherit;
   font-size: 13px;
   font-weight: 400;
@@ -1039,7 +1049,7 @@ button.omi-drawer-close:hover {
 }
 
 .message button.message-quote:hover {
-  background: rgba(124, 58, 237, 0.12);
+  background: rgba(255, 79, 43, 0.12);
 }
 
 .message.user button.message-quote:hover {
@@ -1062,9 +1072,9 @@ button.omi-drawer-close:hover {
   width: min(760px, calc(100% - 32px));
   margin: 0 auto 8px;
   padding: 8px 10px;
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid var(--ember-deep);
   border-radius: 10px;
-  background: #f5f0ff;
+  background: var(--ember-soft);
   font-size: 13px;
 }
 
@@ -1079,7 +1089,7 @@ button.omi-drawer-close:hover {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  color: #7c3aed;
+  color: var(--ember-deep);
 }
 
 .reply-preview button {
@@ -1091,11 +1101,11 @@ button.omi-drawer-close:hover {
   padding: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--muted, #6b7280);
+  color: var(--muted, var(--muted));
 }
 
 .reply-preview button:hover {
-  background: rgba(124, 58, 237, 0.1);
+  background: rgba(255, 79, 43, 0.1);
 }
 
 .reply-preview button svg {
@@ -1162,12 +1172,12 @@ button.omi-drawer-close:hover {
   border-radius: 999px;
   background: transparent;
   box-shadow: none;
-  color: #77718d;
+  color: var(--muted);
 }
 
 .agentic-chat .composer button.chat-upload-button:hover {
-  background: #f0edf6;
-  color: #5f5872;
+  background: var(--hover);
+  color: var(--ink-2);
 }
 
 .chat-upload-button svg {
@@ -1187,7 +1197,7 @@ button.omi-drawer-close:hover {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
-  box-shadow: 0 16px 36px rgba(38, 53, 59, 0.16);
+  box-shadow: 0 16px 36px rgba(21, 18, 14, 0.16);
 }
 
 .chat-upload-head {
@@ -1236,7 +1246,7 @@ button.omi-drawer-close:hover {
 
 .chat-upload-names button.is-active {
   border-color: var(--brand-violet);
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(255, 79, 43, 0.08);
   color: var(--brand-violet);
 }
 
@@ -1323,7 +1333,7 @@ button.omi-drawer-close:hover {
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.12);
+  background: rgba(255, 79, 43, 0.12);
 }
 
 .upload-progress-bar span {
