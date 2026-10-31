@@ -197,19 +197,25 @@
 .o-thread-label {
   position: absolute;
   z-index: 5;
-  padding: 7px 12px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 13px 8px;
   border-radius: 999px;
   background: var(--ember);
   color: #fff;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 17px;
   line-height: 1;
   white-space: nowrap;
   transform: translate(-50%, -50%) rotate(-4deg);
   box-shadow: 0 6px 18px rgba(255, 79, 43, 0.35);
   opacity: 0;
 }
+.o-thread-label em { font-family: var(--font-serif); font-style: italic; font-size: 17px; }
+.o-thread-label span { font-size: 13px; font-weight: 500; opacity: 0.9; }
+.o-thread-label span:not(:empty)::before { content: "·"; margin-right: 8px; opacity: 0.7; }
+/* The two prints on the thread sit up a little. */
+.o-polaroid.is-linked { position: relative; z-index: 3; }
+.o-polaroid.is-linked .o-print { transform: rotate(calc(var(--r) * 0.5)) translateY(-8px) scale(1.03); box-shadow: var(--shadow-lg); }
 
 /* ─────────── BAND: things people told Omi ─────────── */
 .o-band { overflow: hidden; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
@@ -403,7 +409,9 @@
   .o-polaroid:nth-child(even) { margin-top: 20px; }
   .o-polaroid figcaption { font-size: 10px; margin-top: 7px; }
   .o-polaroid[data-card="4"], .o-polaroid[data-card="5"] { display: none; }
-  .o-thread-label { font-size: 15px; padding: 6px 10px; }
+  .o-thread-label { padding: 6px 11px 7px; }
+  .o-thread-label em { font-size: 15px; }
+  .o-thread-label span { font-size: 12px; }
   .o-band-track span { font-size: 18px; padding: 11px 0; }
   .o-band-track span::after { margin: 0 18px; }
   .o-how { padding-top: 80px; }
