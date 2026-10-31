@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -146,6 +147,46 @@ def set_match_pair_status(pair_id: str, status: str) -> dict[str, Any] | None:
     return get_match_pair(pair_id)
 
 
+def set_match_pair_plan(pair_id: str, plan: dict[str, Any], *, status: str | None = None, introduced_at: datetime | None = None) -> dict[str, Any] | None:
+    """Store the meet plan (place, time, who was told); optionally the status and introduction time with it."""
+    with ENGINE.begin() as connection:
+        row = connection.execute(select(match_pairs.c.user_a).where(match_pairs.c.id == pair_id)).first()
+        if row is None:
+            return None
+        values: dict[str, Any] = {"plan_json": maybe_encrypt_json(row[0], plan), "updated_at": utc_now()}
+        if status is not None:
+            if status not in PAIR_STATUSES:
+                raise ValueError(f"unknown pair status: {status}")
+            values["status"] = status
+        if introduced_at is not None:
+            values["introduced_at"] = introduced_at
+        connection.execute(match_pairs.update().where(match_pairs.c.id == pair_id).values(**values))
+    return get_match_pair(pair_id)
+
+
+def update_match_pair_plan(pair_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], *, status: str | None = None) -> dict[str, Any] | None:
+    """Change the plan under a row lock: `change` gets the stored plan and returns the new one (None keeps it).
+
+    Two jobs (one per user) record that they told their user at about the same time; each reads the
+    newest plan inside the lock, so neither note is lost.
+    """
+    with ENGINE.begin() as connection:
+        row = connection.execute(select(match_pairs).where(match_pairs.c.id == pair_id).with_for_update()).mappings().first()
+        if row is None:
+            return None
+        plan = decrypt_json(row["user_a"], row["plan_json"]) if row["plan_json"] is not None else {}
+        changed = change(dict(plan or {}))
+        values: dict[str, Any] = {"updated_at": utc_now()}
+        if changed is not None:
+            values["plan_json"] = maybe_encrypt_json(row["user_a"], changed)
+        if status is not None:
+            if status not in PAIR_STATUSES:
+                raise ValueError(f"unknown pair status: {status}")
+            values["status"] = status
+        connection.execute(match_pairs.update().where(match_pairs.c.id == pair_id).values(**values))
+    return get_match_pair(pair_id)
+
+
 def delete_match_data_for_user(connection, user_id: str) -> dict[str, int]:
     """Account deletion: memberships and every pair the user was in."""
     members = connection.execute(match_pool_members.delete().where(match_pool_members.c.user_id == user_id)).rowcount or 0
@@ -164,6 +205,8 @@ def _pair(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"], "pool_id": row["pool_id"], "user_a": row["user_a"], "user_b": row["user_b"], "status": row["status"],
         "check": decrypt_json(row["user_a"], row["check_json"]) if row["check_json"] is not None else None,
+        "plan": decrypt_json(row["user_a"], row["plan_json"]) if row["plan_json"] is not None else None,
+        "introduced_at": _isoformat_utc(row["introduced_at"]) if row.get("introduced_at") else None,
         "created_by": row.get("created_by"), "created_at": _isoformat_utc(row["created_at"]), "updated_at": _isoformat_utc(row["updated_at"]),
     }
 
@@ -171,5 +214,5 @@ def _pair(row: Any) -> dict[str, Any]:
 __all__ = [
     "PAIR_STATUSES", "create_match_pool", "delete_match_data_for_user", "get_match_pair", "get_match_pool", "join_match_pool",
     "leave_match_pool", "list_match_pairs", "list_match_pools", "match_pairs_for_user", "match_pool_by_code", "match_pool_members_of",
-    "match_pools_for_user", "save_match_pair", "set_match_pair_status",
+    "match_pools_for_user", "save_match_pair", "set_match_pair_plan", "set_match_pair_status", "update_match_pair_plan",
 ]

@@ -656,6 +656,8 @@ agent_jobs = Table(
     Column("locked_until", DateTime(timezone=True), nullable=True),
     Column("attempts", Integer, nullable=False, default=0),
     Column("last_error", String, nullable=True),
+    # Small facts the job needs (a pair id, a day number); never message text.
+    Column("payload_json", JSON, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -806,6 +808,9 @@ match_pairs = Table(
     # proposed, introduced, met, no_show, declined, still_talking
     Column("status", String, nullable=False, server_default="proposed"),
     Column("check_json", JSON, nullable=True),
+    # The meet plan (place, time, who has been told and when), encrypted like the check.
+    Column("plan_json", JSON, nullable=True),
+    Column("introduced_at", DateTime(timezone=True), nullable=True),
     Column("created_by", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),

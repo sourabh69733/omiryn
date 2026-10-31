@@ -29,8 +29,11 @@ def schedule_agent_job(
     conversation_id: str | None,
     run_after: datetime,
     now: datetime,
+    payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create the job, or move its run_after if one with this key already exists.
+
+    `payload` holds the small facts the job needs (ids, a day number), never message text.
 
     A finished job is reset to pending with fresh attempts. A running job keeps running;
     `finish_agent_job` notices the new run_after and leaves it pending for another pass.
@@ -53,6 +56,7 @@ def schedule_agent_job(
                     status=JOB_PENDING,
                     run_after=run_after_utc,
                     attempts=0,
+                    payload_json=payload,
                     created_at=now_utc,
                     updated_at=now_utc,
                 )
@@ -60,6 +64,8 @@ def schedule_agent_job(
         else:
             job_id = existing["id"]
             values: dict[str, Any] = {"run_after": run_after_utc, "updated_at": now_utc}
+            if payload is not None:
+                values["payload_json"] = payload
             if existing["status"] in {JOB_DONE, JOB_FAILED}:
                 values.update(status=JOB_PENDING, attempts=0, last_error=None)
             connection.execute(agent_jobs.update().where(agent_jobs.c.id == job_id).values(**values))
@@ -189,6 +195,7 @@ def _job_from_row(row: Any) -> dict[str, Any]:
         "locked_until": _utc(row["locked_until"]) if row["locked_until"] else None,
         "attempts": int(row["attempts"] or 0),
         "last_error": row["last_error"],
+        "payload": dict(row["payload_json"]) if isinstance(row["payload_json"], dict) else {},
     }
 
 
