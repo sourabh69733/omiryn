@@ -25,13 +25,13 @@
   gap: 14px;
   min-height: 44px;
   width: 100%;
-  border: 1px solid rgba(31, 95, 91, 0.12);
+  border: 1px solid rgba(255, 79, 43, 0.12);
   border-radius: 999px;
   padding: 0 18px 0 16px;
-  color: #465762;
+  color: var(--muted);
   background: rgba(255, 255, 255, 0.78);
   box-shadow:
-    0 10px 26px rgba(23, 32, 38, 0.045),
+    0 10px 26px rgba(21, 18, 14, 0.045),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   font-size: clamp(13px, 1vw, 14.5px);
   font-weight: 580;
@@ -46,7 +46,7 @@
 }
 
 .choice-pill:hover {
-  border-color: rgba(31, 95, 91, 0.32);
+  border-color: rgba(255, 79, 43, 0.32);
   color: var(--ink);
   background: #ffffff;
   transform: translateY(-1px);
@@ -54,12 +54,12 @@
 
 .choice-pill.is-selected,
 .choice-pill.selected {
-  border-color: rgba(92, 219, 199, 0.8);
+  border-color: rgba(255, 79, 43, 0.8);
   color: #ffffff;
   background: linear-gradient(145deg, #237a74, #12615b);
   box-shadow:
-    0 18px 42px rgba(31, 95, 91, 0.22),
-    0 0 0 5px rgba(92, 219, 199, 0.13),
+    0 18px 42px rgba(255, 79, 43, 0.22),
+    0 0 0 5px rgba(255, 79, 43, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
@@ -156,7 +156,7 @@
   height: 44px;
   border-radius: 8px;
   color: var(--primary);
-  background: rgba(180, 154, 255, 0.14);
+  background: var(--line);
   font-size: 12px;
   font-weight: 820;
 }
@@ -167,7 +167,7 @@
 }
 
 .connect-icon.discord {
-  color: #4352c9;
+  color: var(--ember-deep);
   background: rgba(82, 98, 218, 0.12);
 }
 
@@ -185,8 +185,8 @@
 }
 
 .brand-lockup img {
-  width: 132px;
-  height: auto;
+  width: 40px;
+  height: 20px;
 }
 
 .privacy-note {
@@ -197,8 +197,8 @@
   border: 1px solid #dbe9e4;
   border-radius: 8px;
   padding: 10px 12px;
-  color: #64736e;
-  background: #f7fbf9;
+  color: var(--muted);
+  background: var(--paper-2);
   font-size: 12px;
   line-height: 1.45;
   font-weight: 560;
@@ -245,7 +245,7 @@
   justify-content: space-between;
   gap: 10px;
   outline: none;
-  border: 1px solid #ded7ea;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 10px 13px;
   color: var(--ink-soft);
@@ -257,17 +257,17 @@
 .choice-card:hover {
   transform: translateY(-1px);
   border-color: var(--purple-2);
-  box-shadow: 0 8px 18px rgba(118, 87, 220, 0.09);
+  box-shadow: 0 8px 18px rgba(255, 79, 43, 0.09);
 }
 
 .choice-card:focus-visible {
-  box-shadow: 0 0 0 4px rgba(118, 87, 220, 0.14);
+  box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.14);
 }
 
 .choice-card.selected {
   border-color: var(--purple);
-  color: #5133b6;
-  background: linear-gradient(135deg, rgba(118, 87, 220, 0.1), rgba(255, 95, 154, 0.05));
+  color: var(--ember-deep);
+  background: linear-gradient(135deg, rgba(255, 79, 43, 0.1), rgba(214, 58, 23, 0.05));
 }
 
 .choice-card i {
@@ -276,7 +276,7 @@
   width: 22px;
   height: 22px;
   place-items: center;
-  border: 1px solid #d7cfdf;
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
 }
@@ -284,7 +284,7 @@
 .choice-card.selected i {
   border-color: transparent;
   color: #fff;
-  background: linear-gradient(135deg, var(--purple-2), var(--purple));
+  background: var(--ink);
 }
 
 .choice-card i svg {
@@ -294,7 +294,8 @@
 @media (max-width: 680px) {
 
   .brand-lockup img {
-    width: 108px;
+    width: 36px;
+    height: 18px;
   }
 
 }
@@ -305,20 +306,20 @@
   place-items: center;
   padding: clamp(18px, 4vw, 56px);
   background:
-    radial-gradient(circle at 15% 18%, rgba(118, 87, 220, 0.16), transparent 28%),
-    radial-gradient(circle at 88% 82%, rgba(66, 214, 200, 0.13), transparent 26%),
-    linear-gradient(145deg, #fff, #fbf9ff);
+    radial-gradient(circle at 15% 18%, rgba(255, 79, 43, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 82%, rgba(255, 79, 43, 0.13), transparent 26%),
+    linear-gradient(145deg, #fff, var(--paper-2));
 }
 
 .auth-card {
   display: grid;
   width: min(100%, 440px);
   justify-items: stretch;
-  border: 1px solid rgba(214, 201, 248, 0.78);
+  border: 1px solid var(--line);
   border-radius: 28px;
   padding: clamp(26px, 4vw, 40px);
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 30px 90px rgba(55, 43, 92, 0.13);
+  box-shadow: 0 30px 90px rgba(21, 18, 14, 0.13);
   text-align: left;
   backdrop-filter: none;
 }
@@ -328,7 +329,7 @@
 }
 
 .auth-card .brand-lockup img {
-  width: 144px;
+  width: 40px;
 }
 
 .auth-card h1 {
@@ -346,18 +347,18 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 1px solid #ddd8e7;
-  border-radius: 15px;
-  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
   background: #fff;
   box-shadow: none;
-  font-weight: 720;
+  font-weight: 600;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .google-signin-button:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 12px 28px rgba(39, 33, 64, 0.11);
+  box-shadow: 0 12px 28px rgba(21, 18, 14, 0.11);
   transform: translateY(-1px);
 }
 
@@ -395,7 +396,7 @@
 
 .auth-error {
   margin: 12px 0 0;
-  color: #bd284b;
+  color: #b42318;
   font-size: 12px;
 }
 
@@ -405,8 +406,8 @@
   place-items: center;
   border-radius: 14px;
   color: #fff;
-  background: linear-gradient(135deg, var(--mint), var(--purple));
-  box-shadow: 0 7px 20px rgba(118, 87, 220, 0.18);
+  background: var(--ink);
+  box-shadow: 0 7px 20px rgba(255, 79, 43, 0.18);
 }
 
 .agent-avatar {
@@ -445,7 +446,7 @@
 }
 
 .message-bubble {
-  border: 1px solid rgba(229, 222, 245, 0.9);
+  border: 1px solid var(--line);
   border-radius: 18px 18px 18px 5px;
   padding: 13px 16px;
   color: var(--ink-soft);
@@ -467,7 +468,7 @@
   border-radius: 20px;
   padding: 9px 9px 9px 17px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 16px 46px rgba(55, 43, 92, 0.1);
+  box-shadow: 0 16px 46px rgba(21, 18, 14, 0.1);
 }
 
 .chat-composer textarea {
@@ -497,7 +498,7 @@
   border: 0;
   border-radius: 14px;
   color: #fff;
-  background: linear-gradient(135deg, var(--purple-2), var(--purple));
+  background: var(--ink);
 }
 
 .chat-composer button:disabled {
@@ -543,7 +544,7 @@
 .legacy-react-shell .confirm-overlay {
   z-index: 60;
   padding: 16px;
-  background: rgba(24, 24, 27, 0.32);
+  background: rgba(21, 18, 14, 0.32);
   backdrop-filter: blur(3px);
 }
 
@@ -572,9 +573,9 @@
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 94% 4%, rgba(255, 95, 154, 0.09), transparent 28%),
-    radial-gradient(circle at 10% 96%, rgba(66, 214, 200, 0.09), transparent 30%),
-    linear-gradient(145deg, #fff 0%, #fdfbff 52%, #fbf9ff 100%);
+    radial-gradient(circle at 94% 4%, rgba(214, 58, 23, 0.09), transparent 28%),
+    radial-gradient(circle at 10% 96%, rgba(255, 79, 43, 0.09), transparent 30%),
+    linear-gradient(145deg, #fff 0%, var(--paper-2) 52%, var(--paper-2) 100%);
   font-family: var(--font-ui);
 }
 
@@ -588,11 +589,11 @@
 .quick-setup-card {
   width: min(440px, calc(100% - 32px));
   margin: clamp(24px, 8vh, 96px) auto 48px;
-  border: 1px solid rgba(214, 201, 248, 0.72);
+  border: 1px solid var(--line);
   border-radius: 24px;
   padding: 36px 32px 32px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 26px 70px rgba(55, 43, 92, 0.1);
+  box-shadow: 0 26px 70px rgba(21, 18, 14, 0.1);
 }
 
 .quick-setup-card h1 {
@@ -631,7 +632,7 @@
   width: 100%;
   min-height: 48px;
   outline: none;
-  border: 1px solid #ded7ea;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 0 14px;
   color: var(--ink);
@@ -646,8 +647,8 @@
 }
 
 .quick-setup-input:focus {
-  border-color: var(--purple-2);
-  box-shadow: 0 0 0 4px rgba(118, 87, 220, 0.11);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.11);
 }
 
 .quick-setup-location {
@@ -666,11 +667,11 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  border: 1px solid #ece6f6;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   color: var(--ink-soft);
-  background: #fbf9ff;
+  background: var(--paper-2);
   font-size: 14px;
 }
 
@@ -716,7 +717,7 @@
 
 .quick-setup-error {
   margin: 16px 0 0;
-  color: #bd284b;
+  color: #b42318;
   font-size: 13px;
   font-weight: 600;
 }
@@ -732,7 +733,7 @@
   border: 0;
   border-radius: 999px;
   color: #fff;
-  background: var(--brand-violet);
+  background: var(--ink);
   box-shadow: none;
   font: inherit;
   font-size: 16px;
@@ -747,8 +748,8 @@
 }
 
 .quick-setup-submit:hover {
+  background: var(--ember);
   transform: translateY(-1px);
-  box-shadow: 0 13px 28px rgba(118, 87, 220, 0.29);
 }
 
 .quick-setup-submit:disabled {
