@@ -1,5 +1,6 @@
 // Home page motion. One main animation per section:
-// a live chat with Omi in the hero, step reveals, the match card stack in the dark section.
+// the photo shelf and its thread in the hero, the conversation set big in "How it works",
+// the match card stack in the ink section.
 // Everything renders in a readable final state when the user prefers reduced motion.
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -49,10 +50,73 @@ $$('a[href^="#"]').forEach((link) => {
   });
 });
 
-/* ─────────── Hero: a live chat with Omi ─────────── */
-// The conversation is the hero: Omi asks, you answer, a phrase lights up and sticks to the side
-// as part of your vibe; after three, a match lands. Every element is in the DOM from the start
-// (hidden, keeping its space), so the stage never changes size while the loop runs.
+/* ─────────── Hero: the shelf of photos and the thread between two of them ─────────── */
+const shelf = $("#o-shelf");
+const threadPath = $("#o-thread-path");
+const threadLabel = $("#o-thread-label");
+const THREAD_PAIR = [1, 3];
+const visibleCards = () => $$(".o-polaroid", shelf).filter((card) => card.offsetParent !== null);
+
+// A curve from one photo to the other, in the shelf's own coordinates, with the label at its middle.
+function drawThread() {
+  const cards = visibleCards();
+  const a = cards[THREAD_PAIR[0]];
+  const b = cards[THREAD_PAIR[1]] ?? cards[cards.length - 1];
+  if (!a || !b || a === b) return;
+  const box = shelf.getBoundingClientRect();
+  const center = (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - box.left, y: r.top + r.height * 0.38 - box.top };
+  };
+  const p = center(a);
+  const q = center(b);
+  const lift = Math.min(90, Math.abs(q.x - p.x) * 0.35);
+  const c1 = { x: p.x + (q.x - p.x) * 0.3, y: Math.min(p.y, q.y) - lift };
+  const c2 = { x: p.x + (q.x - p.x) * 0.7, y: Math.min(p.y, q.y) - lift };
+  threadPath.setAttribute("d", `M ${p.x} ${p.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${q.x} ${q.y}`);
+  threadPath.style.strokeDasharray = threadPath.getTotalLength();
+  if (reduce || threadDrawn) threadPath.style.strokeDashoffset = 0;
+  // Bezier midpoint (t = 0.5).
+  const mid = { x: (p.x + 3 * c1.x + 3 * c2.x + q.x) / 8, y: (p.y + 3 * c1.y + 3 * c2.y + q.y) / 8 };
+  threadLabel.style.left = `${mid.x}px`;
+  threadLabel.style.top = `${mid.y}px`;
+}
+let threadDrawn = reduce;
+window.addEventListener("resize", drawThread);
+
+function heroIntro() {
+  const cards = $$(".o-polaroid", shelf);
+  const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
+  tl.from(".o-h1 .w > span", { yPercent: 110, duration: 0.9, stagger: 0.06 })
+    .from("[data-intro]", { y: 16, autoAlpha: 0, duration: 0.7 }, "-=0.55")
+    // Photos land on the table one by one.
+    .from(cards, {
+      y: 90,
+      autoAlpha: 0,
+      rotation: (i) => [-18, 14, -10, 16, -14, 10][i],
+      duration: 0.9,
+      stagger: 0.07,
+      ease: "back.out(1.3)",
+      clearProps: "transform,opacity,visibility",
+    }, "-=0.6")
+    // The thread ties two of them together, then the label pops.
+    .call(() => { threadDrawn = true; drawThread(); }, null, "-=0.2")
+    .fromTo(threadPath, { strokeDashoffset: () => threadPath.getTotalLength() }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" })
+    .fromTo(threadLabel, { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, "-=0.25");
+
+  // Then they breathe: each photo drifts a little, forever.
+  tl.call(() => {
+    cards.forEach((card, i) => {
+      gsap.to(card, { y: i % 2 ? 7 : -7, duration: 2.6 + i * 0.3, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    });
+  });
+  return tl;
+}
+
+/* ─────────── How it works: the conversation ─────────── */
+// Omi asks, you answer, a phrase lights up and gets stamped as part of your vibe; after three,
+// a match lands. Every element is in the DOM from the start (hidden, keeping its space), so the
+// section never changes height while the loop runs.
 const demo = $("#o-demo");
 const bots = $$("[data-bot]", demo);
 const mes = $$("[data-me]", demo);
@@ -60,54 +124,54 @@ const chips = $$("[data-chip]", demo);
 const marks = $$("mark", demo);
 const matchPop = $("#o-matchpop");
 let demoLoop = null;
-let heroVisible = true;
+let demoVisible = false;
 
-// Pause the loop while the hero is off screen; it resumes where it left off.
+// The loop runs only while the conversation is on screen; it resumes where it left off.
 new IntersectionObserver(([entry]) => {
-  heroVisible = entry.isIntersecting;
-  if (demoLoop) heroVisible ? demoLoop.resume() : demoLoop.pause();
-}).observe($("#hero"));
+  demoVisible = entry.isIntersecting;
+  if (reduce) return;
+  if (!demoLoop && demoVisible) demoCycle();
+  else if (demoLoop) demoVisible ? demoLoop.resume() : demoLoop.pause();
+}, { threshold: 0.35 }).observe(demo);
 
 function demoReset() {
   bots.forEach((bot) => bot.classList.add("is-typing"));
   marks.forEach((mark) => mark.classList.remove("is-on"));
-  gsap.set([...bots, ...mes, ...chips], { autoAlpha: 0, y: 10, scale: 1 });
-  gsap.set(matchPop, { autoAlpha: 0, y: 24, scale: 0.9 });
-  demo.classList.remove("is-thinking");
+  gsap.set([...bots, ...mes], { autoAlpha: 0, y: 10 });
+  gsap.set(chips, { autoAlpha: 0, scale: 1.8 });
+  gsap.set(matchPop, { autoAlpha: 0, y: 24 });
 }
 
 function demoFinal() {
   bots.forEach((bot) => bot.classList.remove("is-typing"));
   marks.forEach((mark) => mark.classList.add("is-on"));
   gsap.set([...bots, ...mes, ...chips, matchPop], { autoAlpha: 1, y: 0, scale: 1 });
-  demo.classList.add("is-thinking");
 }
 
 function demoCycle() {
-  demoLoop = gsap.timeline({ paused: !heroVisible, defaults: { ease: "power2.out" }, onComplete: demoCycle });
+  demoLoop = gsap.timeline({ paused: !demoVisible, defaults: { ease: "power2.out" }, onComplete: demoCycle });
   demoLoop.call(demoReset);
   bots.forEach((bot, i) => {
     demoLoop
       // Omi types, then the words replace the dots.
       .fromTo(bot, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.3 }, "+=0.2")
-      .to({}, { duration: 0.9 })
+      .to({}, { duration: 0.8 })
       .call(() => bot.classList.remove("is-typing"))
-      .to({}, { duration: 1.1 })
+      .to({}, { duration: 1.0 })
       // You answer.
       .fromTo(mes[i], { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.3 })
-      .to({}, { duration: 0.5 })
-      // The phrase lights up and lands in your vibe.
+      .to({}, { duration: 0.45 })
+      // The phrase lights up and gets stamped.
       .call(() => marks[i].classList.add("is-on"))
-      .fromTo(chips[i], { autoAlpha: 0, scale: 0.5, y: 14 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.5, ease: "back.out(2.2)" }, "+=0.35");
+      .fromTo(chips[i], { autoAlpha: 0, scale: 1.8 }, { autoAlpha: 1, scale: 1, duration: 0.35, ease: "power3.in" }, "+=0.3");
   });
   demoLoop
     // Someone who fits.
-    .call(() => demo.classList.add("is-thinking"), null, "+=0.6")
-    .fromTo(matchPop, { autoAlpha: 0, y: 24, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, "+=0.5")
-    .to({}, { duration: 4 })
+    .fromTo(matchPop, { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "back.out(1.6)" }, "+=0.9")
+    .to({}, { duration: 4.5 })
     // Fade out, then start over with a fresh chat.
     .to([...bots, ...mes, ...chips, matchPop], { autoAlpha: 0, duration: 0.4, ease: "power1.in" })
-    .to({}, { duration: 0.4 });
+    .to({}, { duration: 0.5 });
   return demoLoop;
 }
 
@@ -204,8 +268,6 @@ function setupCards() {
 // Hero runs now. Everything below the fold is set up in small steps once the
 // browser is idle, or right away on the first scroll or anchor click. The
 // motion is the same, it just stops competing with the first paint.
-if (reduce) demoFinal();
-
 const belowFold = [
   setupCards,
   () => !reduce && setupScrollMotion(),
@@ -227,32 +289,21 @@ function flushBelowFold() {
 if (location.hash || window.scrollY > 0) flushBelowFold();
 else window.addEventListener("load", () => idle(runNextStep, { timeout: 1000 }), { once: true });
 
-if (!reduce) {
+if (reduce) {
+  drawThread();
+  demoFinal();
+} else {
   demoReset();
-  // Hero intro: the line rises, then the button; the conversation starts right after.
-  gsap.timeline({ defaults: { ease: "expo.out" } })
-    .from(".o-h1 .w > span", { yPercent: 110, duration: 0.8, stagger: 0.05 })
-    .from("[data-intro]", { y: 16, autoAlpha: 0, duration: 0.7 }, "-=0.5")
-    .add(demoCycle, 0.7);
-
-  // Background blobs drift.
-  $$(".o-blob").forEach((blob, i) => {
-    gsap.to(blob, {
-      x: () => gsap.utils.random(-120, 120),
-      y: () => gsap.utils.random(-80, 80),
-      duration: 9 + i * 2,
-      repeat: -1,
-      yoyo: true,
-      repeatRefresh: true,
-      ease: "sine.inOut",
-    });
-  });
+  heroIntro();
 }
+// The thread depends on the photos' final layout; redraw once fonts and images settle.
+document.fonts?.ready.then(drawThread);
+window.addEventListener("load", drawThread, { once: true });
 
 // Below-the-fold scroll motion, set up from the queue above.
 function setupScrollMotion() {
   // Section reveals.
-  gsap.set("[data-rv]", { y: 50, autoAlpha: 0 });
+  gsap.set("[data-rv]", { y: 40, autoAlpha: 0 });
   ScrollTrigger.batch("[data-rv]", {
     start: "top 88%",
     once: true,
@@ -271,12 +322,6 @@ function setupScrollMotion() {
 }
 
 if (!reduce && finePointer) {
-  // Soft glow follows the cursor.
-  const glow = $(".o-cursor");
-  const gx = gsap.quickTo(glow, "x", { duration: 0.6, ease: "power3" });
-  const gy = gsap.quickTo(glow, "y", { duration: 0.6, ease: "power3" });
-  window.addEventListener("pointermove", (e) => { gx(e.clientX); gy(e.clientY); glow.classList.add("on"); });
-
   // Magnetic buttons.
   $$(".magnetic").forEach((btn) => {
     const mx = gsap.quickTo(btn, "x", { duration: 0.4, ease: "power3" });
@@ -289,12 +334,13 @@ if (!reduce && finePointer) {
     btn.addEventListener("pointerleave", () => { mx(0); my(0); });
   });
 
-  // The stickers and the match card lean toward the cursor a little.
-  const lean = [$(".o-stickers"), matchPop];
-  const lx = gsap.quickTo(lean, "x", { duration: 1.2, ease: "power3" });
-  const ly = gsap.quickTo(lean, "y", { duration: 1.2, ease: "power3" });
+  // The shelf leans toward the cursor a little, each photo by a different amount.
+  const layers = $$(".o-polaroid", shelf).map((card, i) => ({
+    x: gsap.quickTo(card, "x", { duration: 1.1, ease: "power3" }),
+    depth: 6 + (i % 3) * 5,
+  }));
   $("#hero").addEventListener("pointermove", (e) => {
-    lx((e.clientX / window.innerWidth - 0.5) * 14);
-    ly((e.clientY / window.innerHeight - 0.5) * 10);
+    const t = e.clientX / window.innerWidth - 0.5;
+    layers.forEach((layer) => layer.x(-t * layer.depth * 2));
   });
 }

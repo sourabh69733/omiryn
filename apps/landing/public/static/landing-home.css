@@ -1,81 +1,66 @@
 /* Home page design system. Scoped to body.home so the other public pages keep landing.css as is.
-   Motion lives in apps/landing/src/home.js (GSAP). */
+   Motion lives in apps/landing/src/home.js (GSAP).
+
+   The look: warm paper, ink, and one ember accent. Fraunces (a soft, wonky serif) carries the
+   voice; Bricolage Grotesque does the UI; JetBrains Mono does small labels and stamps. */
 
 .home {
-  /* Color: light, built from the logo's violet to pink, with playful sticker tints */
-  --bg: #fbfaf8;
-  --bg-elev: #ffffff;
-  --surface: #f4f2ef;
-  --line: rgba(24, 24, 27, 0.08);
-  --line-strong: rgba(24, 24, 27, 0.14);
-  --fg: #18181b;
-  --fg-2: #52525b;
-  --fg-3: #6b6b73;
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-soft: rgba(124, 58, 237, 0.10);
-  --pink: #db2777;
-  --pink-soft: rgba(219, 39, 119, 0.10);
+  --paper: #f3eee4;
+  --paper-2: #ebe4d6;
+  --bg: var(--paper);
+  --bg-elev: #fbf8f2;
+  --surface: var(--paper-2);
+  --ink: #15120e;
+  --fg: var(--ink);
+  --fg-2: #4a443b;
+  --fg-3: #7a7266;
+  --line: rgba(21, 18, 14, 0.12);
+  --line-strong: rgba(21, 18, 14, 0.24);
+  --ember: #ff4f2b;
+  --ember-deep: #d63a17;
+  --ember-soft: rgba(255, 79, 43, 0.16);
+  --accent: var(--ember-deep);
+  --accent-hover: var(--ember);
+  --accent-soft: var(--ember-soft);
+  --pink: var(--ember-deep);
   --brand-gradient: linear-gradient(135deg, #6d4aff 0%, #b04dd9 50%, #f062a8 100%);
-  --t-violet: #ede9fe;
-  --t-pink: #fce7f3;
-  --t-sun: #fef3c7;
-  --t-mint: #d1fae5;
-  --t-sky: #e0f2fe;
-  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.05), 0 2px 8px rgba(24, 24, 27, 0.04);
-  --shadow-md: 0 8px 24px rgba(24, 24, 27, 0.08);
-  --shadow-lg: 0 30px 70px rgba(76, 29, 149, 0.16), 0 6px 18px rgba(24, 24, 27, 0.06);
+  --shadow-sm: 0 1px 2px rgba(21, 18, 14, 0.06), 0 2px 10px rgba(21, 18, 14, 0.05);
+  --shadow-md: 0 10px 28px rgba(21, 18, 14, 0.12);
+  --shadow-lg: 0 30px 70px rgba(21, 18, 14, 0.2), 0 6px 18px rgba(21, 18, 14, 0.08);
 
-  /* Type: Geist for everything; Fraunces italic for the two accent phrases. */
-  --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Bricolage Grotesque', 'Geist', system-ui, -apple-system, sans-serif;
   --font-serif: 'Fraunces', Georgia, serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Shape and space */
-  --container: 1160px;
-  --gutter: 24px;
-  --section-y: 128px;
+  --container: 1200px;
+  --gutter: 28px;
+  --section-y: 140px;
   --r-md: 14px;
   --r-lg: 22px;
   --r-xl: 30px;
 
   font-family: var(--font-sans);
+  font-optical-sizing: auto;
   background: var(--bg);
   color: var(--fg);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
-.home ::selection { background: rgba(124, 58, 237, 0.2); }
-.home :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.home ::selection { background: var(--ember); color: #fff; }
+.home :focus-visible { outline: 2px solid var(--ember-deep); outline-offset: 3px; border-radius: 8px; }
 .home main { position: relative; overflow-x: clip; }
 
-/* ─────────── AMBIENT BACKGROUND ─────────── */
-.o-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.o-blob { position: absolute; border-radius: 50%; will-change: transform; }
-.o-blob.b1 { width: 900px; height: 900px; top: -420px; right: -320px; background: radial-gradient(circle, rgba(196, 181, 253, 0.55), transparent 65%); }
-.o-blob.b2 { width: 760px; height: 760px; top: 25%; left: -380px; background: radial-gradient(circle, rgba(251, 207, 232, 0.55), transparent 65%); }
-.o-blob.b3 { width: 700px; height: 700px; bottom: -380px; right: 15%; background: radial-gradient(circle, rgba(253, 230, 138, 0.4), transparent 65%); }
+/* Paper grain over everything, very light. */
 .o-grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.o-cursor {
   position: fixed;
-  top: -220px;
-  left: -220px;
-  z-index: 0;
-  width: 440px;
-  height: 440px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.12), rgba(219, 39, 119, 0.06) 40%, transparent 70%);
+  inset: 0;
+  z-index: 5;
   pointer-events: none;
-  opacity: 0;
-  will-change: transform;
-  transition: opacity 0.6s;
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.o-cursor.on { opacity: 1; }
 
 /* ─────────── LAYOUT + TYPE ─────────── */
 .o-container {
@@ -86,85 +71,82 @@
   padding: 0 var(--gutter);
 }
 .o-section { padding: var(--section-y) 0; }
-.o-head { max-width: 560px; }
+.o-head { max-width: 600px; }
 
-.o-h1, .o-h2, .home h3 { font-weight: 600; color: var(--fg); text-wrap: balance; }
-.o-h1 { font-size: clamp(50px, 6.4vw, 92px); line-height: 0.98; letter-spacing: -0.05em; }
-/* Extra room on each side so italic swashes and descenders are not clipped by the reveal mask. */
-.o-h1 .w { display: inline-block; overflow: hidden; padding: 0 0.12em 0.2em; margin: 0 -0.12em -0.2em; vertical-align: top; }
-.o-h1 .w > span { display: inline-block; }
-.o-h2 { max-width: 15ch; font-size: clamp(34px, 4.4vw, 54px); line-height: 1.04; letter-spacing: -0.04em; }
-.o-h1 em, .o-h2 em {
+.o-h1, .o-h2 {
   font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-weight: 500;
   font-variation-settings: "opsz" 144;
-  letter-spacing: -0.01em;
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* The gradient only paints inside the box, so widen it a little for the italic overhang. */
-  display: inline-block;
-  padding: 0 0.1em 0.14em 0.1em;
-  margin: 0 -0.04em -0.14em -0.1em;
+  color: var(--fg);
+  text-wrap: balance;
 }
-.o-sub { margin-top: 20px; max-width: 44ch; color: var(--fg-2); font-size: 17px; }
-/* Eyebrows: plain words in the brand color, no caps, no mono. */
-.o-eyebrow { margin-bottom: 14px; color: var(--accent); font-size: 15px; font-weight: 600; }
+.o-h1 { font-size: clamp(54px, 9.4vw, 148px); line-height: 0.92; letter-spacing: -0.035em; }
+.o-h1 .o-line1, .o-h1 .o-line2 { display: block; }
+/* Extra room on each side so italic swashes and descenders are not clipped by the reveal mask. */
+.o-h1 .w { display: inline-block; overflow: hidden; padding: 0 0.1em 0.16em; margin: 0 -0.1em -0.16em; vertical-align: top; }
+.o-h1 .w > span { display: inline-block; }
+.o-h2 { max-width: 14ch; font-size: clamp(40px, 5.8vw, 84px); line-height: 0.98; letter-spacing: -0.03em; }
+.o-h1 em, .o-h2 em { font-style: italic; font-weight: 400; color: var(--ember); }
+.home h3 { font-weight: 600; letter-spacing: -0.01em; }
+.o-sub { margin-top: 22px; max-width: 42ch; color: var(--fg-2); font-size: 18px; line-height: 1.5; }
+/* Eyebrows: mono caps, like a label on a folder. */
+.o-eyebrow { margin-bottom: 18px; color: var(--ember-deep); font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
 
-/* ─────────── BUTTONS: one color, the brand violet ─────────── */
+/* ─────────── BUTTONS: ink, turning ember on hover ─────────── */
 .o-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 52px;
+  gap: 10px;
+  min-height: 54px;
   padding: 0 26px;
   border-radius: 999px;
   border: 1px solid transparent;
-  font: 500 15px/1 var(--font-sans);
+  font: 500 16px/1 var(--font-sans);
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.3s, transform 0.2s;
+  transition: background 0.25s, color 0.25s, border-color 0.2s, box-shadow 0.3s, transform 0.2s;
 }
-.o-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.25s; }
-.o-btn:hover svg { transform: translateX(3px); }
-.o-btn-primary { background: var(--accent); color: #fff; box-shadow: 0 10px 30px rgba(124, 58, 237, 0.28); }
-.o-btn-primary:hover { background: var(--accent-hover); box-shadow: 0 14px 36px rgba(124, 58, 237, 0.4); }
-.o-btn-lg { min-height: 60px; padding: 0 34px; font-size: 17px; }
+.o-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.25s; }
+.o-btn:hover svg { transform: translateX(4px); }
+.o-btn-primary { background: var(--ink); color: var(--paper); }
+.o-btn-primary:hover { background: var(--ember); color: #fff; }
+.o-btn-lg { min-height: 64px; padding: 0 34px; font-size: 18px; }
 
 /* ─────────── NAV (overrides landing.css) ─────────── */
 .home .nav {
-  top: 16px;
-  width: min(var(--container), calc(100% - var(--gutter) * 2));
-  min-height: 60px;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: none;
+  width: 100%;
+  min-height: 72px;
   align-items: center;
-  padding: 8px 8px 8px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 0 var(--gutter);
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  transition: background 0.3s, border-color 0.3s;
 }
 .home .nav::before { content: none; }
-.home .nav.is-scrolled { top: 10px; background: rgba(255, 255, 255, 0.88); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
-.home .nav-links { gap: 2px; }
-.home .nav-links a { padding: 9px 14px; color: var(--fg-2); font-size: 14px; font-weight: 500; }
-.home .nav-links a:hover { color: var(--fg); background: var(--surface); box-shadow: none; }
+.home .nav.is-scrolled { top: 0; border-color: var(--line); background: rgba(243, 238, 228, 0.86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: none; }
+.home .nav-links { gap: 4px; }
+.home .nav-links a { padding: 9px 12px; color: var(--fg); font-size: 15px; font-weight: 500; border-radius: 999px; }
+.home .nav-links a:hover { color: var(--ember-deep); background: transparent; box-shadow: none; }
 .home .nav-cta {
-  margin-left: 8px;
-  padding: 10px 18px !important;
+  margin-left: 10px;
+  padding: 11px 18px !important;
   border: 0;
-  background: var(--accent) !important;
-  color: #fff !important;
-  font-size: 14px !important;
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  font-size: 15px !important;
   font-weight: 500 !important;
   box-shadow: none;
 }
-.home .nav-cta:hover { background: var(--accent-hover) !important; box-shadow: none; transform: none; }
+.home .nav-cta:hover { background: var(--ember) !important; color: #fff !important; box-shadow: none; transform: none; }
 /* One "Start talking" at a time: shown only while the page's own buttons are off screen. */
 .home .nav:not(.show-cta) .nav-cta { display: none; }
 .home .nav.show-cta .nav-cta { animation: nav-cta-in 0.25s ease-out; }
@@ -179,266 +161,266 @@
   background-size: 74px auto;
   background-position: -17px -4px;
 }
-.o-word { color: var(--fg); font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+.o-word { color: var(--fg); font-family: var(--font-serif); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variation-settings: "opsz" 48; }
 
-/* ─────────── HERO: the conversation is the hero ─────────── */
-.o-hero { position: relative; padding: 118px 0 72px; min-height: 100svh; display: flex; align-items: flex-start; }
-/* One short line and one button; the rest of the first screen is the chat itself. */
-.o-hero-top { display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center; }
-.o-hero .o-h1 { font-size: clamp(24px, 2.6vw, 32px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.2; color: var(--fg); }
-.o-hero .o-h1 .w { padding: 0 0.1em 0.18em; margin: 0 -0.1em -0.18em; }
-.o-hero .o-h1 em { font-size: 1.12em; padding: 0 0.06em 0.1em 0.06em; margin: 0 -0.02em -0.1em -0.06em; }
+/* ─────────── HERO ─────────── */
+.o-hero { position: relative; padding: 150px 0 0; min-height: 100svh; display: flex; flex-direction: column; justify-content: space-between; }
+.o-hero .o-container { max-width: none; padding-left: max(var(--gutter), calc((100% - var(--container)) / 2)); }
+.o-hero-cta { display: flex; align-items: center; gap: 22px; margin-top: 44px; }
+.o-hero-note { color: var(--fg-3); font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.04em; }
 
 [data-avatar] { display: inline-block; flex: none; }
 [data-avatar] img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-/* The stage: large bubbles with no phone frame, stickers on the side, a match card at the end. */
-.o-demo { position: relative; width: min(760px, 100%); margin: 48px auto 0; padding: 8px 200px 0 0; }
-.o-stage-glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: -1;
-  width: 120%;
-  height: 110%;
-  translate: -50% -50%;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.18), rgba(219, 39, 119, 0.1) 55%, transparent 100%);
-  filter: blur(40px);
-  opacity: 0.6;
-  transform: scale(0.85);
-  transition: opacity 1s ease, transform 1.4s ease;
+/* The shelf: a row of photos wider than the page, each tilted, like prints on a table. */
+.o-shelf { position: relative; margin-top: 64px; padding: 24px 0 56px; overflow: visible; }
+.o-shelf-row { display: flex; justify-content: center; align-items: flex-start; gap: 0; width: max-content; min-width: 100%; margin: 0 auto; padding: 0 12px; }
+.o-polaroid { --w: 196px; flex: none; width: var(--w); margin: 0 -14px; }
+.o-polaroid:nth-child(even) { margin-top: 28px; }
+/* GSAP moves the figure; the print inside keeps its tilt and the hover lift. */
+.o-print {
+  padding: 10px 10px 12px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  transform: rotate(var(--r));
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s;
 }
-.o-demo.is-thinking .o-stage-glow { opacity: 1; transform: scale(1.05); }
-.o-feed { display: flex; flex-direction: column; gap: 12px; }
-.o-msg { display: flex; align-items: flex-end; gap: 10px; max-width: 86%; }
-.o-msg.me { align-self: flex-end; }
-/* Omi's mark in a soft circle; the wordmark under it in the image stays clipped out. */
-.o-omi { position: relative; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--t-violet); overflow: hidden; }
-.o-omi::before { content: ""; position: absolute; left: 50%; top: 50%; width: 32px; height: 14px; translate: -50% -50%; background: url("/static/assets/omiryn-logo-mark.webp") no-repeat; background-size: 58px auto; background-position: -13px -3px; }
-.o-bubble { display: inline-block; padding: 14px 18px; border-radius: 22px; font-size: 17px; line-height: 1.45; box-shadow: var(--shadow-sm); }
-.o-msg.bot .o-bubble { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 8px; }
-.o-msg.me .o-bubble { background: var(--fg); color: #fff; border-bottom-right-radius: 8px; }
-/* A bot bubble shows typing dots first, then its words. Same height, so nothing jumps. */
-.o-dots { display: none; align-items: center; height: 1.45em; gap: 4px; padding: 0 2px; }
-.o-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-3); animation: o-bounce 1s infinite; }
+.o-polaroid:hover { position: relative; z-index: 4; }
+.o-polaroid:hover .o-print { transform: rotate(0deg) translateY(-10px) scale(1.04); box-shadow: var(--shadow-lg); }
+.o-polaroid figcaption { margin-top: 10px; color: var(--fg-2); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+/* The thread: drawn by home.js between two photos. */
+.o-thread { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.o-thread path { fill: none; stroke: var(--ember); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.o-thread-label {
+  position: absolute;
+  z-index: 5;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--ember);
+  color: #fff;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  box-shadow: 0 6px 18px rgba(255, 79, 43, 0.35);
+  opacity: 0;
+}
+
+/* ─────────── BAND: things people told Omi ─────────── */
+.o-band { overflow: hidden; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
+.o-band-track { display: flex; width: max-content; animation: o-marquee 48s linear infinite; }
+.o-band-track span { padding: 14px 0; font-family: var(--font-serif); font-style: italic; font-size: 22px; white-space: nowrap; }
+.o-band-track span::after { content: "✦"; margin: 0 28px; color: var(--ember); font-style: normal; font-size: 14px; vertical-align: 3px; }
+@keyframes o-marquee { to { transform: translateX(-50%); } }
+
+/* ─────────── HOW IT WORKS: copy on the left, the conversation on the right ─────────── */
+.o-how { padding-top: 120px; }
+.o-how-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 72px; align-items: start; }
+.o-how-copy { position: sticky; top: 112px; }
+.o-steps { margin: 40px 0 0; padding: 0; list-style: none; display: grid; gap: 0; max-width: 42ch; }
+.o-steps li { display: flex; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line-strong); color: var(--fg-2); font-size: 16.5px; line-height: 1.45; }
+.o-steps li:last-child { border-bottom: 1px solid var(--line-strong); }
+.o-steps li span { flex: none; color: var(--ember-deep); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; padding-top: 5px; }
+
+/* The conversation, set like a script: a mono label, then the words, large. Omi speaks in the serif, you in the sans. */
+.o-convo { position: relative; display: flex; flex-direction: column; gap: 26px; padding-top: 6px; }
+.o-say { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: baseline; }
+.o-who { color: var(--fg-3); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; padding-top: 0.5em; }
+.o-say.me .o-who { color: var(--ember-deep); }
+.o-say p { margin: 0; font-size: clamp(22px, 2.3vw, 31px); line-height: 1.25; letter-spacing: -0.015em; }
+.o-say.bot p { font-family: var(--font-serif); font-weight: 400; font-variation-settings: "opsz" 48; }
+.o-say.me p { font-weight: 500; }
+/* A bot line shows typing dots first, then its words. Same height, so nothing jumps. */
+.o-dots { display: none; align-items: center; height: 1.25em; gap: 5px; }
+.o-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-3); animation: o-bounce 1s infinite; }
 .o-dots i:nth-child(2) { animation-delay: 0.15s; }
 .o-dots i:nth-child(3) { animation-delay: 0.3s; }
-.o-msg.is-typing .o-dots { display: inline-flex; }
-.o-msg.is-typing .o-text { display: none; }
-.o-msg mark {
-  padding: 1px 6px;
-  margin: 0 -1px;
-  border-radius: 7px;
-  background: linear-gradient(90deg, #fde047, #fde047) no-repeat;
+.o-say.is-typing .o-dots { display: inline-flex; }
+.o-say.is-typing .o-text { display: none; }
+.o-say mark {
+  padding: 0 0.12em;
+  margin: 0 -0.12em;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--ember-soft), var(--ember-soft)) no-repeat;
   background-size: 0% 100%;
   color: inherit;
-  transition: background-size 0.5s ease, color 0.3s ease 0.1s;
+  transition: background-size 0.5s ease;
 }
-.o-msg mark.is-on { background-size: 100% 100%; color: #18181b; }
+.o-say mark.is-on { background-size: 100% 100%; }
 
-/* What Omi picked up, stuck to the side like stickers. */
-.o-stickers { position: absolute; right: 0; top: 0; height: 330px; width: 190px; }
-.o-vtag {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 16px;
-  border-radius: 999px;
-  box-shadow: var(--shadow-md), 0 0 0 3px #fff;
-  font-size: 15px;
-  font-weight: 600;
+/* What Omi picked up, stamped. */
+.o-stamps { display: flex; flex-wrap: wrap; gap: 14px 18px; padding: 10px 0 0 64px; min-height: 60px; }
+.o-stamp {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 2px solid var(--ember-deep);
+  border-radius: 6px;
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   white-space: nowrap;
+  transform: rotate(var(--r));
 }
-.o-vtag[data-chip="0"] { left: 8px; top: 9%; transform: rotate(-6deg); }
-.o-vtag[data-chip="1"] { left: 40px; top: 40%; transform: rotate(4deg); }
-.o-vtag[data-chip="2"] { left: 0; top: 71%; transform: rotate(-3deg); }
-.c1 { background: var(--t-violet); color: #5b21b6; }
-.c2 { background: var(--t-pink); color: #9d174d; }
-.c3 { background: var(--t-sun); color: #92400e; }
 
-/* The last beat: lands under the chat, centered, slightly tilted. */
-.o-matchpop {
-  position: relative;
-  z-index: 3;
-  width: 270px;
-  margin: 26px auto 0;
-  padding: 18px;
-  border-radius: 24px;
-  background: #fff;
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(219, 39, 119, 0.15);
-  transform: rotate(-3deg);
-  text-align: center;
-}
-.o-matchpop-faces { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.o-matchpop-faces [data-avatar] { width: 52px; height: 52px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 3px #fff, var(--shadow-sm); }
-.o-heart { color: var(--pink); font-size: 18px; }
-.o-matchpop strong { display: block; margin-top: 10px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.o-matchpop p { margin-top: 4px; color: var(--fg-2); font-size: 13px; line-height: 1.45; }
+/* The last beat: who you'd click with. */
+.o-matchpop { display: flex; align-items: center; gap: 16px; margin: 6px 0 0 64px; padding: 16px 20px 16px 16px; border-radius: 18px; background: var(--ink); color: var(--paper); box-shadow: var(--shadow-lg); width: fit-content; max-width: 100%; }
+.o-matchpop-faces { display: flex; flex: none; }
+.o-matchpop-faces [data-avatar] { width: 52px; height: 52px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 3px var(--ink); }
+.o-matchpop-faces [data-avatar] + [data-avatar] { margin-left: -14px; }
+.o-matchpop strong { display: block; font-family: var(--font-serif); font-size: 21px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.1; }
+.o-matchpop strong::after { content: " ✦"; color: var(--ember); font-size: 14px; }
+.o-matchpop p { margin-top: 5px; color: rgba(243, 238, 228, 0.7); font-size: 14px; line-height: 1.4; }
 
-/* ─────────── HOW IT WORKS: three steps, left-aligned ─────────── */
-.o-how { padding-top: 96px; }
-.o-steps { margin: 56px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-.o-steps li { padding-top: 22px; border-top: 1px solid var(--line-strong); }
-.o-step-num {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
-.o-steps h3 { margin-top: 18px; font-size: 22px; letter-spacing: -0.02em; }
-.o-steps p { margin-top: 8px; color: var(--fg-2); font-size: 15.5px; line-height: 1.6; }
-
-/* ─────────── MATCHES: the dark section ─────────── */
+/* ─────────── MATCHES: the ink section ─────────── */
 .o-dark {
-  --fg: #fff;
-  --fg-2: rgba(255, 255, 255, 0.72);
-  --fg-3: rgba(255, 255, 255, 0.5);
-  --line: rgba(255, 255, 255, 0.12);
-  --line-strong: rgba(255, 255, 255, 0.22);
-  --surface: rgba(255, 255, 255, 0.06);
+  --fg: var(--paper);
+  --fg-2: rgba(243, 238, 228, 0.72);
+  --fg-3: rgba(243, 238, 228, 0.5);
+  --line: rgba(243, 238, 228, 0.14);
+  --line-strong: rgba(243, 238, 228, 0.26);
+  --surface: rgba(243, 238, 228, 0.06);
   position: relative;
-  color: #fff;
-  background:
-    radial-gradient(60% 70% at 85% 20%, rgba(124, 58, 237, 0.45), transparent 60%),
-    radial-gradient(50% 60% at 10% 90%, rgba(219, 39, 119, 0.3), transparent 60%),
-    #131218;
-  overflow: hidden;
+  color: var(--paper);
+  background: var(--ink);
 }
-/* A thin brand line along the top edge. */
-.o-dark::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--brand-gradient); }
-.o-dark-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 64px; }
-.o-dark .o-eyebrow { color: #c4b5fd; }
-.o-dark .o-h2 { color: #fff; }
+.o-dark-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 72px; }
+.o-dark .o-eyebrow { color: var(--ember); }
+.o-dark .o-h2 { color: var(--paper); }
 .o-dark .o-sub { color: var(--fg-2); }
-.o-dark .o-form { margin-top: 40px; padding: 24px; border: 1px solid var(--line); border-radius: var(--r-lg); background: rgba(255, 255, 255, 0.04); }
-.o-form-title { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.o-dark .o-form { margin-top: 44px; padding: 26px; border: 1px solid var(--line); border-radius: var(--r-lg); background: rgba(243, 238, 228, 0.04); }
+.o-form-title { margin: 0 0 4px; font-family: var(--font-serif); font-size: 21px; font-weight: 500; }
 .o-form { display: grid; gap: 14px; }
-.o-form label { display: grid; gap: 6px; color: var(--fg-2); font-size: 13.5px; font-weight: 500; }
+.o-form label { display: grid; gap: 6px; color: var(--fg-2); font-size: 14px; font-weight: 500; }
 .o-form input, .o-form textarea {
   width: 100%;
-  padding: 12px 14px;
+  padding: 13px 14px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  font: 400 15px/1.5 var(--font-sans);
+  background: rgba(243, 238, 228, 0.06);
+  color: var(--paper);
+  font: 400 16px/1.5 var(--font-sans);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .o-form textarea { resize: vertical; min-height: 72px; }
-.o-form input::placeholder, .o-form textarea::placeholder { color: rgba(255, 255, 255, 0.4); }
-.o-form input:focus, .o-form textarea:focus { outline: none; border-color: #a78bfa; box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.2); }
+.o-form input::placeholder, .o-form textarea::placeholder { color: rgba(243, 238, 228, 0.4); }
+.o-form input:focus, .o-form textarea:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 4px rgba(255, 79, 43, 0.25); }
+.o-dark .o-btn-primary { background: var(--ember); color: #fff; }
+.o-dark .o-btn-primary:hover { background: var(--paper); color: var(--ink); }
 .o-form .o-btn { width: 100%; margin-top: 2px; }
 .o-helper { color: var(--fg-3); font-size: 12.5px; }
-.home .form-status { min-height: 20px; color: #c4b5fd; font-size: 14px; }
+.home .form-status { min-height: 20px; color: var(--ember); font-size: 14px; }
 
 /* Card stack */
-.o-stack-wrap { width: 100%; max-width: 380px; margin: 0 auto; }
-.o-stack { position: relative; height: 420px; touch-action: pan-y; }
+.o-stack-wrap { width: 100%; max-width: 400px; margin: 0 auto; }
+.o-stack { position: relative; height: 440px; touch-action: pan-y; }
 .o-card {
   position: absolute;
   inset: 0 0 auto;
-  padding: 24px;
-  border-radius: var(--r-xl);
-  background: #fff;
-  color: #18181b;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+  padding: 26px;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
   cursor: grab;
   user-select: none;
   transform-origin: 50% 90%;
 }
 .o-card.is-dragging { cursor: grabbing; }
 .o-card-top { display: flex; align-items: center; gap: 14px; }
-.o-card-top .pair [data-avatar] { width: 48px; height: 48px; box-shadow: 0 0 0 3px #fff; }
-.o-card-top .pair [data-avatar] + [data-avatar] { margin-left: -12px; }
-.o-card-top small { color: var(--pink); font-size: 13px; font-weight: 600; }
-.o-card-top strong { display: block; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-.o-card-label { margin-top: 22px; color: #6b6b73; font-size: 13px; font-weight: 500; }
-.o-card ul { margin-top: 10px; list-style: none; display: grid; gap: 10px; }
-.o-card li { position: relative; padding-left: 28px; font-size: 15px; line-height: 1.45; }
-.o-card li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 1px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--t-violet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c3aed' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12l4 4 8-8'/%3E%3C/svg%3E") center / 12px no-repeat;
-}
-.o-card-starter { display: inline-block; margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--t-sun); color: #92400e; font-size: 13.5px; font-weight: 500; }
-.o-card-cta { display: block; margin-top: 22px; padding: 14px; border-radius: 999px; background: var(--accent); color: #fff; text-align: center; font-size: 15px; font-weight: 500; }
+.o-card-top .pair [data-avatar] { width: 52px; height: 52px; box-shadow: 0 0 0 3px var(--paper); }
+.o-card-top .pair [data-avatar] + [data-avatar] { margin-left: -14px; }
+.o-card-top small { color: var(--ember-deep); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.o-card-top strong { display: block; margin-top: 2px; font-family: var(--font-serif); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.05; }
+.o-card-label { margin-top: 24px; color: var(--fg-3); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.o-card ul { margin-top: 10px; list-style: none; display: grid; gap: 8px; }
+.o-card li { position: relative; padding-left: 22px; font-size: 16px; line-height: 1.4; }
+.o-card li::before { content: "✦"; position: absolute; left: 0; top: 0; color: var(--ember); font-size: 13px; }
+.o-card-starter { display: inline-block; margin-top: 10px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--ink); font-family: var(--font-serif); font-style: italic; font-size: 17px; }
+.o-card-cta { display: block; margin-top: 24px; padding: 15px; border-radius: 999px; background: var(--ink); color: var(--paper); text-align: center; font-size: 16px; font-weight: 500; }
 .pair { display: flex; }
-.pair [data-avatar] { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px #fff; }
+.pair [data-avatar] { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--paper); }
 .pair [data-avatar] + [data-avatar] { margin-left: -8px; }
 .o-stack-ctrl { margin-top: 36px; display: flex; align-items: center; justify-content: space-between; }
-.o-stack-hint { color: var(--fg-3); font-size: 13px; }
+.o-stack-hint { color: var(--fg-3); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; }
 .o-round {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   background: transparent;
-  color: #fff;
+  color: var(--paper);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.o-round:hover { background: #fff; color: #18181b; }
+.o-round:hover { background: var(--ember); border-color: var(--ember); color: #fff; }
 .o-round svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ─────────── FINAL CTA ─────────── */
-.o-final { text-align: center; padding-bottom: 160px; }
-.o-final-title { max-width: 14ch; margin: 0 auto; font-size: clamp(44px, 7vw, 92px); line-height: 1; }
-.o-final .o-btn { margin-top: 44px; }
+.o-final { text-align: center; padding-bottom: 170px; }
+.o-final-title { max-width: 12ch; margin: 0 auto; font-size: clamp(52px, 9vw, 150px); line-height: 0.95; }
+.o-final .o-btn { margin-top: 48px; }
 
 /* ─────────── FOOTER (overrides landing.css) ─────────── */
-.home .footer { display: block; padding: 36px 0; border-top: 1px solid var(--line); background: rgba(255, 255, 255, 0.6); }
+.home .footer { display: block; padding: 36px 0; border-top: 1px solid var(--ink); background: transparent; }
 .o-footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.home .footer-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.home .footer-links a { color: var(--fg-3); font-size: 13px; }
-.home .footer-links a:hover { color: var(--fg); }
-.home .footer-copy { color: var(--fg-3); font-size: 13px; }
+.home .footer-links { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.home .footer-links a { color: var(--fg-2); font-size: 14px; }
+.home .footer-links a:hover { color: var(--ember-deep); }
+.home .footer-copy { color: var(--fg-3); font-family: var(--font-mono); font-size: 12px; }
 
 /* ─────────── KEYFRAMES ─────────── */
-@keyframes o-ping-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); } 80%, 100% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
 @keyframes o-bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
 
 @media (prefers-reduced-motion: reduce) {
   .home *, .home *::before, .home *::after { animation: none !important; transition: none !important; }
-  .o-msg mark { background-size: 100% 100%; color: #18181b; }
+  .o-say mark { background-size: 100% 100%; }
+  .o-thread path { stroke-dashoffset: 0; }
+  .o-thread-label { opacity: 1; }
 }
 
 /* ─────────── RESPONSIVE ─────────── */
+@media (max-width: 1100px) {
+  .o-how-grid { grid-template-columns: 1fr; gap: 56px; }
+  .o-how-copy { position: static; }
+}
 @media (max-width: 960px) {
-  .home { --section-y: 88px; --gutter: 16px; }
-  .o-hero { padding: 104px 0 48px; min-height: 0; }
-  /* Stickers sit in a row under the chat, and the match card under those. */
-  .o-demo { margin-top: 32px; padding: 0; }
-  .o-msg { max-width: 92%; }
-  .o-bubble { font-size: 15.5px; padding: 12px 15px; }
-  .o-stickers { position: static; width: auto; height: auto; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
-  .o-vtag { position: static; font-size: 13.5px; padding: 8px 13px; }
-  .o-vtag[data-chip] { transform: rotate(-2deg); }
-  .o-vtag[data-chip="1"] { transform: rotate(2deg); }
-  .o-matchpop { width: 100%; max-width: 320px; margin: 22px auto 0; transform: rotate(-2deg); }
-  .o-steps { grid-template-columns: 1fr; gap: 24px; }
-  .o-dark-grid { grid-template-columns: 1fr; gap: 48px; }
-  .o-dark .o-form { margin-top: 28px; }
+  .home { --section-y: 96px; --gutter: 18px; }
+  .o-hero { padding-top: 118px; min-height: 0; }
+  .o-hero-cta { flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 32px; }
+  .o-shelf { margin-top: 44px; padding-bottom: 40px; }
+  .o-polaroid { --w: 150px; margin: 0 -10px; }
+  .o-print { padding: 7px 7px 9px; }
+  .o-polaroid:nth-child(even) { margin-top: 20px; }
+  .o-polaroid figcaption { font-size: 10px; margin-top: 7px; }
+  .o-polaroid[data-card="4"], .o-polaroid[data-card="5"] { display: none; }
+  .o-thread-label { font-size: 15px; padding: 6px 10px; }
+  .o-band-track span { font-size: 18px; padding: 11px 0; }
+  .o-band-track span::after { margin: 0 18px; }
+  .o-how { padding-top: 80px; }
+  .o-say { grid-template-columns: 1fr; gap: 4px; }
+  .o-say p { font-size: 22px; }
+  .o-stamps, .o-matchpop { margin-left: 0; padding-left: 0; }
+  .o-matchpop { padding: 14px 16px 14px 14px; }
+  .o-dark-grid { grid-template-columns: 1fr; gap: 56px; }
+  .o-dark .o-form { margin-top: 30px; }
   .o-footer { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 900px) {
-  .home .nav { width: calc(100% - var(--gutter) * 2); top: 12px; }
+  .home .nav { min-height: 64px; }
   .home .nav-links a:not(.nav-cta) { display: none; }
 }
 @media (max-width: 520px) {
-  .o-stack { height: 440px; }
+  .o-polaroid { --w: 124px; margin: 0 -8px; }
+  .o-polaroid[data-card="3"] { display: none; }
+  .o-stack { height: 460px; }
 }
 
 /* ═══════════ SUB PAGES (about, safety, privacy, terms, contact...) ═══════════
