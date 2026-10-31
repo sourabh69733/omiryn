@@ -15,14 +15,10 @@ function conversationIdFromUrl() {
 
 function AppLoader() {
   const loaderMark = `${import.meta.env.BASE_URL}assets/omiryn-mark.svg`;
-  const loaderMarkDark = `${import.meta.env.BASE_URL}assets/omiryn-mark-dark.svg`;
   return (
     <main className="boot-loader" aria-label="Loading Omiryn" role="status">
       <div className="boot-mark-card" aria-hidden="true">
-        <picture>
-          <source srcSet={loaderMarkDark} media="(prefers-color-scheme: dark)" />
-          <img className="boot-logo-image" src={loaderMark} alt="" />
-        </picture>
+        <img className="boot-logo-image" src={loaderMark} alt="" />
         <span className="boot-word">Omiryn</span>
       </div>
     </main>
