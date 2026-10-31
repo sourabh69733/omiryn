@@ -68,27 +68,26 @@ let threadDrawn = reduce;
 let heroVisible = true;
 let threadLoop = null;
 
-// A curve from one photo to the other, in the shelf's own coordinates, with the label at its middle.
+// The label hangs above the shelf like a tag; two strings drop from it to the top edge of
+// each print, so nothing crosses a face. All in the shelf's own coordinates.
 function drawThread() {
   const a = prints[pair.a];
   const b = prints[pair.b];
   const box = shelf.getBoundingClientRect();
-  const center = (el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.left + r.width / 2 - box.left, y: r.top + r.height * 0.38 - box.top };
+  const top = (el) => {
+    const r = el.querySelector(".o-print").getBoundingClientRect();
+    return { x: r.left + r.width / 2 - box.left, y: r.top + 6 - box.top };
   };
-  const p = center(a);
-  const q = center(b);
-  const lift = Math.min(120, 40 + Math.abs(q.x - p.x) * 0.4);
-  const c1 = { x: p.x + (q.x - p.x) * 0.3, y: Math.min(p.y, q.y) - lift };
-  const c2 = { x: p.x + (q.x - p.x) * 0.7, y: Math.min(p.y, q.y) - lift };
-  threadPath.setAttribute("d", `M ${p.x} ${p.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${q.x} ${q.y}`);
-  threadPath.style.strokeDasharray = threadPath.getTotalLength();
-  if (threadDrawn) threadPath.style.strokeDashoffset = 0;
-  // Bezier midpoint (t = 0.5).
-  const mid = { x: (p.x + 3 * c1.x + 3 * c2.x + q.x) / 8, y: (p.y + 3 * c1.y + 3 * c2.y + q.y) / 8 };
-  threadLabel.style.left = `${mid.x}px`;
-  threadLabel.style.top = `${mid.y}px`;
+  const p = top(a);
+  const q = top(b);
+  const knot = { x: (p.x + q.x) / 2, y: Math.min(p.y, q.y) - 54 };
+  const string = (from) => `M ${from.x} ${from.y} C ${from.x} ${from.y - 34}, ${knot.x} ${knot.y + 30}, ${knot.x} ${knot.y}`;
+  threadPath.setAttribute("d", `${string(p)} ${string(q)}`);
+  const length = threadPath.getTotalLength();
+  threadPath.style.strokeDasharray = length;
+  threadPath.style.strokeDashoffset = threadDrawn ? 0 : length;
+  threadLabel.style.left = `${knot.x}px`;
+  threadLabel.style.top = `${knot.y}px`;
   threadWhy.textContent = pair.why;
   prints.forEach((print, i) => print.classList.toggle("is-linked", i === pair.a || i === pair.b));
 }
@@ -105,7 +104,7 @@ function threadCycle() {
   threadLoop = gsap.timeline({ paused: !heroVisible, onComplete: threadCycle, defaults: { ease: "power2.inOut" } })
     .to({}, { duration: 3.2 })
     .to(threadLabel, { autoAlpha: 0, scale: 0.6, duration: 0.3, ease: "power2.in" })
-    .to(threadPath, { strokeDashoffset: () => threadPath.getTotalLength(), duration: 0.5 }, "<")
+    .to(threadPath, { strokeDashoffset: () => threadPath.getTotalLength(), duration: 0.45, ease: "power2.in" }, "<")
     .call(() => { pair = next; drawThread(); })
     // immediateRender off: these must not reset the thread the moment the loop is created.
     .fromTo(threadPath, { strokeDashoffset: () => threadPath.getTotalLength() }, { strokeDashoffset: 0, duration: 0.9, immediateRender: false })
@@ -132,7 +131,7 @@ function heroIntro() {
       clearProps: "transform,opacity,visibility",
     }, "-=0.6")
     // The thread ties two of them together, then the label pops.
-    .call(() => { threadDrawn = true; drawThread(); }, null, "-=0.2")
+    .call(() => { threadDrawn = true; drawThread(); shelf.classList.add("is-on"); }, null, "-=0.2")
     .fromTo(threadPath, { strokeDashoffset: () => threadPath.getTotalLength() }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" })
     .fromTo(threadLabel, { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, "-=0.25")
     .call(threadCycle);
@@ -324,6 +323,7 @@ else window.addEventListener("load", () => idle(runNextStep, { timeout: 1000 }),
 
 if (reduce) {
   drawThread();
+  shelf.classList.add("is-on");
   demoFinal();
 } else {
   demoReset();

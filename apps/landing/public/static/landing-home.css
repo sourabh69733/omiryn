@@ -166,16 +166,16 @@
 .o-word { color: var(--fg); font-family: var(--font-serif); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variation-settings: "opsz" 48; transition: color 0.25s; }
 
 /* ─────────── HERO ─────────── */
-.o-hero { position: relative; padding: 150px 0 0; min-height: 100svh; display: flex; flex-direction: column; justify-content: space-between; }
+.o-hero { position: relative; padding: 124px 0 0; min-height: 100svh; display: flex; flex-direction: column; justify-content: space-between; }
 .o-hero .o-container { max-width: none; padding-left: max(var(--gutter), calc((100% - var(--container)) / 2)); }
-.o-hero-cta { display: flex; align-items: center; gap: 22px; margin-top: 44px; }
+.o-hero-cta { display: flex; align-items: center; gap: 22px; margin-top: 36px; }
 .o-hero-note { color: var(--fg-3); font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.04em; }
 
 [data-avatar] { display: inline-block; flex: none; }
 [data-avatar] img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* The shelf: a row of photos wider than the page, each tilted, like prints on a table. */
-.o-shelf { position: relative; margin-top: 64px; padding: 24px 0 56px; overflow: visible; }
+.o-shelf { position: relative; margin-top: 24px; padding: 76px 0 36px; overflow: visible; }
 .o-shelf-row { display: flex; justify-content: center; align-items: flex-start; gap: 0; width: max-content; min-width: 100%; margin: 0 auto; padding: 0 12px; }
 .o-polaroid { --w: 196px; flex: none; width: var(--w); margin: 0 -14px; }
 .o-polaroid:nth-child(even) { margin-top: 28px; }
@@ -192,11 +192,13 @@
 .o-polaroid:hover .o-print { transform: rotate(0deg) translateY(-10px) scale(1.04); box-shadow: var(--shadow-lg); }
 .o-polaroid figcaption { margin-top: 10px; color: var(--fg-2); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
 /* The thread: drawn by home.js between two photos. */
-.o-thread { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.o-thread path { fill: none; stroke: var(--ember); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.o-thread { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.o-thread path { fill: none; stroke: var(--ember); stroke-width: 2.5; stroke-linecap: round; }
+/* The thread and its tag exist only once the prints have landed (home.js adds is-on). */
+.o-shelf:not(.is-on) .o-thread, .o-shelf:not(.is-on) .o-thread-label { visibility: hidden; }
 .o-thread-label {
   position: absolute;
-  z-index: 5;
+  z-index: 7;
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
@@ -206,7 +208,7 @@
   color: #fff;
   line-height: 1;
   white-space: nowrap;
-  transform: translate(-50%, -50%) rotate(-4deg);
+  transform: translate(-50%, -50%) rotate(-2deg);
   box-shadow: 0 6px 18px rgba(255, 79, 43, 0.35);
   opacity: 0;
 }
@@ -403,7 +405,7 @@
   .home { --section-y: 96px; --gutter: 18px; }
   .o-hero { padding-top: 118px; min-height: 0; }
   .o-hero-cta { flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 32px; }
-  .o-shelf { margin-top: 44px; padding-bottom: 40px; }
+  .o-shelf { margin-top: 16px; padding: 72px 0 32px; }
   .o-polaroid { --w: 150px; margin: 0 -10px; }
   .o-print { padding: 7px 7px 9px; }
   .o-polaroid:nth-child(even) { margin-top: 20px; }
