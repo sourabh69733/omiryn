@@ -128,7 +128,7 @@ p {
   min-width: 156px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
   box-shadow: var(--shadow-md);
   padding: 7px;
 }
@@ -181,11 +181,11 @@ p {
 }
 
 .danger-button {
-  background: #b42318;
+  background: var(--danger);
 }
 
 .danger-button:hover {
-  background: #8f1d10;
+  background: var(--danger-hover);
 }
 
 .sidebar-usage-total {
@@ -214,12 +214,12 @@ p {
   border: 1px solid var(--line);
   border-left: 3px solid var(--primary);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--card);
   padding: 10px;
 }
 
 .sidebar-usage-item.failed {
-  border-left-color: #d66b5d;
+  border-left-color: var(--danger);
 }
 
 .sidebar-usage-item strong,

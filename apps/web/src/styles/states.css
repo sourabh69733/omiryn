@@ -23,8 +23,8 @@
 }
 
 .state-view.is-error .state-view-mark {
-  background: #fef0ee;
-  color: #b42318;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .state-view-mark svg {
@@ -83,13 +83,13 @@
 }
 
 .notice.is-success {
-  background: #ecfdf3;
-  color: #067647;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .notice.is-error {
-  background: #fef0ee;
-  color: #b42318;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .notice.is-info {

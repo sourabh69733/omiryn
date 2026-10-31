@@ -52,7 +52,7 @@
   border: 2px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
-  color: #fff;
+  color: var(--on-ink);
 }
 
 .vibe-path-dot svg {
@@ -124,7 +124,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-ink);
   padding: 0 18px;
   font-size: 14px;
   font-weight: 650;
@@ -168,7 +168,7 @@
   min-height: 108px;
   border: 1px dashed var(--line);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--card);
   padding: 14px 16px;
 }
 
@@ -230,19 +230,19 @@
 }
 
 .vibe-strength.is-level-2 {
-  background: rgba(200, 138, 29, 0.14);
-  color: #9a6510;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 /* Levels 3 and 4 use a deeper green than --success so the 13px label passes 4.5:1 contrast. */
 .vibe-strength.is-level-3 {
-  background: rgba(47, 143, 120, 0.14);
-  color: #1d6352;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .vibe-strength.is-level-4 {
-  background: #22705d;
-  color: #fff;
+  background: var(--success);
+  color: var(--on-success);
 }
 
 /* Asked once: may matching use the private areas? */
@@ -290,7 +290,7 @@
 
 .vibe-consent-actions button.is-quiet {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
 }
 
@@ -393,7 +393,7 @@
   margin: 0 0 8px;
   border: 1px solid var(--brand-line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
   padding: 10px 12px;
   color: var(--ink);
   font-size: 12px;
@@ -491,15 +491,15 @@
 }
 
 .vibe-card .vibe-strength.is-level-2:hover {
-  background: rgba(200, 138, 29, 0.14);
+  background: var(--warning-bg);
 }
 
 .vibe-card .vibe-strength.is-level-3:hover {
-  background: rgba(47, 143, 120, 0.14);
+  background: var(--success-bg);
 }
 
 .vibe-card .vibe-strength.is-level-4:hover {
-  background: #22705d;
+  background: var(--success);
 }
 
 .vibe-quotes li.vibe-proof-summary {

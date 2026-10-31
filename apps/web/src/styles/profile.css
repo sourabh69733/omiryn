@@ -104,7 +104,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
@@ -135,14 +135,14 @@
 .privacy-path h2,
 .privacy-details h2 { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: 19px; font-weight: 500; letter-spacing: -0.01em; }
 .privacy-path ol { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
-.privacy-path li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.privacy-path li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
 .privacy-path li > svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--ember-deep); }
 .privacy-path li div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .privacy-path li strong { color: var(--ink); font-size: 14px; line-height: 1.4; }
 .privacy-path li span { color: var(--muted); font-size: 13px; line-height: 1.5; }
 
 .privacy-details { display: grid; gap: 12px; }
-.privacy-details section { padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.privacy-details section { padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
 .privacy-details p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
 .privacy-action { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 999px; background: var(--ember-soft); color: var(--ember-deep); font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; cursor: pointer; }
 .privacy-action:hover { background: rgba(248, 68, 31, 0.2); }
@@ -186,7 +186,7 @@
   padding: 26px 20px 20px;
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--card);
   text-align: center;
 }
 
@@ -236,7 +236,8 @@ button.pf-portrait:hover {
   height: 96px;
   border-radius: 999px;
   object-fit: cover;
-  box-shadow: 0 0 0 3px #ffffff;
+  box-shadow: 0 0 0 3px var(--card);
+  color: var(--on-ink);
 }
 
 .pf-initial {
@@ -256,10 +257,10 @@ button.pf-portrait:hover {
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--card);
   border-radius: 999px;
   background: var(--ink);
-  color: #ffffff;
+  color: var(--on-ink);
 }
 
 .pf-portrait-edit svg {
@@ -348,8 +349,8 @@ button.pf-portrait:hover {
 }
 
 .pf-chips li:nth-child(even) {
-  background: #fdeef5;
-  color: #9d174d;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .pf-photos {
@@ -432,7 +433,7 @@ button.pf-photo-remove {
 .pf-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--card);
 }
 
 .pf-edit {
@@ -455,7 +456,7 @@ button.pf-photo-remove {
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 15px;
@@ -506,7 +507,7 @@ button.pf-row:hover {
 
 button.pf-row.is-danger,
 button.pf-row.is-danger:hover {
-  color: #b42318;
+  color: var(--danger);
 }
 
 .pf-row svg {
@@ -567,7 +568,7 @@ button.pf-row.is-danger:hover {
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--card);
   color: var(--ink);
   font-size: 13.5px;
   font-weight: 550;
@@ -794,7 +795,7 @@ button.pf-channel-action {
 
 button.pf-channel-action:hover {
   background: transparent;
-  color: #b42318;
+  color: var(--danger);
 }
 
 .pf-channel-note {
