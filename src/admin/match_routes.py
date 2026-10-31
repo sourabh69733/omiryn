@@ -6,11 +6,14 @@ read is audited with the pool as the target.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from admin.auth import require_admin_user
 from agent.matching import pool_view, propose_pair
+from agent.matching.hosting import introduce_pair
 from security.auth import CurrentUser
 from storage import PAIR_STATUSES, create_match_pool, list_match_pools, set_match_pair_status
 from storage.audit_log import record_audit_event
@@ -30,6 +33,14 @@ class PairCreate(BaseModel):
 
 class PairStatus(BaseModel):
     status: str
+
+
+class PairIntroduction(BaseModel):
+    """The plan in the operator's words; `meet_at` (ISO 8601 with offset) times the reminder and check-in."""
+
+    place: str | None = Field(default=None, max_length=160)
+    when: str | None = Field(default=None, max_length=80)
+    meet_at: datetime | None = None
 
 
 @router.get("/api/admin/pools")
@@ -61,6 +72,21 @@ async def admin_propose_pair(pool_id: str, payload: PairCreate, admin: CurrentUs
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     record_audit_event("admin.propose_pair", actor_id=admin.id, actor_role="admin", target_id=pair["id"])
+    return pair
+
+
+@router.post("/api/admin/pairs/{pair_id}/introduce")
+async def admin_introduce_pair(pair_id: str, payload: PairIntroduction, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """Omi tells both people about each other in their own chats, with the plan; reminder and check-ins follow."""
+    if payload.meet_at is not None and payload.meet_at.utcoffset() is None:
+        raise HTTPException(status_code=400, detail="meet_at needs a timezone offset.")
+    try:
+        pair = await introduce_pair(pair_id, place=payload.place, when=payload.when, meet_at=payload.meet_at, created_by=admin.id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Pair not found.") from None
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    record_audit_event("admin.introduce_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"has_time": payload.meet_at is not None})
     return pair
 
 
