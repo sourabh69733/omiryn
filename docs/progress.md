@@ -99,14 +99,14 @@ Navigation (merged, PR #2): web has a left rail with "Chats" (Omi, showing typin
 
 ### Landing site (`apps/landing`, port 5174)
 
-Plain HTML with GSAP and ScrollTrigger, light theme. Fonts Geist, Geist Mono and Instrument Serif italic accents; brand gradient `#6d4aff` -> `#b04dd9` -> `#f062a8`. No college or dating wording anywhere.
+Plain HTML with GSAP and ScrollTrigger, light theme. Fonts Geist, with Fraunces italic for two accent phrases; brand gradient `#6d4aff` -> `#b04dd9` -> `#f062a8`; every button is the brand violet. No college or dating wording anywhere. Redesigned 2026-10-31 (branch `ui/landing-redesign`): five sections instead of eight, one pattern per section instead of the same centered block everywhere.
 
 | Section | State |
 |---|---|
-| Hero | Title, one "Start talking" button (the nav button appears only once the hero and final buttons are off screen) and one animation: two "vibe fingerprint" blobs with real portraits drift together and merge on shared traits. |
-| How it works | Pinned scroll story: a phone chat where Omi picks up traits, then a match pops. Phones and tablets (up to 1024px) get a short row of three step titles, the full chat and the match card, no pinning. |
-| Vibe, reasons, match | Venn scrub, reasons marquee, draggable match card stack. |
-| Early access | Lead form (intent "feedback") and final CTA. |
+| Hero | "Talk to Omi. Meet your people." plus one button, next to a live chat: Omi asks, you answer, a phrase lights up and lands in "Your vibe", then a match pops. Loops; still final state with reduced motion. |
+| How it works | Left-aligned: "No forms. No swiping. Just talk." and three numbered steps in a row. |
+| Matches | The one dark section: "Every match comes with a reason.", the draggable match card stack, and the early-access form ("Matches roll out in waves. Want in early?"). |
+| Final CTA | "Your people are out there." and the button. |
 | Sub pages | About, How it works, Safety, AI disclosure, Privacy, Terms and Contact use the same look and nav. |
 
 Portraits are 320 px WebP in `public/static/assets/people/`; source images stay in `design-assets/` (not deployed). Reduced motion gets a static page. The landing dev server has its own Vite cache (`node_modules/.vite-landing`) so it never breaks the web app's pre-bundled deps.
