@@ -6,6 +6,7 @@ passes over the ink loop at the crossing. Run:
     python3 apps/landing/design-assets/mark-src/make_mark.py > apps/landing/public/static/assets/omiryn-mark.svg
 """
 import math
+import sys
 
 A = 44.0            # half width of the loop
 CX, CY = 50.0, 25.0 # center in a 100 x 50 box
@@ -15,6 +16,9 @@ NIB_ANGLE = math.radians(38)
 N = 260
 INK = "#15120e"
 EMBER = "#f8441f"
+# `--dark` draws the ink loop in paper, for dark backgrounds (omiryn-mark-dark.svg).
+if "--dark" in sys.argv:
+    INK = "#f3eee4"
 
 
 def lem(t):
