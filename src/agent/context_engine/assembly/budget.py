@@ -39,6 +39,8 @@ SOURCE_TYPE_PRIORITY = {
     "open_questions": 117,
     # Questions Omi already asked here and what the user said next; needed to not re-ask them.
     "asked_questions": 117,
+    # The plain facts a meet needs that are still unknown; a few lines.
+    "meet_facts": 113,
     "agent_self_notes": 112,
     "agent_behavior_rules": 115,
     "data_points": 100,
@@ -64,6 +66,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "past_lines": 2800,
     "open_questions": 600,
     "asked_questions": 1000,
+    "meet_facts": 600,
     "might_fit": 800,
     "agent_behavior_rules": 1400,
     "data_points": 1200,

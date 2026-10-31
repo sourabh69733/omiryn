@@ -36,6 +36,7 @@ _SOURCE_BLOCKS = {
     "reply_feedback": "how_to_talk",
     "texting_style": "how_to_talk",
     "asked_questions": "how_to_talk",
+    "meet_facts": "friend_vibe",
     "shared_chats": "shared_chats",
     "past_lines": "past_lines",
     "open_questions": "open_questions",
@@ -154,6 +155,7 @@ def build_companion_system_prompt_v4(
         ("about_user", [_user_basics(user_profile), _address_rule(user_profile), *grouped.get("about_user", [])]),
         ("friend_vibe", [
             matching_understanding_prompt(matching_understanding) if matching_understanding else "",
+            *grouped.get("friend_vibe", []),
         ]),
         ("memories", grouped.get("memories", [])),
         ("shared_chats", grouped.get("shared_chats", [])),
