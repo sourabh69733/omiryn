@@ -409,7 +409,7 @@
   .o-polaroid { --w: 150px; margin: 0 -10px; }
   .o-print { padding: 7px 7px 9px; }
   .o-polaroid:nth-child(even) { margin-top: 20px; }
-  .o-polaroid figcaption { font-size: 10px; margin-top: 7px; }
+  .o-polaroid figcaption { font-size: 11px; margin-top: 7px; }
   .o-polaroid[data-card="4"], .o-polaroid[data-card="5"] { display: none; }
   .o-thread-label { padding: 6px 11px 7px; }
   .o-thread-label em { font-size: 15px; }
