@@ -99,15 +99,16 @@ Navigation (merged, PR #2): web has a left rail with "Chats" (Omi, showing typin
 
 ### Landing site (`apps/landing`, port 5174)
 
-Plain HTML with GSAP and ScrollTrigger, light theme. Fonts Geist, with Fraunces italic for two accent phrases; brand gradient `#6d4aff` -> `#b04dd9` -> `#f062a8`; every button is the brand violet. No college or dating wording anywhere. Redesigned 2026-10-31 (branch `ui/landing-redesign`): five sections instead of eight, one pattern per section instead of the same centered block everywhere.
+Plain HTML with GSAP and ScrollTrigger. Look (2026-10-31, branch `ui/landing-redesign`): warm paper `#f3eee4`, ink `#15120e`, one ember accent `#ff4f2b` (`#d63a17` for small text), light grain over the page. Fraunces (variable, opsz 144) is the voice for every heading, with the accent word in ember italic; Bricolage Grotesque for body and buttons; JetBrains Mono for small caps labels and stamps. Buttons are ink, ember on hover. The violet logo mark is the only brand-gradient element left. No college or dating wording anywhere. Five sections instead of eight.
 
 | Section | State |
 |---|---|
-| Hero | The conversation is the hero: one short line ("Talk to Omi. Meet your people.") and one button, then the chat itself at full size with no phone frame. Omi asks, you answer, a phrase lights up and sticks to the side as a vibe sticker; after three, a match card lands under the chat. Loops; still final state with reduced motion. |
-| How it works | Left-aligned: "No forms. No swiping. Just talk." and three numbered steps in a row. |
-| Matches | The one dark section: "Every match comes with a reason.", the draggable match card stack, and the early-access form ("Matches roll out in waves. Want in early?"). |
-| Final CTA | "Your people are out there." and the button. |
-| Sub pages | About, How it works, Safety, AI disclosure, Privacy, Terms and Contact use the same look and nav. |
+| Hero | Six words ("Talk to Omi. Meet your people.") at up to 148 px, one button, "Free. Private by default." in mono. Below, a shelf of six tilted polaroid prints wider than the page, each captioned with a vibe (Night owl, Bad puns, Chai loyalist...). They deal in one by one, then an ember thread draws between two of them with a "would click" label at its middle (path computed in `home.js` from the photos' positions, redrawn on resize). Prints breathe and lean toward the cursor. Phones show three prints. |
+| Band | A slow ink marquee of things people told Omi, in italic serif. |
+| How it works | Two columns: sticky copy ("No forms. No swiping. You just talk." and three numbered lines) and the conversation set like a script, no bubbles: OMI / YOU labels in mono, Omi's lines in Fraunces, yours in Bricolage. A phrase gets an ember highlight and is stamped (outlined mono caps, tilted) as part of your vibe; after three, an ink "You & Riya would click" card lands. Runs only while on screen; still final state with reduced motion. |
+| Matches | The one ink section: "Every match comes with a reason.", the draggable match card stack (paper cards, serif names) and the early-access form with an ember button. |
+| Final CTA | "Your people are out there." at up to 150 px and the button. |
+| Sub pages | About, How it works, Safety, AI disclosure, Privacy, Terms and Contact pick up the same palette and fonts through the shared variables. |
 
 Portraits are 320 px WebP in `public/static/assets/people/`; source images stay in `design-assets/` (not deployed). Reduced motion gets a static page. The landing dev server has its own Vite cache (`node_modules/.vite-landing`) so it never breaks the web app's pre-bundled deps.
 
