@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 from zoneinfo import ZoneInfo
@@ -186,12 +187,17 @@ def test_return_greeting_brings_up_the_plan() -> None:
     assert marked == ["interview"]
 
 
+_TELEGRAM_ENV = {"TELEGRAM_ENABLED": "true", "TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_BOT_USERNAME": "omi_bot", "TELEGRAM_WEBHOOK_SECRET": "s"}
+
+
 def _telegram_follow_up(now: datetime, reply: str = "How did the interview go?") -> tuple[bool, AsyncMock]:
+    # The bubble is sent by the delivery path, to the chat id of the user's Telegram link.
+    storage.link_channel_chat(USER_ID, "telegram", "chat-1")
     send = AsyncMock(return_value=True)
-    with patch("agent.proactive.service.list_agent_memories", return_value=[_event(_local(20, 10))]), patch(
+    with patch.dict(os.environ, _TELEGRAM_ENV), patch("agent.proactive.service.list_agent_memories", return_value=[_event(_local(20, 10))]), patch(
         "agent.proactive.service.mark_agent_memory_followed_up", lambda *args: None
     ), patch("agent.proactive.service._generate", AsyncMock(return_value=reply)), patch(
-        "agent.proactive.away.send_telegram_message", send
+        "channels.telegram.send_telegram_message", send
     ):
         sent = asyncio.run(follow_up_on_telegram(USER_ID, "chat-1", now))
     return sent, send
