@@ -201,6 +201,7 @@ Discord (planned, not started; chosen 2026-10-21 because students use it more th
 
 ## 7. Parked
 
+- Matching and hosting (7a, 7b, 7c): parked on 2026-11-01 by the user, before any live run. The code and tests stay on main. Next steps when resumed: WhatsApp-only sign-up, pool code in chat, operator page, one real pair, then confirm and number sharing.
 - Voice input: test strong speech models on about 20 real Hinglish voice notes (Sarvam, OpenAI transcribe, ElevenLabs Scribe, Whisper large-v3 on DeepInfra) with an LLM cleanup step, then a built-in mic button. Keyboard dictation is too weak; Wispr Flow has no API. Later, a premium "Call Omi" voice mode that feeds the same memory and vibe pipeline.
 - Meaning-based turn understanding, step 2: remove the keyword intent, emotion and stance rules and let the reply model read them. Run before-and-after evals first; Llama 3.3 may drift on requests made several turns back.
 - VPN detection for the location estimate (DB-IP ASN file), and a "use my exact location" button.
