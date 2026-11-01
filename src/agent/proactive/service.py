@@ -26,6 +26,7 @@ from agent.shared.clock import utc_now
 from agent.shared.timeline import day_part, humanize_gap, parse_time, relative_day, user_zone
 from realtime import conversation_event, realtime_hub
 from storage import (
+    channel_link_for_user,
     get_conversation,
     get_proactive_enabled,
     get_user_profile,
@@ -51,7 +52,7 @@ DEFAULT_INTERVAL_SECONDS = 300.0
 _PROACTIVE_INSTRUCTIONS = """
 
 PROACTIVE MESSAGE
-The user is online but quiet. First decide whether there is a natural reason to speak first.
+{situation} First decide whether there is a natural reason to speak first.
 - If the last exchange was in the middle of something (a story, a game, a task, a question
   waiting for them), or nothing specific is worth reopening, reply with exactly: SKIP
 - Otherwise write ONE short message (one or two sentences) that refers to something concrete
@@ -62,6 +63,8 @@ The user is online but quiet. First decide whether there is a natural reason to 
 Topic: {title}. What was said: {summary}. Suggested angle: {angle}.
 """
 _CUE = "(The user has said nothing new. Send your own short opening message now.)"
+_IN_APP = "The user is online but quiet."
+_ON_PHONE = "The user has not written for a while; this reaches them as a message on their phone, so it must be worth the ping."
 
 _RETURN_INSTRUCTIONS = """
 
@@ -268,10 +271,17 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
     conversation = _open_conversation(user_id, conversation_id)
     if conversation is None:
         return False
-    messages = conversation["messages"]
-    if return_greeting_block_reason(messages, now) is None:
+    if return_greeting_block_reason(conversation["messages"], now) is None:
         # A user back after a long gap gets a greeting, not a topic nudge.
         return await greet_on_return(user_id, conversation_id, now)
+    return await nudge_conversation(user_id, conversation, now)
+
+
+async def nudge_conversation(user_id: str, conversation: dict[str, Any], now: datetime) -> bool:
+    """One nudge in this chat if something is due: a promise, a plan that passed, else an open
+    topic. Same limits in the app and on a messaging app; a channel chat is also sent there."""
+    messages = conversation["messages"]
+    conversation_id = conversation["id"]
     if nudge_block_reason(messages, now):
         return False
     promise = due_promise(list_active_self_notes(user_id), now)
@@ -292,7 +302,8 @@ async def _nudge(user_id: str, conversation_id: str, now: datetime) -> bool:
         user_id,
         user_text=thread.next_angle or thread.title,
         instructions=_PROACTIVE_INSTRUCTIONS.format(
-            title=thread.title, summary=thread.summary, angle=thread.next_angle
+            situation=_ON_PHONE if conversation.get("channel") else _IN_APP,
+            title=thread.title, summary=thread.summary, angle=thread.next_angle,
         ),
         cue=_CUE,
         show_typing=False,
@@ -417,7 +428,8 @@ async def deliver_messages(
         added = True
         return [*messages, *new_messages]
 
-    if not update_conversation(conversation_id, user_id, add) or not added:
+    stored = update_conversation(conversation_id, user_id, add)
+    if not stored or not added:
         return False
     for index, message in enumerate(new_messages, start=expected_count):
         await realtime_hub.publish(
@@ -437,7 +449,37 @@ async def deliver_messages(
                 },
             )
         )
+    await send_on_channel(user_id, stored, [str(m.get("content") or "") for m in new_messages])
     return True
+
+
+async def send_on_channel(user_id: str, conversation: dict[str, Any], bubbles: list[str]) -> None:
+    """A chat on a messaging app gets the bubbles sent there too; a web chat hears through the live push.
+
+    Looked up at call time, so tests can patch the channel modules' send functions.
+    """
+    channel = conversation.get("channel")
+    if channel not in {"whatsapp", "telegram"}:
+        return
+    link = channel_link_for_user(user_id, channel)
+    if link is None:
+        return
+    if channel == "whatsapp":
+        from channels import whatsapp
+
+        if not whatsapp.whatsapp_enabled():
+            return
+        for bubble in bubbles:
+            if bubble.strip():
+                await whatsapp.send_whatsapp_message(link["external_chat_id"], bubble)
+    else:
+        from channels import telegram
+
+        if not telegram.telegram_enabled():
+            return
+        for bubble in bubbles:
+            if bubble.strip():
+                await telegram.send_telegram_message(link["external_chat_id"], bubble)
 
 
 async def _generate(

@@ -1,7 +1,9 @@
-"""Reaches users who are away from the app: asks how a plan went in their Telegram chat.
+"""Reaches users who are away from the app, in their Telegram or WhatsApp chat with Omi.
 
-Only plan follow-ups go out this way, only in the user's daytime, and with the same nudge
-limits as in the app. Users with no linked channel hear it in the next return greeting.
+The same nudges as in the app (a promise that is due, a plan that passed, an open topic), with
+the same limits, only in the user's daytime, and never to chase someone who has gone quiet for
+days: a greeting waits for them to write. Users with no linked channel hear it in the next return
+greeting.
 """
 
 from __future__ import annotations
@@ -11,53 +13,63 @@ from datetime import datetime
 from typing import Any
 
 from agent.shared.timeline import user_zone
-from channels.telegram import CHANNEL, send_telegram_message, telegram_enabled
+from channels import telegram, whatsapp
 from storage import get_user_timezone, list_channel_links, list_conversations
 
-from .policy import nudge_block_reason, reach_out_hours
-from .service import _due_event, _open_conversation, follow_up_event
+from .policy import reach_out_hours, return_greeting_block_reason
+from .service import _open_conversation, nudge_conversation
 
 logger = logging.getLogger(__name__)
 
+# (channel, is it switched on), looked up at call time so tests can turn one on.
+CHANNELS = ((telegram.CHANNEL, telegram.telegram_enabled), (whatsapp.CHANNEL, whatsapp.whatsapp_enabled))
+
 
 async def run_away_follow_ups(live_users: set[str], now: datetime) -> int:
-    """Try one plan follow-up per Telegram-linked user who is not in the app; return how many went out."""
-    if not telegram_enabled():
-        return 0
+    """Try one nudge per linked user who is not in the app; return how many went out."""
     sent = 0
-    for link in list_channel_links(CHANNEL):
-        if link["user_id"] in live_users:
+    for channel, enabled in CHANNELS:
+        if not enabled():
             continue
-        try:
-            if await follow_up_on_telegram(link["user_id"], link["external_chat_id"], now):
-                sent += 1
-        except Exception:
-            logger.exception("agent.proactive.away_failed")
+        for link in list_channel_links(channel):
+            if link["user_id"] in live_users:
+                continue
+            try:
+                if await nudge_away(link["user_id"], channel, now):
+                    sent += 1
+            except Exception:
+                logger.exception("agent.proactive.away_failed channel=%s", channel)
     return sent
 
 
-async def follow_up_on_telegram(user_id: str, chat_id: str, now: datetime) -> bool:
+async def nudge_away(user_id: str, channel: str, now: datetime) -> bool:
     if not reach_out_hours(now, user_zone(get_user_timezone(user_id))):
         return False
-    conversation = _telegram_conversation(user_id)
-    if conversation is None or nudge_block_reason(conversation["messages"], now):
+    conversation = channel_conversation(user_id, channel)
+    if conversation is None:
         return False
-    event = _due_event(user_id, now)
-    if event is None:
+    if return_greeting_block_reason(conversation["messages"], now) is None:
+        # Quiet for days: not chased on their phone.
         return False
-    message = await follow_up_event(user_id, conversation, event, now)
-    if message is None:
-        return False
-    await send_telegram_message(chat_id, message["content"])
-    return True
+    return await nudge_conversation(user_id, conversation, now)
 
 
-def _telegram_conversation(user_id: str) -> dict[str, Any] | None:
-    """The user's Telegram chat with Omi; None until they have written there once."""
+async def follow_up_on_telegram(user_id: str, chat_id: str, now: datetime) -> bool:
+    """Older name; the chat id now comes from the link."""
+    return await nudge_away(user_id, telegram.CHANNEL, now)
+
+
+def channel_conversation(user_id: str, channel: str) -> dict[str, Any] | None:
+    """The user's chat with Omi on this app; None until they have written there once."""
     rows = [
         row
         for row in list_conversations(user_id)
-        if row.get("channel") == CHANNEL and row.get("status") == "active" and not row.get("archived_at")
+        if row.get("channel") == channel and row.get("status") == "active" and not row.get("archived_at")
     ]
     newest = max(rows, key=lambda row: str(row.get("created_at") or ""), default=None)
     return _open_conversation(user_id, newest["id"]) if newest else None
+
+
+_telegram_conversation = lambda user_id: channel_conversation(user_id, telegram.CHANNEL)  # noqa: E731  (older name)
+
+__all__ = ["CHANNELS", "channel_conversation", "follow_up_on_telegram", "nudge_away", "run_away_follow_ups"]

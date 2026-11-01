@@ -51,13 +51,17 @@ async def run_story_part_job(job: dict[str, Any]) -> bool:
     messages = conversation["messages"]
     if story_part_block_reason(messages):
         return False
-    where = await watching(user_id, conversation_id)
-    if where == "elsewhere":
-        # The user's socket is on another instance; it pushes the part when it runs the job.
-        hand_over(STORY_PART_JOB, user_id, conversation_id)
-        return False
-    if where is None:
-        return False  # paused: "continue" from the user picks it up again
+    if not conversation.get("channel"):
+        # A web chat: the part goes out only while the user has it open.
+        where = await watching(user_id, conversation_id)
+        if where == "elsewhere":
+            # The user's socket is on another instance; it pushes the part when it runs the job.
+            hand_over(STORY_PART_JOB, user_id, conversation_id)
+            return False
+        if where is None:
+            return False  # paused: "continue" from the user picks it up again
+    # A Telegram or WhatsApp chat has no "open" state; deliver_messages sends the part there, and
+    # the check-in after a few parts stops it until the user answers.
     part = auto_parts_since_user(messages) + 1
     check_in = part >= STORY_CHECK_IN_EVERY
     text = await generate_initiative_text(

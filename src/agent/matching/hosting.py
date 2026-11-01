@@ -333,32 +333,7 @@ async def _host(user_id: str, pair: dict[str, Any], *, kind: str, user_text: str
             return False
     else:
         return False
-    await _send_on_channel(user_id, conversation, bubbles)
     return True
-
-
-async def _send_on_channel(user_id: str, conversation: dict[str, Any], bubbles: list[str]) -> None:
-    """A chat on a messaging app also gets the bubbles sent there; the web app hears through the live push."""
-    channel = conversation.get("channel")
-    if channel not in {"whatsapp", "telegram"}:
-        return
-    link = channel_link_for_user(user_id, channel)
-    if link is None:
-        return
-    if channel == "whatsapp":
-        from channels import whatsapp
-
-        if not whatsapp.whatsapp_enabled():
-            return
-        for bubble in bubbles:
-            await whatsapp.send_whatsapp_message(link["external_chat_id"], bubble)
-    else:
-        from channels import telegram
-
-        if not telegram.telegram_enabled():
-            return
-        for bubble in bubbles:
-            await telegram.send_telegram_message(link["external_chat_id"], bubble)
 
 
 __all__ = [
