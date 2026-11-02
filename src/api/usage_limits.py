@@ -42,6 +42,26 @@ WHATSAPP_IMPORT_LIMIT = UserActionLimit(
 
 # The short abuse-control window is fixed; product-level monthly quotas remain configurable.
 _BURST_WINDOW = timedelta(seconds=60)
+# Messages that join a reply already under way cost no model call and no monthly quota, so a burst
+# never stops someone mid-thought. This only stops a script.
+QUICK_MESSAGES_PER_MINUTE = 60
+
+
+def enforce_quick_message_limit(user_id: str) -> None:
+    """For a message that shares a reply already under way."""
+    result = reserve_user_app_event(
+        user_id,
+        "quota.chat_quick_message",
+        {"action": "chat_quick_message"},
+        burst_since=datetime.now(timezone.utc) - _BURST_WINDOW,
+        burst_limit=_env_int("USER_CHAT_QUICK_MESSAGES_PER_MINUTE", QUICK_MESSAGES_PER_MINUTE),
+    )
+    if not result["allowed"]:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests in a short time. Please wait a minute and try again.",
+            headers={"Retry-After": "60"},
+        )
 
 
 def enforce_user_action_limit(user_id: str, limit: UserActionLimit) -> None:
