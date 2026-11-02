@@ -66,6 +66,13 @@ export class RealtimeClient {
     if (conversationId) this.sendRoomCommand("subscribe", conversationId);
   }
 
+  // False when the socket is down, so the caller can use its HTTP backup.
+  sendTyping(conversationId: string, active: boolean) {
+    if (!this.isOpen() || this.conversationId !== conversationId) return false;
+    this.send({ type: "typing", scope: "conversation", scope_id: conversationId, active });
+    return true;
+  }
+
   private async connect() {
     if (this.stopped || this.socket) return;
     try {

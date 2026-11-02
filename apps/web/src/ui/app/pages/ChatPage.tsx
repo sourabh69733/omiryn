@@ -12,6 +12,7 @@ import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
+import { NO_TYPING_SIGNAL, nextTypingSignal } from "../typingSignal";
 import { applyMessageAt, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
@@ -24,8 +25,6 @@ import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
-// While a reply is pending, how often the server hears the user is still typing.
-const TYPING_SIGNAL_EVERY_MS = 1200;
 // Six menu items plus padding, in pixels.
 const MESSAGE_MENU_HEIGHT = 260;
 
@@ -148,7 +147,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const composerPauseTimerRef = useRef<number | null>(null);
   const openRequestsRef = useRef(new Map<string, number>());
-  const lastTypingSignalRef = useRef(0);
+  const typingSignalRef = useRef(NO_TYPING_SIGNAL);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const handledEvidenceTargetRef = useRef("");
@@ -608,17 +607,24 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (characterCount(value) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
     const nextDraft = limitCharacters(value, CHAT_INPUT_MAX_LENGTH);
     setDraft(nextDraft);
-    signalStillTyping(nextDraft);
+    signalTyping(nextDraft);
     void refreshEmojiShortcodeSuggestions(nextDraft, Math.min(cursor, nextDraft.length));
   }
 
   // A reply is pending and more is coming: Omi waits for the rest instead of starting without it.
-  function signalStillTyping(text: string) {
-    if (!sending || !conversation || !text.trim()) return;
-    const now = Date.now();
-    if (now - lastTypingSignalRef.current < TYPING_SIGNAL_EVERY_MS) return;
-    lastTypingSignalRef.current = now;
-    void apiFetch(`/api/agent/conversations/${conversation.id}/typing`, { method: "POST" }).catch(() => undefined);
+  function signalTyping(text: string) {
+    if (!conversation) return;
+    const replyPending = sending || typingConversationId === conversation.id;
+    const next = nextTypingSignal(typingSignalRef.current, text, replyPending, Date.now());
+    typingSignalRef.current = next.state;
+    if (!next.signal) return;
+    const active = next.signal === "typing";
+    if (realtimeClientRef.current?.sendTyping(conversation.id, active)) return;
+    void apiFetch(`/api/agent/conversations/${conversation.id}/typing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    }).catch(() => undefined);
   }
 
   function closeEmojiShortcodeSuggestions() {
@@ -697,6 +703,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (!message || !conversation || composerLimit) return;
     closeEmojiShortcodeSuggestions();
     setDraft("");
+    typingSignalRef.current = NO_TYPING_SIGNAL;
     await sendText(message);
   }
 
