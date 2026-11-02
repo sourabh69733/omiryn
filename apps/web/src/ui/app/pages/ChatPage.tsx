@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type ReactNode, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
@@ -8,7 +8,6 @@ import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
-import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
@@ -35,7 +34,7 @@ const MESSAGE_MENU_HEIGHT = 260;
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: string | null; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -1209,7 +1208,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                       </div>
                     ) : null}
                     {/* The user's own photo shows only when they have one; no placeholder bubble. */}
-                    {!agent && userAvatar ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback={null} /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {!agent ? showAvatar ? <span className="chat-avatar user">{userAvatar}</span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
                   {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>

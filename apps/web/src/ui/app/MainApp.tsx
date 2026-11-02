@@ -114,7 +114,12 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   // Their names, to find them among the people in a shared WhatsApp chat.
   const userNames = useMemo(() => [profile?.display_name, user?.display_name].filter((name): name is string => Boolean(name)), [profile?.display_name, user?.display_name]);
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "O";
-  const profileAvatar = mainPhoto(profile, user?.avatar_url);
+  const profilePhoto = mainPhoto(profile);
+  // Their photo, else Google's, else their initial: the same badge in the rail and on their messages.
+  const accountBadge = useMemo(
+    () => <AvatarImage src={profilePhoto} fallback={<AvatarImage src={user?.avatar_url} fallback={initial} />} />,
+    [profilePhoto, user?.avatar_url, initial],
+  );
 
   const navItems = [["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const;
   const chatOpenOnMobile = isMobile && page === "chat";
@@ -156,7 +161,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </nav>
         <div className="omi-account" ref={accountRef}>
           <button className="omi-account-button" type="button" onClick={() => setAccountOpen((value) => !value)} aria-expanded={accountOpen} aria-label="Account">
-            <span className="omi-account-avatar"><AvatarImage src={profileAvatar} fallback={initial} /></span>
+            <span className="omi-account-avatar">{accountBadge}</span>
             <span className="omi-account-name">{displayName}</span>
           </button>
           {accountOpen ? (
@@ -169,7 +174,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </aside>
       <main className="omi-main">
-        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenVibe={() => navigate("vibe")} initialConversationId={initialConversationId} userAvatar={profileAvatar} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
+        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenVibe={() => navigate("vibe")} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} /> : null}

@@ -294,13 +294,19 @@ button.omi-account-button:hover {
   background: var(--paper-2);
 }
 
+/* The same badge as on the user's messages when there is no photo: their initial on ink. */
 .omi-account-avatar {
-  display: block;
+  display: grid;
+  place-items: center;
   flex: none;
   width: 30px;
   height: 30px;
   overflow: hidden;
   border-radius: 999px;
+  color: var(--paper);
+  background: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .omi-account-avatar img,
