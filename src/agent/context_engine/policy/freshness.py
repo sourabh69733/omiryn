@@ -190,7 +190,7 @@ def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True, ke
         if keep_length
         else (
             "Keep the same language; follow what the user asked, even when it changes the length or "
-            "format. If you have nothing new to say, say far less: a word or two is fine."
+            "format. If you have nothing new to say, say far less: one word or one emoji is fine."
         )
     )
     return (

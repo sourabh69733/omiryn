@@ -284,5 +284,5 @@ class SeesWhatTheUserSeesTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(reply, "hmm")
         note = job.generate.await_args_list[1].args[0][-1]["content"]
-        self.assertIn("say far less", note)
+        self.assertIn("one emoji", note)
 

@@ -107,7 +107,9 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
         return reply, {"checked": False, "error": type(error).__name__}
     # A request the checker read in this session is saved now, so it holds in every chat from here.
     saved = save_talk_requests(job.user_id or "", job.conversation_id, job.history, job.user_text, found_requests(raw, recent))
-    broken = broken_requests(raw, [*job.requests, *recent, *asked_question_requests(job.asked)])
+    # A reply with no question cannot ask a closed one again, whatever the checker says.
+    closed_questions = asked_question_requests(job.asked) if "?" in reply else []
+    broken = broken_requests(raw, [*job.requests, *recent, *closed_questions])
     if not broken:
         return reply, {"checked": True, "reason": reason, "broken": [], "saved_requests": len(saved)}
     try:
