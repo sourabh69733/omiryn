@@ -30,7 +30,8 @@ _STORY_AUTOPLAY_ENDING = (
 _UNANSWERED_NOTE = (
     "The user sent their last {count} messages in a row before you replied. Read them together "
     "and reply once: answer each one that needs an answer, in its own short bubble, and let "
-    "greetings or fillers pass without a bubble of their own."
+    "greetings or fillers pass without a bubble of their own. When there are many, answer what "
+    "they add up to rather than going through them one by one."
 )
 
 

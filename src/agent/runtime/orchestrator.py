@@ -27,6 +27,11 @@ from storage import (
 )
 
 
+# A long burst is recalled for by its end, like a long message.
+_BURST_RECALL_MESSAGES = 6
+_BURST_RECALL_CHARS = 1500
+
+
 @dataclass(frozen=True)
 class AgentTurnResult:
     messages: list[dict[str, Any]]
@@ -50,7 +55,7 @@ async def run_agent_turn(
     reply_to: dict[str, Any] | None = None,
     unanswered_count: int = 1,
 ) -> AgentTurnResult:
-    """`unanswered_count` > 1: the user sent several messages in a row (on a messaging app);
+    """`unanswered_count` > 1: the user sent several messages in a row;
     the earlier ones are the last items of `messages` and this reply answers them all."""
     updated_messages = [dict(message) for message in messages]
     saved = save_agent_trace(
@@ -124,9 +129,11 @@ async def run_agent_turn(
         return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
 
     # 3. Context: what the model reads besides the chat.
+    # What to recall for: in a burst the last message alone ("it was awesome") says too little.
+    read_together = _read_together(messages, user_text, unanswered_count)
     context_arguments = {
         "conversation_id": conversation_id,
-        "user_text": user_text,
+        "user_text": read_together,
         "user_id": user_id,
         "user_profile": user_profile,
         "model": model,
@@ -138,7 +145,7 @@ async def run_agent_turn(
     }
     if agent_pipeline_config().memory_contract_version == 3:
         context_arguments["memory_query_embedding"] = await embed_memory_query(
-            memory_query_text(user_text, messages), conversation_id=conversation_id
+            memory_query_text(read_together, messages), conversation_id=conversation_id
         )
     context_package = build_model_context_package(**context_arguments)
     trace.step(2, "retrieval", "ok", {
@@ -256,6 +263,15 @@ class _TurnTrace:
             "status": status,
             "metadata": metadata,
         })
+
+
+def _read_together(messages: list[dict[str, Any]], user_text: str, unanswered_count: int) -> str:
+    """The burst's latest messages as one text, for recall; the chat itself keeps them apart."""
+    if unanswered_count <= 1:
+        return user_text
+    earlier = messages[-min(unanswered_count - 1, _BURST_RECALL_MESSAGES - 1) :]
+    lines = [str(message.get("content") or "") for message in earlier if message.get("role") == "user"]
+    return "\n".join([*lines, user_text])[-_BURST_RECALL_CHARS:]
 
 
 def _source_type_counts(sources: list[dict[str, Any]]) -> dict[str, int]:
