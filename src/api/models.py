@@ -230,6 +230,9 @@ class UserMessage(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     # The earlier message this one replies to, by its position in the chat.
     reply_to_index: int | None = Field(default=None, ge=0)
+    # Made by the app for this send: matches its pending bubble to the saved message, and a send
+    # retried after a lost connection is not saved twice.
+    client_id: str | None = Field(default=None, max_length=64)
 
 
 class AgentMessageFeedbackCreate(BaseModel):

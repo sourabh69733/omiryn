@@ -95,15 +95,16 @@ class RealtimeGatewayTest(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
-            user_event = socket.receive_json()
-            assistant_event = socket.receive_json()
-            self.assertEqual(user_event["type"], "message.created")
-            self.assertEqual(user_event["payload"]["message"]["role"], "user")
-            self.assertEqual(assistant_event["payload"]["message"]["role"], "assistant")
+            events = []
+            while not events or events[-1]["payload"].get("message", {}).get("role") != "assistant":
+                events.append(socket.receive_json())
+            messages = [event for event in events if event["type"] == "message.created"]
+            # Saved and shown at once as sending, then again as read when the reply lands.
             self.assertEqual(
-                [user_event["sequence"], assistant_event["sequence"]],
-                [1, 2],
+                [(event["sequence"], event["payload"]["message"]["role"], event["payload"]["message"]["delivery_status"]) for event in messages],
+                [(1, "user", "sending"), (1, "user", "read"), (2, "assistant", None)],
             )
+            self.assertIn("agent.typing", [event["type"] for event in events])
 
     def test_reconnect_can_recover_messages_missed_while_disconnected(self) -> None:
         conversation = self.client.post("/api/agent/conversations", json={}).json()

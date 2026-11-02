@@ -31,10 +31,11 @@ from agent.cognition.background.memory_run.service import (
 from agent.runtime.orchestrator import run_agent_turn
 from agent.shared.clock import utc_now, utc_now_iso
 from agent.shared.timeline import parse_time
-from agent.providers import AgentProviderError, agent_runtime_status
+from agent.providers import agent_runtime_status
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser
 from storage import (
+    burst_open,
     list_conversations as storage_list_conversations,
     save_conversation,
     update_conversation,
@@ -55,10 +56,12 @@ from .models import (
     AgentConversation,
     AgentConversationCreate,
 )
-from .usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
+from .usage_limits import CHAT_MESSAGE_LIMIT, enforce_quick_message_limit, enforce_user_action_limit
 
 
 logger = logging.getLogger(__name__)
+# The web chat's bursts are keyed by this and the conversation id, like a messaging app's chat.
+WEB_CHANNEL = "web"
 # A user message whose reply failed; it stays in the chat with a Retry.
 REPLY_FAILED = "failed"
 REPLY_FAILED_CODE = "reply_failed"
@@ -203,51 +206,75 @@ async def _publish_messages(conversation: AgentConversation, indexes: Iterable[i
                         "content": message.get("content"),
                         "created_at": message.get("created_at"),
                         "delivery_status": message.get("delivery_status"),
+                        **({"client_id": message["client_id"]} if message.get("client_id") else {}),
+                        **({"reply_to": message["reply_to"]} if message.get("reply_to") else {}),
                     },
                 },
             )
         )
 
-async def post_user_message(
+async def save_web_message(
     conversation: AgentConversation,
     user: CurrentUser,
     text: str,
-    background_tasks: BackgroundTasks,
     *,
     reply_to_index: int | None = None,
-    channel: str | None = None,
-) -> AgentConversation:
-    """Save the user's message, reply to it and schedule background learning.
-
-    Shared by the web chat and messaging apps; `channel` marks where the message came from.
-    """
+    client_id: str | None = None,
+) -> None:
+    """Save the web chat's message now, before any model runs; a later reply answers it."""
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="Conversation already extracted.")
     if conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat came from an upload; it can't be replied to.")
-    enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+    _count_message(user, WEB_CHANNEL, conversation.id)
     pending = {
         "role": "user",
         "content": text,
         "created_at": utc_now_iso(),
         "delivery_status": "sending",
         **({"reply_to": _reply_quote(conversation.messages, reply_to_index)} if reply_to_index is not None else {}),
-        **({"channel": channel} if channel else {}),
+        **({"client_id": client_id} if client_id else {}),
     }
+    placed: dict[str, int] = {}
 
-    def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        if client_id and any(message.get("client_id") == client_id for message in messages):
+            return None  # the same send, retried after a lost connection
         # A new message answers for any earlier one whose reply failed: the reply covers both.
         for message in messages:
             if message.get("role") == "user" and _reply_failed(message):
                 message["delivery_status"] = "read"
+        placed["index"] = len(messages)
         messages.append(dict(pending))
         return messages
 
-    # Saved before the model runs, so a failed reply never loses what the user wrote.
     _change_messages(conversation, user, add)
     # Writing in an archived chat brings it back to the main list.
     set_conversation_archived(conversation.id, _user_id(user), False)
-    return await _reply_to_pending(conversation, user, conversation.messages[:-1], pending, background_tasks)
+    if "index" in placed:
+        await _publish_new_messages(conversation, placed["index"])
+
+
+def mark_retry_sending(conversation: AgentConversation, user: CurrentUser) -> None:
+    """Retry answers every message whose reply failed, not only the last."""
+
+    def mark(stored: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for index in _unanswered_indexes(stored):
+            if _reply_failed(stored[index]):
+                stored[index]["delivery_status"] = "sending"
+        return stored
+
+    _change_messages(conversation, user, mark)
+
+
+def _count_message(user: CurrentUser, channel: str, chat_id: str) -> None:
+    """A reply is what costs money, so the quota counts replies: a message that will share a reply
+    already under way counts only against a high per-minute cap."""
+    if burst_open(channel, chat_id, utc_now()):
+        enforce_quick_message_limit(_user_id(user))
+    else:
+        enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+
 
 # Enough of the quoted message to show in the bubble and tell Omi what is meant.
 REPLY_QUOTE_CHARS = 300
@@ -260,70 +287,6 @@ def _reply_quote(messages: list[dict[str, Any]], index: int) -> dict[str, Any]:
     if quoted.get("deleted") or not text or quoted.get("role") not in {"user", "assistant"}:
         raise HTTPException(status_code=400, detail="You can't reply to that message.")
     return {"index": index, "role": quoted["role"], "text": text[:REPLY_QUOTE_CHARS]}
-
-async def _reply_to_pending(
-    conversation: AgentConversation,
-    user: CurrentUser,
-    prior_messages: list[dict[str, Any]],
-    pending: dict[str, Any],
-    background_tasks: BackgroundTasks,
-) -> AgentConversation:
-    """Reply to `pending` (stored at index `len(prior_messages)` when this started) and save the
-    reply after whatever the chat holds now: the user may have written again meanwhile."""
-    pending_index = len(prior_messages)
-    placed: dict[str, int | None] = {"user": None, "start": None}
-    try:
-        turn = await _run_turn(conversation, user, prior_messages, pending)
-    except (AgentProviderError, Exception) as error:
-        logger.warning(
-            "agent.reply.failed conversation_id=%s error=%s", conversation.id, type(error).__name__
-        )
-
-        def mark_failed(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-            placed["user"] = _find_message(stored, pending_index, pending)
-            if placed["user"] is None:
-                return None
-            stored[placed["user"]]["delivery_status"] = REPLY_FAILED
-            return stored
-
-        _change_messages(conversation, user, mark_failed)
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "code": REPLY_FAILED_CODE,
-                "message": "Couldn't reply right now. Your message is saved; tap Retry.",
-                "message_index": placed["user"] if placed["user"] is not None else pending_index,
-            },
-        ) from error
-
-    answered = turn.messages[pending_index]
-    replies = [dict(message) for message in turn.messages[pending_index + 1 :]]
-
-    def commit(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-        # The stored message keeps when the user wrote it, the quote and the channel.
-        placed["user"] = _find_message(stored, pending_index, pending)
-        if placed["user"] is None:
-            return None
-        if answered.get("quality"):
-            stored[placed["user"]]["quality"] = answered["quality"]
-        stored[placed["user"]]["delivery_status"] = "read"
-        placed["start"] = len(stored)
-        stored.extend(replies)
-        _stamp_new_messages(stored, placed["start"])
-        return stored
-
-    voice = getattr(turn, "agent_voice", None)
-    _change_messages(conversation, user, commit, fields={"agent_voice": voice} if voice else None)
-    if placed["user"] is None or placed["start"] is None:
-        # The message was deleted while Omi wrote; the reply no longer fits the chat.
-        logger.warning("agent.reply.dropped conversation_id=%s", conversation.id)
-        return conversation
-    await _publish_messages(
-        conversation, [placed["user"], *range(placed["start"], len(conversation.messages))]
-    )
-    _learn_after_reply(conversation, user, turn.quality_valid, background_tasks)
-    return conversation
-
 
 async def _run_turn(
     conversation: AgentConversation,
@@ -400,9 +363,8 @@ def _learn_after_reply(
         schedule_idle_flush(conversation.id, _user_id(user))
 
 
-# Messaging apps: a message is saved as it arrives and answered later, so several sent in a row
-# can get one reply. Saving and committing never wait on anything in between, so in one process
-# they never overwrite each other.
+# A message is saved as it arrives and answered later, so several sent in a row can get one reply
+# (see reply_bursts.py). Saving and committing never wait on anything in between.
 
 
 @dataclass(frozen=True)
@@ -410,15 +372,16 @@ class DraftReply:
     conversation_id: str
     # The last user message the draft answers; anything after it came in while writing.
     answered_through: int
+    answered_message: dict[str, Any]
     turn: Any
 
 
-async def save_unanswered_message(user: CurrentUser, text: str, channel: str) -> AgentConversation:
+async def save_unanswered_message(user: CurrentUser, text: str, channel: str, chat_id: str) -> AgentConversation:
     """Save a message in the user's chat on that app now; a later reply answers it."""
     conversation = channel_conversation(user, channel)
     if conversation.status != "active" or conversation.import_source_id:
         raise HTTPException(status_code=409, detail="This chat can't be replied to.")
-    enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
+    _count_message(user, channel, chat_id)
     placed: dict[str, int] = {}
 
     def add(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -440,12 +403,16 @@ async def save_unanswered_message(user: CurrentUser, text: str, channel: str) ->
     return conversation
 
 
-async def draft_reply_to_unanswered(user: CurrentUser, conversation_id: str) -> DraftReply | None:
+async def draft_reply_to_unanswered(
+    user: CurrentUser, conversation_id: str, *, count_quota: bool = False
+) -> DraftReply | None:
     """Omi's reply to every message since its last reply, read together. Nothing is saved."""
     conversation = _get_existing_conversation(conversation_id, user)
     unanswered = _unanswered_indexes(conversation.messages)
     if not unanswered:
         return None
+    if count_quota:
+        enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     last = unanswered[-1]
     turn = await _run_turn(
         conversation,
@@ -454,13 +421,22 @@ async def draft_reply_to_unanswered(user: CurrentUser, conversation_id: str) -> 
         conversation.messages[last],
         unanswered_count=len(unanswered),
     )
-    return DraftReply(conversation_id=conversation.id, answered_through=last, turn=turn)
+    return DraftReply(
+        conversation_id=conversation.id,
+        answered_through=last,
+        answered_message=dict(conversation.messages[last]),
+        turn=turn,
+    )
 
 
 async def commit_reply(
     user: CurrentUser, draft: DraftReply, background_tasks: BackgroundTasks
 ) -> list[dict[str, Any]]:
-    """Save a draft's replies after the messages it answered; returns the reply messages."""
+    """Save a draft's replies right after the last message it answered; returns the reply messages.
+
+    A message that came in later stays below them, so it still counts as unanswered and gets the
+    next reply. Saved at the end, it would sit above a reply that never read it and never be answered.
+    """
     conversation = _get_existing_conversation(draft.conversation_id, user)
     answered = draft.answered_through
     quality = draft.turn.messages[answered].get("quality")
@@ -468,15 +444,20 @@ async def commit_reply(
     placed: dict[str, int | None] = {"first": None, "start": None}
 
     def commit(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-        if len(stored) <= answered or stored[answered].get("role") != "user":
-            # Messages were deleted while Omi wrote; the reply no longer fits the chat.
+        index = _find_message(stored, answered, draft.answered_message)
+        if index is None:
+            # The message was deleted while Omi wrote; the reply no longer fits the chat.
             return None
         if quality:
-            stored[answered]["quality"] = quality
-        placed["first"] = _mark_answered(stored, answered)
-        placed["start"] = len(stored)
-        stored.extend(replies)
-        _stamp_new_messages(stored, placed["start"])
+            stored[index]["quality"] = quality
+        placed["first"] = _mark_answered(stored, index)
+        start = index + 1
+        # Omi's own message that landed meanwhile (a nudge) stays above the reply.
+        while start < len(stored) and stored[start].get("role") != "user":
+            start += 1
+        placed["start"] = start
+        stored[start:start] = replies
+        _stamp_new_messages(stored, start)
         return stored
 
     voice = getattr(draft.turn, "agent_voice", None)
@@ -486,7 +467,7 @@ async def commit_reply(
     # From the first answered message, so the web chat also sees them marked read.
     await _publish_new_messages(conversation, placed["first"])
     _learn_after_reply(conversation, user, draft.turn.quality_valid, background_tasks)
-    return conversation.messages[placed["start"] :]
+    return conversation.messages[placed["start"] : placed["start"] + len(replies)]
 
 
 def mark_unanswered_failed(user: CurrentUser, conversation_id: str) -> None:

@@ -14,7 +14,6 @@ from sqlalchemy.exc import IntegrityError
 
 from .database import ENGINE
 from .schema import channel_bursts, channel_seen_messages
-from .utils import _isoformat_utc
 
 
 def join_burst(
@@ -65,13 +64,54 @@ def join_burst(
 def burst_state(channel: str, external_chat_id: str) -> dict[str, Any] | None:
     with ENGINE.begin() as connection:
         row = connection.execute(
-            select(channel_bursts.c.arrivals, channel_bursts.c.last_at).where(
+            select(
+                channel_bursts.c.arrivals,
+                channel_bursts.c.last_at,
+                channel_bursts.c.replier_token,
+                channel_bursts.c.replier_until,
+            ).where(
                 channel_bursts.c.channel == channel, channel_bursts.c.external_chat_id == external_chat_id
             )
         ).mappings().first()
     if row is None:
         return None
-    return {"arrivals": int(row["arrivals"]), "last_at": _aware(row["last_at"])}
+    return {
+        "arrivals": int(row["arrivals"]),
+        "last_at": _aware(row["last_at"]),
+        "token": row["replier_token"],
+        "until": _aware(row["replier_until"]) if row["replier_until"] else None,
+    }
+
+
+def burst_open(channel: str, external_chat_id: str, now: datetime) -> bool:
+    """Someone is answering this chat right now, so a new message will share their reply."""
+    state = burst_state(channel, external_chat_id)
+    return bool(state and state["token"] and state["until"] and state["until"] > now)
+
+
+def touch_burst(channel: str, external_chat_id: str, now: datetime) -> None:
+    """The user is still typing: the wait for quiet starts over. Nothing to do when no burst is open."""
+    with ENGINE.begin() as connection:
+        connection.execute(
+            channel_bursts.update()
+            .where(channel_bursts.c.channel == channel, channel_bursts.c.external_chat_id == external_chat_id)
+            .values(last_at=now)
+        )
+
+
+def renew_burst(channel: str, external_chat_id: str, token: str, *, until: datetime) -> bool:
+    """Extend the replier lease; False when it is no longer this caller's."""
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            channel_bursts.update()
+            .where(
+                channel_bursts.c.channel == channel,
+                channel_bursts.c.external_chat_id == external_chat_id,
+                channel_bursts.c.replier_token == token,
+            )
+            .values(replier_until=until)
+        )
+    return bool(result.rowcount)
 
 
 def finish_burst(channel: str, external_chat_id: str, token: str, *, answered: int) -> bool:
@@ -119,4 +159,13 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
-__all__ = ["burst_state", "claim_channel_message", "finish_burst", "join_burst", "release_burst"]
+__all__ = [
+    "burst_open",
+    "burst_state",
+    "claim_channel_message",
+    "finish_burst",
+    "join_burst",
+    "release_burst",
+    "renew_burst",
+    "touch_burst",
+]

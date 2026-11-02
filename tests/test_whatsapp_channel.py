@@ -71,7 +71,6 @@ class WhatsAppChannelTest(unittest.TestCase):
             patch.object(whatsapp_routes, "send_whatsapp_message", self.sent),
             patch.object(whatsapp_routes, "send_whatsapp_typing", self.typing),
             patch.object(channel_replies, "BUBBLE_PAUSE_SECONDS", 0),
-            patch.object(channel_replies, "QUIET_SECONDS", 0),
         ]
         for item in self.patches:
             item.start()
@@ -195,7 +194,7 @@ class WhatsAppChannelTest(unittest.TestCase):
         self.sent.reset_mock()
         turn = _FakeTurn()
 
-        with patch.object(channel_replies, "QUIET_SECONDS", 0.2), patch("api.main.run_agent_turn", turn):
+        with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "0.2"}), patch("api.main.run_agent_turn", turn):
             asyncio.run(self._deliver([("hey", "wamid.a"), ("listen", "wamid.b"), ("I got the job!", "wamid.c")], gap=0.02))
 
         self.assertEqual(len(turn.calls), 1)

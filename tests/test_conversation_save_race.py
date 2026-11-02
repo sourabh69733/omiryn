@@ -103,9 +103,9 @@ class WebReplyRaceTest(unittest.TestCase):
 
         self.assertEqual([response.status_code for response in responses], [200, 200])
         contents = [m["content"] for m in get_conversation(conversation_id, USER_ID)["messages"][1:]]
-        # "wait" and its reply were saved while "hi" was still being answered; all four are kept.
-        self.assertEqual(sorted(contents), sorted(["hi", "wait", "reply to hi", "reply to wait"]))
-        self.assertEqual(contents[:2], ["hi", "wait"])
+        # "wait" came in while "hi" was being answered: nothing was shown yet, so one reply covers both.
+        self.assertEqual(contents, ["hi", "wait", "reply to wait"])
+        self.assertEqual(turn.calls[1]["unanswered_count"], 2)
         self.assertTrue(all(m["delivery_status"] == "read" for m in get_conversation(conversation_id, USER_ID)["messages"] if m["role"] == "user"))
 
     def test_a_nudge_that_lands_while_omi_replies_is_kept(self) -> None:
