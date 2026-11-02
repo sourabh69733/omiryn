@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_is_the_default(self) -> None:
+    def test_v4_1_is_the_default_and_keeps_its_whole_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,7 +150,10 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4")
+        self.assertEqual(package.prompt_version, "v4-1")
+        self.assertIn("one word or one emoji is the", package.system_prompt)
+        # The goal's last line survives the block's limit.
+        self.assertIn("Say something only this conversation could produce.", package.system_prompt)
 
 
 class TurnFactsTest(unittest.TestCase):
@@ -179,3 +182,15 @@ class AddressRuleTest(unittest.TestCase):
         for gender in (None, "non_binary", "prefer_not_to_say"):
             with self.subTest(gender=gender):
                 self.assertIn("not known", _address_rule({"gender": gender}))
+
+
+class PromptV41Test(unittest.TestCase):
+    def test_only_the_line_about_little_changes_and_v4_is_kept(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_GOAL
+        from agent.context_engine.prompt_engine.versions.v4_1 import V4_1_GOAL, V4_1_PROMPT_VERSION
+
+        self.assertIn("That is your cue to bring something", V4_GOAL)
+        self.assertNotIn("That is your cue to bring something", V4_1_GOAL)
+        self.assertIn("one word or one emoji", V4_1_GOAL)
+        self.assertEqual(V4_1_PROMPT_VERSION.reply_goal, V4_1_GOAL)
+
