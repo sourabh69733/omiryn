@@ -127,7 +127,7 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | --- | --- |
 | `POST /api/agent/conversations` | Start a chat. `{"temporary": true}` starts a Temporary Chat (never in History, never learned from). |
 | `POST /api/agent/conversations/{id}/messages` | Send a message, also while Omi is replying. Optional `reply_to_index` quotes an earlier message; optional `client_id` (up to 64 chars) matches the app's pending bubble and stops a retried send being saved twice. The request that starts a burst stays open and returns the replies; one that joins a burst returns once saved, with the message at `delivery_status: sending`, and its reply arrives on the first request and over realtime. |
-| `POST /api/agent/conversations/{id}/typing` | The user is still typing while a reply is pending; Omi waits a little longer, up to the burst's max. No effect when nothing is pending. |
+| `POST /api/agent/conversations/{id}/typing` | HTTP backup for the realtime command `{"type": "typing", "scope": "conversation", "scope_id": id, "active": true}`, which a subscribed socket sends about once a second while a reply is pending and which gets no answer. `active: false` means the box was cleared. No effect when nothing is pending. |
 | `POST /api/agent/conversations/{id}/messages/deletion-impact` | `{"message_indexes": [...]}`: what deleting them also removes. |
 | `POST /api/agent/conversations/{id}/messages/delete` | Delete those messages and what was learned only from them. |
 | `DELETE /api/agent/conversations/{id}` | Delete a chat (also how the app ends a Temporary Chat). |
