@@ -171,7 +171,7 @@ def build_companion_system_prompt_v4(
         ("might_fit", grouped.get("might_fit", [])),
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
-        ("this_turn", [time_facts, _turn_lines(facts)]),
+        ("this_turn", [time_facts, _turn_lines(facts), _web_search_line()]),
         ("goal", [prompt_version.reply_goal or V4_GOAL]),
     ]
     return "\n\n".join(filter(None, (_block(tag, parts) for tag, parts in blocks)))
@@ -270,6 +270,18 @@ def _turn_lines(facts: TurnFacts) -> str:
     if facts.active_topic:
         lines.append(f"Current topic in this chat: {facts.active_topic}.")
     return "\n".join(lines)
+
+
+def _web_search_line() -> str:
+    """Read last, because the tool's description alone did not get these questions searched."""
+    from agent.tools import tools_enabled, web_search_enabled
+
+    if not (tools_enabled() and web_search_enabled()):
+        return ""
+    return (
+        "You can search the web. If they ask what is going on in the world or in a field, or whether "
+        "you can look things up, what you remember is old: call web_search before you reply."
+    )
 
 
 __all__ = ["BLOCK_CHAR_LIMITS", "TurnFacts", "build_companion_system_prompt_v4", "turn_facts"]
