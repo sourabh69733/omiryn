@@ -207,6 +207,7 @@ async def _publish_messages(conversation: AgentConversation, indexes: Iterable[i
                         "created_at": message.get("created_at"),
                         "delivery_status": message.get("delivery_status"),
                         **({"client_id": message["client_id"]} if message.get("client_id") else {}),
+                        **({"reply_to": message["reply_to"]} if message.get("reply_to") else {}),
                     },
                 },
             )
