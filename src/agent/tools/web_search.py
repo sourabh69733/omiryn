@@ -24,7 +24,11 @@ QUERY_CHARS = 200
 DESCRIPTION = (
     "Search the web for current or factual information you may not know or that may have changed: "
     "news, scores, prices, weather, places, opening hours, events, releases, facts about public "
-    "people or things. Returns short extracts with their source and date. Do not use it for the "
+    "people or things. What you remember about recent events is many months out of date, even when "
+    "you feel sure of it, and in fast-moving fields like AI and tech it is already old. So when "
+    "someone asks what is new, the latest, or what is going on, search before you answer, even if "
+    "earlier replies in this chat did not. Asked whether you can look things up, say yes and do it. "
+    "Returns short extracts with their source and date. Do not use it for the "
     "user's own life or their chats (use search_chats). The query goes to an outside search engine: "
     "never put names of private people, the user's details or anything from their chats in it."
 )

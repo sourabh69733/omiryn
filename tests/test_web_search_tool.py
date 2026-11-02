@@ -60,3 +60,14 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DescriptionTest(unittest.TestCase):
+    def test_the_model_is_told_what_it_remembers_is_out_of_date(self) -> None:
+        # Measured on Gemma 4 31B: a news request after earlier chat searched 4 of 12 times without
+        # this, and 9 of 9 with it. Questions with no time in them still did not search.
+        from agent.tools.web_search import DESCRIPTION
+
+        self.assertIn("out of date", DESCRIPTION)
+        self.assertIn("even if earlier replies in this chat did not", " ".join(DESCRIPTION.split()))
+
