@@ -64,7 +64,7 @@ BLOCK_CHAR_LIMITS = {
     "open_questions": 700,
     "how_to_talk": 3000,
     "this_turn": 2000,
-    "goal": 1200,
+    "goal": 1400,
 }
 _CONSTRAINT_FACTS = {
     "no_questions": "They asked you not to ask questions.",
@@ -172,7 +172,7 @@ def build_companion_system_prompt_v4(
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
         ("this_turn", [time_facts, _turn_lines(facts)]),
-        ("goal", [V4_GOAL]),
+        ("goal", [prompt_version.reply_goal or V4_GOAL]),
     ]
     return "\n\n".join(filter(None, (_block(tag, parts) for tag, parts in blocks)))
 

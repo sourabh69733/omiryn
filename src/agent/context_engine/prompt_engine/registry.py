@@ -8,8 +8,9 @@ from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
 from agent.context_engine.prompt_engine.versions.v3 import V3_PROMPT_VERSION
 from agent.context_engine.prompt_engine.versions.v3_1 import V3_1_PROMPT_VERSION
 from agent.context_engine.prompt_engine.versions.v4 import V4_PROMPT_VERSION
+from agent.context_engine.prompt_engine.versions.v4_1 import V4_1_PROMPT_VERSION
 
-DEFAULT_PROMPT_VERSION_ID = "v4"
+DEFAULT_PROMPT_VERSION_ID = "v4-1"
 
 # v1 and v2 (dating-era) live in _archive/agent/behavior_versions; asking for them gets the default.
 _PROMPT_VERSIONS = {
@@ -19,6 +20,8 @@ _PROMPT_VERSIONS = {
     V3_1_PROMPT_VERSION.name: V3_1_PROMPT_VERSION,
     V4_PROMPT_VERSION.version_id: V4_PROMPT_VERSION,
     V4_PROMPT_VERSION.name: V4_PROMPT_VERSION,
+    V4_1_PROMPT_VERSION.version_id: V4_1_PROMPT_VERSION,
+    V4_1_PROMPT_VERSION.name: V4_1_PROMPT_VERSION,
 }
 
 
