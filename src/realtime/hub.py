@@ -77,6 +77,10 @@ class InMemoryRealtimeHub:
         if scope == "conversation":
             await self._write_presence()
 
+    def is_subscribed(self, connection: RealtimeConnection, scope: str, scope_id: str) -> bool:
+        """Subscribing checked that the room is theirs, so this needs no second lookup."""
+        return _room(scope, scope_id) in connection.rooms
+
     async def unsubscribe(
         self,
         connection: RealtimeConnection,

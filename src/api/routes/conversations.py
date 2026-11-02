@@ -29,7 +29,8 @@ from storage import (
     replace_agent_message_feedback,
     save_draft,
     set_conversation_archived,
-    touch_burst,
+    signal_typing,
+    stop_typing,
 )
 
 from ..helpers import (
@@ -56,6 +57,7 @@ from ..models import (
     AgentProfileSubmission,
     DraftProfile,
     MessageSelection,
+    TypingSignal,
     UserMessage,
 )
 from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
@@ -304,10 +306,15 @@ async def send_agent_message(
 
 
 @router.post("/api/agent/conversations/{conversation_id}/typing")
-async def agent_chat_typing(conversation_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, bool]:
-    """The user is still typing while a reply is pending: Omi waits a little longer for the rest."""
+async def agent_chat_typing(
+    conversation_id: str, payload: TypingSignal | None = None, user: CurrentUser = Depends(require_user)
+) -> dict[str, bool]:
+    """HTTP backup for the realtime `typing` command, for when the socket is down."""
     _get_existing_conversation(conversation_id, user)
-    touch_burst(WEB_CHANNEL, conversation_id, utc_now())
+    if payload is None or payload.active:
+        signal_typing(WEB_CHANNEL, conversation_id, utc_now())
+    else:
+        stop_typing(WEB_CHANNEL, conversation_id)
     return {"ok": True}
 
 @router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/retry")
