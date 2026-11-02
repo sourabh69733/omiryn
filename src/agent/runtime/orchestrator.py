@@ -38,6 +38,7 @@ class AgentTurnResult:
     quality_valid: bool
     # Set when the user asked the companion to change how it talks (neutral, female, male).
     agent_voice: str | None = None
+    trace_id: str | None = None
 
 
 async def run_agent_turn(
@@ -126,7 +127,7 @@ async def run_agent_turn(
                 "turn_policy_reason": direct_reply.reason,
             },
         )
-        return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
+        return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid, trace_id=trace.id)
 
     # 3. Context: what the model reads besides the chat.
     # What to recall for: in a burst the last message alone ("it was awesome") says too little.
@@ -242,7 +243,9 @@ async def run_agent_turn(
             "reply_part_count": len(finished.parts),
         },
     )
-    return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid, agent_voice=finished.voice)
+    return AgentTurnResult(
+        messages=updated_messages, quality_valid=quality_valid, agent_voice=finished.voice, trace_id=trace.id
+    )
 
 
 @dataclass(frozen=True)
