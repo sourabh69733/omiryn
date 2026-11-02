@@ -739,6 +739,8 @@ channel_bursts = Table(
     Column("last_at", DateTime(timezone=True), nullable=False),
     Column("replier_token", String, nullable=True),
     Column("replier_until", DateTime(timezone=True), nullable=True),
+    # The last sign the user is still typing (web only); it expires by itself.
+    Column("typing_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 

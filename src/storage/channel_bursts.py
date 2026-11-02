@@ -48,7 +48,8 @@ def join_burst(
             arrivals = 1
         else:
             arrivals = int(row["arrivals"]) + 1
-            values = {"arrivals": arrivals, "last_at": now}
+            # Sent: whatever they were typing is now this message.
+            values = {"arrivals": arrivals, "last_at": now, "typing_at": None}
             expired = row["replier_until"] is None or _aware(row["replier_until"]) <= now
             if not row["replier_token"] or expired:
                 token = str(uuid4())
@@ -69,6 +70,7 @@ def burst_state(channel: str, external_chat_id: str) -> dict[str, Any] | None:
                 channel_bursts.c.last_at,
                 channel_bursts.c.replier_token,
                 channel_bursts.c.replier_until,
+                channel_bursts.c.typing_at,
             ).where(
                 channel_bursts.c.channel == channel, channel_bursts.c.external_chat_id == external_chat_id
             )
@@ -80,6 +82,7 @@ def burst_state(channel: str, external_chat_id: str) -> dict[str, Any] | None:
         "last_at": _aware(row["last_at"]),
         "token": row["replier_token"],
         "until": _aware(row["replier_until"]) if row["replier_until"] else None,
+        "typing_at": _aware(row["typing_at"]) if row["typing_at"] else None,
     }
 
 
@@ -89,13 +92,24 @@ def burst_open(channel: str, external_chat_id: str, now: datetime) -> bool:
     return bool(state and state["token"] and state["until"] and state["until"] > now)
 
 
-def touch_burst(channel: str, external_chat_id: str, now: datetime) -> None:
-    """The user is still typing: the wait for quiet starts over. Nothing to do when no burst is open."""
+def signal_typing(channel: str, external_chat_id: str, now: datetime) -> None:
+    """The user is still typing. Nothing to do when no burst is open."""
     with ENGINE.begin() as connection:
         connection.execute(
             channel_bursts.update()
             .where(channel_bursts.c.channel == channel, channel_bursts.c.external_chat_id == external_chat_id)
-            .values(last_at=now)
+            .values(typing_at=now)
+        )
+
+
+def stop_typing(channel: str, external_chat_id: str) -> None:
+    """The user cleared the box: nothing more is coming, so the quiet wait counts from the burst's
+    start and the reply begins as soon as it may."""
+    with ENGINE.begin() as connection:
+        connection.execute(
+            channel_bursts.update()
+            .where(channel_bursts.c.channel == channel, channel_bursts.c.external_chat_id == external_chat_id)
+            .values(typing_at=None, last_at=channel_bursts.c.created_at)
         )
 
 
@@ -167,5 +181,6 @@ __all__ = [
     "join_burst",
     "release_burst",
     "renew_burst",
-    "touch_burst",
+    "signal_typing",
+    "stop_typing",
 ]
