@@ -21,6 +21,12 @@ _OPENING_REPEAT_LIMIT = 2  # the same opening already used this many times recen
 _NEAR_COPY_SIMILARITY = 0.6
 # Same words in a new order ("sham ho gayi, abhi kya kar rahe ho?") is still the same message.
 _SAME_WORDS_SIMILARITY = 0.8
+# Same start and end with new words in the middle is the same message too (seen live: "theek hai,
+# main silent mode pe hoon. jab mann kare tab bata dena." then "theek hai, main chup hoon. jab mood
+# ho tab bata dena."). Word overlap misses it: only the middle changed, and that is most of it.
+_SHAPE_MIN_WORDS = 6
+_SHAPE_START_WORDS = 2
+_SHAPE_END_WORDS = 2
 
 
 def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
@@ -47,11 +53,30 @@ def stale_reply_reason(reply: str, previous_replies: list[str]) -> str | None:
             "do not ask it again in any words"
         )
     opening = _opening(flat)
-    if opening:
-        same_opening = sum(1 for earlier in earlier_replies if _opening(earlier) == opening)
-        if same_opening >= _OPENING_REPEAT_LIMIT:
-            return f'it opens with "{opening}" again, as {same_opening} recent replies did'
+    if opening and _opening_is_repeated(opening, earlier_replies):
+        return f'it opens with "{opening}" again, as a recent reply did; open differently'
     return None
+
+
+def _opening_is_repeated(opening: str, earlier_replies: list[str]) -> bool:
+    """The same lead-in as the reply right before it, or as several recent ones."""
+    if earlier_replies and _opening(earlier_replies[-1]) == opening:
+        return True
+    return sum(1 for earlier in earlier_replies if _opening(earlier) == opening) >= _OPENING_REPEAT_LIMIT
+
+
+def without_repeated_opening(reply: str, previous_replies: list[str]) -> str:
+    """Last resort when a rewrite still opens the same way: drop the lead-in. Never empties a reply."""
+    earlier = [item for item in previous_replies[-_RECENT_REPLIES:] if item.strip()]
+    first, separator, rest = reply.partition(REPLY_PART_SEPARATOR)
+    opening = _opening(first)
+    if not opening or not _opening_is_repeated(opening, earlier):
+        return reply
+    without = re.split(r"[,.!?;:\u0964]", first.strip(), maxsplit=1)
+    remainder = without[1].lstrip(" ,.!?;:\u0964") if len(without) > 1 else ""
+    if not remainder:
+        return rest.strip() or reply
+    return f"{remainder}{separator}{rest}"
 
 
 def repeated_questions(reply: str, previous_replies: list[str]) -> list[str]:
@@ -163,7 +188,10 @@ def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True, ke
     keep = (
         "Keep the same language, length and format rules."
         if keep_length
-        else "Keep the same language; follow what the user asked, even when it changes the length or format."
+        else (
+            "Keep the same language; follow what the user asked, even when it changes the length or "
+            "format. If you have nothing new to say, say far less: a word or two is fine."
+        )
     )
     return (
         f"Rewrite needed: {said} needs a rewrite because {reason}. "
@@ -175,7 +203,20 @@ def rewrite_instruction(draft: str, reason: str, *, quote_draft: bool = True, ke
 def _copies(draft: str, earlier: str) -> bool:
     """The draft, or one of its bubbles, nearly copies the earlier reply or one of its bubbles;
     a copy with one new bubble added is still a copy."""
-    return any(_same_text(part, other) for part in _parts(draft) for other in _parts(earlier))
+    return any(
+        _same_text(part, other) or _same_shape(part, other)
+        for part in _parts(draft)
+        for other in _parts(earlier)
+    )
+
+
+def _same_shape(left: str, right: str) -> bool:
+    left_words, right_words = left.split(), right.split()
+    return (
+        min(len(left_words), len(right_words)) >= _SHAPE_MIN_WORDS
+        and left_words[:_SHAPE_START_WORDS] == right_words[:_SHAPE_START_WORDS]
+        and left_words[-_SHAPE_END_WORDS:] == right_words[-_SHAPE_END_WORDS:]
+    )
 
 
 def _same_text(left: str, right: str) -> bool:
@@ -258,5 +299,6 @@ __all__ = [
     "stale_reply_reason",
     "trim_questions",
     "without_copied_replies",
+    "without_repeated_opening",
     "without_repeated_questions",
 ]
