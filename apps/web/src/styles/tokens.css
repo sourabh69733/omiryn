@@ -91,6 +91,7 @@
   --glass-shadow: var(--shadow-sm);
   --font-ui: var(--font-sans);
   --font-chat: var(--font-sans);
+  --font-letter: "Playpen Sans", "Playpen Sans Deva", var(--font-sans);
   --font-terminal: var(--font-mono);
 }
 

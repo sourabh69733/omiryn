@@ -732,6 +732,14 @@ button.history-archived-toggle:hover {
   overflow-wrap: anywhere;
 }
 
+/* Both sides write by hand, like notes passed back and forth. Playpen Sans Deva fills in Devanagari in the same hand. */
+.agentic-chat .message-content.agent,
+.agentic-chat .message-content.user {
+  font-family: var(--font-letter);
+  font-size: 1.04em;
+  line-height: 1.3;
+}
+
 .message-content.user {
   color: var(--paper);
 }
