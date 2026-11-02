@@ -69,3 +69,27 @@
   color: var(--muted);
   opacity: 1;
 }
+
+/* Text-style and icon buttons keep their own look on hover. Without these, the global ink-button
+   hover (ember background, white text) would apply and make the label unreadable. */
+.omi-welcome button:hover,
+.quick-setup-place button:hover,
+.privacy-footer button:hover {
+  background: none;
+  color: var(--ember-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.omi-mobile-navigation-heading button:hover,
+.chat-upload-head button:hover,
+.omi-readonly-bar.upload-note button.upload-note-close:hover,
+.chat-upload-names button:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.chat-upload-names button.is-active:hover {
+  color: var(--ember-deep);
+  background: var(--ember-soft);
+}

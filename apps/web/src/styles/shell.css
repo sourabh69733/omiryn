@@ -651,6 +651,7 @@ button.omi-drawer-close:hover {
 
 .omi-mobile-navigation-panel a:hover,
 .omi-mobile-navigation-panel > button:hover {
+  color: var(--ink);
   background: var(--hover);
 }
 
@@ -999,6 +1000,7 @@ button.omi-drawer-close:hover {
 }
 
 .message-menu-list button:hover {
+  color: var(--ink);
   background: rgba(248, 68, 31, 0.08);
 }
 

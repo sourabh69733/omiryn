@@ -262,6 +262,7 @@ button.history-menu-button[aria-expanded="true"] {
 }
 
 .history-menu button:hover {
+  color: var(--ink);
   background: var(--soft);
 }
 

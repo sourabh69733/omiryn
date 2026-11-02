@@ -154,6 +154,7 @@ p {
 
 .account-menu button:hover,
 .account-menu button:focus-visible {
+  color: var(--ink);
   background: var(--hover);
 }
 
