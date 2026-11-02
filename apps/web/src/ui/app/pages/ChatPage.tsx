@@ -13,6 +13,7 @@ import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
+import { applyMessageAt, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { temporaryName } from "../temporaryName";
@@ -24,6 +25,8 @@ import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
+// While a reply is pending, how often the server hears the user is still typing.
+const TYPING_SIGNAL_EVERY_MS = 1200;
 // Six menu items plus padding, in pixels.
 const MESSAGE_MENU_HEIGHT = 260;
 
@@ -145,6 +148,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const composerPauseTimerRef = useRef<number | null>(null);
+  const openRequestsRef = useRef(new Map<string, number>());
+  const lastTypingSignalRef = useRef(0);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const handledEvidenceTargetRef = useRef("");
@@ -264,11 +269,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     const recovered = (await response.json()) as MessageRecovery;
     setConversation((current) => {
       if (!current || current.id !== id) return current;
-      const messages = [...current.messages];
+      let messages = current.messages;
       for (const item of recovered.messages) {
         if (!Number.isInteger(item.message_index) || item.message_index < 0) continue;
-        if (item.message_index < messages.length) messages[item.message_index] = item.message;
-        else if (item.message_index === messages.length) messages.push(item.message);
+        messages = applyMessageAt(messages, item.message_index, item.message);
       }
       return { ...current, messages };
     });
@@ -491,6 +495,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId && !temporary);
   const earlierUnread = summaries.some((item) => item.id !== omiId && !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
+  const retryIndex = conversation ? lastFailedIndex(conversation.messages, isFailedMessage) : -1;
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
   // A brand-new user's first chat: explain what Omi does until they send their first message.
@@ -604,7 +609,17 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (characterCount(value) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
     const nextDraft = limitCharacters(value, CHAT_INPUT_MAX_LENGTH);
     setDraft(nextDraft);
+    signalStillTyping(nextDraft);
     void refreshEmojiShortcodeSuggestions(nextDraft, Math.min(cursor, nextDraft.length));
+  }
+
+  // A reply is pending and more is coming: Omi waits for the rest instead of starting without it.
+  function signalStillTyping(text: string) {
+    if (!sending || !conversation || !text.trim()) return;
+    const now = Date.now();
+    if (now - lastTypingSignalRef.current < TYPING_SIGNAL_EVERY_MS) return;
+    lastTypingSignalRef.current = now;
+    void apiFetch(`/api/agent/conversations/${conversation.id}/typing`, { method: "POST" }).catch(() => undefined);
   }
 
   function closeEmojiShortcodeSuggestions() {
@@ -680,31 +695,35 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || !conversation || sending || composerLimit) return;
+    if (!message || !conversation || composerLimit) return;
     closeEmojiShortcodeSuggestions();
     setDraft("");
     await sendText(message);
   }
 
-  async function sendText(message: string, target: Conversation | null = conversation) {
+  async function sendText(message: string, target: Conversation | null = conversation, resendId?: string) {
     if (!target) return;
+    const clientId = resendId ?? newClientId();
     shouldStickToBottomRef.current = true;
     setSendingFor(target.id, true);
     setError("");
     setComposerLimit(null);
     // A new message also answers for an earlier failed one; the server clears it the same way.
-    const earlier = target.messages.map((item) => (isFailedMessage(item) ? { ...item, delivery_status: "read" } : item));
     const quote = target.id === conversation?.id ? replyTo : null;
     setReplyTo(null);
-    updateIfOpen(target.id, () => ({ ...target, messages: [...earlier, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", ...(quote ? { reply_to: quote } : {}) }] }));
-    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, ...(quote ? { reply_to_index: quote.index } : {}) }, target, message);
+    const bubble: Message = { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", client_id: clientId, local: true, ...(quote ? { reply_to: quote } : {}) };
+    updateIfOpen(target.id, (current) => ({ ...current, messages: [...current.messages.map((item) => (!item.local && isFailedMessage(item) ? { ...item, delivery_status: "read" } : item)), bubble] }));
+    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, client_id: clientId, ...(quote ? { reply_to_index: quote.index } : {}) }, target, message, clientId);
   }
 
+  // Counts the requests open on a chat: Omi is at work until the last one has returned.
   function setSendingFor(id: string, value: boolean) {
+    const open = Math.max(0, (openRequestsRef.current.get(id) ?? 0) + (value ? 1 : -1));
+    openRequestsRef.current.set(id, open);
     setSendingIds((current) => {
-      if (current.has(id) === value) return current;
+      if (current.has(id) === open > 0) return current;
       const next = new Set(current);
-      if (value) next.add(id);
+      if (open > 0) next.add(id);
       else next.delete(id);
       return next;
     });
@@ -719,6 +738,13 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (!conversation || sending) return;
     const target = conversation;
     const text = target.messages[index]?.content || "";
+    // Bubbles the server never answered for go again, in order, under the ids they were sent with.
+    const unsent = target.messages.filter((item) => item.local && isFailedMessage(item));
+    if (unsent.length) {
+      updateIfOpen(target.id, (current) => ({ ...current, messages: current.messages.filter((item) => !unsent.includes(item)) }));
+      for (const item of unsent) void sendText(item.content || "", target, item.client_id);
+      return;
+    }
     shouldStickToBottomRef.current = true;
     setSendingFor(target.id, true);
     setError("");
@@ -728,14 +754,23 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       // The server never saved it (the connection dropped first): send it as a new message.
       const withoutFailed = { ...target, messages: target.messages.filter((_, position) => position !== index) };
       updateIfOpen(target.id, () => withoutFailed);
-      await sendText(text, withoutFailed);
+      await sendText(text, withoutFailed, target.messages[index]?.client_id);
     }
   }
 
   // Sends the request and settles the pending bubble: replied, failed (with Retry), or rolled back.
-  async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string): Promise<"ok" | "failed" | "not_retryable"> {
+  async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string, clientId: string | null = null): Promise<"ok" | "failed" | "not_retryable"> {
     const id = previousConversation.id;
     const stillOpen = () => openConversationIdRef.current === id;
+    const dropBubble = () => {
+      if (clientId) updateIfOpen(id, (current) => ({ ...current, messages: dropLocal(current.messages, clientId) }));
+      else updateIfOpen(id, () => previousConversation);
+    };
+    let settled = false;
+    const settle = () => {
+      if (!settled) setSendingFor(id, false);
+      settled = true;
+    };
     try {
       const response = await apiFetch(path, {
         method: "POST",
@@ -745,7 +780,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       if (!response.ok) {
         const detail = await apiErrorDetail(response, "Omiryn could not reply.");
         if (response.status === 429) {
-          updateIfOpen(id, () => previousConversation);
+          dropBubble();
           if (stillOpen()) setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
           const friendly = friendlyQuotaMessage(detail.message);
           const retryAfterSeconds = retryAfterFromResponse(response);
@@ -760,11 +795,11 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
         }
         if (response.status === 409 && body === null) return "not_retryable";
         if (detail.code === "reply_failed" || response.status >= 500) {
-          markLastUserMessageFailed(id);
+          updateIfOpen(id, (current) => ({ ...current, messages: markBurstFailed(current.messages, clientId) }));
           return "failed";
         }
         // Rejected before it was saved (for example a finished conversation): nothing to retry.
-        updateIfOpen(id, () => previousConversation);
+        dropBubble();
         if (stillOpen()) {
           setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
           setError(detail.message);
@@ -773,27 +808,23 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       }
       const nextConversation = (await response.json()) as Conversation;
       // Shown only if the user is still in that chat; otherwise it waits there, marked unread.
-      updateIfOpen(id, () => nextConversation);
+      updateIfOpen(id, (current) => ({ ...nextConversation, messages: mergeServerMessages(current.messages, nextConversation.messages) }));
       // Drop the typing row in the same render the reply lands, not after the history refresh.
-      setSendingFor(id, false);
-      await fetchSummaries();
-      if (stillOpen()) void loadConversationUsage(id);
+      settle();
+      // A burst's other requests return as soon as they are saved; refresh once, after the last.
+      if (!openRequestsRef.current.get(id)) {
+        await fetchSummaries();
+        if (stillOpen()) void loadConversationUsage(id);
+      }
       return "ok";
     } catch {
       // No answer at all (offline, server down): keep the bubble with a Retry.
-      markLastUserMessageFailed(id);
+      if (clientId) updateIfOpen(id, (current) => ({ ...current, messages: markLocalFailed(current.messages, clientId) }));
+      else updateIfOpen(id, (current) => ({ ...current, messages: markBurstFailed(current.messages, null) }));
       return "failed";
     } finally {
-      setSendingFor(id, false);
+      settle();
     }
-  }
-
-  function markLastUserMessageFailed(id: string) {
-    setConversation((current) => {
-      if (!current || current.id !== id) return current;
-      const index = current.messages.map((item) => item.role).lastIndexOf("user");
-      return { ...current, messages: current.messages.map((item, position) => (position === index ? { ...item, delivery_status: "failed" } : item)) };
-    });
   }
 
   async function updateModel(model: string) {
@@ -1180,10 +1211,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                     {/* The user's own photo shows only when they have one; no placeholder bubble. */}
                     {!agent && userAvatar ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback={null} /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
-                  {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
+                  {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
+            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
@@ -1312,7 +1343,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
               </div>
               <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)} onSelect={(event) => void refreshEmojiShortcodeSuggestions(draft, event.currentTarget.selectionStart)} onKeyDown={handleComposerKeyDown} onBlur={closeEmojiShortcodeSuggestions} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} role="combobox" aria-autocomplete="list" aria-expanded={Boolean(emojiSuggestions.length)} aria-controls={emojiSuggestions.length ? "emoji-shortcode-menu" : undefined} aria-activedescendant={emojiSuggestions.length ? `emoji-shortcode-option-${selectedEmojiSuggestion}` : undefined} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
               {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
-              <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
+              <button type="submit" disabled={!draft.trim() || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
             </form>
             </>
           )}
@@ -1418,16 +1449,14 @@ function applyRealtimeEvent(
     content: typeof record.content === "string" ? record.content : undefined,
     created_at: typeof record.created_at === "string" ? record.created_at : undefined,
     delivery_status: typeof record.delivery_status === "string" ? record.delivery_status : undefined,
+    ...(typeof record.client_id === "string" ? { client_id: record.client_id } : {}),
+    ...(record.reply_to && typeof record.reply_to === "object" ? { reply_to: record.reply_to as ReplyQuote } : {}),
   };
   if (!message.role || typeof message.content !== "string") return;
 
   setConversation((current) => {
     if (!current || current.id !== event.scope_id) return current;
-    if (messageIndex > current.messages.length) return current;
-    const messages = [...current.messages];
-    if (messageIndex === messages.length) messages.push(message);
-    else messages[messageIndex] = { ...messages[messageIndex], ...message };
-    return { ...current, messages };
+    return { ...current, messages: applyMessageAt(current.messages, messageIndex, message) };
   });
 }
 
