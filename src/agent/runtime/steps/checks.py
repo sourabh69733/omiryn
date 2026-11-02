@@ -12,6 +12,7 @@ from agent.context_engine.policy.freshness import (
     stale_reply_reason,
     trim_questions,
     without_copied_replies,
+    without_repeated_opening,
     without_repeated_questions,
 )
 from agent.context_engine.policy.requests import (
@@ -63,7 +64,13 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
         # The note goes last, where the model follows it best, and the replies the draft copied
         # leave the history so the rewrite cannot copy them again.
         history = without_copied_replies(job.reply_messages, reply)
-        note = rewrite_instruction(reply, reason, quote_draft=len(history) == len(job.reply_messages))
+        note = rewrite_instruction(
+            reply,
+            reason,
+            quote_draft=len(history) == len(job.reply_messages),
+            # Repeating itself, the fix is often to say less, so the draft's length must not bind it.
+            keep_length=question_rule_reason(reply, job.question_limit) is not None,
+        )
         rewritten = await job.rewrite(note, history)
     except Exception as error:
         return reply, {"reason": reason, "rewritten": False, "error": type(error).__name__}
@@ -76,6 +83,7 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
         trimmed = True
     # Same for a question it already asked: the rewrite often brings it back.
     rewritten = without_repeated_questions(rewritten, job.previous_replies)
+    rewritten = without_repeated_opening(rewritten, job.previous_replies)
     return rewritten, {"reason": reason, "rewritten": True, "questions_trimmed": trimmed, "still_stale": problem(rewritten) is not None}
 
 
@@ -117,10 +125,11 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True, "saved_requests": len(saved)}
 
 
-# In order; the name is the key of its result in the turn trace.
+# In order; the name is the key of its result in the turn trace. Freshness comes last so it reads
+# the text the user will see: a request rewrite has no repeat check of its own.
 REPLY_CHECKS: tuple[tuple[str, Check], ...] = (
-    ("freshness", freshen_reply),
     ("request_check", follow_requests),
+    ("freshness", freshen_reply),
 )
 
 __all__ = ["REPLY_CHECKS", "follow_requests", "freshen_reply", "freshness_check_enabled", "request_check_enabled", "request_check_mode"]
