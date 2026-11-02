@@ -20,6 +20,7 @@ UPLOAD_MERGE = "upload_merge"
 CARD_REBUILD = "card_rebuild"
 PERSON_CARD = "person_card"
 SEARCH_QUERIES = "search_queries"
+MATCH_REASONS = "match_reasons"
 
 PROFILE_SIGNAL_EXTRACT = "profile_signal_extract"
 PROFILE_SIGNAL_BACKFILL = "profile_signal_backfill"

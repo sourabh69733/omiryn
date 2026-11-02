@@ -6,6 +6,7 @@ A new tool is one module: a handler that returns a ToolResult and a register_too
 from . import chat_search as _chat_search  # noqa: F401  (registers search_chats)
 from . import web_search as _web_search  # noqa: F401  (registers web_search)
 from . import places as _places  # noqa: F401  (registers find_places)
+from . import match_outcome as _match_outcome  # noqa: F401  (registers record_match_outcome)
 from .chat_search import chat_search_enabled
 from .loop import MAX_CALLS_PER_ROUND, MAX_ROUNDS, reply_with_tools, tool_arguments, tool_result_messages, tools_enabled
 from .places import places_enabled

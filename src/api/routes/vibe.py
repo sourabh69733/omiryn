@@ -68,6 +68,16 @@ class ConsentChoice(BaseModel):
     private_matching: bool
 
 
+@router.get("/api/me/match-readiness")
+async def get_match_readiness(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """Whether Omi knows the user well enough to match them, and what is still missing."""
+    from agent.matching import match_readiness
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in first.")
+    return match_readiness(user.id).as_dict()
+
+
 @router.get("/api/me/consent")
 async def get_consent(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     """Whether matching may weigh the user's private areas. Never asked counts as no."""

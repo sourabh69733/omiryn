@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from admin.match_routes import router as admin_match_router
 from admin.routes import router as admin_router
 from agent.jobs.worker import job_worker
 from agent.proactive import proactive_scheduler
@@ -87,6 +88,7 @@ app.mount(
     name="profile-photos",
 )
 app.include_router(admin_router)
+app.include_router(admin_match_router)
 app.include_router(api_router)
 
 

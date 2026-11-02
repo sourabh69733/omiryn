@@ -40,6 +40,14 @@ def _job_handlers() -> dict[str, JobHandler]:
     # Imported here so storage and the worker load without pulling in cognition code.
     from agent.cognition.background.cards.rebuild import CARD_REBUILD_JOB, run_card_rebuild_job
     from agent.cognition.background.idle import MEMORY_FLUSH_JOB, run_memory_flush_job
+    from agent.matching.hosting import (
+        MATCH_CHECK_IN_JOB,
+        MATCH_INTRO_JOB,
+        MATCH_REMINDER_JOB,
+        run_match_check_in_job,
+        run_match_intro_job,
+        run_match_reminder_job,
+    )
     from agent.proactive.service import RETURN_GREETING_JOB, run_return_greeting_job
     from agent.proactive.story import run_story_part_job
     from agent.runtime.story_mode import STORY_PART_JOB
@@ -49,6 +57,9 @@ def _job_handlers() -> dict[str, JobHandler]:
         STORY_PART_JOB: run_story_part_job,
         CARD_REBUILD_JOB: run_card_rebuild_job,
         RETURN_GREETING_JOB: run_return_greeting_job,
+        MATCH_INTRO_JOB: run_match_intro_job,
+        MATCH_REMINDER_JOB: run_match_reminder_job,
+        MATCH_CHECK_IN_JOB: run_match_check_in_job,
     }
 
 

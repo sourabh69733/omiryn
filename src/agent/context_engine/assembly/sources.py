@@ -24,6 +24,8 @@ from agent.context_engine.sources.legacy import (
     behavior_rule_sources,
     data_point_sources,
 )
+from agent.context_engine.sources.match_hosting import match_hosting_sources
+from agent.context_engine.sources.meet_facts import meet_facts_sources
 from agent.context_engine.sources.memories import memory_sources
 from agent.context_engine.sources.might_fit import might_fit_sources
 from agent.context_engine.sources.open_questions import open_question_sources
@@ -123,6 +125,8 @@ def build_reply_context_sources(
         + self_note_sources(user_id, user_text)
         + open_question_sources(conversation_id, user_id)
         + asked_question_sources(conversation_id, user_id)
+        + (meet_facts_sources(user_id) if pipeline.memory_contract_version == 3 else [])
+        + match_hosting_sources(user_id)
         + reply_feedback_sources(user_id)
         + (uploaded_chat_sources(user_id, user_text, conversation_id) if pipeline.memory_contract_version == 3 else [])
         + past_lines

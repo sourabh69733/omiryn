@@ -43,8 +43,14 @@ A request is broken when the reply goes against it, for example:
   any mention of it.
 Requests the reply has no chance to break (it never comes up) are kept.
 
-Return JSON only: {"broken": ["<the request, or the user message holding it, copied exactly as given>"]},
-or {"broken": []}."""
+Also list the requests the user made in recent_user_messages about how the companion should talk
+to them, including a question they turned down. Each is one short sentence in the imperative, in
+the companion's terms ("Do not ask what they are doing right now.", "Reply in English.", "Keep
+replies short."), with the user message it comes from copied exactly. Plain chat, moods, facts about
+their life and one-off answers are not requests: usually the list is empty.
+
+Return JSON only: {"broken": ["<the request, or the user message holding it, copied exactly as given>"],
+"requests": [{"request": "<one sentence>", "from": "<the user message, copied exactly>"}]}."""
 
 
 def request_check_reason(
@@ -63,7 +69,8 @@ def request_check_reason(
       understanding already recognises (no questions, no advice, just listen, "you keep asking").
 
     Not caught, by design: a request made this session in words none of those phrases cover, when
-    the draft has no question. It holds once the background run saves it as a how-to-talk memory.
+    the draft has no question. It holds once a later check or the background run saves it as a
+    how-to-talk memory.
     AGENT_REQUEST_CHECK=always restores the check on every reply.
     """
     if requests:
@@ -129,6 +136,24 @@ def broken_requests(raw: Any, requests: list[str]) -> list[str]:
     return [item for item in dict.fromkeys(broken or []) if isinstance(item, str) and item in given]
 
 
+# A request the checker wrote; longer is a paragraph, not a request.
+_REQUEST_CHARS = 160
+
+
+def found_requests(raw: Any, recent_user_messages: list[str]) -> list[tuple[str, str]]:
+    """(request, user message) pairs the checker found; only ones that quote a given message count."""
+    given = set(recent_user_messages)
+    found: list[tuple[str, str]] = []
+    for item in (raw.get("requests") if isinstance(raw, dict) else None) or []:
+        if not isinstance(item, dict):
+            continue
+        request = " ".join(str(item.get("request") or "").split())
+        source = str(item.get("from") or "")
+        if request and len(request) <= _REQUEST_CHARS and source in given and (request, source) not in found:
+            found.append((request, source))
+    return found
+
+
 def broken_requests_reason(broken: list[str]) -> str:
     return "it goes against what the user asked of you: " + "; ".join(f'"{item}"' for item in broken)
 
@@ -140,6 +165,7 @@ __all__ = [
     "REQUEST_CHECK_SYSTEM_PROMPT",
     "broken_requests",
     "broken_requests_reason",
+    "found_requests",
     "how_to_talk_requests",
     "recent_user_requests",
     "request_check_input",

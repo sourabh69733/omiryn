@@ -18,10 +18,12 @@ from agent.context_engine.policy.requests import (
     asked_question_requests,
     broken_requests,
     broken_requests_reason,
+    found_requests,
     recent_user_requests,
     request_check_input,
     request_check_reason,
 )
+from agent.memory_engine.memories.talk_requests import save_talk_requests
 from agent.providers import check_reply_requests
 
 from .job import ReplyJob
@@ -79,8 +81,9 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
 
 async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
     """One rewrite when the draft breaks how the user asked to be talked to: their saved requests,
-    what they asked earlier in this session (saved only once the chat goes quiet), and a question
-    already asked here that they turned down or answered."""
+    what they asked earlier in this session, and a question already asked here that they turned
+    down or answered. A request the checker finds in this session is saved as a how-to-talk memory
+    on the spot, so other chats know it too."""
     recent = recent_user_requests(job.history, job.user_text)
     if not (job.requests or recent) or not request_check_enabled():
         return reply, None
@@ -94,9 +97,11 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
         )
     except Exception as error:
         return reply, {"checked": False, "error": type(error).__name__}
+    # A request the checker read in this session is saved now, so it holds in every chat from here.
+    saved = save_talk_requests(job.user_id or "", job.conversation_id, job.history, job.user_text, found_requests(raw, recent))
     broken = broken_requests(raw, [*job.requests, *recent, *asked_question_requests(job.asked)])
     if not broken:
-        return reply, {"checked": True, "reason": reason, "broken": []}
+        return reply, {"checked": True, "reason": reason, "broken": [], "saved_requests": len(saved)}
     try:
         # Like the freshness rewrite: the replies the draft copied leave the history, so the
         # rewrite cannot copy them back, and a question it already asked is dropped if it returns.
@@ -109,7 +114,7 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     if question_rule_reason(rewritten, job.question_limit):
         rewritten = trim_questions(rewritten, job.question_limit)
     rewritten = without_repeated_questions(rewritten, job.previous_replies)
-    return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True}
+    return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True, "saved_requests": len(saved)}
 
 
 # In order; the name is the key of its result in the turn trace.

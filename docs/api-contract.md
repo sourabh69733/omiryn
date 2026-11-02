@@ -135,6 +135,13 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
 | `DELETE /api/me/account-data?confirm=true` | Delete the account's private data. |
 | `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
+| `GET/POST /api/admin/pools` | Admin only: match pools (name, join code, match weekday). |
+| `GET /api/admin/pools/{id}` | Admin only: the pool's members with readiness and non-private vibe lines, pairs so far, suggested pairs. |
+| `POST /api/admin/pools/{id}/pairs` | Admin only: `{"user_a","user_b"}`; runs the compatibility check, stores the pair as `proposed`. |
+| `POST /api/admin/pairs/{id}/introduce` | Admin only: `{"place"?, "when"?, "meet_at"?}` (`meet_at` ISO 8601 with offset). Marks the pair `introduced`, queues Omi's introduction to both in their own chats, a reminder before the meet and check-ins at day 3 and day 30. 409 when the pair is not `proposed`. |
+| `PATCH /api/admin/pairs/{id}` | Admin only: `{"status"}`, one of proposed, introduced, met, no_show, declined, still_talking. |
+| `GET /api/me/pools`, `POST /api/me/pools/join`, `DELETE /api/me/pools/{id}` | The user's pools and pair statuses (never the reasons), join by code, leave. |
+| `GET /api/me/match-readiness` | Whether the user can be matched yet and what is missing, in plain blockers. |
 | `GET /api/agent/settings/model` | Reply models on offer (name, strong point), the default and the user's pick. |
 | `PUT /api/agent/settings/model` | `{"model": "<id>"}` picks one; `{"model": null}` goes back to the default. |
 | `GET /api/channels/telegram` | `available` (on for this account), `connected`, `bot_username`. |

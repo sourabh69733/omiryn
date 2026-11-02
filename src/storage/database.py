@@ -40,6 +40,7 @@ PRIVATE_USER_OWNED_TABLE_NAMES = (
     "agent_open_questions",
     "channel_links",
     "channel_link_codes",
+    "match_pool_members",
 )
 
 
@@ -171,6 +172,8 @@ def _ensure_runtime_columns() -> None:
         "agent_user_settings": ("timezone", "reply_model"),
         "agent_memories": ("statement", "focus", "followed_up_at"),
         "agent_user_cards": ("rebuilt_at",),
+        "agent_jobs": ("payload_json",),
+        "match_pairs": ("plan_json", "introduced_at"),
         "agent_conversations": (
             "user_id",
             "agent_provider",
@@ -196,7 +199,7 @@ def _ensure_runtime_columns() -> None:
                         column_type = "INTEGER"
                     if column_name.endswith("_at"):
                         column_type = "TIMESTAMP WITH TIME ZONE"
-                    if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons"}:
+                    if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons", "payload_json", "plan_json"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name in _BOOLEAN_COLUMNS else ""
                     if column_name == "fact_type":

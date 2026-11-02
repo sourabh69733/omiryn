@@ -111,6 +111,10 @@ def delete_user_private_data(user_id: str, email: str | None = None) -> dict[str
             result = connection.execute(table.delete().where(table.c.user_id == user_id))
             summary["deleted"][table.name] = int(result.rowcount or 0)
 
+        from .match_pools import delete_match_data_for_user
+
+        summary["deleted"].update(delete_match_data_for_user(connection, user_id))
+
         if email:
             result = connection.execute(
                 public_leads.delete().where(func.lower(public_leads.c.contact) == email.lower())

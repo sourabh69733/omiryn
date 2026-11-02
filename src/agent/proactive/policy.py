@@ -121,7 +121,7 @@ EVENT_NEXT_MORNING = time(9)
 EVENT_FOLLOW_UP_WINDOW = timedelta(days=3)
 # At most one plan follow-up a day, across all chats.
 EVENT_FOLLOW_UP_GAP = timedelta(hours=24)
-# Local hours in which Omi may message a user who is away (Telegram); never at night.
+# Local hours in which Omi may message a user who is away (Telegram, WhatsApp); never at night.
 REACH_OUT_HOURS = range(10, 21)
 
 
