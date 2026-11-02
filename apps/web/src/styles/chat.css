@@ -648,9 +648,9 @@ button.history-archived-toggle:hover {
     var(--ink);
 }
 
-/* A photo that fails to load leaves the circle empty: hide it rather than show a blank badge. */
+/* The photo failed to load: the slot stays, so this bubble lines up with the ones above it. */
 .chat-avatar.user:empty {
-  display: none;
+  visibility: hidden;
 }
 
 .chat-avatar img {
