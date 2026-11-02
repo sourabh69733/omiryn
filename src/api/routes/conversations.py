@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
@@ -10,6 +9,7 @@ from agent.feedback import normalize_message_feedback
 from agent.cognition.background.idle import request_flush_now
 from agent.feedback.rating_memory import sync_rating_memories
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
+from agent.shared.clock import utc_now
 from security.auth import CurrentUser, require_user
 from storage.audit_log import record_audit_event
 from storage.conversations import is_temporary_conversation
@@ -29,6 +29,7 @@ from storage import (
     replace_agent_message_feedback,
     save_draft,
     set_conversation_archived,
+    touch_burst,
 )
 
 from ..helpers import (
@@ -60,13 +61,12 @@ from ..models import (
 from ..usage_limits import CHAT_MESSAGE_LIMIT, enforce_user_action_limit
 
 from ..chat_service import (
+    WEB_CHANNEL,
     _change_messages,
-    _find_message,
     _new_conversation,
     _reply_failed,
-    _reply_to_pending,
-    post_user_message,
 )
+from ..reply_bursts import post_web_message, retry_web_message
 
 router = APIRouter()
 
@@ -293,9 +293,22 @@ async def send_agent_message(
 ) -> AgentConversation:
     conversation = _get_existing_conversation(conversation_id, user)
     _remember_user_timezone(user, timezone_header)
-    return await post_user_message(
-        conversation, user, payload.message, background_tasks, reply_to_index=payload.reply_to_index
+    return await post_web_message(
+        conversation,
+        user,
+        payload.message,
+        background_tasks,
+        reply_to_index=payload.reply_to_index,
+        client_id=payload.client_id,
     )
+
+
+@router.post("/api/agent/conversations/{conversation_id}/typing")
+async def agent_chat_typing(conversation_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, bool]:
+    """The user is still typing while a reply is pending: Omi waits a little longer for the rest."""
+    _get_existing_conversation(conversation_id, user)
+    touch_burst(WEB_CHANNEL, conversation_id, utc_now())
+    return {"ok": True}
 
 @router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/retry")
 async def retry_agent_message(
@@ -318,19 +331,7 @@ async def retry_agent_message(
         raise HTTPException(status_code=409, detail="This message has nothing to retry.")
     enforce_user_action_limit(_user_id(user), CHAT_MESSAGE_LIMIT)
     _remember_user_timezone(user, timezone_header)
-    pending = dict(messages[message_index])
-
-    def mark_sending(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-        index = _find_message(stored, message_index, pending)
-        if index is None:
-            return None
-        stored[index]["delivery_status"] = "sending"
-        return stored
-
-    _change_messages(conversation, user, mark_sending)
-    return await _reply_to_pending(
-        conversation, user, conversation.messages[:message_index], pending, background_tasks
-    )
+    return await retry_web_message(conversation, user, background_tasks)
 
 def _sync_rating_memories(user_id: str) -> None:
     """A reason given on several bad replies becomes a lasting how-to-talk memory."""
