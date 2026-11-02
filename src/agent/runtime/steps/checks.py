@@ -31,6 +31,8 @@ from .job import ReplyJob
 
 Check = Callable[[str, ReplyJob], Awaitable[tuple[str, dict[str, Any] | None]]]
 
+_BARE_ACKNOWLEDGEMENT_WORDS = 3
+
 
 def freshness_check_enabled() -> bool:
     return os.getenv("AGENT_FRESHNESS_CHECK", "true").strip().lower() != "false"
@@ -87,6 +89,11 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
     return rewritten, {"reason": reason, "rewritten": True, "questions_trimmed": trimmed, "still_stale": problem(rewritten) is not None}
 
 
+def _bare_acknowledgement(reply: str) -> bool:
+    """A few plain words with no question or emoji, such as "theek hai."."""
+    return len(reply.split()) <= _BARE_ACKNOWLEDGEMENT_WORDS and all(char.isalnum() or char.isspace() or char in ".,!'" for char in reply)
+
+
 async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
     """One rewrite when the draft breaks how the user asked to be talked to: their saved requests,
     what they asked earlier in this session, and a question already asked here that they turned
@@ -109,7 +116,8 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     saved = save_talk_requests(job.user_id or "", job.conversation_id, job.history, job.user_text, found_requests(raw, recent))
     # A reply with no question cannot ask a closed one again, whatever the checker says.
     closed_questions = asked_question_requests(job.asked) if "?" in reply else []
-    broken = broken_requests(raw, [*job.requests, *recent, *closed_questions])
+    # Nor does a bare "theek hai" have anything in it to break; the checker often says it does.
+    broken = [] if _bare_acknowledgement(reply) else broken_requests(raw, [*job.requests, *recent, *closed_questions])
     if not broken:
         return reply, {"checked": True, "reason": reason, "broken": [], "saved_requests": len(saved)}
     try:
