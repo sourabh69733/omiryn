@@ -35,6 +35,7 @@ from agent.cognition.background.memory_run.settings import (
 from agent.config import agent_pipeline_config
 from agent.context_engine.threads import apply_validated_thread_proposal, background_thread_candidates
 from agent.memory_engine.memories.application import apply_validated_memory_analysis_v3
+from agent.memory_engine.memories.talk_requests import without_unclear_requests
 from agent.memory_engine.memories.embeddings import embed_memory_query, index_agent_memories, refresh_user_memory_embeddings
 from agent.memory_engine.memories.vibe import rejected_texts, vibe_texts
 from agent.memory_engine.processing.application import apply_validated_memory_analysis
@@ -361,6 +362,7 @@ async def _run_claimed_background_cognition(
 async def _apply_memories(batch: MemoryBatch, analysis: Any, model: str | None, memory_version: int) -> Any:
     if memory_version != 3:
         return apply_validated_memory_analysis(batch, analysis)
+    analysis = await without_unclear_requests(batch, analysis)
     result = apply_validated_memory_analysis_v3(batch, analysis, extractor_model=background_model(model))
     await index_agent_memories(result.memories, conversation_id=batch.conversation_id)
     # Heals memories whose embedding failed in an earlier run.

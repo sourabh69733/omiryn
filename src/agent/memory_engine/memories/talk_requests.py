@@ -4,15 +4,24 @@ Before this, a request ("stop asking that", "english?") held in the same chat th
 and in other chats only once the background run saved it minutes later, if it did. Now the checker
 names the requests it read in the user's recent messages, and code saves each as a procedural
 memory with that message as evidence. The background run still sees it and may refine or replace it.
+
+A rule is applied to every later reply for good, so one saved from a moment of anger ("do not ask
+stupid questions") does harm. The checker judges this well; the background run's long prompt does
+not, so a how-to-talk memory that run adds is kept only if the checker also reads a request in its
+evidence.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
 from agent.context_engine.policy.freshness import _normalize, _word_overlap
+from agent.context_engine.policy.requests import request_check_input
+from agent.memory_engine.memories.operations import MemoryAddProposal, MemoryAnalysisV3
+from agent.memory_engine.processing.models import MemoryBatch
 from agent.shared.clock import utc_now
 from agent.shared.memory_models import MemoryKind, MemoryPurpose
 
@@ -92,4 +101,32 @@ def _message_index(history: list[dict[str, Any]], user_text: str, source: str) -
     return None
 
 
-__all__ = ["EXTRACTOR", "save_talk_requests"]
+async def without_unclear_requests(batch: MemoryBatch, analysis: MemoryAnalysisV3) -> MemoryAnalysisV3:
+    """Drops how-to-talk memories the background run added when the checker reads no request in
+    their evidence. Only additions are checked, so this costs a call only when one is proposed."""
+    kept = [
+        operation
+        for operation in analysis.operations
+        if not (isinstance(operation, MemoryAddProposal) and operation.kind == MemoryKind.PROCEDURAL and await _no_request_in_evidence(batch, operation))
+    ]
+    if len(kept) == len(analysis.operations):
+        return analysis
+    logger.info("agent.talk_requests.dropped_unclear count=%s", len(analysis.operations) - len(kept))
+    return replace(analysis, operations=tuple(kept))
+
+
+async def _no_request_in_evidence(batch: MemoryBatch, proposal: MemoryAddProposal) -> bool:
+    from agent.providers import check_reply_requests
+
+    quotes = [message.content for message in batch.messages if message.message_index in proposal.evidence_message_indexes]
+    if not quotes:
+        return False
+    try:
+        raw = await check_reply_requests(request_check_input("", [], quotes, []), conversation_id=batch.conversation_id)
+    except Exception as error:
+        logger.warning("agent.talk_requests.check_failed error_type=%s", type(error).__name__)
+        return False
+    return isinstance(raw, dict) and raw.get("requests") == []
+
+
+__all__ = ["EXTRACTOR", "save_talk_requests", "without_unclear_requests"]

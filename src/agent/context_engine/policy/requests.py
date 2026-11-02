@@ -41,13 +41,23 @@ A request is broken when the reply goes against it, for example:
 - more detail or longer replies: fewer than about 40 words, or only one or two sentences, breaks it.
 - "no emojis": any emoji. "no advice": telling them what to do. A subject they asked not to bring up:
   any mention of it.
-Requests the reply has no chance to break (it never comes up) are kept.
+Requests the reply has no chance to break (it never comes up) are kept. A reply with no question in
+it cannot break a request about questions.
 
-Also list the requests the user made in recent_user_messages about how the companion should talk
-to them, including a question they turned down. Each is one short sentence in the imperative, in
-the companion's terms ("Do not ask what they are doing right now.", "Reply in English.", "Keep
-replies short."), with the user message it comes from copied exactly. Plain chat, moods, facts about
-their life and one-off answers are not requests: usually the list is empty.
+Separately, under "requests", never in "broken": list the lasting requests the user made in
+recent_user_messages about how the companion should talk to them. Each one is applied to every later
+reply for good, so list it only when two people reading a reply would agree whether it was followed:
+a language, a length, emojis, what to call them, a particular question or subject. Write each as one short English instruction to the companion, not
+in the user's words ("Do not call them <name>.", "Reply in <language>.", "Do not ask about <thing>."),
+with the user message it comes from copied exactly. It must be what that message itself asks. Stopping
+a kind of question they name counts, and a bare language name asked as a question ("<language>?")
+asks for that language.
+A request resting on an opinion word (stupid, nonsense, useless, annoying, boring) cannot be checked.
+So "do not ask stupid questions" is never listed as it stands: when it turns down a question in
+asked_questions, write "Do not ask <what that question asks>."; when asked_questions has none, list
+nothing. Also not requests: anger, insults and complaints with no clear change in them, "shut up" or
+"stop" for this moment, plain chat, moods, facts about their life and one-off answers. Usually the
+list is empty.
 
 Return JSON only: {"broken": ["<the request, or the user message holding it, copied exactly as given>"],
 "requests": [{"request": "<one sentence>", "from": "<the user message, copied exactly>"}]}."""
