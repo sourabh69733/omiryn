@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from agent.context_engine.policy.replies import strip_quiet_markers
+from agent.context_engine.policy.replies import is_one_emoji, strip_quiet_markers
 from agent.context_engine.prompt_engine.versions.v4_1 import V4_1_GOAL
 from agent.context_engine.prompt_engine.versions.v4_2 import V4_2_GOAL
 from agent.providers import _provider_messages
@@ -46,6 +46,14 @@ class MarkersTest(unittest.TestCase):
     def test_emoji_with_joiners_counts_as_one(self) -> None:
         self.assertEqual(strip_quiet_markers("<react:👍🏽>")[1], "👍🏽")
         self.assertEqual(strip_quiet_markers("<react:❤️‍🔥>")[1], "❤️‍🔥")
+
+    def test_keycaps_and_flags_count_as_one_emoji(self) -> None:
+        for emoji in ("1️⃣", "🇮🇳", "❤️", "©️"):
+            with self.subTest(emoji=emoji):
+                self.assertTrue(is_one_emoji(emoji))
+        for text in ("nice", "हाँ", "12", "—", "👍 👍", ""):
+            with self.subTest(text=text):
+                self.assertFalse(is_one_emoji(text))
 
     def test_plain_text_is_untouched(self) -> None:
         finished = finish_reply("kya hua?", "hmm")
@@ -132,6 +140,52 @@ class OverTheApiTest(unittest.TestCase):
         sent = generate.await_args_list[1].args[0]
         self.assertEqual(sent[-1]["content"].split()[-1], "suno")
         self.assertIn("<react:👍>", [m["content"] for m in _provider_messages(sent)])
+
+
+    def _react(self, calls: list[tuple[str, int, str | None]]) -> tuple[list[dict], list[int]]:
+        statuses: list[int] = []
+
+        async def scenario() -> str:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                conversation_id = (await client.post("/api/agent/conversations")).json()["id"]
+                await client.post(f"/api/agent/conversations/{conversation_id}/messages", json={"message": "hmm"})
+                for method, index, emoji in calls:
+                    url = f"/api/agent/conversations/{conversation_id}/messages/{index}/reaction"
+                    response = await client.request(method, url, **({"json": {"emoji": emoji}} if emoji else {}))
+                    statuses.append(response.status_code)
+            return conversation_id
+
+        with patch("agent.runtime.orchestrator.generate_agent_reply", AsyncMock(return_value="haan bolo")):
+            conversation_id = asyncio.run(scenario())
+        return get_conversation(conversation_id, USER_ID)["messages"], statuses
+
+    def test_the_user_reacts_to_omi_and_takes_it_back(self) -> None:
+        messages, statuses = self._react([("PUT", 2, "❤️")])
+        self.assertEqual(statuses, [200])
+        self.assertEqual(messages[2]["user_reaction"], "❤️")
+        self.assertEqual(len(messages), 3)  # no reply is started
+
+        messages, statuses = self._react([("PUT", 2, "❤️"), ("PUT", 2, "😂"), ("DELETE", 2, None)])
+        self.assertEqual(statuses, [200, 200, 200])
+        self.assertNotIn("user_reaction", messages[2])
+
+    def test_a_reaction_needs_one_of_omis_messages_and_one_emoji(self) -> None:
+        _, statuses = self._react([("PUT", 1, "❤️"), ("PUT", 99, "❤️"), ("PUT", -1, "❤️"), ("PUT", 2, "nice")])
+        self.assertEqual(statuses, [404, 404, 404, 422])
+
+
+class SeesTheUsersReactionTest(unittest.TestCase):
+    def test_the_model_is_told_what_they_reacted_to(self) -> None:
+        sent = _provider_messages(
+            [
+                {"role": "assistant", "content": "ek joke", "user_reaction": "😂"},
+                {"role": "user", "content": "aur suna"},
+            ]
+        )
+        self.assertEqual(
+            [m["content"] for m in sent], ["ek joke", "[They reacted 😂 to your message above.]", "aur suna"]
+        )
 
 
 class VersionTest(unittest.TestCase):

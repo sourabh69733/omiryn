@@ -132,6 +132,8 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         wordless = _wordless_answer(message)
         if wordless:
             provider_messages.append({"role": "assistant", "content": wordless})
+        if role == "assistant" and message.get("user_reaction"):
+            provider_messages.append({"role": "user", "content": f"[They reacted {message['user_reaction']} to your message above.]"})
     if tool_results_as_plain_text():
         provider_messages = flatten_tool_messages(provider_messages)
     provider_messages = _merge_adjacent_assistant_messages(provider_messages)
