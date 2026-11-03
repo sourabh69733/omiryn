@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_1_is_the_default_and_keeps_its_whole_goal(self) -> None:
+    def test_v4_2_is_the_default_and_keeps_its_whole_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,8 +150,8 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4-1")
-        self.assertIn("one word or one emoji is the", package.system_prompt)
+        self.assertEqual(package.prompt_version, "v4-2")
+        self.assertIn("<no_reply> as your whole reply", package.system_prompt)
         # The goal's last line survives the block's limit.
         self.assertIn("Say something only this conversation could produce.", package.system_prompt)
 
