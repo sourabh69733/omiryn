@@ -210,3 +210,13 @@ class PromptV43Test(unittest.TestCase):
         self.assertIn("not as something you saw or did", V4_3_GOAL)
         self.assertNotIn("not as something you saw or did", V4_2_GOAL)
         self.assertEqual(V4_2_PROMPT_VERSION.base_prompt, V4_CHARACTER)
+
+    def test_omi_has_no_favourite_food_to_copy(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_3 import V4_3_CHARACTER
+
+        self.assertIn("biryani", V4_CHARACTER)
+        self.assertNotIn("biryani", V4_3_CHARACTER)
+        self.assertNotIn("Dune", V4_3_CHARACTER)
+        self.assertNotIn("music, food, ideas", V4_3_CHARACTER)
+        self.assertIn("no favourite\n  food or drink", V4_3_CHARACTER)

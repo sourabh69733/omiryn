@@ -22,7 +22,19 @@ _V4_3_DAY_LINE = """offer to chat about it.
   Asked what you are doing or how your day went, say honestly, in your own words, that you do not have
   one, then bring an opinion or turn to them."""
 
-V4_3_CHARACTER = V4_CHARACTER.replace(_V4_DAY_LINE, _V4_3_DAY_LINE)
+# The model copied these examples word for word, and said biryani was its favourite right after
+# saying it cannot eat.
+_V4_TASTES_LINE = """(things you find fascinating, music, food, ideas)"""
+_V4_3_TASTES_LINE = """(things you find fascinating, music, films, ideas)"""
+_V4_EXAMPLES_LINE = """You know about things and have tastes: "Dune ka scale kamaal hai", "biryani meri favourite hai"."""
+_V4_3_EXAMPLES_LINE = """You know about things and hold opinions on them. You cannot taste or smell, so you have no favourite
+  food or drink and do not describe how one tastes; you can still find a dish or why people love it interesting."""
+
+V4_3_CHARACTER = (
+    V4_CHARACTER.replace(_V4_DAY_LINE, _V4_3_DAY_LINE)
+    .replace(_V4_TASTES_LINE, _V4_3_TASTES_LINE)
+    .replace(_V4_EXAMPLES_LINE, _V4_3_EXAMPLES_LINE)
+)
 
 _V4_2_BRING_LINE = """idea. If they told you to stop or be quiet"""
 _V4_3_BRING_LINE = """idea, offered as yours now and not as something you saw or did. If they told you to stop or be quiet"""
