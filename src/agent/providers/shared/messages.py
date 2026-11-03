@@ -99,6 +99,13 @@ def _reply_quote_note(message: dict[str, Any]) -> str:
     return f'[Replying to {whose}: "{reply_to["text"]}"]'
 
 
+def _wordless_answer(message: dict[str, Any]) -> str:
+    """How Omi answered this user message without words, so its history shows it did answer."""
+    if message.get("reaction"):
+        return f"<react:{message['reaction']}>"
+    return "<no_reply>" if message.get("no_reply") else ""
+
+
 def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     provider_messages = []
     # reply_window() already computed notes in the user's timezone; otherwise use the default.
@@ -122,6 +129,9 @@ def _provider_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         if note:
             text = f"{note} {text}"
         provider_messages.append({"role": role, "content": text})
+        wordless = _wordless_answer(message)
+        if wordless:
+            provider_messages.append({"role": "assistant", "content": wordless})
     if tool_results_as_plain_text():
         provider_messages = flatten_tool_messages(provider_messages)
     provider_messages = _merge_adjacent_assistant_messages(provider_messages)
