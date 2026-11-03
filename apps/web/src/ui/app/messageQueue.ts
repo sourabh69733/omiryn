@@ -37,6 +37,16 @@ export function applyMessageAt(current: Message[], index: number, message: Messa
   return [...next, ...stillOnTheirWay(current, [message])];
 }
 
+// The user's emoji on one of Omi's messages; null removes it.
+export function withUserReaction(messages: Message[], index: number, reaction: string | null): Message[] {
+  if (messages[index]?.role !== "assistant") return messages;
+  return messages.map((message, position) => {
+    if (position !== index) return message;
+    const { user_reaction: _old, ...rest } = message;
+    return reaction ? { ...rest, user_reaction: reaction } : rest;
+  });
+}
+
 export function dropLocal(messages: Message[], clientId: string): Message[] {
   return messages.filter((message) => !(message.local && message.client_id === clientId));
 }

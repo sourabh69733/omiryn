@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyMessageAt, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages } from "./messageQueue";
+import { applyMessageAt, dropLocal, withUserReaction, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages } from "./messageQueue";
 import type { Message } from "./types";
 
 const user = (content: string, extra: Message = {}): Message => ({ role: "user", content, client_id: content, ...extra });
@@ -71,4 +71,13 @@ test("a reaction outlives the message being saved again", () => {
   const current = [user("hmm", { reaction: "👍", delivery_status: "sending" })];
   assert.equal(applyMessageAt(current, 0, user("hmm", { delivery_status: "read" }))[0].reaction, "👍");
   assert.equal(applyMessageAt([user("hmm")], 0, user("hmm", { reaction: "👍" }))[0].reaction, "👍");
+});
+
+test("the user reacts only to Omi's messages, and can take it back", () => {
+  const current = [user("hmm"), omi("hi")];
+  const reacted = withUserReaction(current, 1, "❤️");
+  assert.equal(reacted[1].user_reaction, "❤️");
+  assert.equal("user_reaction" in withUserReaction(reacted, 1, null)[1], false);
+  assert.equal(withUserReaction(current, 0, "❤️"), current);
+  assert.equal(withUserReaction(current, 9, "❤️"), current);
 });
