@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 
 from agent.feedback import normalize_message_feedback
 from agent.cognition.background.idle import request_flush_now
+from agent.context_engine.policy.replies import is_one_emoji
 from agent.feedback.rating_memory import sync_rating_memories
 from agent.providers import AgentProviderError, agent_runtime_status, extract_profile
 from agent.shared.clock import utc_now
@@ -54,6 +55,7 @@ from ..models import (
     AgentConversationSettings,
     AgentConversationSummary,
     AgentMessageFeedbackCreate,
+    AgentMessageReaction,
     AgentProfileSubmission,
     DraftProfile,
     MessageSelection,
@@ -67,6 +69,7 @@ from ..chat_service import (
     _change_messages,
     _new_conversation,
     _reply_failed,
+    set_user_reaction,
 )
 from ..reply_bursts import post_web_message, retry_web_message
 
@@ -347,6 +350,32 @@ def _sync_rating_memories(user_id: str) -> None:
     except Exception:
         # The rating itself is saved; the lasting memory catches up on the next rating.
         logger.exception("agent.rating_memory.failed")
+
+@router.put("/api/agent/conversations/{conversation_id}/messages/{message_index}/reaction")
+async def react_to_agent_message(
+    conversation_id: str,
+    message_index: int,
+    payload: AgentMessageReaction,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """Put the user's emoji on one of Omi's messages, replacing an earlier one."""
+    if not is_one_emoji(payload.emoji):
+        raise HTTPException(status_code=422, detail="A reaction is one emoji.")
+    conversation = _get_existing_conversation(conversation_id, user)
+    await set_user_reaction(conversation, user, message_index, payload.emoji)
+    return {"user_reaction": payload.emoji}
+
+
+@router.delete("/api/agent/conversations/{conversation_id}/messages/{message_index}/reaction")
+async def remove_agent_message_reaction(
+    conversation_id: str,
+    message_index: int,
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    conversation = _get_existing_conversation(conversation_id, user)
+    await set_user_reaction(conversation, user, message_index, None)
+    return {"user_reaction": None}
+
 
 @router.post("/api/agent/conversations/{conversation_id}/messages/{message_index}/feedback")
 async def create_agent_message_feedback(

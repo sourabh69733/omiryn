@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 
 from agent.context_engine.policy.script import normalize_assistant_script
 
@@ -73,14 +74,17 @@ _NO_REPLY_MARKER = re.compile(r"[<\[]\s*no_reply\s*[>\]]", re.IGNORECASE)
 _REACTION_MAX_CHARS = 12
 
 
-def _is_one_emoji(text: str) -> bool:
-    return 0 < len(text) <= _REACTION_MAX_CHARS and not any(char.isascii() or char.isalnum() or char.isspace() for char in text)
+def is_one_emoji(text: str) -> bool:
+    """Short, with a symbol in it (or a keycap such as 1️⃣), and no letters or spaces."""
+    if not 0 < len(text) <= _REACTION_MAX_CHARS or any(char.isalpha() or char.isspace() for char in text):
+        return False
+    return "\u20e3" in text or any(unicodedata.category(char) == "So" for char in text)
 
 
 def strip_quiet_markers(text: str) -> tuple[str, str | None, bool]:
     """Remove the reaction and no-reply markers; return the text, the emoji, and whether the model
     chose to say nothing. A marker with no words and no usable emoji counts as saying nothing."""
-    emojis = [found for found in _REACTION_MARKER.findall(text) if _is_one_emoji(found)]
+    emojis = [found for found in _REACTION_MARKER.findall(text) if is_one_emoji(found)]
     marked = bool(_REACTION_MARKER.search(text) or _NO_REPLY_MARKER.search(text))
     cleaned = _NO_REPLY_MARKER.sub("", _REACTION_MARKER.sub("", text)).strip()
     reaction = emojis[-1] if emojis else None

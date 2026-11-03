@@ -240,6 +240,10 @@ class TypingSignal(BaseModel):
     active: bool = True
 
 
+class AgentMessageReaction(BaseModel):
+    emoji: str = Field(min_length=1, max_length=16)
+
+
 class AgentMessageFeedbackCreate(BaseModel):
     rating: AgentMessageFeedbackRating
     reason: str | None = Field(default=None, max_length=80)

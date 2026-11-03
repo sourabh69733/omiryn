@@ -256,6 +256,38 @@ async def save_web_message(
         await _publish_new_messages(conversation, placed["index"])
 
 
+async def set_user_reaction(
+    conversation: AgentConversation, user: CurrentUser, index: int, emoji: str | None
+) -> None:
+    """The user's emoji on one of Omi's messages, or none. Omi sees it the next time it replies;
+    a reaction does not start a reply."""
+    found: dict[str, bool] = {}
+
+    def change(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        if not 0 <= index < len(messages):
+            return None
+        message = messages[index]
+        if message.get("role") != "assistant" or message.get("deleted"):
+            return None
+        found["message"] = True
+        if emoji:
+            message["user_reaction"] = emoji
+        else:
+            message.pop("user_reaction", None)
+        return messages
+
+    _change_messages(conversation, user, change)
+    if not found:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    await realtime_hub.publish(
+        conversation_event(
+            "message.user_reaction",
+            conversation.id,
+            payload={"conversation_id": conversation.id, "message_index": index, "user_reaction": emoji},
+        )
+    )
+
+
 def mark_retry_sending(conversation: AgentConversation, user: CurrentUser) -> None:
     """Retry answers every message whose reply failed, not only the last."""
 
