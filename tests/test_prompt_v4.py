@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_2_is_the_default_and_keeps_its_whole_goal(self) -> None:
+    def test_v4_3_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,7 +150,10 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4-2")
+        self.assertEqual(package.prompt_version, "v4-3")
+        self.assertIn("Nothing happens to you between messages", package.system_prompt)
+        # The character's last line survives its block's limit too.
+        self.assertIn("one, then bring an opinion or turn to them.", package.system_prompt)
         self.assertIn("<no_reply> as your whole reply", package.system_prompt)
         # The goal's last line survives the block's limit.
         self.assertIn("Say something only this conversation could produce.", package.system_prompt)
@@ -194,3 +197,16 @@ class PromptV41Test(unittest.TestCase):
         self.assertIn("one word or one emoji", V4_1_GOAL)
         self.assertEqual(V4_1_PROMPT_VERSION.reply_goal, V4_1_GOAL)
 
+
+class PromptV43Test(unittest.TestCase):
+    def test_only_the_day_lines_change_and_v4_2_is_kept(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_2 import V4_2_GOAL, V4_2_PROMPT_VERSION
+        from agent.context_engine.prompt_engine.versions.v4_3 import V4_3_CHARACTER, V4_3_GOAL
+
+        self.assertIn("something you were curious about", V4_CHARACTER)
+        self.assertNotIn("something you were curious about", V4_3_CHARACTER)
+        self.assertIn("Nothing happens to you between messages", V4_3_CHARACTER)
+        self.assertIn("not as something you saw or did", V4_3_GOAL)
+        self.assertNotIn("not as something you saw or did", V4_2_GOAL)
+        self.assertEqual(V4_2_PROMPT_VERSION.base_prompt, V4_CHARACTER)
