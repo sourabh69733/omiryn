@@ -66,6 +66,27 @@ def strip_voice_marker(text: str) -> tuple[str, str | None]:
     return _VOICE_MARKER.sub("", text).strip(), (found[-1].lower() if found else None)
 
 
+# Written by the model as its whole reply when words would add nothing.
+_REACTION_MARKER = re.compile(r"[<\[]\s*react\s*:\s*([^<>\[\]]*?)\s*[>\]]", re.IGNORECASE)
+_NO_REPLY_MARKER = re.compile(r"[<\[]\s*no_reply\s*[>\]]", re.IGNORECASE)
+# One emoji, with room for its skin tone and joiners.
+_REACTION_MAX_CHARS = 12
+
+
+def _is_one_emoji(text: str) -> bool:
+    return 0 < len(text) <= _REACTION_MAX_CHARS and not any(char.isascii() or char.isalnum() or char.isspace() for char in text)
+
+
+def strip_quiet_markers(text: str) -> tuple[str, str | None, bool]:
+    """Remove the reaction and no-reply markers; return the text, the emoji, and whether the model
+    chose to say nothing. A marker with no words and no usable emoji counts as saying nothing."""
+    emojis = [found for found in _REACTION_MARKER.findall(text) if _is_one_emoji(found)]
+    marked = bool(_REACTION_MARKER.search(text) or _NO_REPLY_MARKER.search(text))
+    cleaned = _NO_REPLY_MARKER.sub("", _REACTION_MARKER.sub("", text)).strip()
+    reaction = emojis[-1] if emojis else None
+    return cleaned, reaction, marked and not cleaned and reaction is None
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = " ".join(
         normalize_part_separators(normalize_assistant_script(str(reply or ""))).strip().split()
