@@ -871,6 +871,23 @@ button.history-archived-toggle:hover {
   background: var(--card);
 }
 
+/* The user's own reaction, on Omi's message: tap it to take it back. */
+.agentic-chat button.message-reaction.is-yours {
+  min-height: 0;
+  padding: 0 4px;
+  border-color: var(--line);
+  color: var(--brand-ink);
+  background: var(--card);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.agentic-chat button.message-reaction.is-yours::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
 .message-row.is-new .message-reaction {
   animation: chat-reaction-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }

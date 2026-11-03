@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type ReactNode, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
 import { rememberedUpload, rememberUpload, type SharedUpload, UploadReading } from "../UploadReading";
 import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
@@ -13,7 +13,7 @@ import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
 import { NO_TYPING_SIGNAL, nextTypingSignal } from "../typingSignal";
-import { applyMessageAt, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
+import { applyMessageAt, withUserReaction, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { temporaryName } from "../temporaryName";
@@ -26,7 +26,10 @@ import { cognitionResultLabel } from "../usagePresentation";
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
 // Six menu items plus padding, in pixels.
-const MESSAGE_MENU_HEIGHT = 260;
+const MESSAGE_MENU_HEIGHT = 310;
+const MESSAGE_REACT_HEIGHT = 60;
+const MESSAGE_REACT_WIDTH = 300;
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 // `away`: an earlier chat or a temporary chat is open, so the Omi row is not the open chat.
@@ -101,6 +104,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const [menuUp, setMenuUp] = useState(false);
   // After "Bad reply" the menu asks what was off, in place.
   const [menuAsksWhy, setMenuAsksWhy] = useState(false);
+  // The ☺ beside a reply opens only the emojis; + from there opens the full picker.
+  const [menuView, setMenuView] = useState<"actions" | "react" | "picker">("actions");
+  // The emojis need more width than a menu; near the edge they open over the message instead.
+  const [menuToLeft, setMenuToLeft] = useState(false);
   // How the user rated Omi's replies in this chat, by message index.
   const [ratings, setRatings] = useState<ReadonlyMap<number, ReplyRating>>(() => new Map());
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
@@ -923,11 +930,33 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   }
 
   // The menu opens upward when there is no room for it below the message.
-  function openMenu(index: number, anchor: Element) {
-    const bottom = logRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
-    setMenuUp(bottom - anchor.getBoundingClientRect().bottom < MESSAGE_MENU_HEIGHT);
+  function openMenu(index: number, anchor: Element, view: "actions" | "react" = "actions") {
+    const log = logRef.current?.getBoundingClientRect();
+    const place = anchor.getBoundingClientRect();
+    setMenuUp((log?.bottom ?? window.innerHeight) - place.bottom < (view === "react" ? MESSAGE_REACT_HEIGHT : MESSAGE_MENU_HEIGHT));
+    setMenuToLeft((log?.right ?? window.innerWidth) - place.left < MESSAGE_REACT_WIDTH);
     setMenuAsksWhy(false);
+    setMenuView(view);
     setMenuFor(index);
+  }
+
+  // Choosing the emoji already there takes it back. Omi sees it on its next reply; none is started.
+  async function reactToMessage(index: number, emoji: string) {
+    if (!conversation) return;
+    const id = conversation.id;
+    const before = conversation.messages[index]?.user_reaction ?? null;
+    const next = before === emoji ? null : emoji;
+    setMenuFor(null);
+    updateIfOpen(id, (current) => ({ ...current, messages: withUserReaction(current.messages, index, next) }));
+    const url = `/api/agent/conversations/${id}/messages/${index}/reaction`;
+    const response = await apiFetch(url, next
+      ? { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji: next }) }
+      : { method: "DELETE" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      updateIfOpen(id, (current) => ({ ...current, messages: withUserReaction(current.messages, index, before) }));
+      if (openConversationIdRef.current === id) setError("Couldn't save your reaction. Try again.");
+    }
   }
 
   async function loadRatings(id: string) {
@@ -1167,7 +1196,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
                   <div
-                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""} ${message.reaction ? "has-reaction" : ""}`}
+                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""} ${message.reaction || message.user_reaction ? "has-reaction" : ""}`}
                     id={`message-${index}`}
                     data-message-index={index}
                     {...(selecting
@@ -1185,13 +1214,31 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                       ) : null}
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
                       {message.reaction ? <span className="message-reaction" role="img" aria-label={`${conversation?.agent_name || "Omi"} reacted ${message.reaction}`}>{message.reaction}</span> : null}
+                      {agent && message.user_reaction ? <button type="button" className="message-reaction is-yours" disabled={selecting} aria-label={`Remove your reaction ${message.user_reaction}`} onClick={(event) => { event.stopPropagation(); void reactToMessage(index, message.user_reaction!); }}>{message.user_reaction}</button> : null}
                     </div>
                     {!selecting && !isFailedMessage(message) && message.delivery_status !== "sending" ? (
                       <div className="message-menu">
-                        <button type="button" className={`message-menu-trigger ${menuFor === index ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index} onClick={(event) => { if (menuFor === index) setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
+                        {agent ? <button type="button" className={`message-menu-trigger ${menuFor === index && menuView !== "actions" ? "is-open" : ""}`} aria-label="React to this message" aria-haspopup="menu" aria-expanded={menuFor === index && menuView !== "actions"} onClick={(event) => { if (menuFor === index && menuView !== "actions") setMenuFor(null); else openMenu(index, event.currentTarget, "react"); }}><Smile aria-hidden="true" /></button> : null}
+                        <button type="button" className={`message-menu-trigger ${menuFor === index && menuView === "actions" ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index && menuView === "actions"} onClick={(event) => { if (menuFor === index && menuView === "actions") setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
                         {menuFor === index ? (
-                          menuAsksWhy ? (
-                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu" aria-label="What was off?">
+                          menuView === "picker" ? (
+                          <div className="message-react-picker" role="dialog" aria-label="Choose a reaction">
+                            <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
+                              <EmojiPicker
+                                height={360}
+                                emojiStyle={"native" as EmojiStyle}
+                                lazyLoadEmojis
+                                previewConfig={{ showPreview: false }}
+                                searchPlaceHolder="Search emoji"
+                                skinTonesDisabled
+                                theme={"light" as Theme}
+                                width="100%"
+                                onEmojiClick={(data: EmojiClickData) => void reactToMessage(index, data.emoji)}
+                              />
+                            </Suspense>
+                          </div>
+                          ) : menuAsksWhy ? (
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""} ${menuToLeft ? "opens-left" : ""}`} role="menu" aria-label="What was off?">
                             <p className="message-menu-heading">What was off?</p>
                             {BAD_REPLY_REASONS.map((reason) => (
                               <button type="button" role="menuitem" key={reason.key} onClick={() => void rateMessage(index, "bad", [reason.key])}>{reason.label}</button>
@@ -1199,7 +1246,16 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                             <button type="button" role="menuitem" className="is-quiet" onClick={() => void rateMessage(index, "bad")}>Just bad</button>
                           </div>
                           ) : (
-                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu">
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""} ${menuToLeft ? "opens-left" : ""}`} role="menu">
+                            {agent ? (
+                              <div className="message-react-row" role="group" aria-label="React">
+                                {QUICK_REACTIONS.map((emoji) => (
+                                  <button type="button" key={emoji} className={message.user_reaction === emoji ? "is-active" : ""} aria-label={`React ${emoji}`} aria-pressed={message.user_reaction === emoji} onClick={() => void reactToMessage(index, emoji)}>{emoji}</button>
+                                ))}
+                                <button type="button" aria-label="More emojis" onClick={() => setMenuView("picker")}><Plus aria-hidden="true" /></button>
+                              </div>
+                            ) : null}
+                            {menuView === "react" ? null : <>
                             <button type="button" role="menuitem" onClick={() => replyToMessage(index)}><Reply aria-hidden="true" />Reply</button>
                             <button type="button" role="menuitem" onClick={() => copyMessage(index)}><Copy aria-hidden="true" />Copy</button>
                             {agent && !temporary ? (
@@ -1210,6 +1266,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                             ) : null}
                             <button type="button" role="menuitem" onClick={() => { setMenuFor(null); startSelecting(index); }}><ListChecks aria-hidden="true" />Select</button>
                             <button type="button" role="menuitem" className="is-danger" onClick={() => deleteOneMessage(index)}><Trash2 aria-hidden="true" />Delete</button>
+                            </>}
                           </div>
                           )
                         ) : null}
@@ -1221,7 +1278,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                   {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
+            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
@@ -1444,6 +1501,12 @@ function applyRealtimeEvent(
   event: RealtimeEvent,
   setConversation: Dispatch<SetStateAction<Conversation | null>>,
 ) {
+  if (event.type === "message.user_reaction" && event.scope === "conversation") {
+    const { message_index: index, user_reaction: reaction } = event.payload;
+    if (typeof index !== "number" || !(typeof reaction === "string" || reaction === null)) return;
+    setConversation((current) => (current && current.id === event.scope_id ? { ...current, messages: withUserReaction(current.messages, index, reaction) } : current));
+    return;
+  }
   if (event.type !== "message.created" || event.scope !== "conversation" || !event.scope_id) return;
   const messageIndex = event.sequence;
   const rawMessage = event.payload.message;

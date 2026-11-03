@@ -933,7 +933,13 @@ button.omi-drawer-close:hover {
 
 @media (hover: hover) and (pointer: fine) {
   .message-menu {
+    display: flex;
     width: 28px;
+  }
+
+  .message-row.agent .message-menu {
+    width: 58px;
+    gap: 2px;
   }
 
   .message-menu button.message-menu-trigger {
@@ -990,6 +996,64 @@ button.omi-drawer-close:hover {
 .message-row.user .message-menu-list {
   right: 0;
   left: auto;
+}
+
+/* Near the right edge the menu opens over the message. */
+.message-menu-list.opens-left {
+  right: 0;
+  left: auto;
+}
+
+/* Phones have no room beside a message: the menu hangs from the row, under the bubble. */
+@media (hover: none), (pointer: coarse) {
+  .message-row.agent .message-menu {
+    position: static;
+  }
+
+  .message-row.agent .message-menu-list,
+  .message-row.agent .message-menu-list.opens-left {
+    right: auto;
+    left: 40px;
+  }
+}
+
+/* WhatsApp-style quick reactions, above the menu's actions or on their own. */
+.message-menu-list .message-react-row {
+  display: flex;
+  gap: 2px;
+}
+
+.message-menu-list .message-react-row:not(:last-child) {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.message-menu-list .message-react-row button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.message-menu-list .message-react-row button.is-active {
+  background: rgba(248, 68, 31, 0.14);
+}
+
+.message-react-picker {
+  position: fixed;
+  z-index: 40;
+  top: 50%;
+  left: 50%;
+  width: min(330px, calc(100vw - 32px));
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  transform: translate(-50%, -50%);
 }
 
 .message-menu-list button {
