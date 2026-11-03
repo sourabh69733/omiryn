@@ -66,3 +66,9 @@ test("only the newest failed message offers Retry", () => {
   assert.equal(lastFailedIndex([user("a", { delivery_status: "failed" }), user("b", { delivery_status: "failed" }), local("c")], failed), 1);
   assert.equal(lastFailedIndex([local("c")], failed), -1);
 });
+
+test("a reaction outlives the message being saved again", () => {
+  const current = [user("hmm", { reaction: "👍", delivery_status: "sending" })];
+  assert.equal(applyMessageAt(current, 0, user("hmm", { delivery_status: "read" }))[0].reaction, "👍");
+  assert.equal(applyMessageAt([user("hmm")], 0, user("hmm", { reaction: "👍" }))[0].reaction, "👍");
+});

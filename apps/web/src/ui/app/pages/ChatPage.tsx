@@ -1167,7 +1167,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
                   <div
-                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""}`}
+                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""} ${message.reaction ? "has-reaction" : ""}`}
                     id={`message-${index}`}
                     data-message-index={index}
                     {...(selecting
@@ -1184,6 +1184,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                         </button>
                       ) : null}
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
+                      {message.reaction ? <span className="message-reaction" role="img" aria-label={`${conversation?.agent_name || "Omi"} reacted ${message.reaction}`}>{message.reaction}</span> : null}
                     </div>
                     {!selecting && !isFailedMessage(message) && message.delivery_status !== "sending" ? (
                       <div className="message-menu">
@@ -1457,6 +1458,7 @@ function applyRealtimeEvent(
     delivery_status: typeof record.delivery_status === "string" ? record.delivery_status : undefined,
     ...(typeof record.client_id === "string" ? { client_id: record.client_id } : {}),
     ...(record.reply_to && typeof record.reply_to === "object" ? { reply_to: record.reply_to as ReplyQuote } : {}),
+    ...(typeof record.reaction === "string" ? { reaction: record.reaction } : {}),
   };
   if (!message.role || typeof message.content !== "string") return;
 

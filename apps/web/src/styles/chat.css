@@ -848,6 +848,46 @@ button.history-archived-toggle:hover {
   content: none;
 }
 
+/* Omi's emoji, sitting on the corner of the message it answers instead of a new bubble. */
+.message-row.has-reaction {
+  margin-bottom: 16px;
+}
+
+.message-reaction {
+  position: absolute;
+  bottom: -15px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 21px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--brand-ink);
+  background: var(--card);
+}
+
+.message-row.is-new .message-reaction {
+  animation: chat-reaction-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes chat-reaction-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-row.is-new .message-reaction {
+    animation: none;
+  }
+}
+
 .agentic-chat .message.evidence-highlight {
   outline: 2px solid var(--ember);
   outline-offset: 3px;
