@@ -131,6 +131,8 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `POST /api/agent/conversations/{id}/messages/deletion-impact` | `{"message_indexes": [...]}`: what deleting them also removes. |
 | `POST /api/agent/conversations/{id}/messages/delete` | Delete those messages and what was learned only from them. |
 | `DELETE /api/agent/conversations/{id}` | Delete a chat (also how the app ends a Temporary Chat). |
+| `PUT /api/agent/conversations/{id}/messages/{index}/reaction` | The user's emoji on one of Omi's messages: `{"emoji": "😂"}`, one emoji, replacing an earlier one. Saved as `user_reaction`, sent to other tabs as `message.user_reaction`. Does not start a reply. 404 on a user's or deleted message, 422 when it is not one emoji. |
+| `DELETE /api/agent/conversations/{id}/messages/{index}/reaction` | Take the reaction back. |
 | `POST /api/agent/conversations/{id}/messages/{index}/feedback` | Rate one of Omi's replies: `good` or `bad` with `reasons` (`too_much`, `bad_tone`, `wrong_memory`, `not_helpful`). Replaces an earlier rating. Refused in Temporary Chat. |
 | `DELETE /api/agent/conversations/{id}/messages/{index}/feedback` | Undo a rating. |
 | `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
