@@ -64,7 +64,7 @@ BLOCK_CHAR_LIMITS = {
     "open_questions": 700,
     "how_to_talk": 3000,
     "this_turn": 2000,
-    "goal": 1400,
+    "goal": 1800,
 }
 _CONSTRAINT_FACTS = {
     "no_questions": "They asked you not to ask questions.",

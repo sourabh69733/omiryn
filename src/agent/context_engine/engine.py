@@ -53,11 +53,11 @@ def build_model_context_package(
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
     user_profile = _with_conversation_time(conversation_id, user_id, user_profile)
-    blocks_prompt = prompt_version.version_id in {"v4", "v4-1"}
-    listener_first = prompt_version.version_id in {"v3", "v3-1", "v4", "v4-1"}
+    blocks_prompt = prompt_version.version_id in {"v4", "v4-1", "v4-2"}
+    listener_first = prompt_version.version_id in {"v3", "v3-1", "v4", "v4-1", "v4-2"}
     matching_understanding = (
         build_matching_understanding(user_id=user_id, user_profile=user_profile)
-        if prompt_version.version_id in {"v3-1", "v4", "v4-1"}
+        if prompt_version.version_id in {"v3-1", "v4", "v4-1", "v4-2"}
         else None
     )
     reply_context = build_reply_context(
@@ -69,7 +69,7 @@ def build_model_context_package(
         strict_intent=listener_first,
         memory_query_embedding=memory_query_embedding,
     )
-    if prompt_version.version_id in {"v2", "v3", "v3-1", "v4", "v4-1"}:
+    if prompt_version.version_id in {"v2", "v3", "v3-1", "v4", "v4-1", "v4-2"}:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
         turn_understanding = None
