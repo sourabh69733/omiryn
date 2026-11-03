@@ -90,6 +90,7 @@ variable "secret_names" {
     supabase_url          = "omiryn-supabase-url"
     supabase_anon_key     = "omiryn-supabase-anon-key"
     groq_api_key          = "omiryn-groq-api-key"
+    deepinfra_api_key     = "omiryn-deepinfra-api-key"
     openai_api_key        = "omiryn-openai-api-key"
   }
 }

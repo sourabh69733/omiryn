@@ -5,6 +5,7 @@ locals {
     SUPABASE_URL          = var.secret_names.supabase_url
     SUPABASE_ANON_KEY     = var.secret_names.supabase_anon_key
     GROQ_API_KEY          = var.secret_names.groq_api_key
+    DEEPINFRA_API_KEY     = var.secret_names.deepinfra_api_key
     OPENAI_API_KEY        = var.secret_names.openai_api_key
   }
 
