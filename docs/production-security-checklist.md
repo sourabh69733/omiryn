@@ -44,6 +44,7 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Chats, memories, vibe lines and profiles are never removed by retention; only the user's own deletes remove them.
 - [x] `audit_events` table records chat, message, memory and upload deletes, Clear Omi, account delete, data requests, every admin view and each retention run. IDs and counts only, never text. Kept when an account is deleted.
 - [x] Admins can list audit rows at `GET /api/admin/audit`.
+- [x] Names on memories (`about_json`: people, places) are encrypted like the memory value and go with the memory on any delete.
 - [ ] Encryption key rotation plan for `ENCRYPTION_MASTER_KEY`.
 
 ## Auth And Access Control
