@@ -11,6 +11,7 @@ from agent.context_engine.threads import conversation_thread_context_sources, co
 from agent.context_engine.understanding.rules.intent import context_query_intent
 from agent.context_engine.shared.text import source_identity
 from agent.context_engine.sources.asked_questions import asked_question_sources
+from agent.context_engine.sources.calendar import calendar_sources
 from agent.context_engine.sources.attached import (
     STYLE_CONTEXT_SOURCE_TYPES,
     relevant_attached_sources,
@@ -126,6 +127,7 @@ def build_reply_context_sources(
         + open_question_sources(conversation_id, user_id)
         + asked_question_sources(conversation_id, user_id)
         + (meet_facts_sources(user_id) if pipeline.memory_contract_version == 3 else [])
+        + (calendar_sources(user_id) if pipeline.memory_contract_version == 3 else [])
         + match_hosting_sources(user_id)
         + reply_feedback_sources(user_id)
         + (uploaded_chat_sources(user_id, user_text, conversation_id) if pipeline.memory_contract_version == 3 else [])

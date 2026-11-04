@@ -6,8 +6,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-# Room for the user card and conversation summary on top of the five earlier source slots.
-CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "9"))
+# Room for the user card, conversation summary and calendar on top of the five earlier source slots.
+CONTEXT_SOURCE_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_LIMIT", "10"))
 CONTEXT_TOTAL_CHAR_BUDGET = int(os.getenv("AGENT_CONTEXT_TOTAL_CHAR_BUDGET", "10500"))
 CONTEXT_SOURCE_CHAR_LIMIT = int(os.getenv("AGENT_CONTEXT_SOURCE_CHAR_LIMIT", "2000"))
 STYLE_CONTEXT_CHAR_LIMIT = int(os.getenv("AGENT_STYLE_CONTEXT_CHAR_LIMIT", "1500"))
@@ -22,6 +22,8 @@ SOURCE_TYPE_PRIORITY = {
     # The current inline thread contract requires candidate IDs to be present.
     # Keep this above optional memories until thread classification is decoupled.
     "conversation_threads": 120,
+    # The user's dates around today; present only when they have some, and takes no other source's place.
+    "calendar": 111,
     "agent_memories_v3": 110,
     # How the user asked to be talked to; few lines, needed on every reply.
     "how_to_talk": 118,
@@ -60,6 +62,7 @@ SOURCE_TYPE_CHAR_LIMIT = {
     "conversation_threads": 1800,
     # Up to 12 one-line memories with their dates on a "what do you know about me" turn.
     "agent_memories_v3": 2800,
+    "calendar": 1300,
     "agent_self_notes": 1000,
     "how_to_talk": 800,
     "reply_feedback": 1000,
