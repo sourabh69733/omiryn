@@ -35,9 +35,9 @@ def calendar_sources(user_id: str | None, now: datetime | None = None) -> list[d
         return []
     lines = [
         f"Dates they told you, from {CALENDAR_DAYS} days ago to {CALENDAR_DAYS} days ahead, worked out by "
-        "code. Answer from this when they ask about a day, their week or what happened or is coming up; "
-        "a day in this range that is not listed has nothing you know of. It is a calendar to read from, "
-        "not a list to bring up.",
+        "code. Only for a message that asks about a day, their week, their plans or what happened: answer "
+        "from this, and a day in this range that is not listed has nothing you know of. For any other "
+        "message act as if this block is not here and mention nothing from it.",
         *(dated_line(memory, day, today, zone) for day, memory in entries),
     ]
     if more:
@@ -45,7 +45,7 @@ def calendar_sources(user_id: str | None, now: datetime | None = None) -> list[d
     return [
         {
             "source_type": CALENDAR_SOURCE_TYPE,
-            "title": "Their calendar",
+            "title": "Their dates",
             "content": "\n".join(lines),
             "metadata": {"memory_ids": [memory.get("id") for _, memory in entries]},
         }

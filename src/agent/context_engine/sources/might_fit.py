@@ -38,7 +38,8 @@ def might_fit_sources(
     zone = user_zone(get_user_timezone(user_id))
     lines = [
         "Things you know about them that this message does not touch. Use at most one, only if it "
-        "fits the moment naturally (a quiet or open turn); their message comes first. Never list them.",
+        "fits the moment naturally (a quiet or open turn); their message comes first. Never list them. "
+        "They cannot see this, so name the thing when you raise it: never just \"uske liye\" or \"that\".",
         *(f"- {memory_sentence(memory)}{memory_time_note(memory, zone)}" for memory in memories),
     ]
     return [

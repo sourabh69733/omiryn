@@ -42,7 +42,7 @@ _SOURCE_BLOCKS = {
     "past_lines": "past_lines",
     "open_questions": "open_questions",
     "might_fit": "might_fit",
-    "calendar": "calendar",
+    "calendar": "their_dates",
     "data_points": "memories",
     "agent_self_notes": "your_notes",
     "conversation_summary": "this_chat",
@@ -61,7 +61,7 @@ BLOCK_CHAR_LIMITS = {
     "your_notes": 1400,
     "this_chat": 3600,
     "attached": 4000,
-    "calendar": 1300,
+    "their_dates": 1300,
     "might_fit": 800,
     "open_questions": 700,
     "how_to_talk": 3000,
@@ -170,7 +170,7 @@ def build_companion_system_prompt_v4(
             if attached
             else []
         )),
-        ("calendar", grouped.get("calendar", [])),
+        ("their_dates", grouped.get("their_dates", [])),
         ("might_fit", grouped.get("might_fit", [])),
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
@@ -294,7 +294,7 @@ def _dates_tool_line() -> str:
     if not tools_enabled():
         return ""
     return (
-        "If they ask what happens or happened on a day, week or month your calendar does not cover, "
+        "If they ask what happens or happened on a day, week or month their_dates does not cover, "
         "call memories_by_date first, before search_chats and before you say you do not know."
     )
 
