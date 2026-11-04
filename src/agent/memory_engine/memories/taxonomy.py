@@ -7,7 +7,12 @@ V3_MEMORY_TAXONOMY_GUIDANCE = """Memory kinds:
   preserve whose behavior it was and do not convert it into a general personality trait.
 - procedural: instructions or learned preferences for how this companion should interact with the user;
   ordinary interests and friend preferences are semantic, not procedural. What the user is doing,
-  studying or working on is never procedural; "stop bringing up <subject>" is.
+  studying or working on is never procedural; "stop bringing up <subject>" is. It is applied to every
+  later reply for good, so it must be something two people reading a reply would agree was followed: a
+  language, a length, emojis, what to call them, a particular question or subject. Words of opinion
+  or anger are not procedural and add no memory at all: "do not ask stupid questions", "stop being
+  annoying", "shut up", "be better". Right after a question, "do not ask stupid questions" may only
+  become "Do not ask <what that question asks>".
 
 Purposes are independent of kind:
 - profile describes the user.

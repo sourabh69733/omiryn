@@ -235,6 +235,15 @@ class UserMessage(BaseModel):
     client_id: str | None = Field(default=None, max_length=64)
 
 
+class TypingSignal(BaseModel):
+    # False: the user cleared the box, so nothing more is coming.
+    active: bool = True
+
+
+class AgentMessageReaction(BaseModel):
+    emoji: str = Field(min_length=1, max_length=16)
+
+
 class AgentMessageFeedbackCreate(BaseModel):
     rating: AgentMessageFeedbackRating
     reason: str | None = Field(default=None, max_length=80)

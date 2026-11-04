@@ -12,6 +12,7 @@ from agent.context_engine.policy.freshness import (
     stale_reply_reason,
     trim_questions,
     without_copied_replies,
+    without_repeated_opening,
     without_repeated_questions,
 )
 from agent.context_engine.policy.requests import (
@@ -29,6 +30,8 @@ from agent.providers import check_reply_requests
 from .job import ReplyJob
 
 Check = Callable[[str, ReplyJob], Awaitable[tuple[str, dict[str, Any] | None]]]
+
+_BARE_ACKNOWLEDGEMENT_WORDS = 3
 
 
 def freshness_check_enabled() -> bool:
@@ -63,7 +66,13 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
         # The note goes last, where the model follows it best, and the replies the draft copied
         # leave the history so the rewrite cannot copy them again.
         history = without_copied_replies(job.reply_messages, reply)
-        note = rewrite_instruction(reply, reason, quote_draft=len(history) == len(job.reply_messages))
+        note = rewrite_instruction(
+            reply,
+            reason,
+            quote_draft=len(history) == len(job.reply_messages),
+            # Repeating itself, the fix is often to say less, so the draft's length must not bind it.
+            keep_length=question_rule_reason(reply, job.question_limit) is not None,
+        )
         rewritten = await job.rewrite(note, history)
     except Exception as error:
         return reply, {"reason": reason, "rewritten": False, "error": type(error).__name__}
@@ -76,7 +85,13 @@ async def freshen_reply(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] 
         trimmed = True
     # Same for a question it already asked: the rewrite often brings it back.
     rewritten = without_repeated_questions(rewritten, job.previous_replies)
+    rewritten = without_repeated_opening(rewritten, job.previous_replies)
     return rewritten, {"reason": reason, "rewritten": True, "questions_trimmed": trimmed, "still_stale": problem(rewritten) is not None}
+
+
+def _bare_acknowledgement(reply: str) -> bool:
+    """A few plain words with no question or emoji, such as "theek hai."."""
+    return len(reply.split()) <= _BARE_ACKNOWLEDGEMENT_WORDS and all(char.isalnum() or char.isspace() or char in ".,!'" for char in reply)
 
 
 async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
@@ -99,7 +114,10 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
         return reply, {"checked": False, "error": type(error).__name__}
     # A request the checker read in this session is saved now, so it holds in every chat from here.
     saved = save_talk_requests(job.user_id or "", job.conversation_id, job.history, job.user_text, found_requests(raw, recent))
-    broken = broken_requests(raw, [*job.requests, *recent, *asked_question_requests(job.asked)])
+    # A reply with no question cannot ask a closed one again, whatever the checker says.
+    closed_questions = asked_question_requests(job.asked) if "?" in reply else []
+    # Nor does a bare "theek hai" have anything in it to break; the checker often says it does.
+    broken = [] if _bare_acknowledgement(reply) else broken_requests(raw, [*job.requests, *recent, *closed_questions])
     if not broken:
         return reply, {"checked": True, "reason": reason, "broken": [], "saved_requests": len(saved)}
     try:
@@ -117,10 +135,11 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True, "saved_requests": len(saved)}
 
 
-# In order; the name is the key of its result in the turn trace.
+# In order; the name is the key of its result in the turn trace. Freshness comes last so it reads
+# the text the user will see: a request rewrite has no repeat check of its own.
 REPLY_CHECKS: tuple[tuple[str, Check], ...] = (
-    ("freshness", freshen_reply),
     ("request_check", follow_requests),
+    ("freshness", freshen_reply),
 )
 
 __all__ = ["REPLY_CHECKS", "follow_requests", "freshen_reply", "freshness_check_enabled", "request_check_enabled", "request_check_mode"]

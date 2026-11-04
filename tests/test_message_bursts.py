@@ -9,7 +9,8 @@ from unittest.mock import patch
 import httpx
 
 from agent.runtime.orchestrator import AgentTurnResult, _read_together
-from api.burst_window import max_wait_seconds, quiet_seconds, seconds_left
+from api import burst_window
+from api.burst_window import max_wait_seconds, quiet_seconds, seconds_left, typing_active
 from api.chat_service import WEB_CHANNEL
 from api.main import app, current_user
 from security.auth import CurrentUser
@@ -22,7 +23,8 @@ from storage import (
     release_burst,
     renew_burst,
     reset_db,
-    touch_burst,
+    signal_typing,
+    stop_typing,
 )
 
 USER_ID = "burst-user"
@@ -59,6 +61,25 @@ class BurstWindowTest(unittest.TestCase):
             started = NOW - timedelta(seconds=15)
             self.assertEqual(seconds_left(10, NOW, started, NOW), 0)
 
+    def test_typing_extends_the_wait_until_it_pauses_or_hits_the_cap(self) -> None:
+        with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "1.5"}):
+            # Typing right now: the quiet wait has passed, but they get the grace.
+            start = NOW - timedelta(seconds=3)
+            self.assertEqual(seconds_left(1, start, start, NOW, NOW), 2.5)
+            # A long way past the usual 6 s max, still typing: 10 s is the cap.
+            start = NOW - timedelta(seconds=8)
+            self.assertEqual(seconds_left(1, start, start, NOW, NOW), 2.0)
+            start = NOW - timedelta(seconds=10)
+            self.assertEqual(seconds_left(1, start, start, NOW, NOW), 0)
+            # Paused: the signal has expired, so it adds nothing and Omi starts.
+            paused = NOW - timedelta(seconds=3)
+            start = NOW - timedelta(seconds=4)
+            self.assertFalse(typing_active(paused, NOW))
+            self.assertLess(seconds_left(1, start, start, NOW, paused), 0)
+            # A flood keeps its longer cap.
+            start = NOW - timedelta(seconds=12)
+            self.assertGreater(seconds_left(5, NOW, start, NOW, NOW), 0)
+
     def test_a_bad_setting_falls_back(self) -> None:
         with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "soon"}):
             self.assertEqual(quiet_seconds(1), 1.5)
@@ -79,13 +100,28 @@ class BurstStorageTest(unittest.TestCase):
         self.assertFalse(renew_burst("web", "c", "someone-else", until=NOW))
 
     def test_typing_moves_the_quiet_wait_but_counts_no_message(self) -> None:
-        touch_burst("web", "c", NOW)  # no burst: nothing happens
+        signal_typing("web", "c", NOW)  # no burst: nothing happens
         self.assertIsNone(burst_state("web", "c"))
         join_burst("web", "c", "c", now=NOW, lease_seconds=60)
         later = NOW + timedelta(seconds=3)
-        touch_burst("web", "c", later)
+        signal_typing("web", "c", later)
         state = burst_state("web", "c")
-        self.assertEqual((state["arrivals"], state["last_at"]), (1, later))
+        self.assertEqual((state["arrivals"], state["last_at"], state["typing_at"]), (1, NOW, later))
+
+    def test_sending_ends_the_typing_signal(self) -> None:
+        join_burst("web", "c", "c", now=NOW, lease_seconds=60)
+        signal_typing("web", "c", NOW)
+        join_burst("web", "c", "c", now=NOW + timedelta(seconds=1), lease_seconds=60)
+        self.assertIsNone(burst_state("web", "c")["typing_at"])
+
+    def test_clearing_the_box_ends_the_wait(self) -> None:
+        join_burst("web", "c", "c", now=NOW, lease_seconds=60)
+        signal_typing("web", "c", NOW)
+        stop_typing("web", "c")
+        state = burst_state("web", "c")
+        self.assertIsNone(state["typing_at"])
+        self.assertLess(state["last_at"], datetime.now(UTC) + timedelta(seconds=1))
+        self.assertNotEqual(state["last_at"], NOW)
 
     def test_a_dead_repliers_lease_is_taken_over(self) -> None:
         first = join_burst("web", "c", "c", now=NOW, lease_seconds=60)["token"]
@@ -107,7 +143,7 @@ class ReadTogetherTest(unittest.TestCase):
         self.assertEqual(_read_together(messages, "last", 51).split("\n"), ["m45", "m46", "m47", "m48", "m49", "last"])
 
 
-class WebBurstTest(unittest.TestCase):
+class _WebChatCase(unittest.TestCase):
     def setUp(self) -> None:
         self.env = patch.dict(
             os.environ,
@@ -148,6 +184,8 @@ class WebBurstTest(unittest.TestCase):
     def _quota_events(self) -> int:
         return sum(1 for event in list_user_app_events(USER_ID) if event["event_name"] == "quota.chat_message")
 
+
+class WebBurstTest(_WebChatCase):
     def test_quick_messages_share_one_reply_and_one_quota_count(self) -> None:
         turn = _Turn()
         with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "0.2"}), patch("api.main.run_agent_turn", turn):
@@ -253,3 +291,136 @@ class WebBurstTest(unittest.TestCase):
 
         self.assertEqual(asyncio.run(scenario()), (200, 404))
         self.assertEqual(WEB_CHANNEL, "web")
+
+
+class TypingSignalTest(_WebChatCase):
+    """Omi waits for a message the user is still typing, and never waits forever."""
+
+    async def _send_with_typing(self, *, signals: tuple[float, ...], follow_up_at: float | None) -> tuple[str, httpx.Response]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            conversation_id = (await client.post("/api/agent/conversations")).json()["id"]
+            url = f"/api/agent/conversations/{conversation_id}"
+
+            async def signal(at: float) -> None:
+                await asyncio.sleep(at)
+                await client.post(f"{url}/typing")
+
+            async def follow_up() -> None:
+                if follow_up_at is not None:
+                    await asyncio.sleep(follow_up_at)
+                    await client.post(f"{url}/messages", json={"message": "and one more thing"})
+
+            first, *_ = await asyncio.gather(
+                client.post(f"{url}/messages", json={"message": "hi"}), *(signal(at) for at in signals), follow_up()
+            )
+        return conversation_id, first
+
+    def _windows(self):
+        return patch.multiple(burst_window, TYPING_GRACE_SECONDS=0.3, TYPING_MAX_WAIT_SECONDS=1.0, DRAFT_HOLD_SECONDS=0.5)
+
+    def test_a_message_being_typed_saves_a_model_call(self) -> None:
+        turn = _Turn()
+        with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "0.1"}), self._windows(), patch("api.main.run_agent_turn", turn):
+            conversation_id, _ = asyncio.run(self._send_with_typing(signals=(0.05, 0.2, 0.35), follow_up_at=0.5))
+
+        self.assertEqual(len(turn.calls), 1)
+        self.assertEqual(turn.calls[0]["unanswered_count"], 2)
+        self.assertEqual(self._contents(conversation_id), ["hi", "and one more thing", "reply 1"])
+
+    def test_omi_starts_when_the_user_stops_typing(self) -> None:
+        turn = _Turn()
+        with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "0.1"}), self._windows(), patch("api.main.run_agent_turn", turn):
+            conversation_id, _ = asyncio.run(self._send_with_typing(signals=(0.05,), follow_up_at=None))
+
+        self.assertEqual(len(turn.calls), 1)
+        self.assertEqual(self._contents(conversation_id), ["hi", "reply 1"])
+
+    def test_a_finished_draft_waits_for_the_message_being_typed(self) -> None:
+        # The signal comes after the model has started. The draft is held, the message lands, and
+        # the reply that would have missed it is never shown.
+        turn = _Turn(delays=(0.2,))
+        with self._windows(), patch("api.main.run_agent_turn", turn):
+            conversation_id, _ = asyncio.run(self._send_with_typing(signals=(0.15,), follow_up_at=0.3))
+
+        self.assertEqual(len(turn.calls), 2)
+        self.assertEqual(self._contents(conversation_id), ["hi", "and one more thing", "reply 2"])
+
+    def test_a_held_draft_goes_out_when_nothing_arrives(self) -> None:
+        turn = _Turn(delays=(0.1,))
+        with self._windows(), patch("api.main.run_agent_turn", turn):
+            conversation_id, _ = asyncio.run(self._send_with_typing(signals=(0.05,), follow_up_at=None))
+
+        self.assertEqual(len(turn.calls), 1)
+        self.assertEqual(self._contents(conversation_id), ["hi", "reply 1"])
+
+    def test_someone_who_never_stops_typing_still_gets_a_reply(self) -> None:
+        turn = _Turn()
+        signals = tuple(0.1 * step for step in range(1, 30))
+        with patch.dict(os.environ, {"CHAT_BURST_QUIET_SECONDS": "0.1"}), self._windows(), patch("api.main.run_agent_turn", turn):
+            conversation_id, first = asyncio.run(self._send_with_typing(signals=signals, follow_up_at=None))
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(self._contents(conversation_id), ["hi", "reply 1"])
+
+    def test_the_wait_is_kept_in_the_reply_trace(self) -> None:
+        from api.reply_bursts import Burst, _ReplyStats, _save_stats
+        from storage import list_agent_trace_steps, save_agent_trace, save_conversation
+
+        save_conversation({"id": "c1", "status": "active", "messages": []}, USER_ID)
+        trace = save_agent_trace({"user_id": USER_ID, "conversation_id": "c1", "turn_index": 1, "agent_mode": "know_me", "agent_tone": "auto", "model": None, "status": "running", "summary": {}})
+
+        class _Draft:
+            turn = AgentTurnResult(messages=[], quality_valid=True, trace_id=trace["id"])
+
+        stats = _ReplyStats(typing_held_seconds=1.234, messages_while_held=1, drafts_thrown_away=2)
+        _save_stats(CurrentUser(id=USER_ID), Burst("web", "c1", "c1", "t"), _Draft(), stats)
+
+        [step] = [s for s in list_agent_trace_steps(conversation_id="c1", user_id=USER_ID) if s["step_name"] == "burst_wait"]
+        self.assertEqual(step["metadata"]["typing_held_seconds"], 1.23)
+        self.assertEqual(step["metadata"]["messages_while_held"], 1)
+        self.assertEqual(step["metadata"]["drafts_thrown_away"], 2)
+
+
+class RealtimeTypingTest(unittest.TestCase):
+    def setUp(self) -> None:
+        from fastapi.testclient import TestClient
+
+        self.env = patch.dict(os.environ, {"AUTH_REQUIRED": "false", "AGENT_PROVIDER": "mock", "PROACTIVE_MESSAGING_ENABLED": "false"})
+        self.env.start()
+
+        async def signed_in_user() -> CurrentUser:
+            return CurrentUser(id=USER_ID, email="burst@example.com", display_name="Burst User")
+
+        app.dependency_overrides[current_user] = signed_in_user
+        reset_db()
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+        self.env.stop()
+
+    def test_the_socket_carries_typing_only_for_a_chat_it_is_in(self) -> None:
+        own = self.client.post("/api/agent/conversations", json={}).json()["id"]
+        other = "someone-elses-chat"
+        join_burst("web", own, own, now=NOW, lease_seconds=60)
+        join_burst("web", other, other, now=NOW, lease_seconds=60)
+        ticket = self.client.post("/api/realtime/ticket").json()["ticket"]
+        with self.client.websocket_connect(f"/api/realtime?ticket={ticket}") as socket:
+            socket.receive_json()
+            socket.send_json({"type": "typing", "scope": "conversation", "scope_id": own})
+            socket.send_json({"type": "subscribe", "scope": "conversation", "scope_id": own})
+            self.assertEqual(socket.receive_json()["type"], "realtime.subscribed")
+            self.assertIsNone(burst_state("web", own)["typing_at"])
+
+            socket.send_json({"type": "typing", "scope": "conversation", "scope_id": own})
+            socket.send_json({"type": "typing", "scope": "conversation", "scope_id": other})
+            socket.send_json({"type": "ping"})
+            self.assertEqual(socket.receive_json()["type"], "pong")
+            self.assertIsNotNone(burst_state("web", own)["typing_at"])
+            self.assertIsNone(burst_state("web", other)["typing_at"])
+
+            socket.send_json({"type": "typing", "scope": "conversation", "scope_id": own, "active": False})
+            socket.send_json({"type": "ping"})
+            self.assertEqual(socket.receive_json()["type"], "pong")
+            self.assertIsNone(burst_state("web", own)["typing_at"])

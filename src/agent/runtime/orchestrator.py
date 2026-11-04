@@ -16,7 +16,7 @@ from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.memory_engine.memories.embeddings import embed_memory_query, memory_query_text
 from agent.providers import assess_user_message_quality, generate_agent_reply
 from agent.providers.shared.messages import reply_window, summarized_through
-from agent.runtime.steps import REPLY_CHECKS, ReplyJob, assistant_messages, finish_reply, turn_notes, write_draft
+from agent.runtime.steps import REPLY_CHECKS, ReplyJob, assistant_messages, finish_reply, follow_requests, turn_notes, write_draft
 from agent.runtime.story_mode import schedule_story_part, story_autoplay_enabled, story_part_block_reason
 from agent.shared.clock import utc_now_iso
 from storage import (
@@ -38,6 +38,10 @@ class AgentTurnResult:
     quality_valid: bool
     # Set when the user asked the companion to change how it talks (neutral, female, male).
     agent_voice: str | None = None
+    trace_id: str | None = None
+    # An emoji for the user's message, and whether Omi chose to say nothing.
+    reaction: str | None = None
+    no_reply: bool = False
 
 
 async def run_agent_turn(
@@ -126,7 +130,7 @@ async def run_agent_turn(
                 "turn_policy_reason": direct_reply.reason,
             },
         )
-        return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid)
+        return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid, trace_id=trace.id)
 
     # 3. Context: what the model reads besides the chat.
     # What to recall for: in a burst the last message alone ("it was awesome") says too little.
@@ -200,8 +204,12 @@ async def run_agent_turn(
     try:
         draft = await write_draft(job)
         reply, checks = draft.reply, {}
-        for name, check in REPLY_CHECKS:
-            reply, checks[name] = await check(reply, job)
+        if finish_reply(reply, user_text).wordless:
+            # A rule said this turn is still saved; with no words there is nothing to rewrite.
+            _, checks["request_check"] = await follow_requests("", job)
+        else:
+            for name, check in REPLY_CHECKS:
+                reply, checks[name] = await check(reply, job)
         finished = finish_reply(reply, user_text)
     except Exception as error:
         trace.step(4, "model_call", "failed", {"error_type": type(error).__name__})
@@ -242,7 +250,14 @@ async def run_agent_turn(
             "reply_part_count": len(finished.parts),
         },
     )
-    return AgentTurnResult(messages=updated_messages, quality_valid=quality_valid, agent_voice=finished.voice)
+    return AgentTurnResult(
+        messages=updated_messages,
+        quality_valid=quality_valid,
+        agent_voice=finished.voice,
+        trace_id=trace.id,
+        reaction=finished.reaction,
+        no_reply=finished.no_reply,
+    )
 
 
 @dataclass(frozen=True)

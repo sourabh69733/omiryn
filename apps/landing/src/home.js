@@ -9,7 +9,7 @@ gsap.registerPlugin(ScrollTrigger);
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = window.matchMedia("(pointer: fine)").matches;
 // Dark text on the yellow highlight, so a highlighted word stays readable inside a dark bubble.
-const MARK_INK = "#18181b";
+const MARK_INK = "#15120e";
 // Phones and tablets get the story as a simple list plus one readable chat; the pinned scroll story
 // needs the side-by-side room of a wide screen.
 const compact = window.matchMedia("(max-width: 1024px)").matches;
@@ -246,10 +246,10 @@ blobs.forEach((b) => blobObserver.observe(b.el));
 
 /* ─────────── Hero: you meet someone new, again and again ─────────── */
 const PARTNERS = [
-  { face: 4, c: ["#fbcfe8", "#f472b6"], traits: ["Football", "Gym at 6am"], shared: "Bad puns", reason: "both laugh at bad puns" },
-  { face: 2, c: ["#fde68a", "#f59e0b"], traits: ["Coffee person", "Early bird"], shared: "No small talk", reason: "both hate small talk" },
-  { face: 5, c: ["#a7f3d0", "#10b981"], traits: ["Not so sure about god", "Books"], shared: "2am thinker", reason: "same 2am overthinking" },
-  { face: 8, c: ["#bae6fd", "#0ea5e9"], traits: ["Football", "Hills > beaches"], shared: "Side quests", reason: "both live for side quests" },
+  { face: 4, c: ["#e2d9c8", "#7a7266"], traits: ["Football", "Gym at 6am"], shared: "Bad puns", reason: "both laugh at bad puns" },
+  { face: 2, c: ["#f3e3b8", "#c88a1d"], traits: ["Coffee person", "Early bird"], shared: "No small talk", reason: "both hate small talk" },
+  { face: 5, c: ["#d9d2c5", "#4a443b"], traits: ["Not so sure about god", "Books"], shared: "2am thinker", reason: "same 2am overthinking" },
+  { face: 8, c: ["#ffd9cf", "#bc2e0f"], traits: ["Football", "Hills > beaches"], shared: "Side quests", reason: "both live for side quests" },
 ];
 const vs = $("#vs");
 const you = blobs.find((b) => b.el.id === "blob-you");

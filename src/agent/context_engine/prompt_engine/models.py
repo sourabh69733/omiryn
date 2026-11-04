@@ -15,3 +15,5 @@ class PromptBehaviorVersion:
     reply_style: dict[str, object] = field(default_factory=dict)
     conversation_flow: dict[str, object] = field(default_factory=dict)
     data_point_targets: tuple[str, ...] = ()
+    # The goal block of the blocks prompt; empty uses V4's.
+    reply_goal: str = ""

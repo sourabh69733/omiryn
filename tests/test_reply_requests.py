@@ -109,3 +109,46 @@ class RecentRequestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(info["broken"], ["do not ask stupid questions"])
         self.assertIn('"recent_user_messages": ["hi", "do not ask stupid questions", "ok"]', checker.await_args.args[0])
         self.assertIn("do not ask stupid questions", writer.await_args.args[0][-1]["content"])
+
+
+class ClosedQuestionTest(unittest.IsolatedAsyncioTestCase):
+    """Only a reply that asks something can ask a closed question again."""
+
+    async def _follow(self, reply: str):
+        from agent.context_engine.policy.asked_questions import AskedQuestion
+        from agent.context_engine.policy.requests import DO_NOT_ASK_AGAIN
+
+        question = "kya kar rahe ho abhi?"
+        request = DO_NOT_ASK_AGAIN.format(question=question)
+        writer = AsyncMock(return_value="rewritten")
+        job = ReplyJob(
+            [{"role": "user", "content": "hmm"}],
+            ARGS,
+            writer,
+            requests=["Keep replies short."],
+            asked=[AskedQuestion(question=question, user_said=["no"])],
+        )
+        with patch("agent.runtime.steps.checks.check_reply_requests", AsyncMock(return_value={"broken": [request]})):
+            return await follow_requests(reply, job), writer
+
+    async def test_a_reply_with_no_question_is_not_rewritten_for_it(self) -> None:
+        (reply, info), writer = await self._follow("theek hai.")
+        self.assertEqual(reply, "theek hai.")
+        self.assertEqual(info["broken"], [])
+        writer.assert_not_called()
+
+    async def test_a_reply_that_asks_is_rewritten(self) -> None:
+        (reply, info), writer = await self._follow("acha, kya kar rahe ho abhi?")
+        self.assertEqual(reply, "rewritten")
+        writer.assert_awaited_once()
+
+
+class EmojiReplyTest(unittest.TestCase):
+    def test_a_lone_emoji_is_a_whole_reply(self) -> None:
+        from agent.context_engine.policy.freshness import stale_reply_reason
+        from agent.runtime.steps.finish import finish_reply
+
+        self.assertIsNone(stale_reply_reason("👍", ["👍"]))
+        finished = finish_reply("👍", "hmm")
+        self.assertEqual(finished.parts, ["👍"])
+

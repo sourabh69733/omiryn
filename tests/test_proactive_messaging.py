@@ -8,7 +8,13 @@ from unittest.mock import AsyncMock, patch
 
 import storage
 from agent.context_engine.threads.models import ConversationThread
-from agent.proactive import nudge_block_reason, pick_thread, run_proactive_pass
+from agent.proactive import (
+    nudge_block_reason,
+    pick_thread,
+    proactive_messaging_enabled,
+    run_proactive_pass,
+    schedule_return_greeting,
+)
 from realtime import realtime_hub
 
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=UTC)
@@ -29,6 +35,17 @@ def _thread(**overrides) -> ConversationThread:
         title="Riya", summary="Riya keeps calling", origin="user", next_angle="ask how it felt",
     )
     return ConversationThread(**{**values, **overrides})
+
+
+def test_off_unless_switched_on(monkeypatch) -> None:
+    monkeypatch.delenv("PROACTIVE_MESSAGING_ENABLED")
+    assert not proactive_messaging_enabled()
+    with patch("agent.jobs.queue.schedule_job") as schedule:
+        schedule_return_greeting(USER_ID, CONVERSATION_ID)
+    schedule.assert_not_called()
+
+    monkeypatch.setenv("PROACTIVE_MESSAGING_ENABLED", "true")
+    assert proactive_messaging_enabled()
 
 
 def test_allows_a_nudge_after_silence() -> None:

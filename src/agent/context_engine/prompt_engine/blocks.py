@@ -49,7 +49,7 @@ _SOURCE_BLOCKS = {
     "conversation_threads": "this_chat",
 }
 BLOCK_CHAR_LIMITS = {
-    "omi": 2600,
+    "omi": 3200,
     "rules": 4200,
     "format": 1400,
     "about_user": 2000,
@@ -64,7 +64,7 @@ BLOCK_CHAR_LIMITS = {
     "open_questions": 700,
     "how_to_talk": 3000,
     "this_turn": 2000,
-    "goal": 1200,
+    "goal": 1900,
 }
 _CONSTRAINT_FACTS = {
     "no_questions": "They asked you not to ask questions.",
@@ -171,8 +171,8 @@ def build_companion_system_prompt_v4(
         ("might_fit", grouped.get("might_fit", [])),
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
-        ("this_turn", [time_facts, _turn_lines(facts)]),
-        ("goal", [V4_GOAL]),
+        ("this_turn", [time_facts, _turn_lines(facts), _web_search_line()]),
+        ("goal", [prompt_version.reply_goal or V4_GOAL]),
     ]
     return "\n\n".join(filter(None, (_block(tag, parts) for tag, parts in blocks)))
 
@@ -270,6 +270,18 @@ def _turn_lines(facts: TurnFacts) -> str:
     if facts.active_topic:
         lines.append(f"Current topic in this chat: {facts.active_topic}.")
     return "\n".join(lines)
+
+
+def _web_search_line() -> str:
+    """Read last, because the tool's description alone did not get these questions searched."""
+    from agent.tools import tools_enabled, web_search_enabled
+
+    if not (tools_enabled() and web_search_enabled()):
+        return ""
+    return (
+        "You can search the web. If they ask what is going on in the world or in a field, or whether "
+        "you can look things up, what you remember is old: call web_search before you reply."
+    )
 
 
 __all__ = ["BLOCK_CHAR_LIMITS", "TurnFacts", "build_companion_system_prompt_v4", "turn_facts"]

@@ -35,11 +35,14 @@ class StaleReplyTest(unittest.TestCase):
     def test_short_replies_may_repeat(self) -> None:
         self.assertIsNone(stale_reply_reason("haha same", ["haha same", "haha same"]))
 
-    def test_repeated_opening_is_caught_on_the_third_use(self) -> None:
-        earlier = ["that's awesome, congrats on the promotion", "that's awesome, the trek sounds wild"]
-        reason = stale_reply_reason("that's awesome, your sister must be thrilled", earlier)
-        self.assertIn('opens with "that\'s awesome"', reason)
-        self.assertIsNone(stale_reply_reason("that's awesome, your sister must be thrilled", earlier[:1]))
+    def test_repeated_opening_is_caught_right_after_or_on_the_third_use(self) -> None:
+        draft = "that's awesome, your sister must be thrilled"
+        promotion = "that's awesome, congrats on the promotion"
+        trek = "that's awesome, the trek sounds wild"
+        other = "wow, what a week you had"
+        self.assertIn('opens with "that\'s awesome"', stale_reply_reason(draft, [promotion]))
+        self.assertIn('opens with "that\'s awesome"', stale_reply_reason(draft, [promotion, trek, other]))
+        self.assertIsNone(stale_reply_reason(draft, [promotion, other]))
 
     def test_bubble_separator_does_not_hide_a_stock_line(self) -> None:
         self.assertIsNotNone(stale_reply_reason("hmm<next_message>I'm here for you", []))
@@ -222,3 +225,64 @@ class RepeatedQuestionTest(unittest.TestCase):
         from agent.context_engine.policy.freshness import repeated_questions
 
         self.assertEqual(repeated_questions("What are you doing this weekend?", ["What are you doing now?"]), [])
+
+
+class SameShapeRepeatTest(unittest.TestCase):
+    """Seen live on Gemma: the same reply twice with only the middle words changed."""
+
+    FIRST = "theek hai, main silent mode pe ja raha hoon. jab mann kare tab bata dena."
+    SECOND = "theek hai, main chup hoon. jab mood ho tab bata dena."
+
+    def test_the_same_start_and_end_with_a_new_middle_is_a_repeat(self) -> None:
+        from agent.context_engine.policy.freshness import stale_reply_reason
+
+        self.assertIsNotNone(stale_reply_reason(self.SECOND, [self.FIRST]))
+
+    def test_a_different_reply_that_shares_only_one_end_is_fine(self) -> None:
+        from agent.context_engine.policy.freshness import _same_shape, _normalize
+
+        self.assertFalse(_same_shape(_normalize("main ghar pe hoon abhi, kal bata dena."), _normalize(self.FIRST)))
+        self.assertFalse(_same_shape(_normalize("theek hai, kal milte hain phir pakka."), _normalize(self.FIRST)))
+        self.assertFalse(_same_shape(_normalize("theek hai bata dena"), _normalize(self.FIRST)))
+
+    def test_opening_like_the_reply_right_before_it_is_stale(self) -> None:
+        from agent.context_engine.policy.freshness import stale_reply_reason
+
+        reason = stale_reply_reason("theek hai, kal ka plan pakka karte hain phir.", ["theek hai, main yahin hoon."])
+        self.assertIn('opens with "theek hai"', reason)
+        self.assertIsNone(stale_reply_reason("kal ka plan pakka karte hain phir.", ["theek hai, main yahin hoon."]))
+
+    def test_last_resort_drops_a_repeated_opening_but_never_empties(self) -> None:
+        from agent.context_engine.policy.freshness import without_repeated_opening
+
+        earlier = ["theek hai, main yahin hoon."]
+        self.assertEqual(without_repeated_opening("theek hai, kal baat karte hain.", earlier), "kal baat karte hain.")
+        self.assertEqual(without_repeated_opening("theek hai.", earlier), "theek hai.")
+        self.assertEqual(
+            without_repeated_opening("theek hai.<next_message>kal baat karte hain.", earlier), "kal baat karte hain."
+        )
+        self.assertEqual(without_repeated_opening("kal baat karte hain.", earlier), "kal baat karte hain.")
+
+
+class SeesWhatTheUserSeesTest(unittest.IsolatedAsyncioTestCase):
+    async def test_a_request_rewrite_that_repeats_is_caught_by_the_repeat_check(self) -> None:
+        from agent.runtime.steps import REPLY_CHECKS
+
+        self.assertEqual([name for name, _check in REPLY_CHECKS], ["request_check", "freshness"])
+        first = SameShapeRepeatTest.FIRST
+        job = ReplyJob(
+            [{"role": "user", "content": "hmm"}],
+            {"conversation_id": "c"},
+            AsyncMock(side_effect=[SameShapeRepeatTest.SECOND, "hmm"]),
+            requests=["Keep replies short."],
+            previous_replies=[first],
+        )
+        reply = "kal ka kya plan hai tumhara phir?"
+        with patch("agent.runtime.steps.checks.check_reply_requests", AsyncMock(return_value={"broken": ["Keep replies short."]})):
+            for _name, check in REPLY_CHECKS:
+                reply, _info = await check(reply, job)
+
+        self.assertEqual(reply, "hmm")
+        note = job.generate.await_args_list[1].args[0][-1]["content"]
+        self.assertIn("one emoji", note)
+

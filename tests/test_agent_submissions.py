@@ -2655,6 +2655,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
                 "context_pack",
                 "model_call",
                 "context_snapshot",
+                "burst_wait",
             ],
         )
         self.assertTrue(trace_steps[2]["metadata"]["source_count"] >= 1)

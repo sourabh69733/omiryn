@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import timedelta
 from typing import Any, AsyncContextManager, AsyncIterator, Awaitable, Callable
 
@@ -21,9 +21,9 @@ from agent.providers import agent_runtime_status
 from agent.shared.clock import utc_now
 from realtime import conversation_event, realtime_hub
 from security.auth import CurrentUser
-from storage import burst_state, finish_burst, join_burst, release_burst, renew_burst
+from storage import burst_state, finish_burst, join_burst, release_burst, renew_burst, save_agent_trace_step
 
-from .burst_window import seconds_left
+from .burst_window import DRAFT_HOLD_SECONDS, seconds_left, typing_active
 from .chat_service import (
     REPLY_FAILED_CODE,
     WEB_CHANNEL,
@@ -65,6 +65,18 @@ class BurstOutput:
     deliver: Callable[[list[dict[str, Any]]], Awaitable[None]]
 
 
+@dataclass
+class _ReplyStats:
+    """What the waiting did for one reply, kept in its trace to tune the window on real numbers."""
+
+    waited_seconds: float = 0.0
+    typing_held_seconds: float = 0.0
+    # Came in while a typing signal was holding the reply: each would have cost a redraft or its own reply.
+    messages_while_held: int = 0
+    drafts_thrown_away: int = 0
+    draft_held_seconds: float = 0.0
+
+
 def join(channel: str, chat_id: str, conversation_id: str) -> Burst | None:
     """Count a saved message into the chat's burst; a Burst when this caller must answer it."""
     joined = join_burst(channel, chat_id, conversation_id, now=utc_now(), lease_seconds=BURST_LEASE_SECONDS)
@@ -94,8 +106,9 @@ async def _reply_until_answered(
 ) -> None:
     answered = 0
     restarts = 0
+    stats = _ReplyStats()
     while True:
-        seen = await _wait_for_quiet(burst, answered)
+        seen = await _wait_for_quiet(burst, answered, stats)
         if seen is None:
             return  # the lease was taken over
         async with output.writing():
@@ -103,15 +116,18 @@ async def _reply_until_answered(
             draft = await draft_reply_to_unanswered(
                 user, burst.conversation_id, count_quota=answered > 0 and restarts == 0
             )
-            state = _own_state(burst)
+            state = await _hold_for_typing(burst, seen, stats) if restarts < MAX_RESTARTS else _own_state(burst)
             if state is None:
                 return
             if state["arrivals"] > seen and restarts < MAX_RESTARTS:
                 # More came in while Omi wrote: start over so the reply covers those too.
                 restarts += 1
+                stats.drafts_thrown_away += 1
                 continue
             replies = await commit_reply(user, draft, background_tasks) if draft else []
+            _save_stats(user, burst, draft, stats)
         restarts = 0
+        stats = _ReplyStats()
         await output.deliver(replies)
         answered = seen
         # Closes the burst only if nothing arrived since `seen`; otherwise go round again.
@@ -124,17 +140,63 @@ def _own_state(burst: Burst) -> dict[str, Any] | None:
     return state if state and state["token"] == burst.token else None
 
 
-async def _wait_for_quiet(burst: Burst, answered: int) -> int | None:
+async def _wait_for_quiet(burst: Burst, answered: int, stats: _ReplyStats) -> int | None:
     """Wait for the chat to go quiet; returns how many messages the burst then holds."""
+    started_at = utc_now()
+    held_at_arrivals: int | None = None
+    while True:
+        state = _own_state(burst)
+        if state is None:
+            return None
+        now = utc_now()
+        if held_at_arrivals is not None:
+            stats.messages_while_held += max(0, state["arrivals"] - held_at_arrivals)
+        left = seconds_left(state["arrivals"] - answered, state["last_at"], started_at, now, state["typing_at"])
+        if left <= 0:
+            stats.waited_seconds += (now - started_at).total_seconds()
+            return state["arrivals"]
+        pause = min(left, _QUIET_POLL_SECONDS)
+        held_at_arrivals = state["arrivals"] if typing_active(state["typing_at"], now) else None
+        if held_at_arrivals is not None:
+            stats.typing_held_seconds += pause
+        await asyncio.sleep(pause)
+
+
+async def _hold_for_typing(burst: Burst, seen: int, stats: _ReplyStats) -> dict[str, Any] | None:
+    """The draft is done and nothing is shown yet. If they are typing right now, give that message a
+    moment to land, so the reply does not arrive having missed it. Returns the burst's state."""
     started_at = utc_now()
     while True:
         state = _own_state(burst)
         if state is None:
             return None
-        left = seconds_left(state["arrivals"] - answered, state["last_at"], started_at, utc_now())
-        if left <= 0:
-            return state["arrivals"]
-        await asyncio.sleep(min(left, _QUIET_POLL_SECONDS))
+        now = utc_now()
+        held = (now - started_at).total_seconds()
+        if state["arrivals"] > seen or not typing_active(state["typing_at"], now) or held >= DRAFT_HOLD_SECONDS:
+            stats.draft_held_seconds += held
+            return state
+        await asyncio.sleep(_QUIET_POLL_SECONDS)
+
+
+def _save_stats(user: CurrentUser, burst: Burst, draft: Any, stats: _ReplyStats) -> None:
+    """Best effort: a reply is never lost over its numbers."""
+    trace_id = getattr(getattr(draft, "turn", None), "trace_id", None)
+    if not trace_id:
+        return
+    try:
+        save_agent_trace_step(
+            {
+                "trace_id": trace_id,
+                "user_id": user.id,
+                "conversation_id": burst.conversation_id,
+                "step_index": 5,
+                "step_name": "burst_wait",
+                "status": "ok",
+                "metadata": {key: round(value, 2) for key, value in asdict(stats).items()},
+            }
+        )
+    except Exception:
+        logger.exception("burst.stats_failed")
 
 
 async def _keep_lease(burst: Burst) -> None:

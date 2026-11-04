@@ -9,11 +9,20 @@ from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
 from agent.cognition.background.idle import catch_up_pending
 from agent.proactive import schedule_return_greeting
+from agent.shared.clock import utc_now
 from realtime import RealtimeTicketError, issue_realtime_ticket, realtime_hub
 from realtime.tickets import verify_realtime_ticket
 from security.auth import CurrentUser, production_runtime_enabled, require_user
 from security.config import configured_cors_origins
-from storage import delete_stale_temporary_conversations, get_conversation, prune_threads_from_missing_chats
+from storage import (
+    delete_stale_temporary_conversations,
+    get_conversation,
+    prune_threads_from_missing_chats,
+    signal_typing,
+    stop_typing,
+)
+
+from ..chat_service import WEB_CHANNEL
 
 router = APIRouter()
 
@@ -86,6 +95,15 @@ async def _handle_command(websocket: WebSocket, connection, command: object) -> 
         return
     scope = str(command.get("scope") or "").strip()
     scope_id = str(command.get("scope_id") or "").strip()
+    if command_type == "typing":
+        # Sent about once a second while a reply is pending, so it gets no answer. A signal for a
+        # chat this socket is not in is ignored.
+        if scope == "conversation" and realtime_hub.is_subscribed(connection, scope, scope_id):
+            if command.get("active") is False:
+                stop_typing(WEB_CHANNEL, scope_id)
+            else:
+                signal_typing(WEB_CHANNEL, scope_id, utc_now())
+        return
     if command_type not in {"subscribe", "unsubscribe"} or scope != "conversation" or not scope_id:
         await _command_error(websocket, "Unsupported realtime command.")
         return

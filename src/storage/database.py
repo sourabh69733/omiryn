@@ -172,6 +172,7 @@ def _ensure_runtime_columns() -> None:
         "agent_user_settings": ("timezone", "reply_model"),
         "agent_memories": ("statement", "focus", "followed_up_at"),
         "agent_user_cards": ("rebuilt_at",),
+        "channel_bursts": ("typing_at",),
         "agent_jobs": ("payload_json",),
         "match_pairs": ("plan_json", "introduced_at"),
         "agent_conversations": (

@@ -110,8 +110,8 @@ _HAND_OVER_SECONDS = 3.0
 
 
 def proactive_messaging_enabled() -> bool:
-    """Deployment-level kill switch; each user also has their own off switch."""
-    return os.getenv("PROACTIVE_MESSAGING_ENABLED", "true").strip().lower() != "false"
+    """Deployment-level switch, off unless set to true; each user also has their own off switch."""
+    return os.getenv("PROACTIVE_MESSAGING_ENABLED", "false").strip().lower() == "true"
 
 
 async def run_proactive_pass(*, now: datetime | None = None) -> int:

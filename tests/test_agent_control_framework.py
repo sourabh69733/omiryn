@@ -160,21 +160,21 @@ class AgentControlFrameworkTest(unittest.TestCase):
         self.assertEqual(parts[1], "Samajh gayi, ab hum dono milke plan banate hain.")
         self.assertFalse(any(part.startswith(("Rahul:", "Siya:")) for part in parts))
 
-    def test_prompt_version_registry_defaults_to_v4(self) -> None:
+    def test_prompt_version_registry_defaults_to_v4_3(self) -> None:
         version = get_prompt_behavior_version("unknown-version")
 
-        self.assertEqual(version.version_id, "v4")
-        self.assertEqual(version.name, "v4_character_blocks")
+        self.assertEqual(version.version_id, "v4-3")
+        self.assertEqual(version.name, "v4_3_no_life_between_messages")
         self.assertIn("friend_wish", get_prompt_behavior_version("v3").data_point_targets)
         self.assertNotIn("relationship_intent", get_prompt_behavior_version("v3").data_point_targets)
 
     def test_prompt_versions_are_independently_selectable(self) -> None:
         versions = {version.version_id: version for version in available_prompt_versions()}
 
-        self.assertEqual(set(versions), {"v3", "v3-1", "v4"})
+        self.assertEqual(set(versions), {"v3", "v3-1", "v4", "v4-1", "v4-2", "v4-3"})
         # v1 and v2 are archived; asking for them gets the default.
-        self.assertEqual(get_prompt_behavior_version("v1").version_id, "v4")
-        self.assertEqual(get_prompt_behavior_version("v2").version_id, "v4")
+        self.assertEqual(get_prompt_behavior_version("v1").version_id, "v4-3")
+        self.assertEqual(get_prompt_behavior_version("v2").version_id, "v4-3")
         self.assertEqual(get_prompt_behavior_version("v3").name, "v3_listener_first_companion")
         self.assertEqual(
             get_prompt_behavior_version("v3-1").name,
@@ -183,8 +183,8 @@ class AgentControlFrameworkTest(unittest.TestCase):
 
     def test_configured_prompt_version_can_switch_without_changing_default(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
-            self.assertEqual(configured_prompt_version_id(), "v4")
-            self.assertEqual(get_prompt_behavior_version().version_id, "v4")
+            self.assertEqual(configured_prompt_version_id(), "v4-3")
+            self.assertEqual(get_prompt_behavior_version().version_id, "v4-3")
 
         with patch.dict("os.environ", {"AGENT_BEHAVIOR_VERSION": "v3"}, clear=True):
             self.assertEqual(configured_prompt_version_id(), "v3")

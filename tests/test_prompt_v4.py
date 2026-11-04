@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_is_the_default(self) -> None:
+    def test_v4_3_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,7 +150,13 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4")
+        self.assertEqual(package.prompt_version, "v4-3")
+        self.assertIn("Nothing happens to you between messages", package.system_prompt)
+        # The character's last line survives its block's limit too.
+        self.assertIn("one, then bring an opinion or turn to them.", package.system_prompt)
+        self.assertIn("<no_reply> as your whole reply", package.system_prompt)
+        # The goal's last line survives the block's limit.
+        self.assertIn("Say something only this conversation could produce.", package.system_prompt)
 
 
 class TurnFactsTest(unittest.TestCase):
@@ -179,3 +185,38 @@ class AddressRuleTest(unittest.TestCase):
         for gender in (None, "non_binary", "prefer_not_to_say"):
             with self.subTest(gender=gender):
                 self.assertIn("not known", _address_rule({"gender": gender}))
+
+
+class PromptV41Test(unittest.TestCase):
+    def test_only_the_line_about_little_changes_and_v4_is_kept(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_GOAL
+        from agent.context_engine.prompt_engine.versions.v4_1 import V4_1_GOAL, V4_1_PROMPT_VERSION
+
+        self.assertIn("That is your cue to bring something", V4_GOAL)
+        self.assertNotIn("That is your cue to bring something", V4_1_GOAL)
+        self.assertIn("one word or one emoji", V4_1_GOAL)
+        self.assertEqual(V4_1_PROMPT_VERSION.reply_goal, V4_1_GOAL)
+
+
+class PromptV43Test(unittest.TestCase):
+    def test_only_the_day_lines_change_and_v4_2_is_kept(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_2 import V4_2_GOAL, V4_2_PROMPT_VERSION
+        from agent.context_engine.prompt_engine.versions.v4_3 import V4_3_CHARACTER, V4_3_GOAL
+
+        self.assertIn("something you were curious about", V4_CHARACTER)
+        self.assertNotIn("something you were curious about", V4_3_CHARACTER)
+        self.assertIn("Nothing happens to you between messages", V4_3_CHARACTER)
+        self.assertIn("not as something you saw or did", V4_3_GOAL)
+        self.assertNotIn("not as something you saw or did", V4_2_GOAL)
+        self.assertEqual(V4_2_PROMPT_VERSION.base_prompt, V4_CHARACTER)
+
+    def test_omi_has_no_favourite_food_to_copy(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4 import V4_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_3 import V4_3_CHARACTER
+
+        self.assertIn("biryani", V4_CHARACTER)
+        self.assertNotIn("biryani", V4_3_CHARACTER)
+        self.assertNotIn("Dune", V4_3_CHARACTER)
+        self.assertNotIn("music, food, ideas", V4_3_CHARACTER)
+        self.assertIn("no favourite\n  food or drink", V4_3_CHARACTER)

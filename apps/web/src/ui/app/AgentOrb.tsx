@@ -1,5 +1,6 @@
 // The agent's face: a glossy "vibe" blob, not a photo of a person, since
-// Omiryn is not a person. Each state has its own image. Only "thinking"
+// Omiryn is not a person. Each state has its own image (the ember set, recolored
+// from the originals by design-assets/agent-src/recolor_ember.py). Only "thinking"
 // (writing a reply) moves; every other state is still.
 export type AgentOrbState = "idle" | "thinking" | "listening" | "happy";
 
@@ -16,8 +17,8 @@ export function AgentOrb({ state, active = false }: AgentOrbProps) {
       <span className="agent-orb-glow" />
       <img
         className="agent-orb-blob"
-        src={`/assets/agent/agent-${current}-128.webp`}
-        srcSet={`/assets/agent/agent-${current}-128.webp 1x, /assets/agent/agent-${current}-256.webp 2x`}
+        src={`/assets/agent/agent-${current}-ember-128.webp`}
+        srcSet={`/assets/agent/agent-${current}-ember-128.webp 1x, /assets/agent/agent-${current}-ember-256.webp 2x`}
         alt=""
         draggable={false}
         decoding="async"

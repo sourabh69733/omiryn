@@ -1,41 +1,42 @@
-/* App expression of the landing palette. Keep page layout in the screen files (chat.css, vibe.css, ...). */
+/* App expression of the landing palette: paper surfaces, white cards, ink buttons, ember accents.
+   Keep page layout in the screen files (chat.css, vibe.css, ...). */
 body {
-  background: var(--brand-bg);
+  background: var(--paper);
 }
 
 .chat-card {
-  border-color: var(--brand-line);
-  background: #fff;
-  box-shadow: 0 8px 30px rgba(24, 24, 27, 0.05);
+  border-color: var(--line);
+  background: var(--paper);
+  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .agentic-chat .card-heading {
-  border-bottom-color: var(--brand-line);
-  background: #fff;
+  border-bottom-color: var(--line);
+  background: var(--paper);
   box-shadow: none;
 }
 
 .agentic-chat .chat-log {
-  background: var(--brand-bg);
+  background: var(--paper);
 }
 
 .agentic-chat .composer {
-  border-color: var(--brand-line);
-  background: #fff;
-  box-shadow: 0 3px 12px rgba(24, 24, 27, 0.06);
+  border-color: var(--line);
+  background: var(--card);
+  box-shadow: none;
 }
 
 .agentic-chat .composer > textarea::placeholder {
-  color: var(--brand-muted);
+  color: var(--muted);
 }
 
 .vibe-callout,
 .vibe-card.is-known {
-  border-color: var(--brand-line);
-  background: #fff;
-  box-shadow: 0 3px 12px rgba(24, 24, 27, 0.04);
+  border-color: transparent;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
 .vibe-card:not(.is-known) {
@@ -56,6 +57,8 @@ body {
 .vibe-callout,
 .vibe-quotes {
   overflow-wrap: anywhere;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
 }
 
 @media (max-width: 400px) {
@@ -74,9 +77,9 @@ body {
     justify-items: start;
     min-height: 48px;
     gap: 8px;
-    border: 1px solid var(--brand-line);
+    border: 1px solid var(--line);
     border-radius: 12px;
-    background: #fff;
+    background: var(--card);
     padding: 8px;
     text-align: left;
   }

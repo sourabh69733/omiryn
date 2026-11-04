@@ -208,6 +208,7 @@ async def _publish_messages(conversation: AgentConversation, indexes: Iterable[i
                         "delivery_status": message.get("delivery_status"),
                         **({"client_id": message["client_id"]} if message.get("client_id") else {}),
                         **({"reply_to": message["reply_to"]} if message.get("reply_to") else {}),
+                        **({"reaction": message["reaction"]} if message.get("reaction") else {}),
                     },
                 },
             )
@@ -253,6 +254,38 @@ async def save_web_message(
     set_conversation_archived(conversation.id, _user_id(user), False)
     if "index" in placed:
         await _publish_new_messages(conversation, placed["index"])
+
+
+async def set_user_reaction(
+    conversation: AgentConversation, user: CurrentUser, index: int, emoji: str | None
+) -> None:
+    """The user's emoji on one of Omi's messages, or none. Omi sees it the next time it replies;
+    a reaction does not start a reply."""
+    found: dict[str, bool] = {}
+
+    def change(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        if not 0 <= index < len(messages):
+            return None
+        message = messages[index]
+        if message.get("role") != "assistant" or message.get("deleted"):
+            return None
+        found["message"] = True
+        if emoji:
+            message["user_reaction"] = emoji
+        else:
+            message.pop("user_reaction", None)
+        return messages
+
+    _change_messages(conversation, user, change)
+    if not found:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    await realtime_hub.publish(
+        conversation_event(
+            "message.user_reaction",
+            conversation.id,
+            payload={"conversation_id": conversation.id, "message_index": index, "user_reaction": emoji},
+        )
+    )
 
 
 def mark_retry_sending(conversation: AgentConversation, user: CurrentUser) -> None:
@@ -442,6 +475,8 @@ async def commit_reply(
     quality = draft.turn.messages[answered].get("quality")
     replies = [dict(message) for message in draft.turn.messages[answered + 1 :]]
     placed: dict[str, int | None] = {"first": None, "start": None}
+    reaction = getattr(draft.turn, "reaction", None)
+    no_reply = getattr(draft.turn, "no_reply", False)
 
     def commit(stored: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
         index = _find_message(stored, answered, draft.answered_message)
@@ -451,6 +486,11 @@ async def commit_reply(
         if quality:
             stored[index]["quality"] = quality
         placed["first"] = _mark_answered(stored, index)
+        # After marking: a message with one of these no longer counts as unanswered.
+        if reaction:
+            stored[index]["reaction"] = reaction
+        if no_reply:
+            stored[index]["no_reply"] = True
         start = index + 1
         # Omi's own message that landed meanwhile (a nudge) stays above the reply.
         while start < len(stored) and stored[start].get("role") != "user":
@@ -483,13 +523,13 @@ def mark_unanswered_failed(user: CurrentUser, conversation_id: str) -> None:
 
 
 def _unanswered_indexes(messages: list[dict[str, Any]]) -> list[int]:
-    """User messages after Omi's last message, oldest first."""
+    """User messages after Omi's last answer, oldest first. A reaction or a chosen silence is one."""
     indexes: list[int] = []
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
         if message.get("deleted"):
             continue
-        if message.get("role") != "user":
+        if message.get("role") != "user" or message.get("reaction") or message.get("no_reply"):
             break
         indexes.append(index)
     return indexes[::-1]

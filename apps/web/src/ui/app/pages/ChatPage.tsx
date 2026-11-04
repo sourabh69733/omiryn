@@ -1,6 +1,6 @@
-import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type ReactNode, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
 import { rememberedUpload, rememberUpload, type SharedUpload, UploadReading } from "../UploadReading";
 import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
@@ -8,11 +8,12 @@ import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
-import { AvatarImage } from "../AvatarImage";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
+import { NO_TYPING_SIGNAL, nextTypingSignal } from "../typingSignal";
+import { applyMessageAt, withUserReaction, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { temporaryName } from "../temporaryName";
@@ -25,14 +26,17 @@ import { cognitionResultLabel } from "../usagePresentation";
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 const CHAT_INPUT_MAX_LENGTH = 800;
 // Six menu items plus padding, in pixels.
-const MESSAGE_MENU_HEIGHT = 260;
+const MESSAGE_MENU_HEIGHT = 310;
+const MESSAGE_REACT_HEIGHT = 60;
+const MESSAGE_REACT_WIDTH = 300;
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 // One ongoing chat with Omi; older chats open read-only from the "Earlier chats" drawer.
 // `away`: an earlier chat or a temporary chat is open, so the Omi row is not the open chat.
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: string | null; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -100,6 +104,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const [menuUp, setMenuUp] = useState(false);
   // After "Bad reply" the menu asks what was off, in place.
   const [menuAsksWhy, setMenuAsksWhy] = useState(false);
+  // The ☺ beside a reply opens only the emojis; + from there opens the full picker.
+  const [menuView, setMenuView] = useState<"actions" | "react" | "picker">("actions");
+  // The emojis need more width than a menu; near the edge they open over the message instead.
+  const [menuToLeft, setMenuToLeft] = useState(false);
   // How the user rated Omi's replies in this chat, by message index.
   const [ratings, setRatings] = useState<ReadonlyMap<number, ReplyRating>>(() => new Map());
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
@@ -145,6 +153,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const composerPauseTimerRef = useRef<number | null>(null);
+  const openRequestsRef = useRef(new Map<string, number>());
+  const typingSignalRef = useRef(NO_TYPING_SIGNAL);
   const initializedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const handledEvidenceTargetRef = useRef("");
@@ -264,11 +274,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     const recovered = (await response.json()) as MessageRecovery;
     setConversation((current) => {
       if (!current || current.id !== id) return current;
-      const messages = [...current.messages];
+      let messages = current.messages;
       for (const item of recovered.messages) {
         if (!Number.isInteger(item.message_index) || item.message_index < 0) continue;
-        if (item.message_index < messages.length) messages[item.message_index] = item.message;
-        else if (item.message_index === messages.length) messages.push(item.message);
+        messages = applyMessageAt(messages, item.message_index, item.message);
       }
       return { ...current, messages };
     });
@@ -491,6 +500,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId && !temporary);
   const earlierUnread = summaries.some((item) => item.id !== omiId && !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
+  const retryIndex = conversation ? lastFailedIndex(conversation.messages, isFailedMessage) : -1;
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
   // A brand-new user's first chat: explain what Omi does until they send their first message.
@@ -604,7 +614,24 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (characterCount(value) > CHAT_INPUT_MAX_LENGTH) setLimitNoticeVersion((version) => version + 1);
     const nextDraft = limitCharacters(value, CHAT_INPUT_MAX_LENGTH);
     setDraft(nextDraft);
+    signalTyping(nextDraft);
     void refreshEmojiShortcodeSuggestions(nextDraft, Math.min(cursor, nextDraft.length));
+  }
+
+  // A reply is pending and more is coming: Omi waits for the rest instead of starting without it.
+  function signalTyping(text: string) {
+    if (!conversation) return;
+    const replyPending = sending || typingConversationId === conversation.id;
+    const next = nextTypingSignal(typingSignalRef.current, text, replyPending, Date.now());
+    typingSignalRef.current = next.state;
+    if (!next.signal) return;
+    const active = next.signal === "typing";
+    if (realtimeClientRef.current?.sendTyping(conversation.id, active)) return;
+    void apiFetch(`/api/agent/conversations/${conversation.id}/typing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    }).catch(() => undefined);
   }
 
   function closeEmojiShortcodeSuggestions() {
@@ -680,31 +707,36 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || !conversation || sending || composerLimit) return;
+    if (!message || !conversation || composerLimit) return;
     closeEmojiShortcodeSuggestions();
     setDraft("");
+    typingSignalRef.current = NO_TYPING_SIGNAL;
     await sendText(message);
   }
 
-  async function sendText(message: string, target: Conversation | null = conversation) {
+  async function sendText(message: string, target: Conversation | null = conversation, resendId?: string) {
     if (!target) return;
+    const clientId = resendId ?? newClientId();
     shouldStickToBottomRef.current = true;
     setSendingFor(target.id, true);
     setError("");
     setComposerLimit(null);
     // A new message also answers for an earlier failed one; the server clears it the same way.
-    const earlier = target.messages.map((item) => (isFailedMessage(item) ? { ...item, delivery_status: "read" } : item));
     const quote = target.id === conversation?.id ? replyTo : null;
     setReplyTo(null);
-    updateIfOpen(target.id, () => ({ ...target, messages: [...earlier, { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", ...(quote ? { reply_to: quote } : {}) }] }));
-    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, ...(quote ? { reply_to_index: quote.index } : {}) }, target, message);
+    const bubble: Message = { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", client_id: clientId, local: true, ...(quote ? { reply_to: quote } : {}) };
+    updateIfOpen(target.id, (current) => ({ ...current, messages: [...current.messages.map((item) => (!item.local && isFailedMessage(item) ? { ...item, delivery_status: "read" } : item)), bubble] }));
+    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, client_id: clientId, ...(quote ? { reply_to_index: quote.index } : {}) }, target, message, clientId);
   }
 
+  // Counts the requests open on a chat: Omi is at work until the last one has returned.
   function setSendingFor(id: string, value: boolean) {
+    const open = Math.max(0, (openRequestsRef.current.get(id) ?? 0) + (value ? 1 : -1));
+    openRequestsRef.current.set(id, open);
     setSendingIds((current) => {
-      if (current.has(id) === value) return current;
+      if (current.has(id) === open > 0) return current;
       const next = new Set(current);
-      if (value) next.add(id);
+      if (open > 0) next.add(id);
       else next.delete(id);
       return next;
     });
@@ -719,6 +751,13 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (!conversation || sending) return;
     const target = conversation;
     const text = target.messages[index]?.content || "";
+    // Bubbles the server never answered for go again, in order, under the ids they were sent with.
+    const unsent = target.messages.filter((item) => item.local && isFailedMessage(item));
+    if (unsent.length) {
+      updateIfOpen(target.id, (current) => ({ ...current, messages: current.messages.filter((item) => !unsent.includes(item)) }));
+      for (const item of unsent) void sendText(item.content || "", target, item.client_id);
+      return;
+    }
     shouldStickToBottomRef.current = true;
     setSendingFor(target.id, true);
     setError("");
@@ -728,14 +767,23 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       // The server never saved it (the connection dropped first): send it as a new message.
       const withoutFailed = { ...target, messages: target.messages.filter((_, position) => position !== index) };
       updateIfOpen(target.id, () => withoutFailed);
-      await sendText(text, withoutFailed);
+      await sendText(text, withoutFailed, target.messages[index]?.client_id);
     }
   }
 
   // Sends the request and settles the pending bubble: replied, failed (with Retry), or rolled back.
-  async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string): Promise<"ok" | "failed" | "not_retryable"> {
+  async function postReply(path: string, body: unknown, previousConversation: Conversation, text: string, clientId: string | null = null): Promise<"ok" | "failed" | "not_retryable"> {
     const id = previousConversation.id;
     const stillOpen = () => openConversationIdRef.current === id;
+    const dropBubble = () => {
+      if (clientId) updateIfOpen(id, (current) => ({ ...current, messages: dropLocal(current.messages, clientId) }));
+      else updateIfOpen(id, () => previousConversation);
+    };
+    let settled = false;
+    const settle = () => {
+      if (!settled) setSendingFor(id, false);
+      settled = true;
+    };
     try {
       const response = await apiFetch(path, {
         method: "POST",
@@ -745,7 +793,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       if (!response.ok) {
         const detail = await apiErrorDetail(response, "Omiryn could not reply.");
         if (response.status === 429) {
-          updateIfOpen(id, () => previousConversation);
+          dropBubble();
           if (stillOpen()) setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
           const friendly = friendlyQuotaMessage(detail.message);
           const retryAfterSeconds = retryAfterFromResponse(response);
@@ -760,11 +808,11 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
         }
         if (response.status === 409 && body === null) return "not_retryable";
         if (detail.code === "reply_failed" || response.status >= 500) {
-          markLastUserMessageFailed(id);
+          updateIfOpen(id, (current) => ({ ...current, messages: markBurstFailed(current.messages, clientId) }));
           return "failed";
         }
         // Rejected before it was saved (for example a finished conversation): nothing to retry.
-        updateIfOpen(id, () => previousConversation);
+        dropBubble();
         if (stillOpen()) {
           setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : text));
           setError(detail.message);
@@ -773,27 +821,23 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       }
       const nextConversation = (await response.json()) as Conversation;
       // Shown only if the user is still in that chat; otherwise it waits there, marked unread.
-      updateIfOpen(id, () => nextConversation);
+      updateIfOpen(id, (current) => ({ ...nextConversation, messages: mergeServerMessages(current.messages, nextConversation.messages) }));
       // Drop the typing row in the same render the reply lands, not after the history refresh.
-      setSendingFor(id, false);
-      await fetchSummaries();
-      if (stillOpen()) void loadConversationUsage(id);
+      settle();
+      // A burst's other requests return as soon as they are saved; refresh once, after the last.
+      if (!openRequestsRef.current.get(id)) {
+        await fetchSummaries();
+        if (stillOpen()) void loadConversationUsage(id);
+      }
       return "ok";
     } catch {
       // No answer at all (offline, server down): keep the bubble with a Retry.
-      markLastUserMessageFailed(id);
+      if (clientId) updateIfOpen(id, (current) => ({ ...current, messages: markLocalFailed(current.messages, clientId) }));
+      else updateIfOpen(id, (current) => ({ ...current, messages: markBurstFailed(current.messages, null) }));
       return "failed";
     } finally {
-      setSendingFor(id, false);
+      settle();
     }
-  }
-
-  function markLastUserMessageFailed(id: string) {
-    setConversation((current) => {
-      if (!current || current.id !== id) return current;
-      const index = current.messages.map((item) => item.role).lastIndexOf("user");
-      return { ...current, messages: current.messages.map((item, position) => (position === index ? { ...item, delivery_status: "failed" } : item)) };
-    });
   }
 
   async function updateModel(model: string) {
@@ -886,11 +930,33 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   }
 
   // The menu opens upward when there is no room for it below the message.
-  function openMenu(index: number, anchor: Element) {
-    const bottom = logRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
-    setMenuUp(bottom - anchor.getBoundingClientRect().bottom < MESSAGE_MENU_HEIGHT);
+  function openMenu(index: number, anchor: Element, view: "actions" | "react" = "actions") {
+    const log = logRef.current?.getBoundingClientRect();
+    const place = anchor.getBoundingClientRect();
+    setMenuUp((log?.bottom ?? window.innerHeight) - place.bottom < (view === "react" ? MESSAGE_REACT_HEIGHT : MESSAGE_MENU_HEIGHT));
+    setMenuToLeft((log?.right ?? window.innerWidth) - place.left < MESSAGE_REACT_WIDTH);
     setMenuAsksWhy(false);
+    setMenuView(view);
     setMenuFor(index);
+  }
+
+  // Choosing the emoji already there takes it back. Omi sees it on its next reply; none is started.
+  async function reactToMessage(index: number, emoji: string) {
+    if (!conversation) return;
+    const id = conversation.id;
+    const before = conversation.messages[index]?.user_reaction ?? null;
+    const next = before === emoji ? null : emoji;
+    setMenuFor(null);
+    updateIfOpen(id, (current) => ({ ...current, messages: withUserReaction(current.messages, index, next) }));
+    const url = `/api/agent/conversations/${id}/messages/${index}/reaction`;
+    const response = await apiFetch(url, next
+      ? { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji: next }) }
+      : { method: "DELETE" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      updateIfOpen(id, (current) => ({ ...current, messages: withUserReaction(current.messages, index, before) }));
+      if (openConversationIdRef.current === id) setError("Couldn't save your reaction. Try again.");
+    }
   }
 
   async function loadRatings(id: string) {
@@ -1130,7 +1196,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 <Fragment key={index}>
                   {showTimeSeparator ? <div className="chat-day-separator chat-time-separator" role="separator" aria-label={messageSessionLabel(message, index)} data-day-separator={currentDate}><span>{messageSessionLabel(message, index)}</span></div> : null}
                   <div
-                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""}`}
+                    className={`message-row ${agent ? "agent" : "user"} ${clusterClass} ${sameAsPrevious ? "same-cluster" : ""} ${index >= newFromIndexRef.current ? "is-new" : ""} ${selecting ? "is-selectable" : ""} ${isSelected ? "is-selected" : ""} ${message.reaction || message.user_reaction ? "has-reaction" : ""}`}
                     id={`message-${index}`}
                     data-message-index={index}
                     {...(selecting
@@ -1147,13 +1213,32 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                         </button>
                       ) : null}
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
+                      {message.reaction ? <span className="message-reaction" role="img" aria-label={`${conversation?.agent_name || "Omi"} reacted ${message.reaction}`}>{message.reaction}</span> : null}
+                      {agent && message.user_reaction ? <button type="button" className="message-reaction is-yours" disabled={selecting} aria-label={`Remove your reaction ${message.user_reaction}`} onClick={(event) => { event.stopPropagation(); void reactToMessage(index, message.user_reaction!); }}>{message.user_reaction}</button> : null}
                     </div>
                     {!selecting && !isFailedMessage(message) && message.delivery_status !== "sending" ? (
                       <div className="message-menu">
-                        <button type="button" className={`message-menu-trigger ${menuFor === index ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index} onClick={(event) => { if (menuFor === index) setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
+                        {agent ? <button type="button" className={`message-menu-trigger ${menuFor === index && menuView !== "actions" ? "is-open" : ""}`} aria-label="React to this message" aria-haspopup="menu" aria-expanded={menuFor === index && menuView !== "actions"} onClick={(event) => { if (menuFor === index && menuView !== "actions") setMenuFor(null); else openMenu(index, event.currentTarget, "react"); }}><Smile aria-hidden="true" /></button> : null}
+                        <button type="button" className={`message-menu-trigger ${menuFor === index && menuView === "actions" ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index && menuView === "actions"} onClick={(event) => { if (menuFor === index && menuView === "actions") setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
                         {menuFor === index ? (
-                          menuAsksWhy ? (
-                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu" aria-label="What was off?">
+                          menuView === "picker" ? (
+                          <div className="message-react-picker" role="dialog" aria-label="Choose a reaction">
+                            <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
+                              <EmojiPicker
+                                height={360}
+                                emojiStyle={"native" as EmojiStyle}
+                                lazyLoadEmojis
+                                previewConfig={{ showPreview: false }}
+                                searchPlaceHolder="Search emoji"
+                                skinTonesDisabled
+                                theme={"light" as Theme}
+                                width="100%"
+                                onEmojiClick={(data: EmojiClickData) => void reactToMessage(index, data.emoji)}
+                              />
+                            </Suspense>
+                          </div>
+                          ) : menuAsksWhy ? (
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""} ${menuToLeft ? "opens-left" : ""}`} role="menu" aria-label="What was off?">
                             <p className="message-menu-heading">What was off?</p>
                             {BAD_REPLY_REASONS.map((reason) => (
                               <button type="button" role="menuitem" key={reason.key} onClick={() => void rateMessage(index, "bad", [reason.key])}>{reason.label}</button>
@@ -1161,7 +1246,16 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                             <button type="button" role="menuitem" className="is-quiet" onClick={() => void rateMessage(index, "bad")}>Just bad</button>
                           </div>
                           ) : (
-                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""}`} role="menu">
+                          <div className={`message-menu-list ${menuUp ? "opens-up" : ""} ${menuToLeft ? "opens-left" : ""}`} role="menu">
+                            {agent ? (
+                              <div className="message-react-row" role="group" aria-label="React">
+                                {QUICK_REACTIONS.map((emoji) => (
+                                  <button type="button" key={emoji} className={message.user_reaction === emoji ? "is-active" : ""} aria-label={`React ${emoji}`} aria-pressed={message.user_reaction === emoji} onClick={() => void reactToMessage(index, emoji)}>{emoji}</button>
+                                ))}
+                                <button type="button" aria-label="More emojis" onClick={() => setMenuView("picker")}><Plus aria-hidden="true" /></button>
+                              </div>
+                            ) : null}
+                            {menuView === "react" ? null : <>
                             <button type="button" role="menuitem" onClick={() => replyToMessage(index)}><Reply aria-hidden="true" />Reply</button>
                             <button type="button" role="menuitem" onClick={() => copyMessage(index)}><Copy aria-hidden="true" />Copy</button>
                             {agent && !temporary ? (
@@ -1172,18 +1266,19 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                             ) : null}
                             <button type="button" role="menuitem" onClick={() => { setMenuFor(null); startSelecting(index); }}><ListChecks aria-hidden="true" />Select</button>
                             <button type="button" role="menuitem" className="is-danger" onClick={() => deleteOneMessage(index)}><Trash2 aria-hidden="true" />Delete</button>
+                            </>}
                           </div>
                           )
                         ) : null}
                       </div>
                     ) : null}
                     {/* The user's own photo shows only when they have one; no placeholder bubble. */}
-                    {!agent && userAvatar ? showAvatar ? <span className="chat-avatar user"><AvatarImage src={userAvatar} fallback={null} /></span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
+                    {!agent ? showAvatar ? <span className="chat-avatar user">{userAvatar}</span> : <span className="chat-avatar-spacer" aria-hidden="true" /> : null}
                   </div>
-                  {!agent && isFailedMessage(message) && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
+                  {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, userAvatar, selecting, selected, menuFor, menuUp, menuAsksWhy, ratings, temporary]);
+            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
@@ -1312,7 +1407,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
               </div>
               <textarea ref={inputRef} value={draft} onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)} onSelect={(event) => void refreshEmojiShortcodeSuggestions(draft, event.currentTarget.selectionStart)} onKeyDown={handleComposerKeyDown} onBlur={closeEmojiShortcodeSuggestions} placeholder={composerBlocked ? "Hold that thought..." : "Say what matters..."} rows={1} disabled={!conversation} role="combobox" aria-autocomplete="list" aria-expanded={Boolean(emojiSuggestions.length)} aria-controls={emojiSuggestions.length ? "emoji-shortcode-menu" : undefined} aria-activedescendant={emojiSuggestions.length ? `emoji-shortcode-option-${selectedEmojiSuggestion}` : undefined} aria-describedby={composerBlocked ? "composer-pause-note" : characterCount(draft) >= 80 ? "chat-character-count" : undefined} />
               {characterCount(draft) >= 80 ? <span className="chat-character-count" id="chat-character-count" aria-live="polite">{characterCount(draft)}/{CHAT_INPUT_MAX_LENGTH}</span> : null}
-              <button type="submit" disabled={!draft.trim() || sending || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
+              <button type="submit" disabled={!draft.trim() || composerBlocked} aria-label="Send message" onPointerDown={(event) => { if (!event.currentTarget.disabled) event.preventDefault(); }}><svg className="send-message-icon" viewBox="0 0 24 24"><path d="M4 20 21 12 4 4l3.3 7.2L15 12l-7.7.8L4 20Z" /></svg></button>
             </form>
             </>
           )}
@@ -1406,6 +1501,12 @@ function applyRealtimeEvent(
   event: RealtimeEvent,
   setConversation: Dispatch<SetStateAction<Conversation | null>>,
 ) {
+  if (event.type === "message.user_reaction" && event.scope === "conversation") {
+    const { message_index: index, user_reaction: reaction } = event.payload;
+    if (typeof index !== "number" || !(typeof reaction === "string" || reaction === null)) return;
+    setConversation((current) => (current && current.id === event.scope_id ? { ...current, messages: withUserReaction(current.messages, index, reaction) } : current));
+    return;
+  }
   if (event.type !== "message.created" || event.scope !== "conversation" || !event.scope_id) return;
   const messageIndex = event.sequence;
   const rawMessage = event.payload.message;
@@ -1418,16 +1519,15 @@ function applyRealtimeEvent(
     content: typeof record.content === "string" ? record.content : undefined,
     created_at: typeof record.created_at === "string" ? record.created_at : undefined,
     delivery_status: typeof record.delivery_status === "string" ? record.delivery_status : undefined,
+    ...(typeof record.client_id === "string" ? { client_id: record.client_id } : {}),
+    ...(record.reply_to && typeof record.reply_to === "object" ? { reply_to: record.reply_to as ReplyQuote } : {}),
+    ...(typeof record.reaction === "string" ? { reaction: record.reaction } : {}),
   };
   if (!message.role || typeof message.content !== "string") return;
 
   setConversation((current) => {
     if (!current || current.id !== event.scope_id) return current;
-    if (messageIndex > current.messages.length) return current;
-    const messages = [...current.messages];
-    if (messageIndex === messages.length) messages.push(message);
-    else messages[messageIndex] = { ...messages[messageIndex], ...message };
-    return { ...current, messages };
+    return { ...current, messages: applyMessageAt(current.messages, messageIndex, message) };
   });
 }
 

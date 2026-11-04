@@ -11,16 +11,18 @@ body,
 body {
   margin: 0;
   color: var(--ink);
-  background:
-    radial-gradient(circle at 16% 8%, rgba(180, 154, 255, 0.18), transparent 28%),
-    radial-gradient(circle at 84% 4%, rgba(255, 126, 179, 0.11), transparent 30%),
-    radial-gradient(circle at 76% 82%, rgba(94, 234, 212, 0.1), transparent 30%),
-    linear-gradient(180deg, #fffbff 0%, var(--surface) 44%, #ffffff 100%);
+  background: var(--paper);
   font-family: var(--font-ui);
+  font-optical-sizing: auto;
   letter-spacing: 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+}
+
+::selection {
+  background: var(--ember);
+  color: #fff;
 }
 
 button,

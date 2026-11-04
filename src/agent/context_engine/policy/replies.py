@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 
 from agent.context_engine.policy.script import normalize_assistant_script
 
@@ -64,6 +65,30 @@ def strip_voice_marker(text: str) -> tuple[str, str | None]:
     """Remove the voice marker; return the voice the user asked for, if any (the last one wins)."""
     found = _VOICE_MARKER.findall(text)
     return _VOICE_MARKER.sub("", text).strip(), (found[-1].lower() if found else None)
+
+
+# Written by the model as its whole reply when words would add nothing.
+_REACTION_MARKER = re.compile(r"[<\[]\s*react\s*:\s*([^<>\[\]]*?)\s*[>\]]", re.IGNORECASE)
+_NO_REPLY_MARKER = re.compile(r"[<\[]\s*no_reply\s*[>\]]", re.IGNORECASE)
+# One emoji, with room for its skin tone and joiners.
+_REACTION_MAX_CHARS = 12
+
+
+def is_one_emoji(text: str) -> bool:
+    """Short, with a symbol in it (or a keycap such as 1️⃣), and no letters or spaces."""
+    if not 0 < len(text) <= _REACTION_MAX_CHARS or any(char.isalpha() or char.isspace() for char in text):
+        return False
+    return "\u20e3" in text or any(unicodedata.category(char) == "So" for char in text)
+
+
+def strip_quiet_markers(text: str) -> tuple[str, str | None, bool]:
+    """Remove the reaction and no-reply markers; return the text, the emoji, and whether the model
+    chose to say nothing. A marker with no words and no usable emoji counts as saying nothing."""
+    emojis = [found for found in _REACTION_MARKER.findall(text) if is_one_emoji(found)]
+    marked = bool(_REACTION_MARKER.search(text) or _NO_REPLY_MARKER.search(text))
+    cleaned = _NO_REPLY_MARKER.sub("", _REACTION_MARKER.sub("", text)).strip()
+    reaction = emojis[-1] if emojis else None
+    return cleaned, reaction, marked and not cleaned and reaction is None
 
 
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
