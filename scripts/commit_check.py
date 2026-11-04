@@ -58,20 +58,22 @@ def check_problem_map(staged: set[str], everything: bool) -> list[str]:
     except ValueError:
         return ["docs/problem-map.json is not valid JSON"]
 
+    problems = data["problems"] if isinstance(data.get("problems"), list) else [data]
     notes = []
-    for link in data.get("links", []):
-        for source in link.get("sources", []):
-            file = str(source.get("file", ""))
-            if not everything and file not in staged:
-                continue
-            path = ROOT / file
-            words = str(source.get("quote", "")).split()
-            pattern = r"\s+".join(re.escape(word) for word in words)
-            text = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
-            if not words or not re.search(pattern, text, re.IGNORECASE):
-                notes.append(f'problem map, "{link.get("name")}": quote no longer found in {file}')
+    for problem in problems:
+        for link in problem.get("links", []):
+            for source in link.get("sources", []):
+                file = str(source.get("file", ""))
+                if not everything and file not in staged:
+                    continue
+                path = ROOT / file
+                words = str(source.get("quote", "")).split()
+                pattern = r"\s+".join(re.escape(word) for word in words)
+                text = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+                if not words or not re.search(pattern, text, re.IGNORECASE):
+                    notes.append(f'problem map, "{link.get("name")}": quote no longer found in {file}')
 
-    open_points = len(data.get("disagreements", []))
+    open_points = sum(len(problem.get("disagreements", [])) for problem in problems)
     if open_points and (everything or staged & PLAN_DOCS):
         notes.append(f"problem map lists {open_points} points where the plan docs disagree; check if this settles any")
     return notes
