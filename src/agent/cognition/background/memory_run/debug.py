@@ -109,6 +109,7 @@ def _add_operation_dict(operation: MemoryAddProposal, name: str) -> dict[str, An
         "confidence": operation.confidence,
         "importance": operation.importance,
         "repeats": operation.repeats,
+        "about": list(operation.about),
         "focus": operation.focus,
         "evidence_message_indexes": list(operation.evidence_message_indexes),
     }

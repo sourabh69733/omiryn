@@ -64,6 +64,7 @@ def _user_memory_payload(
         "valid_from",
         "valid_until",
         "repeats",
+        "about",
         "last_reinforced_at",
         "supersedes_memory_id",
         "created_at",

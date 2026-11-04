@@ -86,6 +86,7 @@ def existing_memory_context(
                 "statement": memory.get("statement"),
                 **({"focus": True} if memory.get("focus") else {}),
                 **({"repeats": memory["repeats"]} if memory.get("repeats") else {}),
+                **({"about": memory["about"]} if memory.get("about") else {}),
                 "history": memory_history(memory, zone),
             }
             for memory in memories

@@ -50,7 +50,8 @@ personalization"], "key": "short stable key", "value": "what is true, never a ba
 "statement": "one short plain sentence about the user", "sensitivity": "standard | sensitive |
 highly_sensitive", "confidence": 0.0-1.0, "importance": 0.0-1.0, "occurred_at": "ISO-8601 with the
 user_timezone offset for a dated event, else null", "repeats": "yearly:MM-DD | monthly:D |
-weekly:tue,thu | null", "focus": false, "evidence_message_indexes": [i]}
+weekly:tue,thu | null", "about": ["specific people, places, things it is about; never the user or
+anything generic"], "focus": false, "evidence_message_indexes": [i]}
 - repeats is for what comes back on a day they name (a birthday on 12 March is yearly:03-12), with
   occurred_at null; null for a one-off event or when no day is named.
 - focus is true for something they are into for a while that will pass (studying a topic, a project,
