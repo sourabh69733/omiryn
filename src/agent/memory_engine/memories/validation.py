@@ -14,6 +14,8 @@ from agent.memory_engine.processing.models import MemoryBatch, MemoryHandoff
 from agent.memory_engine.processing.sessions import merge_session_log
 from agent.shared.utils import is_non_empty_string, is_number, unknown_fields
 
+from .dates import normalize_repeats
+
 from .models import MemoryKind, MemoryPurpose, MemorySensitivity
 from .operations import (
     MemoryAddProposal,
@@ -40,6 +42,7 @@ _ADD_FIELDS = {
     "occurred_at",
     "valid_from",
     "valid_until",
+    "repeats",
     "focus",
     "evidence_message_indexes",
 }
@@ -236,6 +239,8 @@ def _validate_add(
     )
     if errors or kind is None or sensitivity is None:
         return None, errors
+    # A bad value is dropped, never a reason to lose the memory.
+    repeats = normalize_repeats(raw.get("repeats"))
     return MemoryAddProposal(
         kind=kind,
         purposes=purposes,
@@ -245,11 +250,13 @@ def _validate_add(
         confidence=confidence,
         importance=importance,
         evidence_message_indexes=evidence_indexes,
-        occurred_at=occurred_at,
+        # A repeating thing has its day in repeats; a date beside it is noise that can only mislead.
+        occurred_at=None if repeats else occurred_at,
         valid_from=valid_from,
         valid_until=valid_until,
         statement=statement,
         focus=raw.get("focus") is True,
+        repeats=repeats,
     ), []
 
 

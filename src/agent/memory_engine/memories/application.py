@@ -156,6 +156,7 @@ def _memory_payload(
         "occurred_at": _isoformat(proposal.occurred_at),
         "valid_from": _isoformat(proposal.valid_from),
         "valid_until": _isoformat(proposal.valid_until),
+        "repeats": proposal.repeats,
         "focus": proposal.focus,
         "extractor": "background_cognition_v3",
         "extractor_model": extractor_model,
