@@ -85,6 +85,7 @@ def existing_memory_context(
                 "updated_at": memory["updated_at"],
                 "statement": memory.get("statement"),
                 **({"focus": True} if memory.get("focus") else {}),
+                **({"repeats": memory["repeats"]} if memory.get("repeats") else {}),
                 "history": memory_history(memory, zone),
             }
             for memory in memories

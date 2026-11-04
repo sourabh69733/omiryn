@@ -49,7 +49,10 @@ Memory add operation (about_user):
 personalization"], "key": "short stable key", "value": "what is true, never a bare true or false",
 "statement": "one short plain sentence about the user", "sensitivity": "standard | sensitive |
 highly_sensitive", "confidence": 0.0-1.0, "importance": 0.0-1.0, "occurred_at": "ISO-8601 with the
-user_timezone offset for a dated event, else null", "focus": false, "evidence_message_indexes": [i]}
+user_timezone offset for a dated event, else null", "repeats": "yearly:MM-DD | monthly:D |
+weekly:tue,thu | null", "focus": false, "evidence_message_indexes": [i]}
+- repeats is for what comes back on a day they name (a birthday on 12 March is yearly:03-12), with
+  occurred_at null; null for a one-off event or when no day is named.
 - focus is true for something they are into for a while that will pass (studying a topic, a project,
   preparing for an exam), false for settled facts and lasting interests.
 - Resolve "today", "yesterday", "next Monday" against the message's at; no relative time words in

@@ -18,6 +18,7 @@ add creates a new memory:
   "occurred_at": "timezone-aware ISO-8601 timestamp or null",
   "valid_from": "timezone-aware ISO-8601 timestamp or null",
   "valid_until": "timezone-aware ISO-8601 timestamp or null",
+  "repeats": "yearly:MM-DD | monthly:D | weekly:tue,thu | null",
   "focus": false,
   "evidence_message_indexes": [0]
 }
@@ -98,6 +99,11 @@ V3 memory rules:
   in user_timezone. Write the resolved day as an ISO-8601 timestamp with that timezone's UTC offset,
   using 12:00 when no time of day is stated. Use null when the day cannot be pinned down, such as
   "recently", "a while ago" or "last year", or when the message has no sent_at.
+- repeats is for what comes back on a day the evidence names: yearly:03-12 (a birthday or anniversary
+  on 12 March), monthly:5 (on the 5th of each month), weekly:tue,thu (those weekdays). Copy the day from
+  the evidence and leave occurred_at null. Use null when no day is named ("most days", "sometimes",
+  "every morning") and for a one-off event. Never write a next date or a guessed year in the statement:
+  "Birthday is on 12 March.", not "Birthday is on 12 March 2027."
 - Never put relative time words ("next Friday", "yesterday", "last week") in key or value; they go
   stale. Put the time in occurred_at and write the value without it, or with the absolute date.
 - statement restates the memory as one short, plain third-person sentence without the user's

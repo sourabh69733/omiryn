@@ -108,6 +108,7 @@ def _add_operation_dict(operation: MemoryAddProposal, name: str) -> dict[str, An
         "sensitivity": operation.sensitivity.value,
         "confidence": operation.confidence,
         "importance": operation.importance,
+        "repeats": operation.repeats,
         "focus": operation.focus,
         "evidence_message_indexes": list(operation.evidence_message_indexes),
     }
