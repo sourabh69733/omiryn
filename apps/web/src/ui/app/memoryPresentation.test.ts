@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories, memoryLabel, memoryValueLines, oldMemoryNote, partitionCanonicalMemories } from "./memoryPresentation";
+import { canonicalMemoryEvidenceHref, canonicalMemoryValueText, groupCanonicalMemories, memoryLabel, memoryRepeatsLabel, memoryValueLines, oldMemoryNote, partitionCanonicalMemories } from "./memoryPresentation";
 
 test("groups canonical memories by their actual cognitive kind", () => {
   const sections = groupCanonicalMemories([
@@ -99,4 +99,11 @@ test("structured memory values become one short line per part", () => {
   assert.deepEqual(memoryValueLines(["chai", "coffee"]), ["chai, coffee"]);
   assert.deepEqual(memoryValueLines("Jaipur"), ["Jaipur"]);
   assert.deepEqual(memoryValueLines(null), []);
+});
+
+test("says how a memory repeats", () => {
+  assert.equal(memoryRepeatsLabel("yearly:03-12"), "Every year");
+  assert.equal(memoryRepeatsLabel("monthly:5"), "Every month");
+  assert.equal(memoryRepeatsLabel("weekly:tue,thu"), "Every Tue, Thu");
+  assert.equal(memoryRepeatsLabel(null), "");
 });

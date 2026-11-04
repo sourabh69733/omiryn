@@ -135,6 +135,15 @@ export function oldMemoryNote(memory: CanonicalMemory, all: CanonicalMemory[]): 
   return ended ? `Ended on ${ended}` : "No longer current";
 }
 
+// "Every year", "Every Tue, Thu"; empty when the memory does not repeat.
+export function memoryRepeatsLabel(repeats?: string | null): string {
+  const [every, days] = (repeats || "").split(":");
+  if (every === "yearly") return "Every year";
+  if (every === "monthly") return "Every month";
+  if (every !== "weekly" || !days) return "";
+  return `Every ${days.split(",").map((day) => day.charAt(0).toUpperCase() + day.slice(1)).join(", ")}`;
+}
+
 export function toggleCanonicalMemoryReviewReason(selected: string[], reason: string): string[] {
   return selected.includes(reason)
     ? selected.filter((value) => value !== reason)

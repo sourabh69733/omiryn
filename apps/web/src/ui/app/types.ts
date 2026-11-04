@@ -97,6 +97,8 @@ export type CanonicalMemory = {
   importance?: number;
   occurred_at?: string | null;
   valid_until?: string | null;
+  // Comes back on a calendar: yearly:03-12, monthly:5 or weekly:tue,thu.
+  repeats?: string | null;
   supersedes_memory_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;

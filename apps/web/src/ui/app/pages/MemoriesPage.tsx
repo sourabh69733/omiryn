@@ -5,7 +5,7 @@ import { Notice, StateView } from "../StateView";
 import { MemoryUploads } from "../MemoryUploads";
 import { trackAppEvent } from "../../../lib/appLogger";
 import type { CanonicalMemory, ContextSource, MemoryResponse, ProfileFact, ProfileResponse } from "../types";
-import { canonicalMemoryCardTone, canonicalMemoryControls, memoryLabel, memoryValueLines, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
+import { canonicalMemoryCardTone, canonicalMemoryControls, memoryLabel, memoryValueLines, canonicalMemoryEvidenceHref, canonicalMemoryReviewPayload, canonicalMemoryValueText, groupCanonicalMemories, memoryRepeatsLabel, oldMemoryNote, partitionCanonicalMemories, toggleCanonicalMemoryReviewReason } from "../memoryPresentation";
 
 const memoryReviewReasons = [
   { value: "incorrect", label: "Incorrect" },
@@ -214,6 +214,7 @@ export function MemoriesPage() {
           {memory.status && memory.status !== "active" && !isOld ? <span className="mem-flag">Not in use</span> : null}
           {memory.from_upload ? <span className="mem-flag">From your upload</span> : null}
           {memory.focus_state === "fading" && !isOld ? <span className="mem-flag">Fading: not mentioned lately</span> : null}
+          {memoryRepeatsLabel(memory.repeats) && !isOld ? <span className="mem-flag">{memoryRepeatsLabel(memory.repeats)}</span> : null}
           {memory.sensitivity && memory.sensitivity !== "standard" ? <span className="mem-flag">{sentenceCase(humanizeLabel(memory.sensitivity))}</span> : null}
         </div>
         <div className="history-row-menu mem-row-menu">
