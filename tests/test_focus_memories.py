@@ -53,6 +53,25 @@ class FocusFreshnessTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertTrue(proposal.focus)
 
+    def test_a_bad_repeat_is_dropped_and_the_memory_kept(self) -> None:
+        raw = {
+            "operation": "add", "memory_kind": "semantic", "purposes": ["personalization"], "key": "birthday",
+            "value": "12 March", "statement": "Birthday is on 12 March.", "sensitivity": "standard",
+            "confidence": 0.9, "importance": 0.5, "evidence_message_indexes": [0],
+        }
+        dated = {**raw, "occurred_at": "2026-11-04T12:00:00+05:30"}
+        for fields, expected, occurred in (
+            # The model's date beside a repeat is dropped: it often wrote today's.
+            ({**dated, "repeats": "yearly:03-12"}, "yearly:03-12", False),
+            ({**dated, "repeats": "yearly"}, None, True),
+            ({**dated, "repeats": "daily"}, None, True),
+            ({**raw, "repeats": "weekly:thu,tue"}, "weekly:tue,thu", False),
+        ):
+            proposal, errors = _validate_add(fields, eligible_indexes={0}, expected_operation="add", allowed_fields=_ADD_FIELDS)
+            self.assertEqual(errors, [])
+            self.assertEqual(proposal.repeats, expected)
+            self.assertEqual(proposal.occurred_at is not None, occurred)
+
 
 class FocusCardTest(unittest.TestCase):
     def test_card_lines_that_restate_a_focus_go_and_the_rest_stay(self) -> None:
