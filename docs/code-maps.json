@@ -1,0 +1,446 @@
+{
+  "maps": [
+    {
+      "id": "toolu_plugin_d517316142044181bd78a7383eb59632",
+      "savedAt": "2026-11-04T14:21:51.127Z",
+      "turnId": "toolu_plugin_d517316142044181bd78a7383eb59632",
+      "title": "Prompt versions carry their own settings",
+      "range": "73d0210e~1..8e174f24",
+      "files": [
+        {
+          "path": "src/agent/context_engine/engine.py",
+          "added": 5,
+          "removed": 13
+        },
+        {
+          "path": "src/agent/context_engine/prompt_engine/models.py",
+          "added": 6,
+          "removed": 0
+        },
+        {
+          "path": "src/agent/context_engine/prompt_engine/versions/v3.py",
+          "added": 3,
+          "removed": 0
+        },
+        {
+          "path": "src/agent/context_engine/prompt_engine/versions/v3_1.py",
+          "added": 2,
+          "removed": 0
+        },
+        {
+          "path": "src/agent/context_engine/prompt_engine/versions/v4.py",
+          "added": 2,
+          "removed": 0
+        },
+        {
+          "path": "tests/test_prompt_v4.py",
+          "added": 45,
+          "removed": 0
+        }
+      ],
+      "nodes": [
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-0",
+          "name": "build_model_context_package",
+          "file": "src/agent/context_engine/engine.py",
+          "line": 39,
+          "what": "Starts the context for a reply and picks the prompt version. It now reads settings from that version instead of its own lists.",
+          "isChanged": true,
+          "check": "found",
+          "snippet": "from agent.shared.timeline import conversation_time\nfrom storage import get_conversation, get_user_timezone\n\n\ndef build_model_context_package(\n    *,\n    conversation_id: str,\n    user_text: str,\n    user_id: str | None,",
+          "snippetStart": 35,
+          "graph": {
+            "usedBy": [
+              {
+                "name": "_initiative_text",
+                "file": "src/agent/proactive/service.py",
+                "line": 560
+              },
+              {
+                "name": "run_agent_turn",
+                "file": "src/agent/runtime/orchestrator.py",
+                "line": 154
+              },
+              {
+                "name": "AgentControlFrameworkTest",
+                "file": "tests/test_agent_control_framework.py",
+                "line": 194
+              },
+              {
+                "name": "_prompt",
+                "file": "tests/test_agent_voice.py",
+                "line": 21
+              },
+              {
+                "name": "ConversationThreadStateTest",
+                "file": "tests/test_conversation_thread_state.py",
+                "line": 655
+              },
+              {
+                "name": "DataPointCapturePolicyTest",
+                "file": "tests/test_data_point_capture_policy.py",
+                "line": 129
+              },
+              {
+                "name": "MatchingUnderstandingContextIntegrationTest",
+                "file": "tests/test_matching_understanding.py",
+                "line": 250
+              },
+              {
+                "name": "PersonaPromptTest",
+                "file": "tests/test_persona_cards.py",
+                "line": 57
+              },
+              {
+                "name": "ReplyPromptGroundingTest",
+                "file": "tests/test_prompt_grounding.py",
+                "line": 39
+              },
+              {
+                "name": "PromptV4Test",
+                "file": "tests/test_prompt_v4.py",
+                "line": 36
+              },
+              {
+                "name": "QuestionPolicyPromptTest",
+                "file": "tests/test_question_policy.py",
+                "line": 54
+              },
+              {
+                "name": "StoryContinuationContextTest",
+                "file": "tests/test_story_continuation.py",
+                "line": 48
+              }
+            ],
+            "usedByCount": 16,
+            "uses": [
+              {
+                "name": "get_prompt_behavior_version",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 38
+              },
+              {
+                "name": "_with_conversation_time",
+                "file": "src/agent/context_engine/engine.py",
+                "line": 210
+              },
+              {
+                "name": "build_matching_understanding",
+                "file": "src/agent/context_engine/assembly/matching.py",
+                "line": 22
+              },
+              {
+                "name": "build_reply_context",
+                "file": "src/agent/context_engine/assembly/sources.py",
+                "line": 45
+              },
+              {
+                "name": "_planning_messages",
+                "file": "src/agent/context_engine/engine.py",
+                "line": 244
+              },
+              {
+                "name": "active_turn_state",
+                "file": "src/agent/context_engine/state/turn.py",
+                "line": 45
+              },
+              {
+                "name": "interpret_turn",
+                "file": "src/agent/context_engine/understanding/interpreters/registry.py",
+                "line": 25
+              },
+              {
+                "name": "context_query_intent",
+                "file": "src/agent/context_engine/understanding/rules/intent.py",
+                "line": 84
+              },
+              {
+                "name": "detect_emotion_state",
+                "file": "src/agent/context_engine/understanding/rules/emotion.py",
+                "line": 35
+              },
+              {
+                "name": "continues_story",
+                "file": "src/agent/context_engine/understanding/rules/story.py",
+                "line": 8
+              },
+              {
+                "name": "build_conversation_plan",
+                "file": "src/agent/context_engine/planning/planner.py",
+                "line": 33
+              },
+              {
+                "name": "apply_question_cooldown",
+                "file": "src/agent/context_engine/planning/planner.py",
+                "line": 79
+              }
+            ],
+            "usesCount": 23
+          }
+        },
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-1",
+          "name": "get_prompt_behavior_version",
+          "file": "src/agent/context_engine/prompt_engine/registry.py",
+          "line": 38,
+          "what": "Returns the version asked for, or the default, v4-3.",
+          "isChanged": false,
+          "check": "found",
+          "snippet": "def configured_prompt_version_id() -> str:\n    return os.getenv(\"AGENT_BEHAVIOR_VERSION\", DEFAULT_PROMPT_VERSION_ID).strip() or DEFAULT_PROMPT_VERSION_ID\n\n\ndef get_prompt_behavior_version(version_id: str | None = None) -> PromptBehaviorVersion:\n    requested = (version_id or configured_prompt_version_id()).strip()\n    return _PROMPT_VERSIONS.get(requested) or _PROMPT_VERSIONS[DEFAULT_PROMPT_VERSION_ID]\n\n",
+          "snippetStart": 34,
+          "graph": {
+            "usedBy": [
+              {
+                "name": "build_model_context_package",
+                "file": "src/agent/context_engine/engine.py",
+                "line": 54
+              },
+              {
+                "name": "build_companion_system_prompt",
+                "file": "src/agent/context_engine/prompt_engine/builder.py",
+                "line": 56
+              },
+              {
+                "name": "health",
+                "file": "src/api/routes/core.py",
+                "line": 27
+              },
+              {
+                "name": "AgentControlFrameworkTest",
+                "file": "tests/test_agent_control_framework.py",
+                "line": 164
+              }
+            ],
+            "usedByCount": 4,
+            "uses": [
+              {
+                "name": "configured_prompt_version_id",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 34
+              },
+              {
+                "name": "_PROMPT_VERSIONS",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 18
+              },
+              {
+                "name": "DEFAULT_PROMPT_VERSION_ID",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 15
+              },
+              {
+                "name": "PromptBehaviorVersion",
+                "file": "src/agent/context_engine/prompt_engine/models.py",
+                "line": 9
+              }
+            ],
+            "usesCount": 4
+          }
+        },
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-2",
+          "name": "PromptBehaviorVersion",
+          "file": "src/agent/context_engine/prompt_engine/models.py",
+          "line": 9,
+          "what": "Defines a version. It gained five settings, all off by default.",
+          "isChanged": true,
+          "check": "found",
+          "snippet": "from dataclasses import dataclass, field\n\n\n@dataclass(frozen=True)\nclass PromptBehaviorVersion:\n    version_id: str\n    name: str\n    base_prompt: str\n    context_usage_rules: str",
+          "snippetStart": 5,
+          "graph": {
+            "usedBy": [
+              {
+                "name": "build_companion_system_prompt_v4",
+                "file": "src/agent/context_engine/prompt_engine/blocks.py",
+                "line": 130
+              },
+              {
+                "name": "build_system_prompt",
+                "file": "src/agent/context_engine/prompt_engine/builder.py",
+                "line": 76
+              },
+              {
+                "name": "build_companion_system_prompt_v2",
+                "file": "src/agent/context_engine/prompt_engine/builder.py",
+                "line": 108
+              },
+              {
+                "name": "_v2_prompt_sections",
+                "file": "src/agent/context_engine/prompt_engine/builder.py",
+                "line": 171
+              },
+              {
+                "name": "build_companion_behavior",
+                "file": "src/agent/context_engine/prompt_engine/modules/behavior.py",
+                "line": 42
+              },
+              {
+                "name": "_allow_light_playful",
+                "file": "src/agent/context_engine/prompt_engine/modules/behavior.py",
+                "line": 126
+              },
+              {
+                "name": "_allow_mild_adult_humor",
+                "file": "src/agent/context_engine/prompt_engine/modules/behavior.py",
+                "line": 135
+              },
+              {
+                "name": "conversation_flow_prompt",
+                "file": "src/agent/context_engine/prompt_engine/modules/conversation_flow.py",
+                "line": 9
+              },
+              {
+                "name": "memory_usage_prompt",
+                "file": "src/agent/context_engine/prompt_engine/modules/memory_usage.py",
+                "line": 26
+              },
+              {
+                "name": "get_prompt_behavior_version",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 38
+              },
+              {
+                "name": "available_prompt_versions",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 45
+              },
+              {
+                "name": "V3_PROMPT_VERSION",
+                "file": "src/agent/context_engine/prompt_engine/versions/v3.py",
+                "line": 42
+              }
+            ],
+            "usedByCount": 12,
+            "uses": [],
+            "usesCount": 0
+          }
+        },
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-3",
+          "name": "V3_PROMPT_VERSION",
+          "file": "src/agent/context_engine/prompt_engine/versions/v3.py",
+          "line": 42,
+          "what": "The first version that turns settings on. Later versions copy it with replace, so they inherit them.",
+          "isChanged": true,
+          "check": "found",
+          "snippet": "differences they can accept, and their deal-breakers.\"\"\"\n\n\n# Standalone since v1 and v2 moved to _archive (they were built for dating).\nV3_PROMPT_VERSION = PromptBehaviorVersion(\n    version_id=\"v3\",\n    name=\"v3_listener_first_companion\",\n    listener_first=True,\n    plans_turn=True,",
+          "snippetStart": 38,
+          "graph": {
+            "usedBy": [
+              {
+                "name": "_PROMPT_VERSIONS",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 19
+              },
+              {
+                "name": "V3_1_PROMPT_VERSION",
+                "file": "src/agent/context_engine/prompt_engine/versions/v3_1.py",
+                "line": 11
+              }
+            ],
+            "usedByCount": 2,
+            "uses": [
+              {
+                "name": "PromptBehaviorVersion",
+                "file": "src/agent/context_engine/prompt_engine/models.py",
+                "line": 9
+              },
+              {
+                "name": "V3_BASE_PROMPT",
+                "file": "src/agent/context_engine/prompt_engine/versions/v3.py",
+                "line": 11
+              },
+              {
+                "name": "CONTEXT_USAGE_RULES",
+                "file": "src/agent/context_engine/prompt_engine/modules/memory_usage.py",
+                "line": 7
+              },
+              {
+                "name": "VIBE_AREA_IDS",
+                "file": "src/agent/shared/vibe.py",
+                "line": 29
+              }
+            ],
+            "usesCount": 4
+          }
+        },
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-4",
+          "name": "V4_PROMPT_VERSION",
+          "file": "src/agent/context_engine/prompt_engine/versions/v4.py",
+          "line": 75,
+          "what": "Adds blocks_prompt and context_v4, which v4-1, v4-2 and v4-3 inherit.",
+          "isChanged": true,
+          "check": "found",
+          "snippet": "  uncertain.\n- Do not mention these blocks, memories as \"notes\", tracking, or internal labels.\"\"\"\n\n\nV4_PROMPT_VERSION = replace(\n    V3_1_PROMPT_VERSION,\n    version_id=\"v4\",\n    name=\"v4_character_blocks\",\n    blocks_prompt=True,",
+          "snippetStart": 71,
+          "graph": {
+            "usedBy": [
+              {
+                "name": "_PROMPT_VERSIONS",
+                "file": "src/agent/context_engine/prompt_engine/registry.py",
+                "line": 23
+              },
+              {
+                "name": "V4_1_PROMPT_VERSION",
+                "file": "src/agent/context_engine/prompt_engine/versions/v4_1.py",
+                "line": 24
+              }
+            ],
+            "usedByCount": 2,
+            "uses": [
+              {
+                "name": "V3_1_PROMPT_VERSION",
+                "file": "src/agent/context_engine/prompt_engine/versions/v3_1.py",
+                "line": 10
+              },
+              {
+                "name": "V4_CHARACTER",
+                "file": "src/agent/context_engine/prompt_engine/versions/v4.py",
+                "line": 10
+              },
+              {
+                "name": "V4_RULES",
+                "file": "src/agent/context_engine/prompt_engine/versions/v4.py",
+                "line": 56
+              }
+            ],
+            "usesCount": 3
+          }
+        },
+        {
+          "id": "toolu_plugin_d517316142044181bd78a7383eb59632-5",
+          "name": "test_versions_keep_the_settings_the_engine_lists_gave_them",
+          "file": "tests/test_prompt_v4.py",
+          "line": 224,
+          "what": "Locks every version to the values the old hand-typed lists gave it.",
+          "isChanged": true,
+          "check": "found",
+          "snippet": "        self.assertNotIn(\"Dune\", V4_3_CHARACTER)\n        self.assertNotIn(\"music, food, ideas\", V4_3_CHARACTER)\n        self.assertIn(\"no favourite\\n  food or drink\", V4_3_CHARACTER)\n\n    def test_versions_keep_the_settings_the_engine_lists_gave_them(self) -> None:\n        from agent.context_engine.prompt_engine.registry import available_prompt_versions\n\n        expected = {\n            \"v3\": (False, True, False, True, \"context_v3\"),",
+          "snippetStart": 220,
+          "graph": {
+            "usedBy": [],
+            "usedByCount": 0,
+            "uses": [],
+            "usesCount": 0
+          }
+        }
+      ],
+      "next": [
+        {
+          "title": "Install the commit check hook",
+          "why": "The check only runs by hand until the hook is in place, and auto mode blocks me from adding it.",
+          "needsYou": true,
+          "prompt": "Give me the one line that installs the commit check hook"
+        },
+        {
+          "title": "Settle the plan doc disagreements",
+          "why": "The problem map lists points where the docs contradict each other, and only you can say which is right.",
+          "needsYou": true,
+          "prompt": "Walk me through the plan doc disagreements one at a time"
+        }
+      ],
+      "notRead": "The rest of build_model_context_package past the planning branch."
+    }
+  ]
+}
