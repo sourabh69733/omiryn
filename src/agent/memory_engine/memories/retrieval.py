@@ -270,6 +270,7 @@ def might_fit_memories(
         # Nor is something the user said in this session: they just told it, nothing new to raise.
         and not _said_this_session(memory, current_time)
         and not _reported_after_it_happened(memory, current_time)
+        and not _is_routine(memory)
         and str(memory.get("id")) not in exclude_ids
     ]
 
@@ -285,15 +286,18 @@ def might_fit_memories(
     return ranked[:limit]
 
 
+def _is_routine(memory: dict[str, Any]) -> bool:
+    """A weekly gym or monthly rent is always a few days away: raising it on a quiet turn is nagging.
+    It still reaches a reply when the message touches it, and the calendar answers date questions."""
+    return str(memory.get("repeats") or "").startswith(("weekly", "monthly"))
+
+
 def _coming_up(memory: dict[str, Any], now: datetime) -> bool:
-    """A birthday next week is worth having in mind; a gym that is always a few days away is not."""
-    repeats = str(memory.get("repeats") or "")
-    if repeats.startswith("yearly"):
+    """A birthday next week is worth having in mind."""
+    if memory.get("repeats"):
         # Only ranks, so the day in UTC is close enough.
         day = next_occurrence(memory, now.date(), UTC)
         return day is not None and day <= (now + UPCOMING_WINDOW).date()
-    if repeats:
-        return False
     occurred = aware_datetime(memory.get("occurred_at"))
     return occurred is not None and now <= occurred <= now + UPCOMING_WINDOW
 

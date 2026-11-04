@@ -137,8 +137,8 @@ class StoredDatesTest(unittest.TestCase):
         self.assertIn("Thu 5 Nov 2026 (tomorrow), every Thu: Goes to the gym.", lines[0])
         self.assertIn("Fri 6 Nov 2026 (this Friday, in 2 days), 5:00 pm: Has an interview.", lines[1])
         self.assertIn("Sun 8 Nov 2026 (this Sunday, in 4 days), every year: Sister's birthday", lines[2])
-        self.assertEqual(_SOURCE_BLOCKS[source["source_type"]], "calendar")
-        self.assertLessEqual(len(source["content"]), BLOCK_CHAR_LIMITS["calendar"])
+        self.assertEqual(_SOURCE_BLOCKS[source["source_type"]], "their_dates")
+        self.assertLessEqual(len(source["content"]), BLOCK_CHAR_LIMITS["their_dates"])
 
     def test_calendar_holds_recent_one_off_events_oldest_first(self) -> None:
         _memory("Went to Jaipur.", occurred_at="2026-10-28T06:30:00+00:00")
@@ -160,7 +160,7 @@ class StoredDatesTest(unittest.TestCase):
         lines = content.splitlines()
         self.assertEqual(len(lines), 12)
         self.assertIn("memories_by_date has the rest", lines[-1])
-        self.assertLessEqual(len(content), BLOCK_CHAR_LIMITS["calendar"])
+        self.assertLessEqual(len(content), BLOCK_CHAR_LIMITS["their_dates"])
 
     def test_no_dates_no_calendar(self) -> None:
         _memory("Loves old films.", kind="semantic")
@@ -173,12 +173,13 @@ class StoredDatesTest(unittest.TestCase):
         self.assertNotIn("2024", note)
         self.assertNotIn("happened", note)
 
-    def test_might_fit_lifts_a_birthday_near_but_not_a_weekly_habit(self) -> None:
+    def test_might_fit_lifts_a_birthday_near_and_leaves_out_routines(self) -> None:
         birthday = _memory("Sister's birthday is on 8 November.", kind="relationship", repeats="yearly:11-08", importance=0.3)
-        gym = _memory("Goes to the gym.", kind="semantic", repeats="weekly:thu", importance=0.3)
+        _memory("Goes to the gym.", kind="semantic", repeats="weekly:thu", importance=0.9)
+        _memory("Pays rent on the 5th.", kind="semantic", repeats="monthly:5", importance=0.9)
         films = _memory("Loves old films.", kind="semantic", importance=0.8)
         ranked = [memory["id"] for memory in might_fit_memories(USER_ID, exclude_ids=set(), recently_offered=set(), now=NOW)]
-        self.assertEqual(ranked, [birthday["id"], films["id"], gym["id"]])
+        self.assertEqual(ranked, [birthday["id"], films["id"]])
 
     def test_a_repeating_thing_gets_no_how_did_it_go(self) -> None:
         told = "2026-10-01T10:00:00+00:00"
