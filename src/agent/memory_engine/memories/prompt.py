@@ -19,6 +19,7 @@ add creates a new memory:
   "valid_from": "timezone-aware ISO-8601 timestamp or null",
   "valid_until": "timezone-aware ISO-8601 timestamp or null",
   "repeats": "yearly:MM-DD | monthly:D | weekly:tue,thu | null",
+  "about": ["names of who or what it is about"],
   "focus": false,
   "evidence_message_indexes": [0]
 }
@@ -104,6 +105,10 @@ V3 memory rules:
   the evidence and leave occurred_at null. Use null when no day is named ("most days", "sometimes",
   "every morning") and for a one-off event. Never write a next date or a guessed year in the statement:
   "Birthday is on 12 March.", not "Birthday is on 12 March 2027."
+- about names every specific person, pet, place, company, group, work or project in the memory, up to
+  5, also when the statement already says it, as short names, resolved from context: "my sister" is her name when the messages or an existing memory
+  say so. Reuse the exact spelling from existing memories' about. Never the user, nothing generic
+  ("work", "family", "food"). Use [] when nothing specific is named.
 - Never put relative time words ("next Friday", "yesterday", "last week") in key or value; they go
   stale. Put the time in occurred_at and write the value without it, or with the absolute date.
 - statement restates the memory as one short, plain third-person sentence without the user's

@@ -15,6 +15,7 @@ from agent.memory_engine.processing.sessions import merge_session_log
 from agent.shared.utils import is_non_empty_string, is_number, unknown_fields
 
 from .dates import normalize_repeats
+from .links import normalize_about
 
 from .models import MemoryKind, MemoryPurpose, MemorySensitivity
 from .operations import (
@@ -43,6 +44,7 @@ _ADD_FIELDS = {
     "valid_from",
     "valid_until",
     "repeats",
+    "about",
     "focus",
     "evidence_message_indexes",
 }
@@ -257,6 +259,7 @@ def _validate_add(
         statement=statement,
         focus=raw.get("focus") is True,
         repeats=repeats,
+        about=normalize_about(raw.get("about")),
     ), []
 
 

@@ -29,6 +29,7 @@ class MemoryAddProposal:
     statement: str | None = None
     focus: bool = False
     repeats: str | None = None
+    about: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
