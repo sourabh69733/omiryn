@@ -1,0 +1,243 @@
+{
+  "goal": "Of new residents who message the number, how many meet one person within 30 days; of those pairs, how many are still in touch at day 30. No such number exists yet: no real pair has been run.",
+  "updatedAt": "2026-11-04T12:11:08.214Z",
+  "commit": "6419e461",
+  "links": [
+    {
+      "id": "link-0",
+      "name": "Newcomers feel this problem and would act on it",
+      "status": "assumed",
+      "evidence": "problem.md describes the person and their pain in detail, but the repo holds no interviews or counts from such residents. It is written as a statement, not as a finding.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Someone who moved to one city (Pune first) alone for work in the last two months"
+        }
+      ],
+      "paths": [],
+      "question": "Would someone two months into a new city message a number to be introduced to one person in their building?",
+      "test": "Talk to 5 people who moved to Pune alone in the last two months and ask what they did last weekend and whether they would message the number. No code.",
+      "prompt": "Write me 6 short questions for talking to 5 PG residents in Pune, about their first two months, that don't lead them to say yes."
+    },
+    {
+      "id": "link-1",
+      "name": "One operator opens one building",
+      "status": "assumed",
+      "evidence": "problem.md's reach depends on an operator who posts the number in the building's WhatsApp group. It lists which operator and what they get as open questions, and the repo shows no operator contact.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Which operator first, and what they get"
+        }
+      ],
+      "paths": [],
+      "question": "Will a PG or co-living operator post the number in a building group, and for what in return?",
+      "test": "Message or call 3 Pune operators this week with one line on the offer and see if one says yes to one building.",
+      "prompt": "Draft a short WhatsApp message I can send a PG operator in Pune asking to try this in one building."
+    },
+    {
+      "id": "link-2",
+      "name": "20 residents join in one building",
+      "status": "assumed",
+      "evidence": "The promise needs 20 or more residents who have messaged before a building opens, all in one weekly pool. No pool has run, so the join rate from a building group is unknown.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "A building is opened only once 20 or more residents have messaged."
+        }
+      ],
+      "paths": [
+        "src/agent/matching/pool.py"
+      ],
+      "question": "How many residents of one building message the number after one post in its group?",
+      "test": "Have one operator post a plain message with a number you answer yourself by hand, and count replies for 3 days.",
+      "prompt": "Help me write the one post an operator would put in a building group, with no app and no AI pitch."
+    },
+    {
+      "id": "link-3",
+      "name": "A resident can reach Omi on WhatsApp",
+      "status": "built",
+      "evidence": "The WhatsApp channel exists, but linking starts from Profile in the web app; WhatsApp-only sign-up is not built, Meta verification is outstanding and the GCP account hosting the app was deleted. So no live door exists today.",
+      "sources": [
+        {
+          "file": "docs/production-plan.md",
+          "quote": "Needs Meta business verification and a real number for users"
+        },
+        {
+          "file": "docs/progress.md",
+          "quote": "WhatsApp-only sign-up, pool code in chat, operator page, one real pair"
+        },
+        {
+          "file": "docs/progress.md",
+          "quote": "The GCP account was deleted (2026-11-02)"
+        }
+      ],
+      "paths": [
+        "src/channels/whatsapp.py",
+        "src/api/routes/whatsapp.py",
+        "infra/gcp"
+      ],
+      "question": "What is the least hosting and WhatsApp setup that lets 20 strangers message Omi for a month?",
+      "test": "Check Meta's current rules and cost for one test number and price one small always-on host. An hour of reading, no code.",
+      "prompt": "Compare the cheapest ways to host Omiryn and get one WhatsApp number live for 20 people for a month, including Meta's AI chatbot policy risk."
+    },
+    {
+      "id": "link-4",
+      "name": "People keep answering Omi for a week",
+      "status": "tested_made_up",
+      "evidence": "Reply fixes are measured on invented chats, and the live sightings in progress.md come from a builder's own chats. Nothing shows a stranger answering for a week. Messages Omi starts itself are now off by default, which problem.md's week of talk relied on as nudges.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Omi has to be good enough that people answer it for a week."
+        },
+        {
+          "file": "docs/progress.md",
+          "quote": "Seen live: a return greeting at 3:22 AM"
+        },
+        {
+          "file": "docs/problem.md",
+          "quote": "memories with evidence, vibe card, user card, WhatsApp channel, nudges and follow-ups"
+        }
+      ],
+      "paths": [
+        "src/agent/context_engine",
+        "src/agent/runtime",
+        "src/agent/proactive"
+      ],
+      "question": "Do 5 people outside the team still reply to Omi on day 5 with no nudges from it?",
+      "test": "Give the web app or Telegram to 5 friends of friends and count who is still writing on day 5.",
+      "prompt": "What do I need to do to let 5 outside testers use Omi this week, and how do I count their replies per day without reading their chats?"
+    },
+    {
+      "id": "link-5",
+      "name": "Omi learns enough true things to match on",
+      "status": "tested_made_up",
+      "evidence": "Vibe grounding evals pass with a real model, and date and name recall were measured this week, all on invented chats. No real person's card has been judged good enough to pick a friend from.",
+      "sources": [
+        {
+          "file": "docs/progress.md",
+          "quote": "all 5 vibe grounding scenarios pass"
+        },
+        {
+          "file": "docs/progress.md",
+          "quote": "Measured on made-up data with real embeddings"
+        }
+      ],
+      "paths": [
+        "src/agent/memory_engine",
+        "src/agent/cognition",
+        "src/agent/matching/readiness.py"
+      ],
+      "question": "After a week of real chat, does a person's card describe them well enough that they and a friend agree with it?",
+      "test": "Show 3 people their own vibe page after a few days of chat and ask which lines are wrong or missing.",
+      "prompt": "Using only what users choose to show me, give me a short checklist for reviewing a vibe page with its owner."
+    },
+    {
+      "id": "link-6",
+      "name": "A good pair can be picked from the notes",
+      "status": "built",
+      "evidence": "Readiness, suggested pairs and compatibility reasons exist behind an API, and the whole feature was parked before any live run. problem.md says the first pairs are picked by hand, and no pick has been checked against what happened.",
+      "sources": [
+        {
+          "file": "docs/progress.md",
+          "quote": "Matching, parts 1 and 2 of the loop (built 2026-10-31, not yet used live)"
+        },
+        {
+          "file": "docs/problem.md",
+          "quote": "The first pairs are picked by hand from Omi's vibe notes."
+        },
+        {
+          "file": "docs/progress.md",
+          "quote": "parked on 2026-11-01 by the user, before any live run"
+        }
+      ],
+      "paths": [
+        "src/agent/matching/compatibility.py",
+        "src/agent/matching/pool.py",
+        "src/agent/matching/readiness.py"
+      ],
+      "question": "Can someone reading only two vibe cards tell which pairs of existing friends actually get along?",
+      "test": "Take 3 pairs of real friends and 3 random pairs, have them chat with Omi for a few days with consent, and guess blind from the cards.",
+      "prompt": "Design the smallest blind test of whether vibe cards can tell real friend pairs from random pairs, with consent from everyone."
+    },
+    {
+      "id": "link-7",
+      "name": "Both agree and are introduced safely",
+      "status": "built",
+      "evidence": "Omi can introduce a pair, suggest a plan and remind them, but it has not been used live. Both sides confirming, sharing numbers with consent, and report and block are all missing.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Missing: both sides confirming to each other, and sharing numbers with consent."
+        },
+        {
+          "file": "docs/production-plan.md",
+          "quote": "Required on every match card and user-to-user chat."
+        }
+      ],
+      "paths": [
+        "src/agent/matching/hosting.py",
+        "src/agent/tools/match_outcome.py"
+      ],
+      "question": "Will both people say yes to a named stranger in their building, and what do they need to know first?",
+      "test": "Do one introduction by hand on WhatsApp between two consenting people and note what each asks before saying yes.",
+      "prompt": "Write the exact messages I would send by hand to introduce two consenting people, and list what could go wrong and how each can back out."
+    },
+    {
+      "id": "link-8",
+      "name": "They actually meet",
+      "status": "assumed",
+      "evidence": "problem.md argues a chai downstairs is easy, and also notes that strangers on other apps mostly never show up. No meeting has been arranged or counted.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Meeting is easy: a chai downstairs, not a cross-city trip."
+        },
+        {
+          "file": "docs/problem.md",
+          "quote": "most never show up"
+        }
+      ],
+      "paths": [
+        "src/agent/tools/places.py"
+      ],
+      "question": "Of pairs introduced by hand, how many meet within a week?",
+      "test": "Run 3 hand introductions with a place and time and count who turns up.",
+      "prompt": "Help me run 3 hand-made introductions and keep a simple table of who said yes, who met and what happened."
+    },
+    {
+      "id": "link-9",
+      "name": "They are still in touch at day 30",
+      "status": "built",
+      "evidence": "Day 3 and day 30 check-ins and outcome recording exist in code and have never run live. No pair exists, so this rate is unknown.",
+      "sources": [
+        {
+          "file": "docs/problem.md",
+          "quote": "Omi asks at day 3 and day 30"
+        },
+        {
+          "file": "docs/problem.md",
+          "quote": "Not yet used live."
+        }
+      ],
+      "paths": [
+        "src/agent/matching/hosting.py",
+        "src/agent/tools/match_outcome.py"
+      ],
+      "question": "Do pairs who meet once talk again without being pushed?",
+      "test": "Ask the hand-introduced pairs by message at day 3 and day 30. It can't finish this week, but it starts with the first pair.",
+      "prompt": "Give me a simple tracker and the two check-in messages for hand-introduced pairs."
+    }
+  ],
+  "disagreements": [
+    "Who it is for: problem.md (30 Oct) says newcomers in Pune PGs reached through an operator; progress.md section 1 still says the launch audience is tech college students.",
+    "Next work: problem.md says agent work continues only when it blocks a match day; progress.md parks matching (1 Nov) and lists date recall, graph and reflection next. Of 44 commits since 30 Oct, nearly all after 1 Nov are agent, chat or UI work.",
+    "Pair picking: problem.md says matching code is built only when hand-picking stops scaling; progress.md rows 7a and 7b show that code already built.",
+    "Matching state: production-plan.md (10 Oct) lists matching and match flow as Missing, with an in-app match card and user chat; progress.md and problem.md show pools and WhatsApp hosting built instead.",
+    "The measure: problem.md uses meeting within 30 days and in touch at day 30; production-plan.md uses a 7-day still-talking rate.",
+    "Front door: problem.md says a WhatsApp number in a building group; production-plan.md says test Telegram with 10-20 users before WhatsApp, and WhatsApp linking starts from the web Profile.",
+    "Reply model: progress.md says replies run on Llama 3.3 70B; recent progress rows measure Gemma 4 31B. Its section 6 says to set AGENT_BEHAVIOR_VERSION=v4-1, while the code default is v4-3."
+  ],
+  "notRead": "The dev database and any real usage counts (not read without asking), reports/, production-plan.md past line 70, friends-first-audit.md, and anything outside the repo. Talks with residents or operators, if they happened outside the repo, would move the first three links."
+}
