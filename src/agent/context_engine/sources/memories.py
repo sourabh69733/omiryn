@@ -7,6 +7,7 @@ from typing import Any
 
 from agent.context_engine.policy.requests import HOW_TO_TALK_SOURCE_TYPE
 from agent.memory_engine.memories import BROAD_RECALL_MEMORY_LIMIT, retrieve_agent_memories_for_reply
+from agent.memory_engine.memories.dates import next_occurrence, repeats_label
 from agent.memory_engine.memories.focus import focus_state
 from agent.shared.clock import utc_now
 from agent.shared.timeline import date_label, parse_time, relative_day, user_zone
@@ -133,7 +134,11 @@ def memory_time_note(memory: dict[str, Any], zone: Any, now: datetime | None = N
         if mentions[-1].date() != mentions[0].date():
             told += f", again {dated(mentions[-1])}"
         notes.append(told)
-    if event := parse_time(memory.get("occurred_at")):
+    if every := repeats_label(memory.get("repeats")):
+        coming = next_occurrence(memory, today, zone)
+        when = f", next {date_label(coming)} ({relative_day(coming, today)})" if coming else ""
+        notes.append(f"{every}{when}")
+    elif event := parse_time(memory.get("occurred_at")):
         upcoming = event.astimezone(zone).date() > today
         notes.append(f"{'happens' if upcoming else 'happened'} {dated(event)}")
     if valid_until := parse_time(memory.get("valid_until")):

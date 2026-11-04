@@ -152,6 +152,8 @@ def due_event(memories: list[dict[str, Any]], now: datetime, zone: ZoneInfo) -> 
             or told is None
             or told >= occurred
             or memory.get("followed_up_at")
+            # A birthday or a weekly class is not a plan to ask about once.
+            or memory.get("repeats")
             or memory.get("status") != "active"
             or memory.get("sensitivity") == "highly_sensitive"
             or "reply_context" not in (memory.get("allowed_uses") or [])

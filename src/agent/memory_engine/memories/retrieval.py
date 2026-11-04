@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from typing import Any
 
 from agent.shared.clock import utc_now
 from agent.shared.timeline import session_gap
 
+from .dates import next_occurrence, occurrences_between
 from .focus import focus_state, last_mentioned
 from .models import MemoryKind, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import (
@@ -227,7 +228,7 @@ def _reported_after_it_happened(memory: dict[str, Any], now: datetime) -> bool:
     """News the user gave as it happened ("finished the course today"): it was talked through
     then, so offering it again only brings back a closed subject. An event told ahead ("interview
     tomorrow") is still offered, for the "how did it go?", and so is an old story told later."""
-    if memory.get("kind") != MemoryKind.EPISODIC.value:
+    if memory.get("kind") != MemoryKind.EPISODIC.value or memory.get("repeats"):
         return False
     occurred = aware_datetime(memory.get("occurred_at"))
     if occurred is None or occurred > now:
@@ -273,10 +274,8 @@ def might_fit_memories(
     ]
 
     def score(memory: dict[str, Any]) -> float:
-        occurred = aware_datetime(memory.get("occurred_at"))
-        upcoming = occurred is not None and current_time <= occurred <= current_time + UPCOMING_WINDOW
         value = (
-            (1.0 if upcoming else 0.0)
+            (1.0 if _coming_up(memory, current_time) else 0.0)
             + bounded_score(memory.get("importance")) * 0.6
             + bounded_score(memory.get("confidence")) * 0.2
         )
@@ -286,9 +285,53 @@ def might_fit_memories(
     return ranked[:limit]
 
 
+def _coming_up(memory: dict[str, Any], now: datetime) -> bool:
+    """A birthday next week is worth having in mind; a gym that is always a few days away is not."""
+    repeats = str(memory.get("repeats") or "")
+    if repeats.startswith("yearly"):
+        # Only ranks, so the day in UTC is close enough.
+        day = next_occurrence(memory, now.date(), UTC)
+        return day is not None and day <= (now + UPCOMING_WINDOW).date()
+    if repeats:
+        return False
+    occurred = aware_datetime(memory.get("occurred_at"))
+    return occurred is not None and now <= occurred <= now + UPCOMING_WINDOW
+
+
+def memories_on_dates(
+    user_id: str,
+    first: date,
+    last: date,
+    zone: tzinfo,
+    *,
+    limit: int,
+) -> list[tuple[date, dict[str, Any]]]:
+    """What the user told Omi happens from first to last, soonest first, each once.
+
+    Unlike a reply's facts this keeps a plan whose valid_until has passed: it did happen then.
+    """
+    from storage.memories import list_agent_memories
+
+    found = []
+    for memory in list_agent_memories(user_id):
+        if (
+            memory.get("status") != MemoryStatus.ACTIVE.value
+            or MemoryUse.REPLY_CONTEXT.value not in set(memory.get("allowed_uses") or [])
+            or memory.get("sensitivity") == MemorySensitivity.HIGHLY_SENSITIVE.value
+            or memory.get("kind") == MemoryKind.PROCEDURAL.value
+        ):
+            continue
+        days = occurrences_between(memory, first, last, zone)
+        if days:
+            found.append((days[0], memory))
+    found.sort(key=lambda item: (item[0], -bounded_score(item[1].get("importance")), str(item[1].get("id") or "")))
+    return found[:limit]
+
+
 __all__ = [
     "DEFAULT_REPLY_MEMORY_LIMIT",
     "MIGHT_FIT_LIMIT",
+    "memories_on_dates",
     "might_fit_memories",
     "retrieve_agent_memories_for_reply",
 ]
