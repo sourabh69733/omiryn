@@ -42,6 +42,7 @@ _SOURCE_BLOCKS = {
     "past_lines": "past_lines",
     "open_questions": "open_questions",
     "might_fit": "might_fit",
+    "calendar": "calendar",
     "data_points": "memories",
     "agent_self_notes": "your_notes",
     "conversation_summary": "this_chat",
@@ -60,6 +61,7 @@ BLOCK_CHAR_LIMITS = {
     "your_notes": 1400,
     "this_chat": 3600,
     "attached": 4000,
+    "calendar": 1300,
     "might_fit": 800,
     "open_questions": 700,
     "how_to_talk": 3000,
@@ -168,10 +170,11 @@ def build_companion_system_prompt_v4(
             if attached
             else []
         )),
+        ("calendar", grouped.get("calendar", [])),
         ("might_fit", grouped.get("might_fit", [])),
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
-        ("this_turn", [time_facts, _turn_lines(facts), _web_search_line()]),
+        ("this_turn", [time_facts, _turn_lines(facts), _web_search_line(), _dates_tool_line()]),
         ("goal", [prompt_version.reply_goal or V4_GOAL]),
     ]
     return "\n\n".join(filter(None, (_block(tag, parts) for tag, parts in blocks)))
@@ -281,6 +284,18 @@ def _web_search_line() -> str:
     return (
         "You can search the web. If they ask what is going on in the world or in a field, or whether "
         "you can look things up, what you remember is old: call web_search before you reply."
+    )
+
+
+def _dates_tool_line() -> str:
+    """Read last for the same reason: without it the model said it knew of nothing next month."""
+    from agent.tools import tools_enabled
+
+    if not tools_enabled():
+        return ""
+    return (
+        "If they ask what happens or happened on a day, week or month your calendar does not cover, "
+        "call memories_by_date first, before search_chats and before you say you do not know."
     )
 
 
