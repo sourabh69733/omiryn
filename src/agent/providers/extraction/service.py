@@ -206,6 +206,19 @@ async def write_search_queries(
     return await _upload_call(SEARCH_QUERIES_SYSTEM_PROMPT, SEARCH_QUERIES, text, conversation_id, model, timeout_seconds)
 
 
+async def write_memory_names(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 60,
+) -> dict[str, Any]:
+    """Who or what older memories are about; {"names": {"<id>": ["name"]}}."""
+    from agent.memory_engine.memories.fill_names import MEMORY_NAMES_SYSTEM_PROMPT
+
+    return await _upload_call(MEMORY_NAMES_SYSTEM_PROMPT, "memory_names", text, conversation_id, model, timeout_seconds)
+
+
 async def write_match_reasons(
     text: str,
     *,
