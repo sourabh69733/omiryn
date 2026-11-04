@@ -12,6 +12,7 @@ from agent.shared.timeline import session_gap
 
 from .dates import next_occurrence, occurrences_between
 from .focus import focus_state, last_mentioned
+from .links import linked_memories
 from .models import MemoryKind, MemorySensitivity, MemoryStatus, MemoryUse
 from .ranking import (
     aware_datetime,
@@ -123,7 +124,13 @@ def retrieve_agent_memories_for_reply(
         kind_counts[kind] += 1
         if len(selected) >= limit:
             break
-    return selected + how_to_talk
+    # One thought leads to another; a "tell me everything" question already has the whole picture.
+    linked = [] if broad or not memory_links_enabled() else linked_memories(selected, eligible, user_text)
+    return selected + linked + how_to_talk
+
+
+def memory_links_enabled() -> bool:
+    return os.getenv("AGENT_MEMORY_LINKS", "true").strip().lower() != "false"
 
 
 def _reply_eligible(memory: dict[str, Any], now: datetime) -> bool:

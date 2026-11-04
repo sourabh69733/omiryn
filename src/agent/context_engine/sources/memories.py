@@ -122,6 +122,11 @@ def memory_time_note(memory: dict[str, Any], zone: Any, now: datetime | None = N
         return f"{date_label(local)} ({relative_day(local.date(), today)})"
 
     notes = []
+    # "Had a fight with their sister" says nothing of Riya unless the name comes with it.
+    sentence = memory_sentence(memory).casefold()
+    unnamed = [str(name) for name in memory.get("about") or [] if str(name).casefold() not in sentence]
+    if unnamed:
+        notes.append(f"about {', '.join(unnamed)}")
     mentions = sorted(
         {
             parsed.astimezone(zone)
