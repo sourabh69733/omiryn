@@ -11,17 +11,39 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Awaitable, Callable
 
 from agent.providers.gateway.clients import parse_tool_calls
 
-from .registry import ToolCall, ToolContext, run_calls, tool_specs
+from .registry import ToolCall, ToolContext, get_tool, run_calls, tool_specs
 
 MAX_ROUNDS = 3
 MAX_CALLS_PER_ROUND = 4
 ARGUMENT_CHARS = 200
 
 Generate = Callable[..., Awaitable[str]]
+
+# Gemma sometimes writes a call as plain text in its own format, not through the API:
+# search_chats{query:<|"|>some words<|"|>,days:7}
+_WRITTEN_CALL = re.compile(r"^\s*(?:<\|tool_call>)?(?:call:)?(\w+)\{(.*)\}(?:<tool_call\|>)?\s*$", re.DOTALL)
+_WRITTEN_ARGUMENT = re.compile(r'(\w+):(?:<\|"\|>(.*?)<\|"\|>|([^,}]+))', re.DOTALL)
+
+
+def _written_call(text: str) -> list[tuple[str, dict[str, Any]]]:
+    """That text as a real call, so it runs instead of reaching the user. Only a tool that exists."""
+    match = _WRITTEN_CALL.match(text) if isinstance(text, str) else None
+    if not match or get_tool(match.group(1)) is None:
+        return []
+    arguments: dict[str, Any] = {}
+    for name, quoted, plain in _WRITTEN_ARGUMENT.findall(match.group(2)):
+        value = quoted or plain.strip()
+        arguments[name] = int(value) if value.isdigit() else value
+    return [(match.group(1), arguments)]
+
+
+def _calls_in(text: str) -> list[tuple[str, dict[str, Any]]]:
+    return parse_tool_calls(text) or _written_call(text)
 
 
 def tools_enabled() -> bool:
@@ -47,7 +69,7 @@ async def reply_with_tools(
     messages = list(reply_messages)
     trace: list[dict[str, Any]] = []
     for round_number in range(1, max_rounds + 1):
-        called = parse_tool_calls(raw_reply)
+        called = _calls_in(raw_reply)
         if not called:
             return raw_reply, trace
         calls = [ToolCall(name, arguments) for name, arguments in called[:MAX_CALLS_PER_ROUND]]
@@ -57,7 +79,7 @@ async def reply_with_tools(
         offer = tool_arguments(context) if round_number < max_rounds else {}
         raw_reply = await generate(list(messages), **generation_arguments, **offer)
     # The last call had no tools, but a model may still answer with a call: never send that.
-    if parse_tool_calls(raw_reply):
+    if _calls_in(raw_reply):
         raw_reply = await generate(list(messages), **generation_arguments)
     return raw_reply, trace
 

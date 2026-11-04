@@ -9,7 +9,8 @@ from agent.providers import AgentProviderError
 def looks_like_model_transport(raw_text: str) -> bool:
     """Identify private JSON/tool syntax that must not be rendered as companion text."""
     text = str(raw_text or "").lstrip().casefold()
-    return text.startswith("{") or text.startswith("```json") or "<function" in text
+    # <| is how Gemma writes its own tool calls and strings; a person's reply never holds it.
+    return text.startswith("{") or text.startswith("```json") or "<function" in text or "<|" in text
 
 
 def visible_reply(raw_text: str, decoded_reply: str | None = None) -> str:

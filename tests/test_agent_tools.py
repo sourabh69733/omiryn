@@ -104,5 +104,34 @@ class ToolsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(trace), 4)
 
 
+
+class WrittenToolCallTest(unittest.TestCase):
+    """Gemma sometimes writes a call as plain text; it must run, never reach the user."""
+
+    def test_its_format_becomes_a_real_call(self) -> None:
+        from agent.tools.loop import _written_call
+
+        self.assertEqual(
+            _written_call('search_chats{query:<|"|>kahan gaya tha<|"|>,days:7}'),
+            [("search_chats", {"query": "kahan gaya tha", "days": 7})],
+        )
+        self.assertEqual(
+            _written_call('<|tool_call>call:memories_by_date{period:<|"|>last_week<|"|>}<tool_call|>'),
+            [("memories_by_date", {"period": "last_week"})],
+        )
+
+    def test_prose_and_unknown_names_are_left_alone(self) -> None:
+        from agent.tools.loop import _written_call
+
+        self.assertEqual(_written_call("a plain reply"), [])
+        self.assertEqual(_written_call("use set{a,b} here"), [])
+        self.assertEqual(_written_call("not_a_tool{query:x}"), [])
+
+    def test_leftover_syntax_never_counts_as_a_reply(self) -> None:
+        from agent.runtime.steps.visible import looks_like_model_transport
+
+        self.assertTrue(looks_like_model_transport('sure <|"|>words<|"|>'))
+        self.assertFalse(looks_like_model_transport("Tum Jaipur gaye the."))
+
 if __name__ == "__main__":
     unittest.main()
