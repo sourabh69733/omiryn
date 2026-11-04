@@ -67,6 +67,7 @@ def _create_agent_memory(connection, payload: dict[str, Any]) -> dict[str, Any]:
             valid_from=record.valid_from,
             valid_until=record.valid_until,
             repeats=record.repeats,
+            about_json=maybe_encrypt_json(record.user_id, list(record.about)) if record.about else None,
             focus=record.focus,
             last_reinforced_at=record.last_reinforced_at,
             supersedes_memory_id=record.supersedes_memory_id,
@@ -128,6 +129,18 @@ def list_agent_memories(user_id: str) -> list[dict[str, Any]]:
             .all()
         )
         return [_memory_from_row(connection, row) for row in rows]
+
+
+def set_agent_memory_about(memory_id: str, user_id: str, about: list[str]) -> bool:
+    """Set the names on one memory, for memories saved before they had any."""
+    owner_id = _require_user_id(user_id, "agent memory")
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            agent_memories.update()
+            .where(agent_memories.c.id == memory_id, agent_memories.c.user_id == owner_id)
+            .values(about_json=maybe_encrypt_json(owner_id, about) if about else None)
+        )
+    return bool(result.rowcount)
 
 
 def mark_agent_memory_followed_up(memory_id: str, user_id: str, at: datetime) -> bool:
@@ -674,6 +687,7 @@ def _record_from_create_payload(payload: dict[str, Any]) -> MemoryRecord:
         valid_from=_datetime(payload.get("valid_from"), "valid_from"),
         valid_until=_datetime(payload.get("valid_until"), "valid_until"),
         repeats=_optional_text(payload.get("repeats")),
+        about=tuple(payload.get("about") or ()),
         focus=bool(payload.get("focus")),
         last_reinforced_at=_datetime(payload.get("last_reinforced_at"), "last_reinforced_at"),
         supersedes_memory_id=_optional_text(payload.get("supersedes_memory_id")),
@@ -715,6 +729,7 @@ def _memory_from_row(connection, row) -> dict[str, Any]:
         "valid_from": _isoformat_utc(row["valid_from"]),
         "valid_until": _isoformat_utc(row["valid_until"]),
         "repeats": row.get("repeats"),
+        "about": decrypt_json(row["user_id"], row["about_json"]) if row.get("about_json") else [],
         "focus": bool(row.get("focus")),
         "last_reinforced_at": _isoformat_utc(row["last_reinforced_at"]),
         "followed_up_at": _isoformat_utc(row.get("followed_up_at")),

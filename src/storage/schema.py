@@ -177,6 +177,8 @@ agent_memories = Table(
     Column("valid_until", DateTime(timezone=True), nullable=True),
     # Comes back on a calendar: yearly:03-12, monthly:5 or weekly:tue,thu.
     Column("repeats", String, nullable=True),
+    # The people, places and things it is about, encrypted like value_json. Sharing a name links memories.
+    Column("about_json", JSON, nullable=True),
     # Something the user is into for a while (studying a topic, a project); it fades when not mentioned.
     Column("focus", Boolean, nullable=False, server_default="false"),
     Column("last_reinforced_at", DateTime(timezone=True), nullable=True),

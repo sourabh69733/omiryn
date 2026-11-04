@@ -170,7 +170,7 @@ def _ensure_runtime_columns() -> None:
         "profile_facts": ("used_for_chat_context", "fact_type", "confidence_state"),
         "agent_memory_reviews": ("reasons", "comment"),
         "agent_user_settings": ("timezone", "reply_model"),
-        "agent_memories": ("statement", "focus", "followed_up_at", "repeats"),
+        "agent_memories": ("statement", "focus", "followed_up_at", "repeats", "about_json"),
         "agent_user_cards": ("rebuilt_at",),
         "channel_bursts": ("typing_at",),
         "agent_jobs": ("payload_json",),
@@ -200,7 +200,7 @@ def _ensure_runtime_columns() -> None:
                         column_type = "INTEGER"
                     if column_name.endswith("_at"):
                         column_type = "TIMESTAMP WITH TIME ZONE"
-                    if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons", "payload_json", "plan_json"}:
+                    if column_name in {"profile_photo_urls", "profile_photo_file_names", "reasons", "payload_json", "plan_json", "about_json"}:
                         column_type = "JSON"
                     default = " DEFAULT FALSE" if column_name in _BOOLEAN_COLUMNS else ""
                     if column_name == "fact_type":

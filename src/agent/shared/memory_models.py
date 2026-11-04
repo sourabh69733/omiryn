@@ -102,6 +102,8 @@ class MemoryRecord:
     valid_until: datetime | None = None
     # Comes back on a calendar: yearly:03-12, monthly:5 or weekly:tue,thu (see memories/dates.py).
     repeats: str | None = None
+    # The people, places and things it is about; memories sharing a name are linked (memories/links.py).
+    about: tuple[str, ...] = ()
     # A current focus: fresh while mentioned, fading after weeks of silence (see focus.py).
     focus: bool = False
     last_reinforced_at: datetime | None = None
