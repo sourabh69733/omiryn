@@ -220,3 +220,48 @@ class PromptV43Test(unittest.TestCase):
         self.assertNotIn("Dune", V4_3_CHARACTER)
         self.assertNotIn("music, food, ideas", V4_3_CHARACTER)
         self.assertIn("no favourite\n  food or drink", V4_3_CHARACTER)
+
+    def test_versions_keep_the_settings_the_engine_lists_gave_them(self) -> None:
+        from agent.context_engine.prompt_engine.registry import available_prompt_versions
+
+        expected = {
+            "v3": (False, True, False, True, "context_v3"),
+            "v3-1": (False, True, True, True, "context_v3_1"),
+            "v4": (True, True, True, True, "context_v4"),
+            "v4-1": (True, True, True, True, "context_v4"),
+            "v4-2": (True, True, True, True, "context_v4"),
+            "v4-3": (True, True, True, True, "context_v4"),
+        }
+        actual = {
+            v.version_id: (v.blocks_prompt, v.listener_first, v.matching_understanding, v.plans_turn, v.engine_version)
+            for v in available_prompt_versions()
+        }
+        self.assertEqual(actual, expected)
+
+    def test_omi_block_is_not_cut_with_any_voice_or_tone(self) -> None:
+        from agent.context_engine.prompt_engine.blocks import _fit
+        from agent.context_engine.prompt_engine.modules.identity import voice_prompt
+        from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
+        from agent.context_engine.prompt_engine.registry import available_prompt_versions
+
+        limit = BLOCK_CHAR_LIMITS["omi"]
+        for version in available_prompt_versions():
+            if not version.blocks_prompt:
+                continue
+            for voice in ("neutral", "girl", "boy"):
+                for tone in ("casual", "warm", "formal", "direct", "playful"):
+                    parts = (version.base_prompt, voice_prompt(voice), tone_module_prompt(tone))
+                    body = "\n\n".join(part.strip() for part in parts)
+                    self.assertLessEqual(len(body), limit, (version.version_id, voice, tone))
+                    self.assertEqual(_fit(body, limit), body)
+
+    def test_v4_3_edits_still_find_the_text_they_replace(self) -> None:
+        from agent.context_engine.prompt_engine.versions import v4_3
+        from agent.context_engine.prompt_engine.versions.v4 import V4_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_2 import V4_2_GOAL
+
+        # str.replace does nothing, with no error, when the old text has changed.
+        for line in (v4_3._V4_DAY_LINE, v4_3._V4_TASTES_LINE, v4_3._V4_EXAMPLES_LINE):
+            self.assertIn(line, V4_CHARACTER)
+        for line in (v4_3._V4_2_BRING_LINE, v4_3._TEXT_LINE):
+            self.assertIn(line, V4_2_GOAL)

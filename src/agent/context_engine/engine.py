@@ -53,11 +53,11 @@ def build_model_context_package(
 ) -> ModelContextPackage:
     prompt_version = get_prompt_behavior_version(prompt_version_id)
     user_profile = _with_conversation_time(conversation_id, user_id, user_profile)
-    blocks_prompt = prompt_version.version_id in {"v4", "v4-1", "v4-2", "v4-3"}
-    listener_first = prompt_version.version_id in {"v3", "v3-1", "v4", "v4-1", "v4-2", "v4-3"}
+    blocks_prompt = prompt_version.blocks_prompt
+    listener_first = prompt_version.listener_first
     matching_understanding = (
         build_matching_understanding(user_id=user_id, user_profile=user_profile)
-        if prompt_version.version_id in {"v3-1", "v4", "v4-1", "v4-2", "v4-3"}
+        if prompt_version.matching_understanding
         else None
     )
     reply_context = build_reply_context(
@@ -69,7 +69,7 @@ def build_model_context_package(
         strict_intent=listener_first,
         memory_query_embedding=memory_query_embedding,
     )
-    if prompt_version.version_id in {"v2", "v3", "v3-1", "v4", "v4-1", "v4-2", "v4-3"}:
+    if prompt_version.plans_turn:
         planning_messages = _planning_messages(conversation_id, user_id, user_text)
         pending_turn_state = active_turn_state(planning_messages[:-1])
         turn_understanding = None
@@ -163,15 +163,7 @@ def build_model_context_package(
             style_source_id=style_source_id,
             prompt_version=prompt_version.version_id,
             prompt_version_name=prompt_version.name,
-            engine_version=(
-                "context_v4"
-                if blocks_prompt
-                else "context_v3_1"
-                if prompt_version.version_id == "v3-1"
-                else "context_v3"
-                if listener_first
-                else "context_v2"
-            ),
+            engine_version=prompt_version.engine_version,
             query_intent=query_intent,
             emotion_state=emotion_state,
             conversation_plan=conversation_plan,
