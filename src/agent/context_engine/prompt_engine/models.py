@@ -17,3 +17,9 @@ class PromptBehaviorVersion:
     data_point_targets: tuple[str, ...] = ()
     # The goal block of the blocks prompt; empty uses V4's.
     reply_goal: str = ""
+    # What the context engine does for this version. A new version made with replace() keeps them.
+    blocks_prompt: bool = False
+    listener_first: bool = False
+    matching_understanding: bool = False
+    plans_turn: bool = False
+    engine_version: str = "context_v2"

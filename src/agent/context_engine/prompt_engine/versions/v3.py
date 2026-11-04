@@ -42,6 +42,9 @@ differences they can accept, and their deal-breakers."""
 V3_PROMPT_VERSION = PromptBehaviorVersion(
     version_id="v3",
     name="v3_listener_first_companion",
+    listener_first=True,
+    plans_turn=True,
+    engine_version="context_v3",
     base_prompt=V3_BASE_PROMPT,
     context_usage_rules=CONTEXT_USAGE_RULES,
     reply_style={

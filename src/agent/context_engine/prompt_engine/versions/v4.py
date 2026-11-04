@@ -76,6 +76,8 @@ V4_PROMPT_VERSION = replace(
     V3_1_PROMPT_VERSION,
     version_id="v4",
     name="v4_character_blocks",
+    blocks_prompt=True,
+    engine_version="context_v4",
     base_prompt=V4_CHARACTER,
     prompt_contract=V4_RULES,
 )
