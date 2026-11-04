@@ -135,6 +135,7 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `DELETE /api/agent/conversations/{id}/messages/{index}/reaction` | Take the reaction back. |
 | `POST /api/agent/conversations/{id}/messages/{index}/feedback` | Rate one of Omi's replies: `good` or `bad` with `reasons` (`too_much`, `bad_tone`, `wrong_memory`, `not_helpful`). Replaces an earlier rating. Refused in Temporary Chat. |
 | `DELETE /api/agent/conversations/{id}/messages/{index}/feedback` | Undo a rating. |
+| `GET /api/me/memories` | Each memory also has `repeats`: `yearly:03-12`, `monthly:5`, `weekly:tue,thu`, or null when it does not repeat. |
 | `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
 | `DELETE /api/me/account-data?confirm=true` | Delete the account's private data. |
 | `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
