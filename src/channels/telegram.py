@@ -55,6 +55,13 @@ async def send_telegram_message(chat_id: str, text: str) -> bool:
     return sent
 
 
+async def send_telegram_reaction(chat_id: str, message_id: str, emoji: str) -> bool:
+    """Put an emoji on the user's message. False if it failed: Telegram allows only some emoji."""
+    # Telegram lists its emoji without the variation mark that phones add, as in ❤️.
+    reaction = [{"type": "emoji", "emoji": emoji.replace("\ufe0f", "")}]
+    return await _call("setMessageReaction", {"chat_id": chat_id, "message_id": int(message_id), "reaction": reaction})
+
+
 async def send_telegram_typing(chat_id: str) -> None:
     """Shows "typing…" in the chat for about five seconds."""
     await _call("sendChatAction", {"chat_id": chat_id, "action": "typing"})

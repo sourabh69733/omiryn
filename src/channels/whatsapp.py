@@ -77,6 +77,11 @@ async def send_whatsapp_message(to: str, text: str) -> bool:
     return sent
 
 
+async def send_whatsapp_reaction(to: str, message_id: str, emoji: str) -> bool:
+    """Put an emoji on the user's message. False if it failed."""
+    return await _call({"to": to, "type": "reaction", "reaction": {"message_id": message_id, "emoji": emoji}})
+
+
 async def send_whatsapp_typing(message_id: str) -> None:
     """Marks the user's message read and shows "typing…" (until a reply or about 25 seconds)."""
     await _call({"status": "read", "message_id": message_id, "typing_indicator": {"type": "text"}})
