@@ -15,6 +15,7 @@ from agent.shared.clock import utc_now
 from api.main import app, current_user
 from api.routes import channel_replies
 from api.routes import telegram as telegram_routes
+from channels import telegram as telegram_channel
 from security.auth import CurrentUser
 from storage import (
     channel_link_for_user,
@@ -282,6 +283,74 @@ class _FakeTurn:
         user_message = {"role": "user", "content": kwargs["user_text"]}
         reply = {"role": "assistant", "content": f"reply {len(self.calls)}"}
         return AgentTurnResult(messages=[*kwargs["messages"], user_message, reply], quality_valid=True)
+
+
+class _ReactingTurn:
+    """Stands in for a model that answers with an emoji, and words if given."""
+
+    def __init__(self, reaction: str | None, words: str | None = None, no_reply: bool = False) -> None:
+        self.reaction, self.words, self.no_reply = reaction, words, no_reply
+
+    async def __call__(self, **kwargs) -> AgentTurnResult:
+        messages = [*kwargs["messages"], {"role": "user", "content": kwargs["user_text"]}]
+        if self.words:
+            messages.append({"role": "assistant", "content": self.words})
+        return AgentTurnResult(messages=messages, quality_valid=True, reaction=self.reaction, no_reply=self.no_reply)
+
+
+class TelegramReactionTest(_TelegramTestBase):
+    """Omi can answer with an emoji on the user's message."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.reacted = AsyncMock(return_value=True)
+        self.reaction_patch = patch.object(telegram_routes, "send_telegram_reaction", self.reacted)
+        self.reaction_patch.start()
+        self._connect()
+        self.sent.reset_mock()
+
+    def tearDown(self) -> None:
+        self.reaction_patch.stop()
+        super().tearDown()
+
+    def _say(self, turn: _ReactingTurn, update_id: int = 2) -> None:
+        with patch("api.main.run_agent_turn", turn):
+            self.assertEqual(self._webhook("hmm", update_id=update_id).status_code, 200)
+
+    def test_an_emoji_lands_on_the_message_with_no_bubble(self) -> None:
+        self._say(_ReactingTurn("👍"), update_id=7)
+
+        self.reacted.assert_awaited_once_with(str(CHAT_ID), "7", "👍")
+        self.assertEqual(self._sent_texts(), [])
+
+    def test_an_emoji_telegram_refuses_is_sent_as_a_message(self) -> None:
+        self.reacted.return_value = False
+
+        self._say(_ReactingTurn("😂"))
+
+        self.assertEqual(self._sent_texts(), ["😂"])
+
+    def test_an_emoji_with_words_sends_both(self) -> None:
+        self._say(_ReactingTurn("😂", "that was good"), update_id=7)
+
+        self.reacted.assert_awaited_once_with(str(CHAT_ID), "7", "😂")
+        self.assertEqual(self._sent_texts(), ["that was good"])
+
+    def test_choosing_silence_sends_nothing(self) -> None:
+        self._say(_ReactingTurn(None, no_reply=True))
+
+        self.reacted.assert_not_awaited()
+        self.assertEqual(self._sent_texts(), [])
+
+    def test_the_request_names_the_message_and_drops_the_variation_mark(self) -> None:
+        with patch("channels.telegram._call", AsyncMock(return_value=True)) as call:
+            sent = asyncio.run(telegram_channel.send_telegram_reaction("55", "7", "❤️"))
+
+        self.assertTrue(sent)
+        call.assert_awaited_once_with(
+            "setMessageReaction",
+            {"chat_id": "55", "message_id": 7, "reaction": [{"type": "emoji", "emoji": "❤"}]},
+        )
 
 
 class TelegramBurstTest(_TelegramTestBase):

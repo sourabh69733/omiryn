@@ -16,6 +16,7 @@ from agent.runtime.orchestrator import AgentTurnResult
 from api.main import app, current_user
 from api.routes import channel_replies
 from api.routes import whatsapp as whatsapp_routes
+from channels import whatsapp as whatsapp_channel
 from security.auth import CurrentUser
 from storage import channel_link_for_user, list_conversations, reset_db
 
@@ -217,6 +218,50 @@ class WhatsAppChannelTest(unittest.TestCase):
         self._send(None, "wamid.img", kind="image")
 
         self.assertEqual(self._sent_texts(), [whatsapp_routes._TEXT_ONLY])
+
+    def test_the_user_reacting_gets_no_reply(self) -> None:
+        self._connect()
+        self.sent.reset_mock()
+
+        self._send(None, "wamid.liked", kind="reaction")
+
+        self.assertEqual(self._sent_texts(), [])
+
+    def _answer(self, reaction: str | None, words: str | None = None) -> AsyncMock:
+        self._connect()
+        self.sent.reset_mock()
+
+        async def turn(**kwargs) -> AgentTurnResult:
+            messages = [*kwargs["messages"], {"role": "user", "content": kwargs["user_text"]}]
+            if words:
+                messages.append({"role": "assistant", "content": words})
+            return AgentTurnResult(messages=messages, quality_valid=True, reaction=reaction)
+
+        reacted = AsyncMock(return_value=True)
+        with patch("api.main.run_agent_turn", turn), patch.object(whatsapp_routes, "send_whatsapp_reaction", reacted):
+            self._send("hmm", "wamid.7")
+        return reacted
+
+    def test_an_emoji_lands_on_the_message_with_no_bubble(self) -> None:
+        reacted = self._answer("👍")
+
+        reacted.assert_awaited_once_with(WA_ID, "wamid.7", "👍")
+        self.assertEqual(self._sent_texts(), [])
+
+    def test_an_emoji_with_words_sends_both(self) -> None:
+        reacted = self._answer("😂", "that was good")
+
+        reacted.assert_awaited_once_with(WA_ID, "wamid.7", "😂")
+        self.assertEqual(self._sent_texts(), ["that was good"])
+
+    def test_the_request_names_the_message(self) -> None:
+        with patch("channels.whatsapp._call", AsyncMock(return_value=True)) as call:
+            sent = asyncio.run(whatsapp_channel.send_whatsapp_reaction("91", "wamid.7", "👍"))
+
+        self.assertTrue(sent)
+        call.assert_awaited_once_with(
+            {"to": "91", "type": "reaction", "reaction": {"message_id": "wamid.7", "emoji": "👍"}}
+        )
 
     def test_disconnect_by_message_and_from_profile(self) -> None:
         self._connect()
