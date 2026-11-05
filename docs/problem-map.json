@@ -7,6 +7,15 @@
       "goal": "Of new residents who message the number, how many meet one person within 30 days; of those pairs, how many are still in touch at day 30. No such number exists yet: no real pair has been run.",
       "updatedAt": "2026-11-04T13:05:18.965Z",
       "commit": "6d634380",
+      "kind": "business",
+      "code": [
+        "src/agent/matching",
+        "src/agent/context_engine",
+        "src/agent/memory_engine",
+        "src/agent/proactive",
+        "src/channels",
+        "infra/gcp"
+      ],
       "links": [
         {
           "id": "link-0",
