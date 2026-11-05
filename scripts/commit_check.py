@@ -61,6 +61,14 @@ def check_problem_map(staged: set[str], everything: bool) -> list[str]:
     problems = data["problems"] if isinstance(data.get("problems"), list) else [data]
     notes = []
     for problem in problems:
+        # Code the problem is mapped to must still exist; a rename or delete breaks the map quietly.
+        places = [str(place) for place in problem.get("code", [])]
+        for link in problem.get("links", []):
+            places += [str(place) for place in link.get("paths", [])]
+        for place in dict.fromkeys(places):
+            touched = any(name == place or name.startswith(f"{place}/") for name in staged)
+            if (everything or touched) and not (ROOT / place).exists():
+                notes.append(f'problem map, "{problem.get("title")}": mapped code {place} is no longer in the repo')
         for link in problem.get("links", []):
             for source in link.get("sources", []):
                 file = str(source.get("file", ""))
