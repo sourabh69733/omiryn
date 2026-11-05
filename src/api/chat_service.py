@@ -9,7 +9,7 @@ the newest stored list under the database lock.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import sys
 from collections.abc import Callable, Iterable
 from typing import Any
@@ -409,7 +409,19 @@ class DraftReply:
     turn: Any
 
 
-async def save_unanswered_message(user: CurrentUser, text: str, channel: str, chat_id: str) -> AgentConversation:
+@dataclass(frozen=True)
+class CommittedReply:
+    """What a saved reply still has to show on a messaging app."""
+
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    reaction: str | None = None
+    # The app's own id for the message the emoji goes on; None when it was not recorded.
+    reaction_target: str | None = None
+
+
+async def save_unanswered_message(
+    user: CurrentUser, text: str, channel: str, chat_id: str, channel_message_id: str | None = None
+) -> AgentConversation:
     """Save a message in the user's chat on that app now; a later reply answers it."""
     conversation = channel_conversation(user, channel)
     if conversation.status != "active" or conversation.import_source_id:
@@ -426,6 +438,7 @@ async def save_unanswered_message(user: CurrentUser, text: str, channel: str, ch
                 "created_at": utc_now_iso(),
                 "delivery_status": "sending",
                 "channel": channel,
+                **({"channel_message_id": channel_message_id} if channel_message_id else {}),
             }
         )
         return messages
@@ -464,8 +477,8 @@ async def draft_reply_to_unanswered(
 
 async def commit_reply(
     user: CurrentUser, draft: DraftReply, background_tasks: BackgroundTasks
-) -> list[dict[str, Any]]:
-    """Save a draft's replies right after the last message it answered; returns the reply messages.
+) -> CommittedReply:
+    """Save a draft's replies right after the last message it answered; returns what to show.
 
     A message that came in later stays below them, so it still counts as unanswered and gets the
     next reply. Saved at the end, it would sit above a reply that never read it and never be answered.
@@ -503,11 +516,15 @@ async def commit_reply(
     voice = getattr(draft.turn, "agent_voice", None)
     _change_messages(conversation, user, commit, fields={"agent_voice": voice} if voice else None)
     if placed["first"] is None or placed["start"] is None:
-        return []
+        return CommittedReply()
     # From the first answered message, so the web chat also sees them marked read.
     await _publish_new_messages(conversation, placed["first"])
     _learn_after_reply(conversation, user, draft.turn.quality_valid, background_tasks)
-    return conversation.messages[placed["start"] : placed["start"] + len(replies)]
+    return CommittedReply(
+        conversation.messages[placed["start"] : placed["start"] + len(replies)],
+        reaction,
+        draft.answered_message.get("channel_message_id"),
+    )
 
 
 def mark_unanswered_failed(user: CurrentUser, conversation_id: str) -> None:

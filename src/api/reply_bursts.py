@@ -27,6 +27,7 @@ from .burst_window import DRAFT_HOLD_SECONDS, seconds_left, typing_active
 from .chat_service import (
     REPLY_FAILED_CODE,
     WEB_CHANNEL,
+    CommittedReply,
     _unanswered_indexes,
     commit_reply,
     draft_reply_to_unanswered,
@@ -62,7 +63,7 @@ class BurstOutput:
     """How one kind of chat shows Omi at work."""
 
     writing: Callable[[], AsyncContextManager[None]]
-    deliver: Callable[[list[dict[str, Any]]], Awaitable[None]]
+    deliver: Callable[[CommittedReply], Awaitable[None]]
 
 
 @dataclass
@@ -124,11 +125,11 @@ async def _reply_until_answered(
                 restarts += 1
                 stats.drafts_thrown_away += 1
                 continue
-            replies = await commit_reply(user, draft, background_tasks) if draft else []
+            committed = await commit_reply(user, draft, background_tasks) if draft else CommittedReply()
             _save_stats(user, burst, draft, stats)
         restarts = 0
         stats = _ReplyStats()
-        await output.deliver(replies)
+        await output.deliver(committed)
         answered = seen
         # Closes the burst only if nothing arrived since `seen`; otherwise go round again.
         if finish_burst(burst.channel, burst.chat_id, burst.token, answered=seen):
@@ -273,7 +274,7 @@ def _web_output(conversation_id: str) -> BurstOutput:
         finally:
             await _publish_typing(conversation_id, False)
 
-    async def deliver(_replies: list[dict[str, Any]]) -> None:
+    async def deliver(_committed: CommittedReply) -> None:
         return  # commit_reply already published them
 
     return BurstOutput(writing, deliver)
