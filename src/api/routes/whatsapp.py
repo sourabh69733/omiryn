@@ -18,6 +18,7 @@ from channels.whatsapp import (
     CHANNEL,
     CONNECT_WORD,
     send_whatsapp_message,
+    send_whatsapp_reaction,
     send_whatsapp_typing,
     valid_whatsapp_signature,
     whatsapp_allowed_for,
@@ -68,8 +69,12 @@ async def _send_typing(chat_id: str) -> None:
         await send_whatsapp_typing(message_id)
 
 
+async def _send_reaction(chat_id: str, message_id: str, emoji: str) -> bool:
+    return await send_whatsapp_reaction(chat_id, message_id, emoji)
+
+
 # WhatsApp's typing indicator lasts until the reply or about 25 seconds.
-_SENDER = ChannelSender(CHANNEL, _send_text, _send_typing, typing_refresh_seconds=20.0)
+_SENDER = ChannelSender(CHANNEL, _send_text, _send_typing, _send_reaction, typing_refresh_seconds=20.0)
 
 
 @router.get("/api/channels/whatsapp")
@@ -157,7 +162,8 @@ async def _handle(message: dict[str, Any]) -> None:
 
 async def _handle_message(message: dict[str, Any]) -> None:
     chat_id = str(message.get("from") or "")
-    if not chat_id:
+    # The user reacting to Omi's message arrives like a message; it must not get a reply.
+    if not chat_id or message.get("type") == "reaction":
         return
     if message.get("id"):
         _last_message_ids[chat_id] = str(message["id"])
@@ -181,7 +187,8 @@ async def _handle_message(message: dict[str, Any]) -> None:
 
     # The request has already returned, so background learning runs here when the reply is done.
     tasks = BackgroundTasks()
-    await handle_channel_message(_SENDER, chat_id, CurrentUser(id=link["user_id"]), text, tasks)
+    message_id = str(message["id"]) if message.get("id") else None
+    await handle_channel_message(_SENDER, chat_id, CurrentUser(id=link["user_id"]), text, tasks, message_id)
     await tasks()
 
 

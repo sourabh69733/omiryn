@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from channels.telegram import (
     CHANNEL,
     send_telegram_message,
+    send_telegram_reaction,
     send_telegram_typing,
     telegram_allowed_for,
     telegram_bot_username,
@@ -52,8 +53,12 @@ async def _send_typing(chat_id: str) -> None:
     await send_telegram_typing(chat_id)
 
 
+async def _send_reaction(chat_id: str, message_id: str, emoji: str) -> bool:
+    return await send_telegram_reaction(chat_id, message_id, emoji)
+
+
 # Telegram shows "typing…" for about five seconds; it is renewed every four.
-_SENDER = ChannelSender(CHANNEL, _send_text, _send_typing, typing_refresh_seconds=4.0)
+_SENDER = ChannelSender(CHANNEL, _send_text, _send_typing, _send_reaction, typing_refresh_seconds=4.0)
 
 
 @router.get("/api/channels/telegram")
@@ -129,7 +134,15 @@ async def telegram_webhook(
 
     # On Cloud Run the server has CPU only while a request is open, so the first message's
     # request stays open until every message of the burst is answered.
-    await handle_channel_message(_SENDER, chat_id, CurrentUser(id=link["user_id"]), text, background_tasks)
+    message_id = message.get("message_id")
+    await handle_channel_message(
+        _SENDER,
+        chat_id,
+        CurrentUser(id=link["user_id"]),
+        text,
+        background_tasks,
+        str(message_id) if message_id is not None else None,
+    )
     return {"ok": True}
 
 
