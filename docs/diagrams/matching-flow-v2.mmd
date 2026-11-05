@@ -1,0 +1,14 @@
+```mermaid
+flowchart LR
+    KNOW["1. Know enough<br/>vibe card ready, meet facts known"] --> POOL["2. Pool<br/>building join code = consent"]
+    POOL --> CAND["3. Candidates<br/>code: hard filters, shortlist order"]
+    CAND --> JUDGE["4. Judge<br/>model per pair: fit, reasons,<br/>difference, icebreaker, clash, meet fit"]
+    JUDGE --> CHECK["code checks every line<br/>against the cards"]
+    CHECK --> PICK["5. Pick<br/>code: each person once,<br/>group when thin"]
+    PICK --> OP["operator confirms or swaps"]
+    OP --> ASK["6. Ask both<br/>first name + reasons<br/>say hi / not for me"]
+    ASK -- "both yes" --> INTRO["7. Introduce and host<br/>plan, reminder, day 3, day 30"]
+    ASK -- "a pass or silence" --> WAIT["'not this week'<br/>pair never proposed again"]
+    INTRO --> LEARN["8. Learn<br/>outcome stored on the pair"]
+    LEARN -. "clicked: eligible for a group;<br/>no-show: lower next week" .-> CAND
+```

@@ -70,6 +70,8 @@ Everything else (messages per day, return rate, memory accuracy, card completene
 
 ## Open questions
 
+The flow and the algorithm, with a recommendation on each question below, are in [matching-design.md](matching-design.md) (5 November).
+
 - Which operator first, and what they get: a report per building (how many met), or a cut of a paid tier later.
 - Both sides accept before the intro, or Omi opens a three-way chat and lets either leave.
 - What a resident sees of the reasons, and whether the other person's vibe notes are ever shown.
