@@ -1203,3 +1203,149 @@ td small {
   gap: 8px;
   justify-self: end;
 }
+
+/* Match pools: the operator page. Members, suggested pairs, pairs so far. */
+.pool-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.pool-create label,
+.pool-introduce label,
+.pool-status-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pool-create input,
+.pool-create select,
+.pool-introduce input,
+.pool-status-row select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.pool-row {
+  cursor: pointer;
+}
+
+.pool-row.is-selected td {
+  background: rgba(21, 18, 14, 0.05);
+}
+
+.pool-row:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.pool-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.pool-detail > section,
+.pool-columns > section {
+  min-width: 0;
+}
+
+.pool-detail h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.pool-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.pool-muted {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.pool-lines,
+.pool-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.pool-lines li span {
+  display: inline-block;
+  min-width: 120px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pool-reasons li::before {
+  content: "✓ ";
+  color: var(--muted);
+}
+
+.pool-check p,
+.pool-plan {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.pool-introduce {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.pool-introduce button {
+  min-height: 36px;
+}
+
+.pool-member.is-ready {
+  border-color: rgba(21, 18, 14, 0.3);
+}
+
+@media (max-width: 900px) {
+  .pool-columns,
+  .pool-introduce {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pool-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.pool-suggestion:first-child {
+  border-top: 0;
+}
+
+.pool-suggestion > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.pool-suggestion-rank {
+  flex: none;
+  width: 24px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

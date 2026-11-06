@@ -1,5 +1,6 @@
 import { adminFetch, ensureAdminSession, signInWithGoogle, signOut } from "./auth.js";
 import { cognitionResultLabel } from "./usagePresentation.js";
+import { renderPoolList, renderPoolView } from "./pools.js";
 
 const state = {
   data: null,
@@ -13,7 +14,10 @@ const state = {
   feedbackPerPage: 5,
   dataPointReviewPage: 1,
   dataPointReviewPerPage: 5,
-  requests: null
+  requests: null,
+  pools: null,
+  selectedPoolId: null,
+  poolView: null
 };
 
 const statusEl = document.querySelector("#admin-status");
@@ -94,6 +98,7 @@ function routeName() {
   if (window.location.pathname === "/users") return "users";
   if (window.location.pathname === "/requests") return "requests";
   if (window.location.pathname === "/usage") return "usage";
+  if (window.location.pathname === "/pools") return "pools";
   return "dashboard";
 }
 
@@ -155,7 +160,8 @@ function configureRoute() {
     dashboard: ["Dashboard", "Live view of users and product health."],
     users: ["Users", "Track every user profile, onboarding session, and learned signal."],
     requests: ["Requests", "Review feedback, contacts, invite requests, data requests, and app events."],
-    usage: ["Usage", "Track agent model calls, tokens, failures, and cost."]
+    usage: ["Usage", "Track agent model calls, tokens, failures, and cost."],
+    pools: ["Pools", "Match pools: who is ready, which pairs the code suggests, and the introductions you confirmed."]
   };
   const [title, subtitle] = titles[state.route] || titles.dashboard;
   document.querySelector("#page-title").textContent = title;
@@ -164,6 +170,10 @@ function configureRoute() {
 
 async function loadAdminOverview() {
   setStatus("Loading admin data...");
+  if (state.route === "pools") {
+    await loadPoolsPage();
+    return;
+  }
   try {
     const response = handleAuthResponse(await adminFetch("/api/admin/overview?limit=50", {
       headers: { Accept: "application/json" }
@@ -1443,6 +1453,117 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+/* ─────────── Match pools (the operator page) ─────────── */
+const poolList = document.querySelector("#pool-list");
+const poolDetail = document.querySelector("#pool-detail");
+const poolCreateForm = document.querySelector("#pool-create");
+
+async function adminJson(path, options = {}) {
+  const response = handleAuthResponse(await adminFetch(path, { headers: { Accept: "application/json", ...(options.body ? { "Content-Type": "application/json" } : {}) }, ...options }));
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(apiErrorMessage(data.detail, "The request failed."));
+  return data;
+}
+
+async function loadPoolsPage() {
+  try {
+    const data = await adminJson("/api/admin/pools");
+    state.pools = data.pools || [];
+    if (!state.selectedPoolId && state.pools.length) state.selectedPoolId = state.pools[0].id;
+    poolList.innerHTML = renderPoolList(state.pools, state.selectedPoolId);
+    if (state.selectedPoolId) await loadPoolView(state.selectedPoolId);
+    else poolDetail.hidden = true;
+    setStatus(`Updated ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    poolList.innerHTML = emptyRow(4, error.message);
+    setStatus(error.message);
+  }
+}
+
+async function loadPoolView(poolId) {
+  state.selectedPoolId = poolId;
+  poolList.innerHTML = renderPoolList(state.pools || [], poolId);
+  poolDetail.hidden = false;
+  poolDetail.innerHTML = '<div class="table-empty">Loading pool...</div>';
+  try {
+    state.poolView = await adminJson(`/api/admin/pools/${encodeURIComponent(poolId)}`);
+    poolDetail.innerHTML = renderPoolView(state.poolView);
+  } catch (error) {
+    poolDetail.innerHTML = `<div class="table-empty">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message);
+  }
+}
+
+poolCreateForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(poolCreateForm);
+  try {
+    const pool = await adminJson("/api/admin/pools", { method: "POST", body: JSON.stringify({ name: String(form.get("name") || "").trim(), match_weekday: Number(form.get("match_weekday")) }) });
+    poolCreateForm.reset();
+    state.selectedPoolId = pool.id;
+    await loadPoolsPage();
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+poolList?.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-pool-id]");
+  if (row) void loadPoolView(row.dataset.poolId);
+});
+poolList?.addEventListener("keydown", (event) => {
+  const row = event.target.closest("[data-pool-id]");
+  if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); void loadPoolView(row.dataset.poolId); }
+});
+
+poolDetail?.addEventListener("click", async (event) => {
+  const propose = event.target.closest("[data-propose]");
+  if (!propose || !state.selectedPoolId) return;
+  const [userA, userB] = propose.dataset.propose.split("|");
+  propose.disabled = true;
+  propose.textContent = "Checking...";
+  try {
+    await adminJson(`/api/admin/pools/${encodeURIComponent(state.selectedPoolId)}/pairs`, { method: "POST", body: JSON.stringify({ user_a: userA, user_b: userB }) });
+    setStatus("Pair proposed. Read the check, then introduce them when it fits.");
+    await loadPoolView(state.selectedPoolId);
+  } catch (error) {
+    propose.disabled = false;
+    propose.textContent = "Propose";
+    setStatus(error.message);
+  }
+});
+
+poolDetail?.addEventListener("submit", async (event) => {
+  const form = event.target.closest("form.pool-introduce");
+  if (!form) return;
+  event.preventDefault();
+  const data = new FormData(form);
+  const meetAt = String(data.get("meet_at") || "");
+  const payload = { place: String(data.get("place") || "").trim(), when: String(data.get("when") || "").trim() };
+  if (meetAt) payload.meet_at = new Date(meetAt).toISOString();
+  form.querySelector("button").disabled = true;
+  try {
+    await adminJson(`/api/admin/pairs/${encodeURIComponent(form.dataset.pairId)}/introduce`, { method: "POST", body: JSON.stringify(payload) });
+    setStatus("Introduced. Omi tells both in their own chats, reminds them, and checks in.");
+    await loadPoolView(state.selectedPoolId);
+  } catch (error) {
+    form.querySelector("button").disabled = false;
+    setStatus(error.message);
+  }
+});
+
+poolDetail?.addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-pair-status]");
+  if (!select) return;
+  try {
+    await adminJson(`/api/admin/pairs/${encodeURIComponent(select.dataset.pairStatus)}`, { method: "PATCH", body: JSON.stringify({ status: select.value }) });
+    setStatus("Status saved.");
+    await loadPoolView(state.selectedPoolId);
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
 
 async function startAdminApp() {
   showLoading();

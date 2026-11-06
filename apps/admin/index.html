@@ -40,6 +40,7 @@
           <a href="/users" data-route="users">Users</a>
           <a href="/requests" data-route="requests">Requests</a>
           <a href="/usage" data-route="usage">Usage</a>
+          <a href="/pools" data-route="pools">Pools</a>
         </nav>
         <div class="admin-actions">
           <button id="refresh-admin" type="button">Refresh</button>
@@ -204,6 +205,30 @@
           </section>
         </section>
 
+        <section class="admin-section" data-section="pools">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Match pools</p>
+              <h2>Pools</h2>
+            </div>
+            <form class="pool-create" id="pool-create">
+              <label>Name <input name="name" maxlength="80" placeholder="Sunrise Residency" required></label>
+              <label>Match day
+                <select name="match_weekday">
+                  <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6" selected>Sunday</option>
+                </select>
+              </label>
+              <button type="submit">Create pool</button>
+            </form>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Join code</th><th>Match day</th><th>Created</th></tr></thead>
+              <tbody id="pool-list"><tr><td colspan="4">Loading pools...</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="admin-section pool-detail" id="pool-detail" data-section="pools" hidden></section>
         <section class="admin-usage-dashboard" data-section="usage">
           <div class="usage-grid" id="usage-grid">
             <article class="metric-card">
