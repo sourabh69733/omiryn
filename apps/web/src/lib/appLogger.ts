@@ -19,7 +19,9 @@ type AppEventName =
   | "feedback_opened"
   | "feedback_submitted"
   | "community_invite_requested"
-  | "client_error";
+  | "client_error"
+  | "match_answered"
+  | "pool_joined";
 
 type AppEventMetadata = Record<string, string | number | boolean | null | undefined>;
 
