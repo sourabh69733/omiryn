@@ -2,13 +2,13 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarDays, Check, MessageCircle, MoreHorizontal, X } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
-import { deadlineLabel, initialOf, matchDayLabel, matchesLabel, needsList, poolLine, splitMatches, statusLine, type MatchCard, type MatchPool, type MatchReadiness, type PoolPair } from "../matches";
+import { REPORT_REASONS, deadlineLabel, initialOf, matchDayLabel, matchesLabel, needsList, poolLine, splitMatches, statusLine, type MatchCard, type MatchPool, type MatchReadiness, type PoolPair } from "../matches";
 
 // Matches: where the user stands before match day, the one card to answer, who they are waiting
 // on, the people they met, and their groups. Omi does the talking in the chat; this page is the
 // record. Shapes: docs/matching-design.md section 6.
 
-type Props = { onVibe: () => void; onChat: () => void; onContact: () => void };
+type Props = { onVibe: () => void; onChat: () => void };
 
 const PASS_REASONS = [
   { id: "not_my_kind", label: "Not my kind of person" },
@@ -17,7 +17,7 @@ const PASS_REASONS = [
   { id: "not_now", label: "Not right now" },
 ];
 
-export function MatchesPage({ onVibe, onChat, onContact }: Props) {
+export function MatchesPage({ onVibe, onChat }: Props) {
   const [readiness, setReadiness] = useState<MatchReadiness | null>(null);
   const [cards, setCards] = useState<MatchCard[]>([]);
   const [pools, setPools] = useState<MatchPool[]>([]);
@@ -27,6 +27,11 @@ export function MatchesPage({ onVibe, onChat, onContact }: Props) {
   const [answering, setAnswering] = useState<string | null>(null);
   const [passing, setPassing] = useState<MatchCard | null>(null);
   const [passReason, setPassReason] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<MatchCard | null>(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNote, setReportNote] = useState("");
+  const [reportBlock, setReportBlock] = useState(true);
+  const [reportSent, setReportSent] = useState("");
   const [menuId, setMenuId] = useState<string | null>(null);
   const [shownAgain, setShownAgain] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -87,6 +92,35 @@ export function MatchesPage({ onVibe, onChat, onContact }: Props) {
     const updated: MatchCard = data.match ?? data;
     setCards((current) => current.map((item) => (item.pair_id === card.pair_id ? { ...item, ...updated } : item)));
     trackAppEvent("match_answered", { decision }, { page: "matches" });
+    setPassing(null);
+    setPassReason(null);
+  }
+
+  // A report goes to the team with the reason; a block also keeps the two out of each other's
+  // future matches. The other person is told nothing beyond "not this week" or "it won't happen".
+  async function sendReport() {
+    if (!reporting || !reportReason || answering) return;
+    setAnswering(reporting.pair_id);
+    setError("");
+    const response = await apiFetch(`/api/me/matches/${reporting.pair_id}/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reportReason, note: reportNote.trim() || undefined, block: reportBlock }),
+    });
+    setAnswering(null);
+    if (!response.ok) {
+      setError(await apiErrorMessage(response, "Could not send the report."));
+      return;
+    }
+    const data = await response.json();
+    const updated: MatchCard = data.match ?? { ...reporting, status: reportBlock ? "blocked" : "declined" };
+    setCards((current) => current.map((item) => (item.pair_id === reporting.pair_id ? { ...item, ...updated } : item)));
+    trackAppEvent("match_reported", { reason: reportReason, block: reportBlock }, { page: "matches" });
+    setReportSent(reportBlock ? `Reported and blocked. ${reporting.name} won't come up again.` : "Reported. The team will look at it.");
+    setReporting(null);
+    setReportReason(null);
+    setReportNote("");
+    setReportBlock(true);
     setPassing(null);
     setPassReason(null);
   }
@@ -167,6 +201,7 @@ export function MatchesPage({ onVibe, onChat, onContact }: Props) {
       </header>
 
       {error ? <p className="mt-error" role="alert">{error}</p> : null}
+      {reportSent ? <p className="mt-note mt-sent" role="status">{reportSent}</p> : null}
 
       {loaded && readiness && !ready ? (
         <section className="mt-card" aria-labelledby="mt-needs-title">
@@ -232,7 +267,7 @@ export function MatchesPage({ onVibe, onChat, onContact }: Props) {
                         <button type="button" role="menuitem" onClick={() => { setMenuId(null); setShownAgain(shownAgain === card.pair_id ? null : card.pair_id); }}><MessageCircle aria-hidden="true" />{shownAgain === card.pair_id ? "Hide the introduction" : "See the introduction again"}</button>
                         {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><CalendarDays aria-hidden="true" />Change the plan with Omi</button> : null}
                         {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
-                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuId(null); onContact(); }}><AlertTriangle aria-hidden="true" />Report or block {card.name}</button>
+                        <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuId(null); setReporting(card); }}><AlertTriangle aria-hidden="true" />Report or block {card.name}</button>
                       </div>
                     ) : null}
                   </div>
@@ -298,7 +333,34 @@ export function MatchesPage({ onVibe, onChat, onContact }: Props) {
             </div>
             <div className="confirm-actions">
               <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => { setPassing(null); setPassReason(null); }}>Back</button>
-              <button type="button" disabled={Boolean(answering)} onClick={() => { if (passReason === "report") onContact(); void answer(passing, "pass", passReason ?? undefined); }}>{answering ? "Sending..." : passReason ? "Done" : "Done, no reason"}</button>
+              <button type="button" disabled={Boolean(answering)} onClick={() => { if (passReason === "report") setReporting(passing); else void answer(passing, "pass", passReason ?? undefined); }}>{answering ? "Sending..." : passReason === "report" ? "Continue" : passReason ? "Done" : "Done, no reason"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {reporting ? (
+        <div className="confirm-overlay">
+          <section className="confirm-dialog mt-pass" role="dialog" aria-modal="true" aria-labelledby="mt-report-title" onKeyDown={(event) => { if (event.key === "Escape" && !answering) setReporting(null); }}>
+            <div className="confirm-copy">
+              <h2 id="mt-report-title">Report {reporting.name}</h2>
+              <p>Goes to the Omiryn team, never to {reporting.name}. Tell us what happened; a line is enough.</p>
+            </div>
+            <div className="mt-pass-reasons" role="group" aria-label="What happened">
+              {REPORT_REASONS.map((reason) => (
+                <button key={reason.id} type="button" className={reportReason === reason.id ? "is-selected" : ""} aria-pressed={reportReason === reason.id} onClick={() => setReportReason(reason.id)}>{reason.label}</button>
+              ))}
+            </div>
+            <label className="mt-report-note">
+              <span>Anything else (optional)</span>
+              <textarea value={reportNote} onChange={(event) => setReportNote(event.target.value)} rows={3} maxLength={1000} placeholder="What was said, what felt off." />
+            </label>
+            <label className="mt-report-block">
+              <input type="checkbox" checked={reportBlock} onChange={(event) => setReportBlock(event.target.checked)} />
+              <span>Also block {reporting.name}. You won't be matched again, and they won't be told why.</span>
+            </label>
+            <div className="confirm-actions">
+              <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => setReporting(null)}>Back</button>
+              <button type="button" className="danger-button" disabled={Boolean(answering) || !reportReason} onClick={() => void sendReport()}>{answering ? "Sending..." : reportBlock ? "Report and block" : "Send report"}</button>
             </div>
           </section>
         </div>
