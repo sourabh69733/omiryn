@@ -1,5 +1,21 @@
 export type Page = "chat" | "vibe" | "memories" | "matches" | "profile" | "privacy" | "contact";
-export type Message = { role?: string; content?: string; quality?: string; created_at?: string; delivery_status?: string; deleted?: boolean; reply_to?: ReplyQuote; client_id?: string; local?: boolean; reaction?: string; user_reaction?: string };
+/* A card Omi's message can carry while hosting a match: the plan, the number-sharing consent, the
+   day-3 check-in, or the ask itself. Tapping an action sends its `reply` as the user's own message,
+   so the host reads words as it does on WhatsApp; `answered` holds the action taken. */
+export type ChatCardAction = { id: string; label: string; reply: string; primary?: boolean };
+export type ChatCard = {
+  kind: "match_ask" | "match_plan" | "match_consent" | "match_checkin";
+  pair_id: string;
+  title?: string;
+  headline?: string;
+  detail?: string;
+  lines?: string[];
+  note?: string;
+  actions: ChatCardAction[];
+  answered?: string | null;
+};
+
+export type Message = { role?: string; content?: string; card?: ChatCard | null; quality?: string; created_at?: string; delivery_status?: string; deleted?: boolean; reply_to?: ReplyQuote; client_id?: string; local?: boolean; reaction?: string; user_reaction?: string };
 export type ReplyQuote = { index: number; role?: string; text?: string; deleted?: boolean };
 export type Conversation = {
   id: string;

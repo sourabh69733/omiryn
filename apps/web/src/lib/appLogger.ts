@@ -21,7 +21,8 @@ type AppEventName =
   | "community_invite_requested"
   | "client_error"
   | "match_answered"
-  | "pool_joined";
+  | "pool_joined"
+  | "match_card_answered";
 
 type AppEventMetadata = Record<string, string | number | boolean | null | undefined>;
 
