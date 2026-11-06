@@ -177,7 +177,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenVibe={() => navigate("vibe")} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
-        {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} onContact={() => navigate("contact")} /> : null}
+        {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} /> : null}
         {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} onPrivacy={() => navigate("privacy")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}
         {page === "privacy" ? <PrivacyPage onProfile={() => navigate("profile")} onMemories={() => navigate("memories")} onContact={() => navigate("contact")} /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
