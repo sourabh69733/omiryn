@@ -1,0 +1,601 @@
+/* Matches: where the user stands, the introduction card, the people they met, and their groups.
+   One column on the paper; cards follow the surface rule (white, soft shadow, no outline). */
+.mt-screen {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 26px;
+}
+
+.mt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mt-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 40px);
+  font-weight: 500;
+  font-variation-settings: "opsz" 144;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.mt-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.mt-label {
+  flex: none;
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mt-card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 14px;
+}
+
+.mt-card h2,
+.mt-section h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.mt-section {
+  display: grid;
+  gap: 10px;
+}
+
+.mt-eyebrow {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mt-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* What Omi still needs */
+.mt-needs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.mt-needs li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mt-needs li strong {
+  font-weight: 600;
+}
+
+.mt-needs li small {
+  display: block;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.mt-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--ember-deep);
+  display: grid;
+  place-items: center;
+}
+
+.mt-dot.is-done {
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.mt-dot svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Ink card: Omi is looking */
+.mt-looking {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 18px;
+  padding: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.mt-looking .mt-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--paper-2);
+}
+
+.mt-looking .mt-eyebrow::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ember);
+}
+
+.mt-looking p {
+  margin: 0;
+}
+
+.mt-looking .mt-big {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.mt-looking .mt-big em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ember);
+}
+
+.mt-looking .mt-note {
+  color: var(--ink-2);
+  color: #d6cfc2;
+}
+
+/* The introduction card */
+.mt-intro {
+  border-radius: 22px;
+  padding: 22px 20px 20px;
+  gap: 18px;
+}
+
+.mt-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mt-avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--ember);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  overflow: hidden;
+}
+
+.mt-avatar.is-small {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+}
+
+.mt-avatar.is-ink {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.mt-avatar.is-quiet {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.mt-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mt-person h2 {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.mt-person p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mt-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  font-size: 15.5px;
+}
+
+.mt-reasons li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.mt-reasons .mt-dot {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+}
+
+.mt-reasons .mt-dot svg {
+  width: 11px;
+  height: 11px;
+}
+
+.mt-difference {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.mt-difference p {
+  margin: 0;
+}
+
+.mt-starter {
+  margin: 0;
+  color: var(--ember-deep);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.mt-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mt-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  border-radius: 999px;
+}
+
+.mt-actions .secondary-button {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.mt-actions .secondary-button:hover {
+  border-color: var(--ink);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.mt-fine {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Waiting on the other person */
+.mt-wait {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  font-size: 14.5px;
+}
+
+.mt-wait::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ember);
+}
+
+.mt-wait span {
+  color: var(--muted);
+}
+
+.mt-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  color: var(--ink-2);
+  font-size: 14.5px;
+}
+
+.mt-steps li {
+  display: flex;
+  gap: 10px;
+}
+
+.mt-steps li span:first-child {
+  flex: none;
+  padding-top: 4px;
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.mt-link {
+  justify-self: start;
+  min-height: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.mt-link:hover,
+.mt-link.is-strong {
+  background: transparent;
+  color: var(--ember-deep);
+}
+
+.mt-link.is-strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Lists: people and groups */
+.mt-list {
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  display: grid;
+}
+
+.mt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 10px 14px 16px;
+}
+
+.mt-row + .mt-row {
+  border-top: 1px solid var(--line);
+}
+
+.mt-row.is-past {
+  opacity: 0.6;
+}
+
+.mt-row-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.mt-row-copy strong {
+  display: block;
+  font-weight: 600;
+}
+
+.mt-row-copy span {
+  display: block;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.mt-row .history-menu-button {
+  flex: none;
+}
+
+.mt-row .history-menu {
+  min-width: 230px;
+}
+
+.mt-row .history-menu button.is-danger {
+  color: var(--danger);
+}
+
+.mt-chip {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mt-chip.is-ink {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Join a group */
+.mt-join {
+  display: flex;
+  gap: 8px;
+}
+
+.mt-join input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: 500 16px var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mt-join input::placeholder {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+.mt-join input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--ember-soft);
+}
+
+.mt-join button {
+  min-height: 46px;
+  padding: 0 20px;
+}
+
+/* How it goes */
+.mt-how {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mt-how li {
+  background: var(--paper-2);
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.mt-how li span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.mt-how li strong {
+  font-weight: 600;
+}
+
+.mt-how li small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+/* Pass sheet: reasons as plain rows */
+.legacy-react-shell .mt-pass {
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: min(440px, 100%);
+  padding: 22px;
+}
+
+.mt-pass-reasons {
+  display: grid;
+  gap: 8px;
+}
+
+.mt-pass-reasons button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+}
+
+.mt-pass-reasons button:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+
+.mt-pass-reasons button.is-selected {
+  border-color: var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.mt-pass-reasons button.is-report {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.mt-pass-reasons button.is-report:hover,
+.mt-pass-reasons button.is-report.is-selected {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.mt-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+@media (max-width: 480px) {
+  .mt-how {
+    grid-template-columns: 1fr;
+  }
+
+  .mt-how li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .mt-how li span {
+    margin: 0;
+  }
+}
