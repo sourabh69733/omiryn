@@ -8,6 +8,7 @@ import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { RealtimeClient, type RealtimeEvent } from "../../../lib/realtime";
 import { AgentOrb } from "../AgentOrb";
+import { MessageCard } from "../MessageCard";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
@@ -20,7 +21,7 @@ import { temporaryName } from "../temporaryName";
 import { canShowUsage, pathForPage } from "../appUtils";
 import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
-import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, ReplyQuote, UsageEvent, UsageSummary } from "../types";
+import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, ReplyQuote, UsageEvent, UsageSummary, ChatCardAction } from "../types";
 import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
@@ -714,7 +715,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     await sendText(message);
   }
 
-  async function sendText(message: string, target: Conversation | null = conversation, resendId?: string) {
+  async function sendText(message: string, target: Conversation | null = conversation, resendId?: string, extra: Record<string, unknown> = {}) {
     if (!target) return;
     const clientId = resendId ?? newClientId();
     shouldStickToBottomRef.current = true;
@@ -726,7 +727,19 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     setReplyTo(null);
     const bubble: Message = { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", client_id: clientId, local: true, ...(quote ? { reply_to: quote } : {}) };
     updateIfOpen(target.id, (current) => ({ ...current, messages: [...current.messages.map((item) => (!item.local && isFailedMessage(item) ? { ...item, delivery_status: "read" } : item)), bubble] }));
-    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, client_id: clientId, ...(quote ? { reply_to_index: quote.index } : {}) }, target, message, clientId);
+    await postReply(`/api/agent/conversations/${target.id}/messages`, { message, client_id: clientId, ...(quote ? { reply_to_index: quote.index } : {}), ...extra }, target, message, clientId);
+  }
+
+  // A tap on a card is the user's answer in words: the card closes, the reply goes as a message, and
+  // the server hears which card it answered.
+  async function answerCard(index: number, action: ChatCardAction) {
+    if (!conversation) return;
+    const message = conversation.messages[index];
+    if (!message?.card || message.card.answered) return;
+    const pairId = message.card.pair_id;
+    updateIfOpen(conversation.id, (current) => ({ ...current, messages: current.messages.map((item, i) => (i === index && item.card ? { ...item, card: { ...item.card, answered: action.id } } : item)) }));
+    trackAppEvent("match_card_answered", { kind: message.card.kind, action: action.id }, { page: "chat" });
+    await sendText(action.reply, conversation, undefined, { card_action: { message_index: index, pair_id: pairId, action: action.id } });
   }
 
   // Counts the requests open on a chat: Omi is at work until the last one has returned.
@@ -1213,6 +1226,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                         </button>
                       ) : null}
                       <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
+                      {agent && message.card ? <MessageCard card={message.card} busy={sending} disabled={selecting} onAction={(action) => void answerCard(index, action)} /> : null}
                       {message.reaction ? <span className="message-reaction" role="img" aria-label={`${conversation?.agent_name || "Omi"} reacted ${message.reaction}`}>{message.reaction}</span> : null}
                       {agent && message.user_reaction ? <button type="button" className="message-reaction is-yours" disabled={selecting} aria-label={`Remove your reaction ${message.user_reaction}`} onClick={(event) => { event.stopPropagation(); void reactToMessage(index, message.user_reaction!); }}>{message.user_reaction}</button> : null}
                     </div>

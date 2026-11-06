@@ -1791,3 +1791,126 @@ button.message-retry-button:hover {
     transform: translate(-50%, 0);
   }
 }
+
+/* A card inside Omi's bubble while it hosts a match (plan, number consent, check-in, the ask).
+   The bubble stays white; the card is a quiet paper block with ink and outlined actions. */
+.message-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 360px);
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.message-card-eyebrow {
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.message-card-headline {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.message-card-detail {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.message-card-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.message-card-lines li {
+  display: flex;
+  gap: 8px;
+}
+
+.message-card-lines li::before {
+  content: "·";
+  color: var(--ember-deep);
+}
+
+.message-card-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.message-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.message-card-actions.is-chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.agentic-chat .message-card-actions button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.agentic-chat .message-card-actions button:hover {
+  border-color: var(--ink);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.agentic-chat .message-card-actions button.is-primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.agentic-chat .message-card-actions button.is-primary:hover {
+  background: var(--ember-deep);
+  border-color: var(--ember-deep);
+  color: #fff;
+}
+
+.agentic-chat .message-card-actions button:disabled {
+  opacity: 0.5;
+}
+
+.message-card-answered {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.message-card-answered strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .message-card-actions {
+    grid-template-columns: 1fr;
+  }
+}
