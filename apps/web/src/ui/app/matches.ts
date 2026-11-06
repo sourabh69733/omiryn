@@ -3,7 +3,7 @@
 // treats a missing endpoint as "no cards".
 import { VIBE_STEPS, vibeStepIndex } from "./vibe";
 
-export type MatchStatus = "asked" | "waiting" | "introduced" | "met" | "still_talking" | "declined" | "no_show" | "expired";
+export type MatchStatus = "asked" | "waiting" | "introduced" | "met" | "still_talking" | "declined" | "no_show" | "expired" | "blocked";
 
 export type MatchLine = { area: string; text: string };
 
@@ -21,6 +21,8 @@ export type MatchCard = {
   difference: MatchLine | null;
   icebreaker: string | null;
   plan: MatchPlan | null;
+  /** True once both shared their number through Omi; the app only shows it. */
+  number_shared?: boolean | null;
   asked_at: string;
   answer_by: string | null;
   updated_at?: string | null;
@@ -75,11 +77,11 @@ export function deadlineLabel(answerBy: string | null | undefined, now: Date = n
 export function statusLine(card: MatchCard): string {
   switch (card.status) {
     case "introduced":
-      return card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : "You both said hi · Omi is setting a time";
+      return (card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : "You both said hi · Omi is setting a time") + sharedNote(card);
     case "met":
-      return "Met · how did it go?";
+      return "Met · how did it go?" + sharedNote(card);
     case "still_talking":
-      return "Met · still talking";
+      return "Met · still talking" + sharedNote(card);
     case "no_show":
       return "Didn't happen";
     case "waiting":
@@ -88,6 +90,16 @@ export function statusLine(card: MatchCard): string {
       return "";
   }
 }
+
+const sharedNote = (card: MatchCard) => (card.number_shared ? " · numbers shared" : "");
+
+/** Why someone reports a match. The reason goes to the team, never to the other person. */
+export const REPORT_REASONS = [
+  { id: "uncomfortable", label: "Made me uncomfortable" },
+  { id: "not_who_they_said", label: "Not who they said they were" },
+  { id: "spam", label: "Selling or spam" },
+  { id: "other", label: "Something else" },
+] as const;
 
 const WEEKDAYS = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
 

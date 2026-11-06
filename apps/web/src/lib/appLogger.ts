@@ -22,7 +22,8 @@ type AppEventName =
   | "client_error"
   | "match_answered"
   | "pool_joined"
-  | "match_card_answered";
+  | "match_card_answered"
+  | "match_reported";
 
 type AppEventMetadata = Record<string, string | number | boolean | null | undefined>;
 

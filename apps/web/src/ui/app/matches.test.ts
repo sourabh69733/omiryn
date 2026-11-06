@@ -8,7 +8,7 @@ const card = (status: MatchCard["status"], extra: Partial<MatchCard> = {}): Matc
 });
 
 test("splitMatches keeps the card for the user, the waiting ones and the people; hides passes and expiries", () => {
-  const split = splitMatches([card("asked"), card("waiting"), card("introduced"), card("met"), card("still_talking"), card("no_show"), card("declined"), card("expired")]);
+  const split = splitMatches([card("asked"), card("waiting"), card("introduced"), card("met"), card("still_talking"), card("no_show"), card("declined"), card("expired"), card("blocked")]);
   assert.equal(split.open.length, 1);
   assert.equal(split.waiting.length, 1);
   assert.deepEqual(split.people.map((c) => c.status), ["introduced", "met", "still_talking", "no_show"]);
@@ -35,6 +35,7 @@ test("statusLine says what Omi is doing for each person", () => {
   assert.equal(statusLine(card("introduced")), "You both said hi · Omi is setting a time");
   assert.equal(statusLine(card("still_talking")), "Met · still talking");
   assert.equal(statusLine(card("no_show")), "Didn't happen");
+  assert.equal(statusLine(card("met", { number_shared: true })), "Met · how did it go? · numbers shared");
 });
 
 test("matchDayLabel uses Python weekday numbers", () => {
