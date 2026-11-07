@@ -12,7 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from admin.auth import require_admin_user
-from agent.matching import pool_view, propose_pair
+from agent.matching import pick_pool, pool_view, propose_pair
+from agent.matching.asking import ask_pair
 from agent.matching.hosting import introduce_pair
 from security.auth import CurrentUser
 from storage import PAIR_STATUSES, create_match_pool, list_match_pools, set_match_pair_status
@@ -72,6 +73,30 @@ async def admin_propose_pair(pool_id: str, payload: PairCreate, admin: CurrentUs
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     record_audit_event("admin.propose_pair", actor_id=admin.id, actor_role="admin", target_id=pair["id"])
+    return pair
+
+
+@router.post("/api/admin/pools/{pool_id}/pick")
+async def admin_pick(pool_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """Match day: judge what needs judging and propose pairs (each ready person once), a group in a thin
+    week, and who waits. Picked pairs become proposed; nothing reaches a user until they are asked."""
+    if pool_view(pool_id) is None:
+        raise HTTPException(status_code=404, detail="Pool not found.")
+    proposal = await pick_pool(pool_id, created_by=admin.id)
+    record_audit_event("admin.pick_pairs", actor_id=admin.id, actor_role="admin", target_id=pool_id, detail={"pairs": len(proposal.pairs), "judged": proposal.judged})
+    return proposal.as_dict()
+
+
+@router.post("/api/admin/pairs/{pair_id}/ask")
+async def admin_ask_pair(pair_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """Omi tells both people about each other and asks each whether to introduce them."""
+    try:
+        pair = await ask_pair(pair_id, created_by=admin.id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Pair not found.") from None
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    record_audit_event("admin.ask_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id)
     return pair
 
 

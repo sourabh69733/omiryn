@@ -10,6 +10,7 @@ from . import (
     demo,
     drafts,
     memories,
+    matches,
     pools,
     profile,
     public,
@@ -35,6 +36,7 @@ router.include_router(drafts.router)
 router.include_router(demo.router)
 router.include_router(vibe.router)
 router.include_router(pools.router)
+router.include_router(matches.router)
 router.include_router(telegram.router)
 router.include_router(whatsapp.router)
 

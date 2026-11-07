@@ -31,9 +31,16 @@ def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
     now = utc_now()
     zone = user_zone(get_user_timezone(user_id))
     lines = []
+    asks = []
     for pair in match_pairs_for_user(user_id):
         plan = pair.get("plan") or {}
         told = (plan.get("told") or {}).get(user_id) or {}
+        if pair["status"] == "asked" and told.get("sent"):
+            facts = pair_facts(pair, user_id)
+            mine = ((plan.get("answers") or {}).get(user_id) or {}).get("answer")
+            state = "they said yes; the other person has not answered yet" if mine == "accept" else "they have not answered yet"
+            asks.append(f"- {facts['name']} (pair id {pair['id']}): you offered to introduce them; {state}.")
+            continue
         if pair["status"] not in OPEN_STATUSES | CLOSED_STATUSES or not told.get("sent"):
             continue
         introduced_at = parse_time(pair.get("introduced_at")) or parse_time(told.get("at"))
@@ -43,9 +50,27 @@ def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
         when = relative_day(introduced_at.astimezone(zone).date(), now.astimezone(zone).date()) if introduced_at else "recently"
         plan_words = ", ".join(part for part in (plan.get("place"), plan.get("when")) if part) or "no place or time set yet"
         lines.append(f"- {facts['name']} (pair id {pair['id']}): introduced {when}. Plan: {plan_words}. Status: {_STATUS_WORDS.get(pair['status'], pair['status'])}.")
+    sources = []
+    if asks:
+        sources.append(
+            {
+                "source_type": MATCH_HOSTING_SOURCE_TYPE,
+                "title": "Someone you offered to introduce",
+                "content": "\n".join(
+                    [
+                        "You told this user about these people from their group and asked whether to introduce them:",
+                        *asks,
+                        "Share nothing more about them than the reasons you gave. When the user gives a clear answer (yes, "
+                        "introduce them; or no), record it with answer_match and the pair id in the same turn, then answer as a "
+                        "friend would. A question about the person is not an answer; a maybe is not an answer.",
+                    ]
+                ),
+                "metadata": {"asks": len(asks)},
+            }
+        )
     if not lines:
-        return []
-    return [
+        return sources
+    return sources + [
         {
             "source_type": MATCH_HOSTING_SOURCE_TYPE,
             "title": "Introductions you made",
