@@ -182,7 +182,7 @@ Added 7 November 2026. Section 3 compares eleven one-line summaries per person. 
 
 For users A and B: take each active memory of A with purpose `matching` and sensitivity `standard`; find the most similar memory of B with the same rules by cosine between their stored embeddings; keep pairs above a floor. Each touchpoint is the two statements and the similarity. Code ranks them and sends the top six to the judge, with `about` names removed. The judge labels each: shared, complementary, clash or nothing, and may use shared and complementary ones in a reason.
 
-Rules: a memory with `sensitive` or `highly_sensitive` sensitivity never leaves its owner's account. A touchpoint reaches a reason only when both memories are `matching` purpose and `standard` sensitivity, and the reason text is checked by code against both statements: words that match neither are dropped with the reason. A user never sees the other person's statement, only the reason written from both.
+Rules: a memory with `sensitive` or `highly_sensitive` sensitivity never leaves its owner's account, nor does a retracted one or a how-to-talk rule. A touchpoint reaches a reason only when both memories are `matching` purpose and `standard` sensitivity, and the reason text is checked by code against both statements: words that match neither are dropped with the reason. A user never sees the other person's statement, only the reason written from both.
 
 ### 8.3 Talk style (source C)
 
@@ -201,7 +201,7 @@ The judge's job is to find pairs who will click. The first ground truth is pairs
 | # | Piece | Where | Size |
 |---|---|---|---|
 | D1 | Style card: counts per user, rebuilt with the user card; pair lines | `matching/style.py`, table `agent_user_style` | built 2026-11-07 (progress 7d) |
-| D2 | Touchpoints from stored memory embeddings, with the sensitivity and purpose rules | new `matching/touchpoints.py` | medium |
+| D2 | Touchpoints from stored memory embeddings, with the sensitivity and purpose rules | `matching/touchpoints.py` | built 2026-11-07 (progress 7e) |
 | D3 | Evidence pack, judge prompt v2 with sources, validation of sources and words | `matching/compatibility.py` | medium |
 | D4 | Evaluation on known friend pairs with the three-way comparison | `scripts/evals/match_judge_eval.py` | small, needs real cards |
 | D5 | Patterns from the memory graph as judge context | `matching/patterns.py` | later |
