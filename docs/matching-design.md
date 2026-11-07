@@ -164,3 +164,46 @@ Pool and pair statuses already in the API (`GET /api/me/pools`) stay; the card l
 2. **Who confirms the proposal.** Operator confirm on every match day for the pilot; automatic once ten match days have gone by without a swap. Recommendation: as written.
 3. **Groups.** Three or four people when pairs are thin, as problem.md says, or pairs only until the pair flow is proven. Recommendation: pairs only for the first two match days.
 4. **Judge model.** The request-check model today. A stronger judge costs more per pair but there are under a thousand pairs a week per building; the evaluation in step 8 decides, not a guess.
+
+## 8. The deep layer: matching on what people said, not only on the card
+
+Added 7 November 2026. Section 3 compares eleven one-line summaries per person. That is the shallow version the vibe card was already called. The deep layer gives the judge three more kinds of evidence per pair, all computed by code from what each person actually said to Omi, with the model judging and code checking as before.
+
+### 8.1 Three sources of evidence
+
+| Source | What it is | Who computes | Used for |
+|---|---|---|---|
+| A. Vibe lines | The eleven areas, as today | background model, proven | reasons, difference, icebreaker |
+| B. Touchpoints | Pairs of memories, one from each person, that are about the same thing: both love it, one needs what the other is, or they clash | code, from the memory embeddings that already exist (same multilingual model) | reasons (when allowed), clash, chemistry |
+| C. Talk style | How each person writes to Omi: length, pace, hours, Hinglish share, laugh markers, who starts sessions | code, from the person's own messages | compatibility lines for the judge, shortlist |
+| D. Patterns (later) | How they talk about friends, how many they keep, conflict stories, what repeats | code, from the memory graph (`about` names, relationship memories, repeats) | judge context only, never a reason |
+
+### 8.2 Touchpoints (source B)
+
+For users A and B: take each active memory of A with purpose `matching` and sensitivity `standard`; find the most similar memory of B with the same rules by cosine between their stored embeddings; keep pairs above a floor. Each touchpoint is the two statements and the similarity. Code ranks them and sends the top six to the judge, with `about` names removed. The judge labels each: shared, complementary, clash or nothing, and may use shared and complementary ones in a reason.
+
+Rules: a memory with `sensitive` or `highly_sensitive` sensitivity never leaves its owner's account. A touchpoint reaches a reason only when both memories are `matching` purpose and `standard` sensitivity, and the reason text is checked by code against both statements: words that match neither are dropped with the reason. A user never sees the other person's statement, only the reason written from both.
+
+### 8.3 Talk style (source C)
+
+A style card per user, rebuilt with the user card: average message length, share of short messages, questions, laugh markers (haha, lol, 😂 and the like), emoji, script and language mix (Devanagari, romanised Hindi, English), median gap between their own messages inside a session, the hours they usually write, and how often they open a session themselves. Nothing here is a judgment; it is counts. For a pair, code turns the two cards into a few plain lines: "both write mostly Hinglish", "both active after 9 pm", "A writes long, B short", "both laugh in text often". The judge reads those lines as compatibility facts; nothing from them is shown to a user. The shortlist may use language mix and active hours as hard compatibility.
+
+### 8.4 The evidence pack and the judge
+
+Per pair, code builds one JSON pack: both first names; comparable vibe lines with which are shareable; up to six touchpoints with their allowed-in-reason flag; the style lines; the meet facts. One judge call returns, as in 3.4, fit, reasons (each now carries its source: an area or a touchpoint index), difference, icebreaker, why_not, clash, meet_fit, and a `chemistry` note (one sentence on whether a conversation between them would flow, for the operator and the evaluation, never shown to users). Code validation extends to sources: a reason whose source is not allowed is dropped. About 2.5K tokens in per pair; a pool of forty judged in full stays under $1 per match day.
+
+### 8.5 How we know it is better
+
+The judge's job is to find pairs who will click. The first ground truth is pairs who already do: the friend compatibility check (invite a friend, both chat with Omi). The evaluation runs the judge three ways on the same pairs, vibe only, vibe plus touchpoints, and all three sources, against known friend pairs mixed with random pairs from the same pool, and reports how many known friends come out "yes" at the rate of random pairs that also do. The version that separates them best is the one that ships; weights in 3.3 are set from the same runs. Later, day 30 outcomes replace known friends as the truth.
+
+### 8.6 Build order for the deep layer
+
+| # | Piece | Where | Size |
+|---|---|---|---|
+| D1 | Style card: counts per user, rebuilt with the user card; pair lines | new `matching/style.py`, storage table `user_style` | small |
+| D2 | Touchpoints from stored memory embeddings, with the sensitivity and purpose rules | new `matching/touchpoints.py` | medium |
+| D3 | Evidence pack, judge prompt v2 with sources, validation of sources and words | `matching/compatibility.py` | medium |
+| D4 | Evaluation on known friend pairs with the three-way comparison | `scripts/evals/match_judge_eval.py` | small, needs real cards |
+| D5 | Patterns from the memory graph as judge context | `matching/patterns.py` | later |
+
+D1 to D3 come before the flow pieces in section 5, since they change what the judge returns and what the pick orders on.
