@@ -295,7 +295,9 @@
   justify-content: center;
   gap: 8px;
   min-height: 50px;
+  padding-inline: 14px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .mt-actions .secondary-button {
@@ -565,13 +567,16 @@
   color: var(--ink);
 }
 
+/* Report row: quiet until picked, so the picked state reads clearly. */
 .mt-pass-reasons button.is-report {
-  border-color: var(--danger-line);
-  background: var(--danger-bg);
   color: var(--danger);
 }
 
-.mt-pass-reasons button.is-report:hover,
+.mt-pass-reasons button.is-report:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
 .mt-pass-reasons button.is-report.is-selected {
   background: var(--danger-bg);
   color: var(--danger);
@@ -647,4 +652,71 @@
 
 .mt-sent {
   color: var(--success);
+}
+
+/* Confirmation toast: sits above the page bottom, inside the main pane's width on desktop. */
+.mt-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 520px);
+  padding: 12px 12px 12px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-md);
+  font-size: 14.5px;
+  line-height: 1.4;
+  transform: translateX(-50%);
+  animation: mt-toast-in 220ms ease-out;
+}
+
+.mt-toast > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--ember);
+}
+
+.mt-toast button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--on-ink);
+}
+
+.mt-toast button:hover {
+  color: var(--on-ink);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mt-toast button svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (min-width: 761px) {
+  .mt-toast {
+    left: calc(50% + 120px); /* centred on the main pane beside the 240px sidebar */
+  }
+}
+
+@keyframes mt-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-toast { animation: none; }
 }

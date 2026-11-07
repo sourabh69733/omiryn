@@ -37,6 +37,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
   const [code, setCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinNote, setJoinNote] = useState("");
+  const [joinFailed, setJoinFailed] = useState(false);
   const joinRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -131,9 +132,11 @@ export function MatchesPage({ onVibe, onChat }: Props) {
     if (!trimmed || joining) return;
     setJoining(true);
     setJoinNote("");
+    setJoinFailed(false);
     const response = await apiFetch("/api/me/pools/join", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: trimmed }) });
     setJoining(false);
     if (!response.ok) {
+      setJoinFailed(true);
       setJoinNote(await apiErrorMessage(response, "That code does not match any group."));
       return;
     }
@@ -143,6 +146,13 @@ export function MatchesPage({ onVibe, onChat }: Props) {
     setJoinNote(`You're in ${data.pool?.name ?? "the group"}.`);
     trackAppEvent("pool_joined", {}, { page: "matches" });
   }
+
+  // The report confirmation shows where the user is looking, not at the top of a scrolled page.
+  useEffect(() => {
+    if (!reportSent) return;
+    const timer = window.setTimeout(() => setReportSent(""), 7000);
+    return () => window.clearTimeout(timer);
+  }, [reportSent]);
 
   const intro = (card: MatchCard, withActions: boolean) => (
     <article className="mt-card mt-intro" aria-label={`Introduction to ${card.name}`}>
@@ -201,7 +211,6 @@ export function MatchesPage({ onVibe, onChat }: Props) {
       </header>
 
       {error ? <p className="mt-error" role="alert">{error}</p> : null}
-      {reportSent ? <p className="mt-note mt-sent" role="status">{reportSent}</p> : null}
 
       {loaded && readiness && !ready ? (
         <section className="mt-card" aria-labelledby="mt-needs-title">
@@ -217,7 +226,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
           <p className="mt-note">No form for this. Omi will ask when it fits, or just tell it.</p>
           <div className="mt-actions">
             <button type="button" className="secondary-button" onClick={onVibe}>See your vibe</button>
-            <button type="button" onClick={onChat}>Tell Omi now <ArrowRight aria-hidden="true" size={16} /></button>
+            <button type="button" onClick={onChat}>Tell Omi <ArrowRight aria-hidden="true" size={16} /></button>
           </div>
         </section>
       ) : null}
@@ -289,7 +298,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
             <input id="mt-code" ref={joinRef} value={code} onChange={(event) => setCode(event.target.value)} placeholder="6-letter code" maxLength={12} autoComplete="off" autoCapitalize="characters" />
             <button type="submit" disabled={joining || code.trim().length < 4}>{joining ? "Joining..." : "Join"}</button>
           </form>
-          {joinNote ? <p className="mt-note" role="status">{joinNote}</p> : null}
+          {joinNote ? <p className={joinFailed ? "mt-error" : "mt-note"} role={joinFailed ? "alert" : "status"}>{joinNote}</p> : null}
           {pools.length ? (
             <div className="mt-list">
               {pools.map((pool) => {
@@ -363,6 +372,13 @@ export function MatchesPage({ onVibe, onChat }: Props) {
               <button type="button" className="danger-button" disabled={Boolean(answering) || !reportReason} onClick={() => void sendReport()}>{answering ? "Sending..." : reportBlock ? "Report and block" : "Send report"}</button>
             </div>
           </section>
+        </div>
+      ) : null}
+      {reportSent ? (
+        <div className="mt-toast" role="status">
+          <Check aria-hidden="true" />
+          <span>{reportSent}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setReportSent("")}><X aria-hidden="true" /></button>
         </div>
       ) : null}
     </section>
