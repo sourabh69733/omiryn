@@ -1304,7 +1304,7 @@ td small {
 
 .pool-introduce {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* two per row: the pair card is half the page */
   align-items: end;
   gap: 8px;
 }
