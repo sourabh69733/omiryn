@@ -70,8 +70,8 @@ class MatchPoolTest(unittest.TestCase):
         self.assertNotIn("Private belief", str(view))
         self.assertEqual([(s["user_a"], s["user_b"]) for s in view["suggestions"]], [("ua", "ub")])
 
-        writer = AsyncMock(return_value={"fit": "yes", "reasons": [{"area": "humor", "text": "Aman and Bela both like dry humour."}]})
-        with patch("agent.providers.write_match_reasons", writer):
+        writer = AsyncMock(return_value={"fit": "yes", "reasons": [{"source": "area:humor", "text": "Aman and Bela both have the same humor line about them."}]})
+        with patch("agent.providers.judge_match", writer):
             pair = self.client.post(f"/api/admin/pools/{pool['id']}/pairs", json={"user_a": "ua", "user_b": "ub"}).json()
         self.assertEqual((pair["status"], pair["check"]["fit"]), ("proposed", "yes"))
         self.assertEqual(self.client.post(f"/api/admin/pools/{pool['id']}/pairs", json={"user_a": "ua", "user_b": "zz"}).status_code, 400)

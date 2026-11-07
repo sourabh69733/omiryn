@@ -119,19 +119,19 @@ class CompatibilityTest(unittest.IsolatedAsyncioTestCase):
         update_vibe_card("ua", self.a)
         update_vibe_card("ub", self.b)
         set_private_matching_consent("ua", True)
-        writer = AsyncMock(return_value={"fit": "yes", "reasons": [{"area": "humor", "text": "Aman and Bela both love a bad pun."}, {"area": "values", "text": "leaks"}], "difference": {"area": "interests", "text": "Sci-fi versus fantasy, both read."}})
-        with patch("agent.providers.write_match_reasons", writer):
+        writer = AsyncMock(return_value={"fit": "yes", "reasons": [{"source": "area:humor", "text": "Aman and Bela both love a bad pun."}, {"source": "area:values", "text": "leaks"}], "difference": {"source": "area:interests", "text": "Sci-fi versus fantasy, both read."}})
+        with patch("agent.providers.judge_match", writer):
             result = await check_compatibility("ua", "ub")
         self.assertEqual(result.fit, "yes")
         self.assertEqual([r["area"] for r in result.reasons], ["humor"])
         self.assertEqual(result.difference["area"], "interests")
         sent = json.loads(writer.await_args.args[0])
-        self.assertEqual((sent["a"]["name"], sent["b"]["name"]), ("Aman", "Bela"))
+        self.assertEqual({sent["a"]["name"], sent["b"]["name"]}, {"Aman", "Bela"})  # random order
         self.assertNotIn("values", sent["comparable"])  # only one side consented
         # Too little in common: no model call.
         update_vibe_card("uc", {"humor": line("Dry humour.")})
         writer.reset_mock()
-        with patch("agent.providers.write_match_reasons", writer):
+        with patch("agent.providers.judge_match", writer):
             thin = await check_compatibility("ua", "uc")
         self.assertEqual(thin.fit, "unknown")
         writer.assert_not_awaited()
