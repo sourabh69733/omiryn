@@ -4,7 +4,7 @@ Code computes the facts (which vibe areas have proof, which meet facts are known
 cards share); a model writes the reasons; code checks every reason against the cards.
 """
 
-from .compatibility import MatchCheck, check_compatibility, comparable_areas, compatibility_score, validate_match_reasons
+from .compatibility import MatchCheck, check_compatibility, comparable_areas, compatibility_score, evidence_pack, validate_match_judgement, validate_match_reasons
 from .pool import pool_view, propose_pair
 from .readiness import MEET_FACTS, MatchReadiness, match_readiness, readiness_from
 
@@ -15,9 +15,11 @@ __all__ = [
     "check_compatibility",
     "comparable_areas",
     "compatibility_score",
+    "evidence_pack",
     "match_readiness",
     "pool_view",
     "propose_pair",
     "readiness_from",
+    "validate_match_judgement",
     "validate_match_reasons",
 ]
