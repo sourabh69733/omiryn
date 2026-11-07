@@ -134,10 +134,10 @@ Each step is small and testable on its own; the order follows problem.md (one re
 
 | # | Piece | Where | Size |
 |---|---|---|---|
-| 1 | Judge: `clash` and `meet_fit` fields, random order, code validation | `matching/compatibility.py` | small |
-| 2 | Pick: filters, ordering, greedy pairs, group, "one more week" | new `matching/pick.py` | medium |
-| 3 | Ask both: jobs, `answer_match` tool, `POST /api/me/matches/{id}/answer`, pair statuses `asked`, `accepted_a`, `declined` | `matching/hosting.py`, `tools/`, `api/routes/` | medium |
-| 4 | `GET /api/me/matches` for the match card | `api/routes/` | small |
+| 1 | Judge: `clash` and `meet_fit` fields, random order, code validation | `matching/compatibility.py` | built 2026-11-07 (progress 7f) |
+| 2 | Pick: filters, ordering, greedy pairs, group, "one more week" | `matching/pick.py` | built 2026-11-08 (progress 7h) |
+| 3 | Ask both: jobs, `answer_match` tool, `POST /api/me/matches/{id}/answer`, pair statuses `asked`, `expired`, `declined` | `matching/asking.py`, `tools/match_answer.py`, `api/routes/matches.py` | built 2026-11-08 (progress 7h) |
+| 4 | `GET /api/me/matches` for the match card | `api/routes/matches.py` | built 2026-11-08 (progress 7h) |
 | 5 | Operator page (confirm, swap, drop) | web, UI session | medium |
 | 6 | Match chat or number sharing with consent | storage, api, web | large; decide first |
 | 7 | Shortlist on embeddings, per-area weights | `matching/`, roadmap item 15 | medium; only when pools pass forty |

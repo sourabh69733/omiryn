@@ -143,7 +143,11 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `GET /api/admin/pools/{id}` | Admin only: the pool's members with readiness and non-private vibe lines, pairs so far, suggested pairs. |
 | `POST /api/admin/pools/{id}/pairs` | Admin only: `{"user_a","user_b"}`; runs the compatibility check, stores the pair as `proposed`. |
 | `POST /api/admin/pairs/{id}/introduce` | Admin only: `{"place"?, "when"?, "meet_at"?}` (`meet_at` ISO 8601 with offset). Marks the pair `introduced`, queues Omi's introduction to both in their own chats, a reminder before the meet and check-ins at day 3 and day 30. 409 when the pair is not `proposed`. |
-| `PATCH /api/admin/pairs/{id}` | Admin only: `{"status"}`, one of proposed, introduced, met, no_show, declined, still_talking. |
+| `PATCH /api/admin/pairs/{id}` | Admin only: `{"status"}`, one of candidate, proposed, asked, introduced, met, no_show, declined, expired, still_talking. |
+| `POST /api/admin/pools/{id}/pick` | Admin only: match day. Judges the pairs that need it, stores them as candidates, and returns `{pairs, group, waiting, busy, dropped, judged}`; the picked pairs become proposed. Nothing reaches a user. |
+| `POST /api/admin/pairs/{id}/ask` | Admin only: Omi tells both people about each other (first name, reasons, difference) and asks whether to introduce them; 48 hours to answer. 409 unless the pair is proposed. |
+| `GET /api/me/matches` | The user's match cards: `{pair_id, status, name, reasons[{area,text}], difference, icebreaker, plan{place,when}|null, asked_at, answer_by, introduced_at}`. `status`: asked (waiting for you), waiting (you said hi), introduced, met, still_talking, declined, no_show, expired. Only pairs the user has heard about; never the other person's notes or a score. |
+| `POST /api/me/matches/{id}/answer` | `{"answer": "accept"|"pass"}`. Both accept: introduced and Omi introduces them in chat. A pass closes it; the other person hears only "not this week". 404 unknown pair, 409 when no longer open. |
 | `GET /api/me/pools`, `POST /api/me/pools/join`, `DELETE /api/me/pools/{id}` | The user's pools and pair statuses (never the reasons), join by code, leave. |
 | `GET /api/me/match-readiness` | Whether the user can be matched yet and what is missing, in plain blockers. |
 | `GET /api/agent/settings/model` | Reply models on offer (name, strong point), the default and the user's pick. |
