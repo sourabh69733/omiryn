@@ -5,6 +5,7 @@ cards share); a model writes the reasons; code checks every reason against the c
 """
 
 from .compatibility import MatchCheck, check_compatibility, comparable_areas, compatibility_score, evidence_pack, validate_match_judgement, validate_match_reasons
+from .pick import pick_pool, propose
 from .pool import pool_view, propose_pair
 from .readiness import MEET_FACTS, MatchReadiness, match_readiness, readiness_from
 
@@ -17,7 +18,9 @@ __all__ = [
     "compatibility_score",
     "evidence_pack",
     "match_readiness",
+    "pick_pool",
     "pool_view",
+    "propose",
     "propose_pair",
     "readiness_from",
     "validate_match_judgement",
