@@ -331,6 +331,7 @@ button.omi-account-button:hover {
 }
 
 .omi-main {
+  position: relative; /* contains absolutely positioned helpers (sr-only labels) so they never stretch the document */
   min-width: 0;
   height: 100dvh;
   overflow-y: auto;
