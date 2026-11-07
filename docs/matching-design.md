@@ -203,7 +203,7 @@ The judge's job is to find pairs who will click. The first ground truth is pairs
 | D1 | Style card: counts per user, rebuilt with the user card; pair lines | `matching/style.py`, table `agent_user_style` | built 2026-11-07 (progress 7d) |
 | D2 | Touchpoints from stored memory embeddings, with the sensitivity and purpose rules | `matching/touchpoints.py` | built 2026-11-07 (progress 7e) |
 | D3 | Evidence pack, judge prompt v2 with sources, validation of sources and words | `matching/compatibility.py` | built 2026-11-07 (progress 7f) |
-| D4 | Evaluation on known friend pairs with the three-way comparison | `scripts/evals/match_judge_eval.py` | small, needs real cards |
+| D4 | Evaluation on known friend pairs, four runs (v1, v2 vibe only, plus touchpoints, plus style and meet) | `scripts/evals/run_match_judge_evals.py` | built 2026-11-07 (progress 7g); not yet run |
 | D5 | Patterns from the memory graph as judge context | `matching/patterns.py` | later |
 
 D1 to D3 come before the flow pieces in section 5, since they change what the judge returns and what the pick orders on.
