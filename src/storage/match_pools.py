@@ -17,7 +17,9 @@ from .database import ENGINE
 from .schema import match_pairs, match_pool_members, match_pools
 from .utils import _isoformat_utc, _require_user_id
 
-PAIR_STATUSES = ("proposed", "introduced", "met", "no_show", "declined", "still_talking")
+# candidate: judged by the pick, not picked. proposed: picked, waiting for the operator. asked: both
+# people have been (or are being) asked. expired: the ask lapsed unanswered.
+PAIR_STATUSES = ("candidate", "proposed", "asked", "introduced", "met", "no_show", "declined", "still_talking", "expired")
 
 
 def create_match_pool(name: str, *, match_weekday: int = 6, created_by: str | None = None) -> dict[str, Any]:
@@ -105,13 +107,15 @@ def match_pool_members_of(pool_id: str) -> list[dict[str, Any]]:
     return [{"user_id": row["user_id"], "joined_at": _isoformat_utc(row["joined_at"])} for row in rows]
 
 
-def save_match_pair(pool_id: str, user_a: str, user_b: str, check: dict[str, Any], *, created_by: str | None = None) -> dict[str, Any]:
+def save_match_pair(pool_id: str, user_a: str, user_b: str, check: dict[str, Any], *, created_by: str | None = None, status: str = "proposed") -> dict[str, Any]:
+    if status not in PAIR_STATUSES:
+        raise ValueError(f"unknown pair status: {status}")
     pair_id = str(uuid4())
     now = utc_now()
     with ENGINE.begin() as connection:
         connection.execute(
             match_pairs.insert().values(
-                id=pair_id, pool_id=pool_id, user_a=user_a, user_b=user_b, status="proposed",
+                id=pair_id, pool_id=pool_id, user_a=user_a, user_b=user_b, status=status,
                 check_json=maybe_encrypt_json(user_a, check), created_by=created_by, created_at=now, updated_at=now,
             )
         )

@@ -108,8 +108,6 @@ async def introduce_pair(
     `when` is the time in the operator's words ("Sunday 6pm"); `meet_at` the same as a datetime,
     when known, which times the reminder and the first check-in.
     """
-    from agent.jobs.queue import schedule_job
-
     pair = get_match_pair(pair_id)
     if pair is None:
         raise LookupError("pair not found")
@@ -126,6 +124,15 @@ async def introduce_pair(
     }
     pair = set_match_pair_plan(pair_id, plan, status="introduced", introduced_at=now)
     assert pair is not None
+    schedule_hosting_jobs(pair, now, meet_at)
+    return pair
+
+
+def schedule_hosting_jobs(pair: dict[str, Any], now: datetime, meet_at: datetime | None) -> None:
+    """Queue, per person, the introduction now and the reminder and check-ins after it."""
+    from agent.jobs.queue import schedule_job
+
+    pair_id = pair["id"]
     for user_id in (pair["user_a"], pair["user_b"]):
         conversation = hosting_conversation(user_id)
         conversation_id = conversation["id"] if conversation else None
@@ -140,7 +147,6 @@ async def introduce_pair(
                 payload={**payload, **extra},
                 key=f"{pair_id}:{extra.get('day', 'reminder')}",
             )
-    return pair
 
 
 def follow_up_times(now: datetime, meet_at: datetime | None) -> list[tuple[str, datetime, dict[str, Any]]]:
@@ -350,4 +356,5 @@ __all__ = [
     "run_match_check_in_job",
     "run_match_intro_job",
     "run_match_reminder_job",
+    "schedule_hosting_jobs",
 ]
