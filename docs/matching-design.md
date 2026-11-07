@@ -202,7 +202,7 @@ The judge's job is to find pairs who will click. The first ground truth is pairs
 |---|---|---|---|
 | D1 | Style card: counts per user, rebuilt with the user card; pair lines | `matching/style.py`, table `agent_user_style` | built 2026-11-07 (progress 7d) |
 | D2 | Touchpoints from stored memory embeddings, with the sensitivity and purpose rules | `matching/touchpoints.py` | built 2026-11-07 (progress 7e) |
-| D3 | Evidence pack, judge prompt v2 with sources, validation of sources and words | `matching/compatibility.py` | medium |
+| D3 | Evidence pack, judge prompt v2 with sources, validation of sources and words | `matching/compatibility.py` | built 2026-11-07 (progress 7f) |
 | D4 | Evaluation on known friend pairs with the three-way comparison | `scripts/evals/match_judge_eval.py` | small, needs real cards |
 | D5 | Patterns from the memory graph as judge context | `matching/patterns.py` | later |
 
