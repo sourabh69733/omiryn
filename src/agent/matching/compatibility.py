@@ -287,10 +287,38 @@ def validate_match_judgement(raw: Any, comparable: tuple[str, ...], touchpoints:
     }
 
 
-async def check_compatibility(user_a: str, user_b: str, *, model: str | None = None) -> MatchCheck:
-    """Load both cards, build the evidence pack, and ask the judge when there is enough. With too
-    little in common, fit is "unknown" and no model call is made."""
-    from agent.providers import judge_match
+@dataclass(frozen=True)
+class PairEvidence:
+    """Everything code can put in front of the judge for one pair, in the users' own order."""
+
+    name_a: str
+    name_b: str
+    areas_a: dict[str, Any]
+    areas_b: dict[str, Any]
+    comparable: tuple[str, ...]
+    score: int
+    touchpoints: list[dict[str, Any]]
+    style_lines: list[str]
+    meet_a: dict[str, str]
+    meet_b: dict[str, str]
+
+    def pack(self, *, touchpoints: bool = True, style: bool = True, meet: bool = True, swapped: bool = False) -> str:
+        """The JSON the judge reads, with parts left out for the evaluation's comparison runs."""
+        points = self.touchpoints if touchpoints else []
+        first, second = (self.name_a, self.areas_a, self.meet_a), (self.name_b, self.areas_b, self.meet_b)
+        if swapped:
+            first, second = second, first
+            points = [{**point, "a": point["b"], "b": point["a"]} for point in points]
+        return evidence_pack(
+            first[0], first[1], second[0], second[1], self.comparable,
+            touchpoints=points, style_lines=self.style_lines if style else [],
+            meet_a=first[2] if meet else {}, meet_b=second[2] if meet else {},
+        )
+
+
+def pair_evidence(user_a: str, user_b: str, *, with_touchpoints: bool = True, with_style: bool = True) -> PairEvidence:
+    """Load both cards and gather the pack's parts. Touchpoints and style can be skipped to save
+    the reads when a caller only needs the vibe lines."""
     from storage import get_user_profile, get_user_style, get_vibe_card, private_matching_allowed
 
     from .readiness import match_readiness
@@ -300,26 +328,32 @@ async def check_compatibility(user_a: str, user_b: str, *, model: str | None = N
     card_a, card_b = get_vibe_card(user_a), get_vibe_card(user_b)
     both_private = private_matching_allowed(card_a) and private_matching_allowed(card_b)
     comparable = comparable_areas(card_a["areas"], card_b["areas"], both_private_allowed=both_private)
-    score = compatibility_score(card_a["areas"], card_b["areas"], comparable)
-    if len(comparable) < MIN_COMPARABLE_AREAS:
-        return MatchCheck("unknown", score, comparable, why_not=f"only {len(comparable)} areas to compare; needs {MIN_COMPARABLE_AREAS}")
     name_a, name_b = _first_name(get_user_profile(user_a), "A"), _first_name(get_user_profile(user_b), "B")
-    points = [point.as_dict() for point in pair_touchpoints(user_a, user_b)]
-    style_lines = pair_style_lines(get_user_style(user_a) or {}, get_user_style(user_b) or {}, name_a, name_b)
-    meet_a, meet_b = match_readiness(user_a).facts_known, match_readiness(user_b).facts_known
-    # The two people go in random order: a pairwise judge leans towards whoever comes first.
-    swapped = random.random() < 0.5
-    first, second = ((name_b, card_b["areas"], meet_b), (name_a, card_a["areas"], meet_a)) if swapped else ((name_a, card_a["areas"], meet_a), (name_b, card_b["areas"], meet_b))
-    pack_points = [{**point, "a": point["b"], "b": point["a"]} for point in points] if swapped else points
-    raw = await judge_match(
-        evidence_pack(first[0], first[1], second[0], second[1], comparable, touchpoints=pack_points, style_lines=style_lines, meet_a=first[2], meet_b=second[2]),
-        conversation_id=f"match:{user_a}:{user_b}",
-        model=model,
+    enough = len(comparable) >= MIN_COMPARABLE_AREAS
+    return PairEvidence(
+        name_a, name_b, card_a["areas"], card_b["areas"], comparable,
+        compatibility_score(card_a["areas"], card_b["areas"], comparable),
+        [point.as_dict() for point in pair_touchpoints(user_a, user_b)] if enough and with_touchpoints else [],
+        pair_style_lines(get_user_style(user_a) or {}, get_user_style(user_b) or {}, name_a, name_b) if enough and with_style else [],
+        match_readiness(user_a).facts_known if enough else {},
+        match_readiness(user_b).facts_known if enough else {},
     )
-    checked = validate_match_judgement(raw, comparable, points, card_a["areas"], card_b["areas"])
+
+
+async def check_compatibility(user_a: str, user_b: str, *, model: str | None = None) -> MatchCheck:
+    """Load both cards, build the evidence pack, and ask the judge when there is enough. With too
+    little in common, fit is "unknown" and no model call is made."""
+    from agent.providers import judge_match
+
+    evidence = pair_evidence(user_a, user_b)
+    if len(evidence.comparable) < MIN_COMPARABLE_AREAS:
+        return MatchCheck("unknown", evidence.score, evidence.comparable, why_not=f"only {len(evidence.comparable)} areas to compare; needs {MIN_COMPARABLE_AREAS}")
+    # The two people go in random order: a pairwise judge leans towards whoever comes first.
+    raw = await judge_match(evidence.pack(swapped=random.random() < 0.5), conversation_id=f"match:{user_a}:{user_b}", model=model)
+    checked = validate_match_judgement(raw, evidence.comparable, evidence.touchpoints, evidence.areas_a, evidence.areas_b)
     return MatchCheck(
-        checked["fit"], score, comparable, checked["reasons"], checked["difference"], checked["icebreaker"], checked["why_not"],
-        clash=checked["clash"], meet_fit=checked["meet_fit"], chemistry=checked["chemistry"], touchpoints=points, style_lines=style_lines,
+        checked["fit"], evidence.score, evidence.comparable, checked["reasons"], checked["difference"], checked["icebreaker"], checked["why_not"],
+        clash=checked["clash"], meet_fit=checked["meet_fit"], chemistry=checked["chemistry"], touchpoints=evidence.touchpoints, style_lines=evidence.style_lines,
     )
 
 
@@ -359,6 +393,7 @@ __all__ = [
     "MATCH_REASONS_SYSTEM_PROMPT",
     "MIN_COMPARABLE_AREAS",
     "MatchCheck",
+    "PairEvidence",
     "allowed_sources",
     "check_compatibility",
     "comparable_areas",
@@ -366,6 +401,7 @@ __all__ = [
     "evidence_pack",
     "grounded",
     "match_reasons_input",
+    "pair_evidence",
     "shareable_areas",
     "validate_match_judgement",
     "validate_match_reasons",
