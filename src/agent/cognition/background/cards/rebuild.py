@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from agent.jobs.queue import schedule_job
+from agent.matching.style import rebuild_user_style
 from agent.memory_engine.memories.focus import focus_state, without_focus_lines
 from agent.memory_engine.memories.user_card import validate_user_card
 from agent.providers import rebuild_user_card_text
@@ -50,6 +51,11 @@ def schedule_card_rebuild(user_id: str) -> bool:
 
 
 async def run_card_rebuild_job(job: dict[str, Any]) -> dict[str, Any]:
+    # The talk-style counts (matching) are rebuilt with the card: cheap, no model call.
+    try:
+        rebuild_user_style(job["user_id"])
+    except Exception as error:
+        logger.warning("agent.user_style.rebuild_failed error_type=%s", type(error).__name__)
     return await rebuild_user_card(job["user_id"])
 
 
