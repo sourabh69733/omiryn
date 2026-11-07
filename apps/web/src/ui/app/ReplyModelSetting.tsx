@@ -51,6 +51,8 @@ export function ReplyModelSetting() {
 
   return (
     <>
+      <p className="pf-kicker pf-private">Advanced</p>
+      <div className="pf-panel pf-rows">
       <button type="button" className="pf-row is-action" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span>Reply model</span>
         <span className="pf-muted pf-model-current">{current ? current.name : "Default"}<ChevronDown aria-hidden="true" className={open ? "is-open" : ""} /></span>
@@ -70,6 +72,7 @@ export function ReplyModelSetting() {
           {error ? <Notice tone="error">{error}</Notice> : null}
         </div>
       ) : null}
+      </div>
     </>
   );
 }
