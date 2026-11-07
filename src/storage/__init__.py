@@ -15,6 +15,7 @@ from .presence import *
 from .realtime_events import *
 from .match_pools import *
 from .user_cards import *
+from .user_style import *
 from .vibe_cards import *
 from .self_notes import *
 from .open_questions import *

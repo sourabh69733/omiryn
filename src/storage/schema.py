@@ -835,6 +835,17 @@ agent_user_cards = Table(
     Column("rebuilt_at", DateTime(timezone=True), nullable=True),
 )
 
+# How the user writes to Omi, as counts (agent.matching.style), for the match judge's pair lines.
+# JSON, encrypted like the user card; never shown to a user.
+agent_user_style = Table(
+    "agent_user_style",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("counts", String, nullable=False),
+    Column("message_count", Integer, nullable=False, server_default="0"),
+    Column("built_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # The user's friend vibe: one line per compatibility area, written by background cognition from
 # what the user said (JSON, encrypted). The milestone is computed from how many areas are filled.
 agent_vibe_cards = Table(
