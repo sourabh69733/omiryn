@@ -166,3 +166,9 @@ Synthetic evaluation scores are grouped by day for comparison.
 | Time (IST) | Result | Stage | Companion | Score | Passed |
 | --- | --- | --- | --- | --- | --- |
 | 19:34:43 | FAIL | Memory v3 eval | meta-llama/Llama-3.3-70B-Instruct-Turbo | 0% | 0/2 scenarios |
+
+## 2026-11-10
+
+| Time (IST) | Result | Stage | Companion | Score | Passed |
+| --- | --- | --- | --- | --- | --- |
+| 06:40:00 | FAIL | Match judge eval (6 made-up people) | Qwen/Qwen3-235B-A22B-Instruct-2507 | separation +0.00 | 1/1 known yes, 4/4 random yes, 5 pairs unjudgeable |
