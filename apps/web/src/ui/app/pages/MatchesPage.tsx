@@ -110,7 +110,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
     });
     setAnswering(null);
     if (!response.ok) {
-      setError(await apiErrorMessage(response, "Could not send the report."));
+      setError("Could not send the report. Nothing was sent, so please tell us through Contact.");
       return;
     }
     const data = await response.json();
@@ -210,7 +210,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
         {loaded ? <span className="mt-label">{matchesLabel(ready, split)}</span> : null}
       </header>
 
-      {error ? <p className="mt-error" role="alert">{error}</p> : null}
+      {error && !passing && !reporting ? <p className="mt-error" role="alert">{error}</p> : null}
 
       {loaded && readiness && !ready ? (
         <section className="mt-card" aria-labelledby="mt-needs-title">
@@ -340,6 +340,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
               ))}
               <button type="button" className={`is-report ${passReason === "report" ? "is-selected" : ""}`} aria-pressed={passReason === "report"} onClick={() => setPassReason(passReason === "report" ? null : "report")}>Something felt off, report this</button>
             </div>
+            {error && !reporting ? <p className="mt-error" role="alert">{error}</p> : null}
             <div className="confirm-actions">
               <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => { setPassing(null); setPassReason(null); }}>Back</button>
               <button type="button" disabled={Boolean(answering)} onClick={() => { if (passReason === "report") setReporting(passing); else void answer(passing, "pass", passReason ?? undefined); }}>{answering ? "Sending..." : passReason === "report" ? "Continue" : passReason ? "Done" : "Done, no reason"}</button>
@@ -367,8 +368,9 @@ export function MatchesPage({ onVibe, onChat }: Props) {
               <input type="checkbox" checked={reportBlock} onChange={(event) => setReportBlock(event.target.checked)} />
               <span>Also block {reporting.name}. You won't be matched again, and they won't be told why.</span>
             </label>
+            {error ? <p className="mt-error" role="alert">{error}</p> : null}
             <div className="confirm-actions">
-              <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => setReporting(null)}>Back</button>
+              <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => { setReporting(null); setError(""); }}>Back</button>
               <button type="button" className="danger-button" disabled={Boolean(answering) || !reportReason} onClick={() => void sendReport()}>{answering ? "Sending..." : reportBlock ? "Report and block" : "Send report"}</button>
             </div>
           </section>
