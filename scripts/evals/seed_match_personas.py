@@ -88,6 +88,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--prompt", default=os.getenv("AGENT_BEHAVIOR_VERSION", "v4-3"), help="Companion prompt version.")
     parser.add_argument("--parallel", type=int, default=3, help="Personas chatting at the same time.")
+    parser.add_argument(
+        "--more",
+        action="store_true",
+        help="Give the people already in today's saved report --sessions more chats instead of making new users.",
+    )
     parser.add_argument("--no-save", action="store_true")
     return parser
 
@@ -139,16 +144,41 @@ def _repeating(turns) -> bool:
     return bool(lines) and lines.count(lines[-1]) >= REPEAT_LIMIT
 
 
+def _report_path() -> Path:
+    return PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d") / "match-personas.json"
+
+
+def _existing_user(person: MatchPersona) -> str | None:
+    """The user id today's report holds for this person, when there is one."""
+    path = _report_path()
+    if not path.exists():
+        return None
+    for row in json.loads(path.read_text()).get("people", []):
+        if row.get("persona") == person.id and row.get("user_id"):
+            return str(row["user_id"])
+    return None
+
+
+def _already_told(user_id: str) -> list[str]:
+    return [
+        str(m.get("content") or "")
+        for conversation in list_conversations(user_id)
+        for m in conversation["messages"]
+        if m.get("role") == "user" and m.get("content")
+    ]
+
+
 async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
-    user_id = f"ai-user-eval-match-{person.id}-{uuid4().hex[:8]}"
+    user_id = (_existing_user(person) if args.more else None) or f"ai-user-eval-match-{person.id}-{uuid4().hex[:8]}"
     save_user_profile(user_id, person.gender, "unknown", display_name=person.name, age=person.age, city="Pune")
     set_private_matching_consent(user_id, True)
     companion = RuntimeDriverConfig(provider=args.provider, model=args.model, prompt_version=args.prompt, agent_name="Omi")
-    told: list[str] = []
+    told: list[str] = _already_told(user_id) if args.more else []
+    earlier_chats = len(list_conversations(user_id)) if args.more else 0
     turns_done = 0
     conversation_id = ""
-    for session in range(args.sessions):
-        print(f"[{person.id}] chat {session + 1} of {args.sessions}, {args.turns} turns", flush=True)
+    for session in range(earlier_chats, earlier_chats + args.sessions):
+        print(f"[{person.id}] chat {session + 1} of {earlier_chats + args.sessions}, {args.turns} turns", flush=True)
         result = None
         for attempt in range(SESSION_ATTEMPTS):
             try:
@@ -231,7 +261,7 @@ async def _run(args: argparse.Namespace) -> int:
     }
     print(json.dumps({"known": known, "ready": [r["persona"] for r in rows if r.get("ready")]}, indent=2))
     if not args.no_save:
-        out = PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d") / "match-personas.json"
+        out = _report_path()
         out.parent.mkdir(parents=True, exist_ok=True)
         if out.exists():
             # A rerun of some people (--only) replaces only their rows.
