@@ -31,3 +31,4 @@ tmp/
 skills-*.json
 superpowers
 .worktrees/
+.claude
