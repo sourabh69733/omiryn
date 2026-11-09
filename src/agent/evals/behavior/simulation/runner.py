@@ -48,8 +48,10 @@ async def run_simulated_conversation(
     companion: RuntimeDriverConfig,
     independent_judges: tuple[ConversationJudge, ...] = (),
     event_sink: EventSink | None = None,
+    user_id: str | None = None,
 ) -> SimulatedConversationResult:
-    user_id = f"ai-user-eval-{scenario.id}-{uuid4().hex[:8]}"
+    # A given user id lets one made-up person chat again, so memories build up across chats.
+    user_id = user_id or f"ai-user-eval-{scenario.id}-{uuid4().hex[:8]}"
     conversation_id = f"ai-user-eval-conversation-{uuid4().hex}"
     messages: list[dict[str, Any]] = []
     profile = {"user_id": user_id, **scenario.user_profile}

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Make up people for the match judge evaluation and let them chat with Omi for real.
 
-Each persona from src/agent/evals/matching/personas.py is played by a model over a conversation
-with the companion through the real runtime, then background cognition writes their memories and
-vibe card, embeddings are filled, the vibe card is backfilled if it is not yet ready, and their
-talk style is counted. The result is a set of users whose cards were built the way real ones are,
+Each persona from src/agent/evals/matching/personas.py is played by a model over several short
+chats with the companion through the real runtime (one long sitting makes the persona model
+repeat itself), background cognition writes their memories and vibe card after each chat,
+embeddings are filled, the vibe card is backfilled if it is not yet ready, and their talk style
+is counted. The result is a set of users whose cards were built the way real ones are,
 in a database of their own, so the judge evaluation can run before any real pair exists:
 
-  .venv/bin/python scripts/evals/seed_match_personas.py --turns 30
+  .venv/bin/python scripts/evals/seed_match_personas.py --sessions 4 --turns 8
   DATABASE_URL=sqlite:///./data/omiryn_match_eval.db .venv/bin/python scripts/evals/run_match_judge_evals.py \\
       --known <a>:<b> ... --random-pairs 6
 
@@ -24,6 +25,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -60,30 +62,51 @@ MAX_BACKGROUND_RUNS = 40
 GOAL = (
     "Chat with Omi the way you would with a new companion app over your first days in the city: casually, "
     "in your own words and your own language mix. Answer what it asks honestly from who you are, bring up "
-    "your own day, plans, annoyances and opinions, and let what you care about come out over the conversation "
-    "rather than all at once. Never describe yourself in a list. Keep going until the turns run out."
+    "your own day, plans, annoyances and opinions, and let what you care about come out over the chats "
+    "rather than all at once. Never describe yourself in a list, and never repeat a line you already sent. "
+    "Keep going until the turns run out."
 )
+# The persona model gets no memory between chats, so it is told what it already said.
+TOLD_LIMIT_CHARS = 1500
+# A persona model that sends the same line this many times has lost the thread; the chat ends there.
+REPEAT_LIMIT = 3
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--only", default="", help="Comma-separated persona ids (default all).")
-    parser.add_argument("--turns", type=int, default=30, help="User turns per persona.")
+    parser.add_argument("--sessions", type=int, default=4, help="Chats per persona, each a new conversation.")
+    parser.add_argument("--turns", type=int, default=8, help="User turns per chat.")
     parser.add_argument("--provider", default=os.getenv("AGENT_PROVIDER", "deepinfra"))
     parser.add_argument("--model", default=os.getenv("EVAL_MODEL") or "google/gemma-4-31B-it", help="Companion model.")
-    parser.add_argument("--user-model", default=None, help="Model that plays the persona (default: the provider's).")
+    parser.add_argument(
+        "--user-model",
+        default=os.getenv("REQUEST_CHECK_MODEL") or "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        help="Model that plays the persona; a small one repeats itself.",
+    )
     parser.add_argument("--prompt", default=os.getenv("AGENT_BEHAVIOR_VERSION", "v4-3"), help="Companion prompt version.")
     parser.add_argument("--parallel", type=int, default=3, help="Personas chatting at the same time.")
     parser.add_argument("--no-save", action="store_true")
     return parser
 
 
-def _scenario(person: MatchPersona, turns: int) -> SimulatedUserScenario:
+def _scenario(person: MatchPersona, turns: int, session: int, told: list[str]) -> SimulatedUserScenario:
+    goal = GOAL
+    if session:
+        said = ""
+        for line in reversed(told):
+            if len(said) + len(line) > TOLD_LIMIT_CHARS:
+                break
+            said = f"- {line}\n{said}"
+        goal += (
+            f" This is your chat number {session + 1} with Omi, on a later day; Omi remembers your earlier chats. "
+            f"Things you already told it, which you need not repeat:\n{said}"
+        )
     return SimulatedUserScenario(
         id=f"match-{person.id}",
         description=f"{person.name} gets to know Omi.",
         persona=person.persona,
-        goal=GOAL,
+        goal=goal,
         user_profile={
             "display_name": person.name,
             "gender": person.gender,
@@ -109,20 +132,36 @@ async def _learn(user_id: str, conversation_id: str) -> None:
             return
 
 
+def _repeating(turns) -> bool:
+    lines = [t.user_message.strip().casefold() for t in turns]
+    return bool(lines) and lines.count(lines[-1]) >= REPEAT_LIMIT
+
+
 async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
-    print(f"[{person.id}] chatting, {args.turns} turns", flush=True)
-    result = await run_simulated_conversation(
-        scenario=_scenario(person, args.turns),
-        simulated_user=ProviderSimulatedUser(provider=args.provider, model=args.user_model),
-        companion=RuntimeDriverConfig(provider=args.provider, model=args.model, prompt_version=args.prompt, agent_name="Omi"),
-    )
-    user_id = result.turns[0].user_id
+    user_id = f"ai-user-eval-match-{person.id}-{uuid4().hex[:8]}"
     save_user_profile(user_id, person.gender, "unknown", display_name=person.name, age=person.age, city="Pune")
     set_private_matching_consent(user_id, True)
-    print(f"[{person.id}] {len(result.turns)} turns done, learning", flush=True)
-    await _learn(user_id, result.conversation_id)
-    while await refresh_user_memory_embeddings(user_id, conversation_id=result.conversation_id):
-        pass
+    companion = RuntimeDriverConfig(provider=args.provider, model=args.model, prompt_version=args.prompt, agent_name="Omi")
+    told: list[str] = []
+    turns_done = 0
+    conversation_id = ""
+    for session in range(args.sessions):
+        print(f"[{person.id}] chat {session + 1} of {args.sessions}, {args.turns} turns", flush=True)
+        result = await run_simulated_conversation(
+            scenario=_scenario(person, args.turns, session, told),
+            simulated_user=ProviderSimulatedUser(provider=args.provider, model=args.user_model),
+            companion=companion,
+            user_id=user_id,
+        )
+        kept = list(result.turns)
+        if _repeating(kept):
+            print(f"[{person.id}] chat {session + 1} looped after {len(kept)} turns", flush=True)
+        told.extend(t.user_message for t in kept)
+        turns_done += len(kept)
+        conversation_id = result.conversation_id
+        await _learn(user_id, conversation_id)
+        while await refresh_user_memory_embeddings(user_id, conversation_id=conversation_id):
+            pass
     readiness = match_readiness(user_id)
     backfilled = None
     if not readiness.ready:
@@ -134,8 +173,8 @@ async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
     row = {
         "persona": person.id,
         "user_id": user_id,
-        "conversation_id": result.conversation_id,
-        "turns": len(result.turns),
+        "conversation_id": conversation_id,
+        "turns": turns_done,
         "memories": len(memories),
         "embedded": embedded,
         "milestone": readiness.milestone,
