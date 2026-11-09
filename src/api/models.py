@@ -31,6 +31,10 @@ AppEventName = Literal[
     "feedback_submitted",
     "community_invite_requested",
     "client_error",
+    "match_answered",
+    "pool_joined",
+    "match_card_answered",
+    "match_reported",
 ]
 ContextSourceType = Literal[
     "llm_profile",
