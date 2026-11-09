@@ -64,8 +64,10 @@ GOAL = (
     "in your own words and your own language mix. Answer what it asks honestly from who you are, bring up "
     "your own day, plans, annoyances and opinions, and let what you care about come out over the chats "
     "rather than all at once. Never describe yourself in a list, and never repeat a line you already sent. "
-    "Keep going until the turns run out."
+    "Write like a person on a phone: one to three short lines a message. Keep going until the turns run out."
 )
+# A chat that fails in the persona model (a message too long, a bad reply) is tried again this often.
+SESSION_ATTEMPTS = 3
 # The persona model gets no memory between chats, so it is told what it already said.
 TOLD_LIMIT_CHARS = 1500
 # A persona model that sends the same line this many times has lost the thread; the chat ends there.
@@ -147,12 +149,20 @@ async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
     conversation_id = ""
     for session in range(args.sessions):
         print(f"[{person.id}] chat {session + 1} of {args.sessions}, {args.turns} turns", flush=True)
-        result = await run_simulated_conversation(
-            scenario=_scenario(person, args.turns, session, told),
-            simulated_user=ProviderSimulatedUser(provider=args.provider, model=args.user_model),
-            companion=companion,
-            user_id=user_id,
-        )
+        result = None
+        for attempt in range(SESSION_ATTEMPTS):
+            try:
+                result = await run_simulated_conversation(
+                    scenario=_scenario(person, args.turns, session, told),
+                    simulated_user=ProviderSimulatedUser(provider=args.provider, model=args.user_model),
+                    companion=companion,
+                    user_id=user_id,
+                )
+                break
+            except Exception as error:
+                print(f"[{person.id}] chat {session + 1} attempt {attempt + 1} failed: {type(error).__name__}", flush=True)
+        if result is None:
+            continue
         kept = list(result.turns)
         if _repeating(kept):
             print(f"[{person.id}] chat {session + 1} looped after {len(kept)} turns", flush=True)
@@ -223,6 +233,13 @@ async def _run(args: argparse.Namespace) -> int:
     if not args.no_save:
         out = PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d") / "match-personas.json"
         out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists():
+            # A rerun of some people (--only) replaces only their rows.
+            earlier = json.loads(out.read_text())
+            kept = [r for r in earlier.get("people", []) if r.get("persona") not in by_persona]
+            payload["people"] = kept + rows
+            ids = {r["persona"]: r.get("user_id") for r in payload["people"]}
+            payload["known"] = [f"{ids[a]}:{ids[b]}" for a, b in KNOWN_FRIEND_PAIRS if ids.get(a) and ids.get(b)]
         out.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
         print(f"saved {out.relative_to(PROJECT_ROOT)}")
     return 0 if all(r.get("ready") for r in rows) else 1
