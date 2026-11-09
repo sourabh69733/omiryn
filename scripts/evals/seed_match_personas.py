@@ -107,7 +107,8 @@ def _scenario(person: MatchPersona, turns: int, session: int, told: list[str]) -
             said = f"- {line}\n{said}"
         goal += (
             f" This is your chat number {session + 1} with Omi, on a later day; Omi remembers your earlier chats. "
-            f"Things you already told it, which you need not repeat:\n{said}"
+            "Bring something new from your life today (work, the weekend, family, a plan, an opinion, something from "
+            f"your past), not the same topics or jokes as before. Things you already told it, which you must not repeat:\n{said}"
         )
     return SimulatedUserScenario(
         id=f"match-{person.id}",

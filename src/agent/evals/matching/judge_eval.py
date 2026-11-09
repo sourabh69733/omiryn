@@ -73,16 +73,25 @@ def pick_pairs(known: list[tuple[str, str]], users: list[str], *, random_pairs: 
     return [(a, b, True) for a, b in known] + [(a, b, False) for a, b in others[:random_pairs]]
 
 
+# An evaluation can wait longer than a live check: a slow answer is better than a lost pair.
+JUDGE_TIMEOUT_SECONDS = 120.0
+
+
 async def judge_pair(evidence: PairEvidence, run: str, *, user_a: str, user_b: str, model: str | None = None) -> dict[str, Any]:
     """One judged pair under one run; the same checks the live check applies."""
     from agent.providers import judge_match, write_match_reasons
 
     if run == "v1_vibe":
-        raw = await write_match_reasons(evidence.pack(touchpoints=False, style=False, meet=False), conversation_id=f"match-eval:{user_a}:{user_b}", model=model)
+        raw = await write_match_reasons(
+            evidence.pack(touchpoints=False, style=False, meet=False),
+            conversation_id=f"match-eval:{user_a}:{user_b}",
+            model=model,
+            timeout_seconds=JUDGE_TIMEOUT_SECONDS,
+        )
         checked = validate_match_reasons(raw, shareable_areas(evidence.comparable))
         return {**checked, "clash": None, "chemistry": None}
     pack = evidence.pack(touchpoints=run != "v2_vibe", style=run == "v2_all", meet=run == "v2_all")
-    raw = await judge_match(pack, conversation_id=f"match-eval:{user_a}:{user_b}", model=model)
+    raw = await judge_match(pack, conversation_id=f"match-eval:{user_a}:{user_b}", model=model, timeout_seconds=JUDGE_TIMEOUT_SECONDS)
     points = evidence.touchpoints if run != "v2_vibe" else []
     return validate_match_judgement(raw, evidence.comparable, points, evidence.areas_a, evidence.areas_b)
 
