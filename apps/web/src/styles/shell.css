@@ -598,11 +598,13 @@ button.omi-drawer-close:hover {
   z-index: 100;
 }
 
-.omi-mobile-navigation-backdrop {
+.omi-mobile-navigation-backdrop,
+.omi-mobile-navigation-backdrop:hover {
   position: absolute;
   inset: 0;
   width: 100%;
   border: 0;
+  border-radius: 0; /* a button by markup; the pill shape must not reach the scrim */
   background: rgba(21, 18, 14, 0.32);
 }
 
