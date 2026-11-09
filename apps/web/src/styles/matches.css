@@ -663,9 +663,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: min(92vw, 520px);
-  padding: 12px 12px 12px 16px;
-  border-radius: 999px;
+  width: max-content; /* left: 50% would otherwise shrink it to half the screen */
+  max-width: min(calc(100vw - 32px), 520px);
+  padding: 10px 10px 10px 16px;
+  border-radius: 24px;
   background: var(--ink);
   color: var(--on-ink);
   box-shadow: var(--shadow-md);
