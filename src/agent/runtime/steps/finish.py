@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.context_engine.policy import split_assistant_reply
-from agent.context_engine.policy.replies import strip_quiet_markers, strip_story_end, strip_story_marker, strip_voice_marker
+from agent.context_engine.policy.replies import (
+    strip_open_marker,
+    strip_quiet_markers,
+    strip_story_end,
+    strip_story_marker,
+    strip_voice_marker,
+)
 from agent.context_engine.state.turn import assistant_turn_state
 
 
@@ -21,6 +27,8 @@ class FinishedReply:
     # An emoji for the user's message, and whether the model chose to say nothing.
     reaction: str | None = None
     no_reply: bool = False
+    # An app page the model put a button for under its reply.
+    open_page: str | None = None
 
     @property
     def wordless(self) -> bool:
@@ -31,10 +39,19 @@ def finish_reply(reply: str, user_text: str) -> FinishedReply:
     reply, story_ended = strip_story_end(reply)
     reply, story_marked = strip_story_marker(reply)
     reply, voice = strip_voice_marker(reply)
+    reply, open_page = strip_open_marker(reply)
     reply, reaction, no_reply = strip_quiet_markers(reply)
     if no_reply or (reaction and not reply):
         return FinishedReply("", [], False, False, voice, reaction, no_reply)
-    return FinishedReply(reply, split_assistant_reply(reply, user_text=user_text), story_marked or story_ended, story_ended, voice, reaction)
+    return FinishedReply(
+        reply,
+        split_assistant_reply(reply, user_text=user_text),
+        story_marked or story_ended,
+        story_ended,
+        voice,
+        reaction,
+        open_page=open_page,
+    )
 
 
 def assistant_messages(finished: FinishedReply, context_summary: dict[str, Any]) -> list[dict[str, Any]]:
@@ -54,6 +71,8 @@ def assistant_messages(finished: FinishedReply, context_summary: dict[str, Any])
             message["turn_state"] = turn_state
         if finished.story and finished.story_ended and index == last:
             message["story_end"] = True
+        if finished.open_page and index == last:
+            message["open_page"] = finished.open_page
         messages.append(message)
     return messages
 

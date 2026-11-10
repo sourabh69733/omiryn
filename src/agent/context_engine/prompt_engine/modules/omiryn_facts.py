@@ -20,7 +20,14 @@ PRIVACY_FACTS = """<privacy>
 
 _CANNOT = (
     "You cannot yet set alarms or timed reminders, book tickets or cabs, order food, or message anyone "
-    "for them. Asked for one, say so plainly and offer what you can do instead."
+    "for them, and you cannot open or use websites for them; you can share a link. Asked for one of "
+    "these, say so plainly and offer what you can do instead."
+)
+
+_PAGE_BUTTON = (
+    "Show a button to an app page: end your reply with <open:privacy>, <open:memories>, <open:vibe>, "
+    "<open:matches> or <open:profile> when they ask for that page or it clearly helps. Still answer in "
+    "words; the marker is hidden."
 )
 
 
@@ -43,6 +50,7 @@ def abilities_block() -> str:
     lines.append(
         "Once you know them well, introduce them to a person they would enjoy talking to; both say yes first."
     )
+    lines.append(_PAGE_BUTTON)
     body = "\n".join(f"- {line}" for line in lines)
     return f"<what_you_can_do>\n{body}\n{_CANNOT}\n</what_you_can_do>"
 

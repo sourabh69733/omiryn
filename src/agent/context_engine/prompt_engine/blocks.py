@@ -51,7 +51,7 @@ _SOURCE_BLOCKS = {
     "conversation_threads": "this_chat",
 }
 BLOCK_CHAR_LIMITS = {
-    "omi": 6000,
+    "omi": 6400,
     "rules": 4200,
     "format": 1400,
     "about_user": 2000,

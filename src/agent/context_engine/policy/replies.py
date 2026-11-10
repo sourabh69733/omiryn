@@ -91,6 +91,19 @@ def strip_quiet_markers(text: str) -> tuple[str, str | None, bool]:
     return cleaned, reaction, marked and not cleaned and reaction is None
 
 
+# Written by the model to put a button under its reply that opens a page of the app.
+_OPEN_MARKER = re.compile(r"[<\[]\s*open\s*:\s*([a-z_ -]*?)\s*[>\]]", re.IGNORECASE)
+# The app pages a button may open; anything else is dropped.
+APP_PAGES = ("privacy", "memories", "vibe", "matches", "profile")
+
+
+def strip_open_marker(text: str) -> tuple[str, str | None]:
+    """Remove page markers; return the text and the last page the app can open, if any."""
+    pages = [found.strip().lower() for found in _OPEN_MARKER.findall(text)]
+    known = [page for page in pages if page in APP_PAGES]
+    return _OPEN_MARKER.sub("", text).strip(), (known[-1] if known else None)
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = " ".join(
         normalize_part_separators(normalize_assistant_script(str(reply or ""))).strip().split()
