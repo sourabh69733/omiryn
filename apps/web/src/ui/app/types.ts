@@ -15,7 +15,7 @@ export type ChatCard = {
   answered?: string | null;
 };
 
-export type Message = { role?: string; content?: string; card?: ChatCard | null; quality?: string; created_at?: string; delivery_status?: string; deleted?: boolean; reply_to?: ReplyQuote; client_id?: string; local?: boolean; reaction?: string; user_reaction?: string };
+export type Message = { role?: string; content?: string; card?: ChatCard | null; quality?: string; created_at?: string; delivery_status?: string; deleted?: boolean; reply_to?: ReplyQuote; client_id?: string; local?: boolean; reaction?: string; user_reaction?: string; open_page?: string };
 export type ReplyQuote = { index: number; role?: string; text?: string; deleted?: boolean };
 export type Conversation = {
   id: string;
