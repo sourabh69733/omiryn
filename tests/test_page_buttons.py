@@ -6,8 +6,9 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from agent.context_engine.policy.replies import strip_open_marker
+from agent.context_engine.policy.replies import keep_open_marker, strip_open_marker
 from agent.context_engine.prompt_engine.modules.omiryn_facts import abilities_block
+from agent.providers.gateway.clients import TOOL_CALL_MARKER
 from agent.runtime.steps import assistant_messages, finish_reply
 from api.routes import channel_replies
 from api.routes.channel_replies import ChannelSender
@@ -30,8 +31,48 @@ class PageMarkerTest(unittest.TestCase):
         finished = finish_reply("<react:👍> <open:vibe>", "ok")
         self.assertEqual(assistant_messages(finished, {}), [])
 
+    def test_a_rewrite_keeps_the_drafts_button(self) -> None:
+        self.assertEqual(keep_open_marker("Chats are encrypted <open:privacy>", "They're encrypted."), "They're encrypted. <open:privacy>")
+        # Its own button wins, and a wordless rewrite or a draft without one is left alone.
+        self.assertEqual(keep_open_marker("a <open:privacy>", "b <open:memories>"), "b <open:memories>")
+        self.assertEqual(keep_open_marker("a <open:privacy>", ""), "")
+        self.assertEqual(keep_open_marker("just words", "other words"), "other words")
+
     def test_omi_is_told_about_the_button(self) -> None:
-        self.assertIn("<open:privacy>", abilities_block())
+        self.assertIn("show_app_page", abilities_block())
+
+
+class ShowAppPageToolTest(unittest.TestCase):
+    def _run(self, page: str) -> dict:
+        from agent.tools import ToolCall, ToolContext, run_calls
+
+        result = asyncio.run(run_calls([ToolCall("show_app_page", {"page": page})], ToolContext(user_id="u1")))[0]
+        return result.trace
+
+    def test_a_known_page_is_recorded_and_an_unknown_one_is_not(self) -> None:
+        from agent.tools.app_pages import shown_page
+
+        self.assertEqual(self._run("Privacy")["page"], "privacy")
+        self.assertIsNone(self._run("settings")["page"])
+        self.assertEqual(shown_page([self._run("vibe"), self._run("memories")]), "memories")
+        self.assertIsNone(shown_page([{"tool": "web_search", "page": "privacy"}]))
+
+    def test_the_draft_carries_the_button_the_tool_asked_for(self) -> None:
+        from agent.runtime.steps.draft import write_draft
+        from agent.runtime.steps.job import ReplyJob
+
+        replies = iter([
+            TOOL_CALL_MARKER + '{"name": "show_app_page", "arguments": {"page": "privacy"}}',
+            "Chats are stored encrypted.",
+        ])
+
+        async def generate(*args, **kwargs):
+            return next(replies)
+
+        job = ReplyJob(reply_messages=[{"role": "user", "content": "tell ur privacy policy"}], generation_arguments={}, generate=generate)
+        with patch.dict("os.environ", {"AGENT_TOOLS": "true"}):
+            draft = asyncio.run(write_draft(job))
+        self.assertEqual(finish_reply(draft.reply, "tell ur privacy policy").open_page, "privacy")
 
 
 class ChannelLinkTest(unittest.TestCase):

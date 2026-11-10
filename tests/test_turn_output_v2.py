@@ -1,6 +1,7 @@
 import unittest
 
 from agent.memory_engine.search import SEARCH_TOOL
+from agent.tools.app_pages import SHOW_APP_PAGE
 from agent.tools.memory_dates import MEMORIES_BY_DATE
 from unittest.mock import AsyncMock, patch
 
@@ -442,7 +443,7 @@ class TurnOutputV2Test(unittest.IsolatedAsyncioTestCase):
             "Tell me more about what made that important to you.",
         )
         self.assertEqual(model_call.await_count, 2)
-        self.assertIn(model_call.await_args_list[0].kwargs.get("tools"), (None, [SEARCH_TOOL, MEMORIES_BY_DATE.spec()]))
+        self.assertIn(model_call.await_args_list[0].kwargs.get("tools"), (None, [SEARCH_TOOL, MEMORIES_BY_DATE.spec(), SHOW_APP_PAGE.spec()]))
         self.assertNotIn("tools", model_call.await_args_list[1].kwargs)
         self.assertEqual(model_call.await_args_list[1].kwargs["max_tokens"], 400)
         model_step = next(
