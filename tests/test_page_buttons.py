@@ -93,5 +93,23 @@ class ChannelLinkTest(unittest.TestCase):
         self.assertEqual(self._send([{"role": "assistant", "content": "hey"}]), ["hey"])
 
 
+
+class LiveEventTest(unittest.TestCase):
+    def test_the_live_event_carries_the_button(self) -> None:
+        from api import chat_service
+        from api.models import AgentConversation
+
+        conversation = AgentConversation(id="c1", status="active", messages=[
+            {"role": "assistant", "content": "Here's how it works", "open_page": "privacy"},
+            {"role": "assistant", "content": "plain"},
+        ])
+        publish = AsyncMock()
+        with patch.object(chat_service.realtime_hub, "publish", publish):
+            asyncio.run(chat_service._publish_new_messages(conversation, 0))
+        sent = [call.args[0].payload["message"] for call in publish.await_args_list]
+        self.assertEqual(sent[0]["open_page"], "privacy")
+        self.assertNotIn("open_page", sent[1])
+
+
 if __name__ == "__main__":
     unittest.main()

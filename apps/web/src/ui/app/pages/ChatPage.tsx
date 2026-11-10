@@ -1539,6 +1539,7 @@ function applyRealtimeEvent(
     ...(typeof record.client_id === "string" ? { client_id: record.client_id } : {}),
     ...(record.reply_to && typeof record.reply_to === "object" ? { reply_to: record.reply_to as ReplyQuote } : {}),
     ...(typeof record.reaction === "string" ? { reaction: record.reaction } : {}),
+    ...(typeof record.open_page === "string" ? { open_page: record.open_page } : {}),
   };
   if (!message.role || typeof message.content !== "string") return;
 

@@ -209,6 +209,7 @@ async def _publish_messages(conversation: AgentConversation, indexes: Iterable[i
                         **({"client_id": message["client_id"]} if message.get("client_id") else {}),
                         **({"reply_to": message["reply_to"]} if message.get("reply_to") else {}),
                         **({"reaction": message["reaction"]} if message.get("reaction") else {}),
+                        **({"open_page": message["open_page"]} if message.get("open_page") else {}),
                     },
                 },
             )
