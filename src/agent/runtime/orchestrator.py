@@ -10,6 +10,7 @@ from agent.config import agent_pipeline_config
 from agent.context_engine.policy import direct_turn_reply
 from agent.context_engine.policy.asked_questions import asked_questions
 from agent.context_engine.policy.freshness import recent_assistant_replies
+from agent.context_engine.policy.replies import keep_open_marker
 from agent.context_engine.policy.requests import how_to_talk_requests
 from agent.context_engine.engine import build_model_context_package
 from agent.memory_engine.engine import capture_profile_facts_from_user_message
@@ -210,6 +211,7 @@ async def run_agent_turn(
         else:
             for name, check in REPLY_CHECKS:
                 reply, checks[name] = await check(reply, job)
+            reply = keep_open_marker(draft.reply, reply)
         finished = finish_reply(reply, user_text)
     except Exception as error:
         trace.step(4, "model_call", "failed", {"error_type": type(error).__name__})

@@ -104,6 +104,14 @@ def strip_open_marker(text: str) -> tuple[str, str | None]:
     return _OPEN_MARKER.sub("", text).strip(), (known[-1] if known else None)
 
 
+def keep_open_marker(draft: str, final: str) -> str:
+    """A rewrite is a fresh reply and can drop the draft's page button; the model chose it, so it stays."""
+    _, page = strip_open_marker(draft)
+    if page is None or not final.strip() or strip_open_marker(final)[1] is not None:
+        return final
+    return f"{final.rstrip()} <open:{page}>"
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = " ".join(
         normalize_part_separators(normalize_assistant_script(str(reply or ""))).strip().split()
