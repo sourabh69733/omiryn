@@ -42,6 +42,8 @@ PROFILE_PHOTO_MAX_BYTES = int(_float_env("PROFILE_PHOTO_MAX_MB", 10) * 1024 * 10
 PROFILE_PHOTO_MAX_COUNT = 4
 PROFILE_PHOTO_GCS_BUCKET = os.getenv("PROFILE_PHOTO_GCS_BUCKET", "").strip()
 PROFILE_PHOTO_GCS_PREFIX = os.getenv("PROFILE_PHOTO_GCS_PREFIX", "profile_photos").strip("/")
+# Where links to app pages point, for chats on Telegram and WhatsApp.
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://app.omiryn.com").strip().rstrip("/")
 PROFILE_PHOTO_GCS_PUBLIC_BASE_URL = os.getenv("PROFILE_PHOTO_GCS_PUBLIC_BASE_URL", "").strip().rstrip("/")
 PROFILE_PHOTO_CONTENT_TYPES = {
     "image/jpeg": ".jpg",

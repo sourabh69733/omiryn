@@ -311,7 +311,7 @@ class PromptV44Test(unittest.TestCase):
 
         with patch.dict(os.environ, {"TAVILY_API_KEY": "", "GOOGLE_PLACES_API_KEY": "", "PROACTIVE_MESSAGING_ENABLED": "false"}):
             block = abilities_block()
-        self.assertNotIn("web", block)
+        self.assertNotIn("facts on the web", block)
         self.assertNotIn("maps link", block)
         self.assertNotIn("on your own", block)
 

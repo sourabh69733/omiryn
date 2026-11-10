@@ -16,6 +16,7 @@ from fastapi import BackgroundTasks, HTTPException
 from security.auth import CurrentUser
 
 from ..chat_service import CommittedReply, save_unanswered_message
+from ..config import WEB_APP_URL
 from ..reply_bursts import BurstOutput, answer_burst, join
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 BUBBLE_PAUSE_SECONDS = 0.8
 
 REPLY_FAILED = "Couldn't reply right now. Send your message again in a bit."
+
+# The web app's path for each page Omi can put a button for (apps/web/src/ui/app/appUtils.ts).
+PAGE_PATHS = {
+    "privacy": "/profile/privacy",
+    "memories": "/memories",
+    "vibe": "/vibe",
+    "matches": "/matches",
+    "profile": "/profile",
+}
 
 
 @dataclass(frozen=True)
@@ -99,12 +109,14 @@ async def _send_reaction(sender: ChannelSender, chat_id: str, committed: Committ
 
 
 async def _send_bubbles(sender: ChannelSender, chat_id: str, replies: list[dict[str, Any]]) -> None:
-    bubbles = [
-        str(message.get("content") or "").strip()
-        for message in replies
-        if message.get("role") == "assistant"
-    ]
-    for index, bubble in enumerate(bubble for bubble in bubbles if bubble):
+    assistant = [message for message in replies if message.get("role") == "assistant"]
+    bubbles = [str(message.get("content") or "").strip() for message in assistant]
+    bubbles = [bubble for bubble in bubbles if bubble]
+    # A button in the web app is a link here, under the last bubble.
+    page = next((message.get("open_page") for message in reversed(assistant) if message.get("open_page")), None)
+    if bubbles and page in PAGE_PATHS:
+        bubbles[-1] = f"{bubbles[-1]}\n{WEB_APP_URL}{PAGE_PATHS[page]}"
+    for index, bubble in enumerate(bubbles):
         if index:
             await sender.send_typing(chat_id)
             await asyncio.sleep(BUBBLE_PAUSE_SECONDS)
