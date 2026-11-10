@@ -22,6 +22,7 @@ from agent.context_engine.prompt_engine.modules.language import language_module_
 from agent.context_engine.prompt_engine.modules.matching_understanding import (
     matching_understanding_prompt,
 )
+from agent.context_engine.prompt_engine.modules.omiryn_facts import PRIVACY_FACTS, abilities_block
 from agent.context_engine.prompt_engine.modules.output_format import output_format_prompt
 from agent.context_engine.prompt_engine.modules.safety import safety_module_prompt
 from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
@@ -50,7 +51,7 @@ _SOURCE_BLOCKS = {
     "conversation_threads": "this_chat",
 }
 BLOCK_CHAR_LIMITS = {
-    "omi": 3200,
+    "omi": 6000,
     "rules": 4200,
     "format": 1400,
     "about_user": 2000,
@@ -66,7 +67,7 @@ BLOCK_CHAR_LIMITS = {
     "open_questions": 700,
     "how_to_talk": 3000,
     "this_turn": 2000,
-    "goal": 1900,
+    "goal": 2000,
 }
 _CONSTRAINT_FACTS = {
     "no_questions": "They asked you not to ask questions.",
@@ -147,6 +148,8 @@ def build_companion_system_prompt_v4(
             prompt_version.base_prompt.replace("{name}", behavior.persona_name),
             voice_prompt(behavior.voice),
             tone_module_prompt(agent_tone) if agent_tone not in {"", "auto"} else "",
+            abilities_block() if prompt_version.introduces_itself else "",
+            PRIVACY_FACTS if prompt_version.introduces_itself else "",
         ]),
         ("rules", [
             prompt_version.prompt_contract,
@@ -174,7 +177,13 @@ def build_companion_system_prompt_v4(
         ("might_fit", grouped.get("might_fit", [])),
         ("open_questions", grouped.get("open_questions", [])),
         ("how_to_talk", grouped.get("how_to_talk", [])),
-        ("this_turn", [time_facts, _turn_lines(facts), _web_search_line(), _dates_tool_line()]),
+        ("this_turn", [
+            time_facts,
+            _turn_lines(facts),
+            _new_person_line(grouped) if prompt_version.introduces_itself else "",
+            _web_search_line(),
+            _dates_tool_line(),
+        ]),
         ("goal", [prompt_version.reply_goal or V4_GOAL]),
     ]
     return "\n\n".join(filter(None, (_block(tag, parts) for tag, parts in blocks)))
@@ -273,6 +282,13 @@ def _turn_lines(facts: TurnFacts) -> str:
     if facts.active_topic:
         lines.append(f"Current topic in this chat: {facts.active_topic}.")
     return "\n".join(lines)
+
+
+def _new_person_line(grouped: dict[str, list[str]]) -> str:
+    """Nothing saved about them yet: no memories, no user card, no earlier chats."""
+    if any(grouped.get(block) for block in ("memories", "about_user", "this_chat")):
+        return ""
+    return "You know nothing about them yet: they are new to you."
 
 
 def _web_search_line() -> str:

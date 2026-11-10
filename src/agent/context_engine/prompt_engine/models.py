@@ -22,4 +22,6 @@ class PromptBehaviorVersion:
     listener_first: bool = False
     matching_understanding: bool = False
     plans_turn: bool = False
+    # Gives Omi what it can do now and how chats are kept, and says when the person is new to it.
+    introduces_itself: bool = False
     engine_version: str = "context_v2"
