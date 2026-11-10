@@ -1510,3 +1510,55 @@ button.omi-drawer-close:hover {
   width: 15px;
   height: 15px;
 }
+
+/* Links inside a bubble, and the button Omi can put under its reply to open an app page. */
+.message-content a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.message-content a:hover {
+  color: var(--ember-deep);
+}
+
+.message-page-link,
+.message-page-link:hover {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 0;
+  margin-top: 6px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ember-deep);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.message-page-link:hover {
+  border-color: var(--line-strong);
+  background: var(--ember-soft);
+}
+
+.message-page-link:focus-visible {
+  outline: 3px solid var(--brand-violet);
+  outline-offset: 2px;
+}
+
+.message-page-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.message-page-link svg {
+  width: 14px;
+  height: 14px;
+}

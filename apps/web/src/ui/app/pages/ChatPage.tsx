@@ -21,7 +21,8 @@ import { temporaryName } from "../temporaryName";
 import { canShowUsage, pathForPage } from "../appUtils";
 import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
-import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, ReplyQuote, UsageEvent, UsageSummary, ChatCardAction } from "../types";
+import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, Page, ReplyQuote, UsageEvent, UsageSummary, ChatCardAction } from "../types";
+import { pageButton, splitLinks } from "../messageLinks";
 import { cognitionResultLabel } from "../usagePresentation";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
@@ -37,7 +38,7 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenPrivacy }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenPrivacy?: () => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenPage }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenPage?: (page: Page) => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -1225,7 +1226,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                           {message.reply_to.text ? <span>{message.reply_to.text}</span> : null}
                         </button>
                       ) : null}
-                      <div className={`message-content ${agent ? "agent" : "user"}`}>{message.content}</div>
+                      <div className={`message-content ${agent ? "agent" : "user"}`}>{messageText(message.content)}</div>
+                      {agent && onOpenPage && pageButton(message.open_page) ? <button type="button" className="message-page-link" disabled={selecting} onClick={(event) => { event.stopPropagation(); onOpenPage(pageButton(message.open_page)!.page); }}>{pageButton(message.open_page)!.label}<ChevronRight aria-hidden="true" /></button> : null}
                       {agent && message.card ? <MessageCard card={message.card} busy={sending} disabled={selecting} onAction={(action) => void answerCard(index, action)} /> : null}
                       {message.reaction ? <span className="message-reaction" role="img" aria-label={`${conversation?.agent_name || "Omi"} reacted ${message.reaction}`}>{message.reaction}</span> : null}
                       {agent && message.user_reaction ? <button type="button" className="message-reaction is-yours" disabled={selecting} aria-label={`Remove your reaction ${message.user_reaction}`} onClick={(event) => { event.stopPropagation(); void reactToMessage(index, message.user_reaction!); }}>{message.user_reaction}</button> : null}
@@ -1337,7 +1339,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 <p>Your AI friend. Talk about anything, share anything, any time.</p>
                 <p>It remembers what matters to you, like birthdays and plans, and helps with small things.</p>
                 <p>Once it knows you, it can introduce you to someone you'd enjoy talking to.</p>
-                <p className="omi-welcome-private"><Lock aria-hidden="true" />Your chats are encrypted and private.{onOpenPrivacy ? <> <button type="button" onClick={onOpenPrivacy}>How it works <ChevronRight aria-hidden="true" /></button></> : null}</p>
+                <p className="omi-welcome-private"><Lock aria-hidden="true" />Your chats are encrypted and private.{onOpenPage ? <> <button type="button" onClick={() => onOpenPage("privacy")}>How it works <ChevronRight aria-hidden="true" /></button></> : null}</p>
               </section>
             ) : null}
             {!loading && conversation && !temporary && !firstChat ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Chats are encrypted and private. Don't share passwords or IDs.</p> : null}
@@ -1709,4 +1711,14 @@ function averageChatUsage(events: UsageEvent[], summary: UsageSummary = {}) {
     prompt: Math.round(chatEvents.reduce((total, event) => total + (event.prompt_tokens || 0), 0) / chatEvents.length),
     completion: Math.round(chatEvents.reduce((total, event) => total + (event.completion_tokens || 0), 0) / chatEvents.length)
   };
+}
+
+// A bubble's text with its web links clickable; they open in a new tab.
+function messageText(content: string | undefined) {
+  const text = content ?? "";
+  const parts = splitLinks(text);
+  if (parts.length === 1 && !parts[0].href) return text;
+  return parts.map((part, index) => part.href
+    ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>{part.text}</a>
+    : <Fragment key={index}>{part.text}</Fragment>);
 }
