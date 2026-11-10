@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_3_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
+    def test_v4_4_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,13 +150,13 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4-3")
+        self.assertEqual(package.prompt_version, "v4-4")
         self.assertIn("Nothing happens to you between messages", package.system_prompt)
         # The character's last line survives its block's limit too.
         self.assertIn("one, then bring an opinion or turn to them.", package.system_prompt)
         self.assertIn("<no_reply> as your whole reply", package.system_prompt)
         # The goal's last line survives the block's limit.
-        self.assertIn("Say something only this conversation could produce.", package.system_prompt)
+        self.assertIn("conversation could produce.\n</goal>", package.system_prompt)
 
 
 class TurnFactsTest(unittest.TestCase):
@@ -231,6 +231,7 @@ class PromptV43Test(unittest.TestCase):
             "v4-1": (True, True, True, True, "context_v4"),
             "v4-2": (True, True, True, True, "context_v4"),
             "v4-3": (True, True, True, True, "context_v4"),
+            "v4-4": (True, True, True, True, "context_v4"),
         }
         actual = {
             v.version_id: (v.blocks_prompt, v.listener_first, v.matching_understanding, v.plans_turn, v.engine_version)
@@ -265,3 +266,57 @@ class PromptV43Test(unittest.TestCase):
             self.assertIn(line, V4_CHARACTER)
         for line in (v4_3._V4_2_BRING_LINE, v4_3._TEXT_LINE):
             self.assertIn(line, V4_2_GOAL)
+
+
+class PromptV44Test(unittest.TestCase):
+    """Omi can say who it is, what it can do and how chats are kept; funny like a friend."""
+
+    def _prompt(self, version: str, sources: list | None = None) -> str:
+        from agent.context_engine.prompt_engine.blocks import TurnFacts, build_companion_system_prompt_v4
+        from agent.context_engine.prompt_engine.registry import get_prompt_behavior_version
+
+        return build_companion_system_prompt_v4(
+            context_sources=sources or [],
+            user_profile={"display_name": "Riya"},
+            agent_tone="auto",
+            agent_name="Omi",
+            prompt_version=get_prompt_behavior_version(version),
+            matching_understanding=None,
+            facts=TurnFacts(user_words=4, user_asked=True),
+        )
+
+    def test_v4_4_is_a_personal_friend_and_v4_3_is_unchanged(self) -> None:
+        from agent.context_engine.prompt_engine.versions.v4_3 import V4_3_CHARACTER
+        from agent.context_engine.prompt_engine.versions.v4_4 import V4_4_CHARACTER, V4_4_GOAL
+
+        self.assertIn("an AI friend in the Omiryn app", V4_4_CHARACTER)
+        self.assertNotIn("Omiryn helps people find friends", V4_4_CHARACTER)
+        self.assertIn("never\n  a stock joke", V4_4_CHARACTER)
+        self.assertIn("Oh no, that\n  sounds frustrating!", V4_4_GOAL)
+        self.assertIn("Omiryn helps people find friends", V4_3_CHARACTER)
+
+    def test_only_v4_4_gets_abilities_and_privacy(self) -> None:
+        with patch.dict(os.environ, {"AGENT_TOOLS": "true", "TAVILY_API_KEY": "x", "GOOGLE_PLACES_API_KEY": "x"}):
+            new, old = self._prompt("v4-4"), self._prompt("v4-3")
+        self.assertIn("<what_you_can_do>", new)
+        self.assertIn("not end-to-end encrypted", new)
+        self.assertIn("You cannot yet set alarms", new)
+        self.assertNotIn("<what_you_can_do>", old)
+        self.assertNotIn("<privacy>", old)
+        # Nothing in the omi block is cut by its size limit.
+        self.assertNotIn("...\n</omi>", new)
+
+    def test_a_tool_that_is_off_is_not_offered(self) -> None:
+        from agent.context_engine.prompt_engine.modules.omiryn_facts import abilities_block
+
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "", "GOOGLE_PLACES_API_KEY": "", "PROACTIVE_MESSAGING_ENABLED": "false"}):
+            block = abilities_block()
+        self.assertNotIn("web", block)
+        self.assertNotIn("maps link", block)
+        self.assertNotIn("on your own", block)
+
+    def test_someone_new_is_marked_until_omi_knows_them(self) -> None:
+        self.assertIn("they are new to you", self._prompt("v4-4"))
+        memory = {"source_type": "agent_memories_v3", "title": "Memories", "content": "Has a cat named Biscuit."}
+        self.assertNotIn("they are new to you", self._prompt("v4-4", [memory]))
+        self.assertNotIn("they are new to you", self._prompt("v4-3"))
