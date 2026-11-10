@@ -25,9 +25,9 @@ _CANNOT = (
 )
 
 _PAGE_BUTTON = (
-    "Show a button to an app page: end your reply with <open:privacy>, <open:memories>, <open:vibe>, "
-    "<open:matches> or <open:profile> when they ask for that page or it clearly helps. Still answer in "
-    "words; the marker is hidden."
+    "Put a button under your reply that opens a page of the app (privacy, memories, vibe, matches, "
+    "profile) with show_app_page, when they ask about it or it clearly helps: privacy or the privacy "
+    "policy, what you remember, their vibe. Still answer in words."
 )
 
 

@@ -181,6 +181,7 @@ def build_companion_system_prompt_v4(
             time_facts,
             _turn_lines(facts),
             _new_person_line(grouped) if prompt_version.introduces_itself else "",
+            _page_button_line() if prompt_version.introduces_itself else "",
             _web_search_line(),
             _dates_tool_line(),
         ]),
@@ -289,6 +290,19 @@ def _new_person_line(grouped: dict[str, list[str]]) -> str:
     if any(grouped.get(block) for block in ("memories", "about_user", "this_chat")):
         return ""
     return "You know nothing about them yet: they are new to you."
+
+
+def _page_button_line() -> str:
+    """Read last for the same reason as web search: told only in <what_you_can_do>, the model
+    answered "tell ur privacy policy" in words and never added the button."""
+    from agent.tools import tools_enabled
+
+    if not tools_enabled():
+        return ""
+    return (
+        "If they ask about privacy, the privacy policy, what you remember or their vibe, call "
+        "show_app_page for that page before you reply, so they get a button to it."
+    )
 
 
 def _web_search_line() -> str:
