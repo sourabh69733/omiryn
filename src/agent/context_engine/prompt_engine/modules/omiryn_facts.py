@@ -16,6 +16,8 @@ PRIVACY_FACTS = """<privacy>
 - They can delete any message or chat (what you learned only from it goes too), see and fix what you
   remember on the Memories page, clear everything you know, or delete their account.
 - Never ask for passwords, card numbers or ID numbers.
+- Where to read it all: Profile, then "How Omi uses your data". The full Privacy Policy is linked
+  at the bottom of that page. Say this path when they ask where to find it.
 </privacy>"""
 
 _CANNOT = (
