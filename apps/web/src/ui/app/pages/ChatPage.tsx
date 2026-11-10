@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type ReactNode, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, History, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
 import { rememberedUpload, rememberUpload, type SharedUpload, UploadReading } from "../UploadReading";
 import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
@@ -76,12 +76,10 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const [pauseNow, setPauseNow] = useState(() => Date.now());
   // Right-side drawer: earlier chats, or usage (dev only). The chat stays open beside it.
   const [drawer, setDrawer] = useState<"earlier" | "usage" | null>(null);
-  const [chatMenuOpen, setChatMenuOpen] = useState(false);
   // The temporary chat on screen, deleted once the user leaves it.
   const temporaryIdRef = useRef<string | null>(null);
   // Picked fresh for each Temporary Chat and shown as its title.
   const [temporaryTitle, setTemporaryTitle] = useState("");
-  const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -477,19 +475,6 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   }, [conversation]);
 
   useEffect(() => {
-    if (!chatMenuOpen) return;
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !(event.target instanceof Node && chatMenuRef.current?.contains(event.target))) setChatMenuOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", close);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", close);
-    };
-  }, [chatMenuOpen]);
-
-  useEffect(() => {
     if (!drawer) return;
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawer(null); };
     window.addEventListener("keydown", close);
@@ -500,7 +485,6 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const omiId = omiThreadId(summaries);
   const temporary = Boolean(conversation?.temporary);
   const viewingEarlier = Boolean(conversation && omiId && conversation.id !== omiId && !temporary);
-  const earlierUnread = summaries.some((item) => item.id !== omiId && !item.archived_at && isUnread(item, seen, openId));
   const visibleMessages = conversation ? conversation.messages.slice(0, shownCount) : [];
   const retryIndex = conversation ? lastFailedIndex(conversation.messages, isFailedMessage) : -1;
   const revealingBubbles = Boolean(conversation && shownCount < conversation.messages.length);
@@ -1315,17 +1299,17 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
             ) : (
               <div className="chat-title-lockup"><span className="terminal-mark"><AgentOrb state={typingVisible ? "thinking" : draft.trim() ? "listening" : "idle"} /></span><div><h2>{agentName}</h2></div></div>
             )}
-            <div className="chat-controls omi-chat-menu" ref={chatMenuRef}>
-              <button type="button" className="omi-menu-button" aria-label="Chat options" aria-haspopup="menu" aria-expanded={chatMenuOpen} onClick={() => setChatMenuOpen((value) => !value)}>
-                <MoreHorizontal aria-hidden="true" />{earlierUnread ? <span className="history-unread-dot" role="img" aria-label="New messages in an earlier chat" /> : null}
-              </button>
-              {chatMenuOpen ? (
-                <div className="history-menu omi-chat-menu-list" role="menu">
-                  <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("earlier"); }}><History aria-hidden="true" />Earlier chats{earlierUnread ? <span className="history-new-pill">New</span> : null}</button>
-                  {conversation && !viewingEarlier ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setSelecting(true); setSelected([]); }}><ListChecks aria-hidden="true" />Select messages</button> : null}
-                  {temporary ? null : <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); void startTemporaryChat(); }}><MessageCircleDashed aria-hidden="true" />Temporary chat</button>}
-                  {canShowUsage ? <button type="button" role="menuitem" onClick={() => { setChatMenuOpen(false); setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}><BarChart3 aria-hidden="true" />Usage (dev)</button> : null}
-                </div>
+            {/* Two direct actions instead of a menu; each says what it does on hover and focus. */}
+            <div className="chat-controls omi-chat-menu">
+              {temporary ? null : (
+                <button type="button" className="omi-menu-button" aria-label="Temporary chat" data-tip="Temporary chat: Omi won't remember it or learn from it. Deleted when you leave." onClick={() => void startTemporaryChat()}>
+                  <MessageCircleDashed aria-hidden="true" />
+                </button>
+              )}
+              {canShowUsage ? (
+                <button type="button" className="omi-menu-button" aria-label="Usage, developers only" data-tip="Usage (dev only): tokens and cost for this chat." onClick={() => { setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}>
+                  <BarChart3 aria-hidden="true" />
+                </button>
               ) : null}
             </div>
           </div>

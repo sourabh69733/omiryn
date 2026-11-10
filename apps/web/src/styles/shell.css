@@ -1562,3 +1562,45 @@ button.omi-drawer-close:hover {
   width: 14px;
   height: 14px;
 }
+
+/* Chat header actions: a short label under the icon on hover or keyboard focus. */
+.omi-chat-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+button.omi-menu-button[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+button.omi-menu-button[data-tip]:hover::after,
+button.omi-menu-button[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 250ms;
+}
+
+@media (hover: none) {
+  button.omi-menu-button[data-tip]::after { display: none; }
+}
