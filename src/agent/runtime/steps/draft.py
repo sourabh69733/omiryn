@@ -6,10 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent.context_engine.policy.replies import keep_open_marker
 from agent.context_engine.policy.unknown import says_unknown
 from agent.outputs.companion_response import structured_companion_reply
 from agent.providers import AgentProviderTruncationError
 from agent.tools import ToolContext, chat_search_enabled, reply_with_tools, tool_arguments
+from agent.tools.app_pages import shown_page
 
 from .job import ReplyJob
 from .unsure_search import search_when_unsure
@@ -52,7 +54,12 @@ async def write_draft(job: ReplyJob) -> Draft:
         fallback_reason = "malformed_structured_output"
         raw = await job.generate(job.reply_messages, **job.generation_arguments, max_tokens=FALLBACK_MAX_TOKENS)
         decoded = structured_companion_reply(raw)
-    return Draft(visible_reply(raw, decoded), fallback_reason, tool_calls, chat_search)
+    reply = visible_reply(raw, decoded)
+    page = shown_page(tool_calls)
+    if page and reply.strip():
+        # The button the model asked for travels as the same hidden marker it can also write.
+        reply = keep_open_marker(f"<open:{page}>", reply)
+    return Draft(reply, fallback_reason, tool_calls, chat_search)
 
 
 __all__ = ["Draft", "write_draft"]

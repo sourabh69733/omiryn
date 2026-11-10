@@ -9,6 +9,7 @@ from . import places as _places  # noqa: F401  (registers find_places)
 from . import match_answer as _match_answer  # noqa: F401  (registers answer_match)
 from . import match_outcome as _match_outcome  # noqa: F401  (registers record_match_outcome)
 from . import memory_dates as _memory_dates  # noqa: F401  (registers memories_by_date)
+from . import app_pages as _app_pages  # noqa: F401  (registers show_app_page)
 from .chat_search import chat_search_enabled
 from .loop import MAX_CALLS_PER_ROUND, MAX_ROUNDS, reply_with_tools, tool_arguments, tool_result_messages, tools_enabled
 from .places import places_enabled
