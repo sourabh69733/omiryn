@@ -1,8 +1,19 @@
 # Omiryn progress
 
-Last updated 4 November 2026. Where the product, the agent and the app stand, what is decided, and what comes next. Details live in the linked docs; this page is the map.
+Last updated 10 November 2026. Where the product, the agent and the app stand, what is decided, and what comes next. Details live in the linked docs; this page is the map.
 
-## 1. The idea (locked)
+## 1. The idea (changed 10 November 2026)
+
+> Omiryn: a personal agent you talk to. It keeps you company, remembers what matters to you, helps with a few small things, and finds you people you'd find interesting to talk to.
+
+- Company first: talk or share anything, any time.
+- Remembers for you: birthdays, meetings, outing plans, and follows up at sensible hours.
+- Small helps: ideas and honest opinions, places and maps, what to watch, movie or cab booking by link. More are picked by what people ask for.
+- One of its main jobs: finding a person you'd enjoy talking to and could connect with deeply, from how well Omi knows you. Both say yes before an introduction.
+- Not a nearby-people or building platform. The building niche in [problem.md](problem.md) is superseded.
+- Live status of every part: the build map artifact (https://claude.ai/artifact/RHbCH4by15ApJQXETMd3zE).
+
+### Before 10 November (kept for history)
 
 > Omiryn: an AI you talk to that finds friends you'd actually get along with.
 

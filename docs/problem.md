@@ -1,5 +1,7 @@
 # The problem Omiryn solves first
 
+> **Superseded on 10 November 2026.** Omiryn is now a personal agent first: company, remembering, a few small helps, and finding you people you'd enjoy talking to as one of its main jobs. It is not a nearby-people or building platform. See [progress.md](progress.md) section 1 and the build map artifact (https://claude.ai/artifact/RHbCH4by15ApJQXETMd3zE). The building plan below is kept for history.
+
 Written 30 October 2026, rewritten the same day around one niche. One page, so every piece of work can be checked against it. The idea itself is locked in [progress.md](progress.md): an AI you talk to that finds friends you would get along with. This page says who that is for first, what their problem is, and how we know it is working. The niche is an internal choice; it stays out of the mission and the product copy.
 
 ## Who
