@@ -98,12 +98,17 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     const viewport = window.visualViewport;
     const syncHeight = () => {
       document.documentElement.style.setProperty("--omi-viewport-height", `${Math.round(viewport?.height ?? window.innerHeight)}px`);
+      // iOS scrolls the page up when the keyboard opens, pushing the header off screen. The app
+      // scrolls inside its panes, never the page, so keep the page at the top.
+      if (window.scrollY) window.scrollTo(0, 0);
     };
     syncHeight();
     viewport?.addEventListener("resize", syncHeight);
+    viewport?.addEventListener("scroll", syncHeight);
     window.addEventListener("resize", syncHeight);
     return () => {
       viewport?.removeEventListener("resize", syncHeight);
+      viewport?.removeEventListener("scroll", syncHeight);
       window.removeEventListener("resize", syncHeight);
       document.documentElement.style.removeProperty("--omi-viewport-height");
     };

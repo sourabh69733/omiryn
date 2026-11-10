@@ -92,3 +92,77 @@
   color: var(--ember-deep);
   background: var(--ember-soft);
 }
+
+/* Phones (2026-11-11 mobile pass). */
+@media (max-width: 760px) {
+  /* iOS zooms the whole page when a field under 16px takes focus; keep every field at 16px. */
+  .legacy-react-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select),
+  .legacy-react-shell .agentic-chat .composer > textarea,
+  .quick-setup-input {
+    font-size: 16px;
+  }
+
+  /* Bottom sheets sit above the keyboard (the app keeps --omi-viewport-height to the visible
+     area) and scroll when taller than the screen. */
+  .legacy-react-shell .confirm-overlay {
+    bottom: auto;
+    height: var(--omi-viewport-height, 100dvh);
+  }
+
+  .legacy-react-shell .confirm-dialog,
+  .legacy-react-shell .evidence-dialog {
+    max-height: calc(var(--omi-viewport-height, 100dvh) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Top bar icons and the chat's menu button: a thumb-sized target. */
+  .omi-rail-nav a,
+  .omi-main button.omi-back {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Small text controls keep their look but get a bigger invisible hit area. */
+  .vibe-strength,
+  .vibe-remove,
+  .mem-link,
+  .mem-row-menu .history-menu-button,
+  .contact-other a,
+  .pf-link {
+    position: relative;
+  }
+
+  .vibe-strength::after,
+  .vibe-remove::after,
+  .mem-link::after,
+  .mem-row-menu .history-menu-button::after,
+  .contact-other a::after,
+  .pf-link::after {
+    content: "";
+    position: absolute;
+    inset: -8px -4px;
+  }
+}
+
+/* Touch screens: holding a message opens its menu (which has Copy), so the system's text
+   selection and callout must not start at the same time; taps get no grey flash. */
+@media (hover: none) and (pointer: coarse) {
+  .agentic-chat .message-row .message {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .legacy-react-shell :is(button, a) {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* The smallest phones (320px): the top bar's icons step down so the account button stays on screen. */
+@media (max-width: 360px) {
+  .omi-rail-nav a {
+    width: 36px;
+    height: 36px;
+  }
+}
