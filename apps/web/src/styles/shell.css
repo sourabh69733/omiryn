@@ -242,6 +242,23 @@ button.omi-contact.is-active {
   cursor: pointer;
 }
 
+.omi-welcome .omi-welcome-private {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--success);
+  font-size: 13px;
+}
+
+.omi-welcome .omi-welcome-private > svg {
+  width: 13px;
+  height: 13px;
+}
+
 .omi-welcome button svg {
   width: 15px;
   height: 15px;

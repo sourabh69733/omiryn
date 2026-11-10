@@ -37,7 +37,7 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenVibe }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenVibe?: () => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenPrivacy }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenPrivacy?: () => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -1334,12 +1334,13 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
             {!loading && firstChat ? (
               <section className="omi-welcome" aria-label="Welcome to Omi">
                 <h3><AgentOrb state="idle" />This is Omi</h3>
-                <p>Talk about anything: your week, what you love, what bugs you.</p>
-                <p>As you chat, Omi learns your vibe. See it in {onOpenVibe ? <button type="button" onClick={onOpenVibe}>Vibe <ChevronRight aria-hidden="true" /></button> : "Vibe"}</p>
-                <p>Later, Omi introduces you to people you'd get along with.</p>
+                <p>Your AI friend. Talk about anything, share anything, any time.</p>
+                <p>It remembers what matters to you, like birthdays and plans, and helps with small things.</p>
+                <p>Once it knows you, it can introduce you to someone you'd enjoy talking to.</p>
+                <p className="omi-welcome-private"><Lock aria-hidden="true" />Your chats are encrypted and private.{onOpenPrivacy ? <> <button type="button" onClick={onOpenPrivacy}>How it works <ChevronRight aria-hidden="true" /></button></> : null}</p>
               </section>
             ) : null}
-            {!loading && conversation && !temporary ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Omi learns from your chats to find you friends. Don't share passwords or IDs.</p> : null}
+            {!loading && conversation && !temporary && !firstChat ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Chats are encrypted and private. Don't share passwords or IDs.</p> : null}
             {messageRows}
             {typingVisible ? <div className={`message-row agent is-new ${lastVisibleIsAgent ? "cluster-end same-cluster" : "cluster-single"}`}><span className="chat-avatar agent"><AgentOrb active /></span><div className="message agent typing-message"><div className="message-content typing-content"><span className="typing-dots"><span /><span /><span /></span></div></div></div> : null}
             {sending && slowReply ? <p className="typing-slow-note" role="status">Taking longer than usual…</p> : null}
