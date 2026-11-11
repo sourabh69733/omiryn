@@ -22,7 +22,7 @@ from agent.context_engine.prompt_engine.modules.language import language_module_
 from agent.context_engine.prompt_engine.modules.matching_understanding import (
     matching_understanding_prompt,
 )
-from agent.context_engine.prompt_engine.modules.omiryn_facts import PRIVACY_FACTS, abilities_block
+from agent.context_engine.prompt_engine.modules.omiryn_facts import APP_PAGES_FACTS, IDENTITY_FACTS, PRIVACY_FACTS, abilities_block
 from agent.context_engine.prompt_engine.modules.output_format import output_format_prompt
 from agent.context_engine.prompt_engine.modules.safety import safety_module_prompt
 from agent.context_engine.prompt_engine.modules.tone import tone_module_prompt
@@ -51,7 +51,7 @@ _SOURCE_BLOCKS = {
     "conversation_threads": "this_chat",
 }
 BLOCK_CHAR_LIMITS = {
-    "omi": 6800,
+    "omi": 8000,
     "rules": 4200,
     "format": 1400,
     "about_user": 2000,
@@ -150,6 +150,8 @@ def build_companion_system_prompt_v4(
             tone_module_prompt(agent_tone) if agent_tone not in {"", "auto"} else "",
             abilities_block() if prompt_version.introduces_itself else "",
             PRIVACY_FACTS if prompt_version.introduces_itself else "",
+            IDENTITY_FACTS if prompt_version.knows_itself else "",
+            APP_PAGES_FACTS if prompt_version.knows_itself else "",
         ]),
         ("rules", [
             prompt_version.prompt_contract,
