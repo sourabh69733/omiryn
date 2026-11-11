@@ -1,4 +1,5 @@
 import { Fragment, lazy, Suspense, useCallback, useMemo, type Dispatch, type ReactNode, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction, type TouchEvent as ReactTouchEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
@@ -108,6 +109,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const [menuView, setMenuView] = useState<"actions" | "react" | "picker">("actions");
   // The emojis need more width than a menu; near the edge they open over the message instead.
   const [menuToLeft, setMenuToLeft] = useState(false);
+  // Where the open message menu was opened from, for placing the full emoji picker beside it.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; left: number; right: number } | null>(null);
   // How the user rated Omi's replies in this chat, by message index.
   const [ratings, setRatings] = useState<ReadonlyMap<number, ReplyRating>>(() => new Map());
   const [replyTo, setReplyTo] = useState<ReplyQuote | null>(null);
@@ -133,14 +136,19 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     if (menuFor === null) return;
     const close = (event: Event) => {
       if (event instanceof KeyboardEvent && event.key !== "Escape") return;
-      if (event instanceof MouseEvent && (event.target as HTMLElement | null)?.closest(".message-menu")) return;
+      if (event instanceof MouseEvent && (event.target as HTMLElement | null)?.closest(".message-menu, .message-react-picker")) return;
       setMenuFor(null);
     };
+    // The full picker stays put on screen, so a scrolled chat would leave it beside the wrong message.
+    const log = logRef.current;
+    const closeOnScroll = () => setMenuFor(null);
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
+    log?.addEventListener("scroll", closeOnScroll, { passive: true });
     return () => {
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", close);
+      log?.removeEventListener("scroll", closeOnScroll);
     };
   }, [menuFor]);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -933,6 +941,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     const place = anchor.getBoundingClientRect();
     setMenuUp((log?.bottom ?? window.innerHeight) - place.bottom < (view === "react" ? MESSAGE_REACT_HEIGHT : MESSAGE_MENU_HEIGHT));
     setMenuToLeft((log?.right ?? window.innerWidth) - place.left < MESSAGE_REACT_WIDTH);
+    setMenuAnchor({ top: place.top, bottom: place.bottom, left: place.left, right: place.right });
     setMenuAsksWhy(false);
     setMenuView(view);
     setMenuFor(index);
@@ -1222,7 +1231,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                         <button type="button" className={`message-menu-trigger ${menuFor === index && menuView === "actions" ? "is-open" : ""}`} aria-label="Message options" aria-haspopup="menu" aria-expanded={menuFor === index && menuView === "actions"} onClick={(event) => { if (menuFor === index && menuView === "actions") setMenuFor(null); else openMenu(index, event.currentTarget); }}><MoreHorizontal aria-hidden="true" /></button>
                         {menuFor === index ? (
                           menuView === "picker" ? (
-                          <div className="message-react-picker" role="dialog" aria-label="Choose a reaction">
+                          createPortal(<div className="message-react-picker" role="dialog" aria-label="Choose a reaction" style={pickerPlace(menuAnchor)}>
                             <Suspense fallback={<div className="emoji-picker-loading">Loading emoji...</div>}>
                               <EmojiPicker
                                 height={360}
@@ -1236,7 +1245,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                                 onEmojiClick={(data: EmojiClickData) => void reactToMessage(index, data.emoji)}
                               />
                             </Suspense>
-                          </div>
+                          </div>, document.body)
                           ) : menuAsksWhy ? (
                           <div className={`message-menu-list ${menuUp ? "opens-up" : ""} ${menuToLeft ? "opens-left" : ""}`} role="menu" aria-label="What was off?">
                             <p className="message-menu-heading">What was off?</p>
@@ -1278,7 +1287,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                   {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
+            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuAnchor, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
@@ -1706,4 +1715,19 @@ function messageText(content: string | undefined) {
   return parts.map((part, index) => part.href
     ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>{part.text}</a>
     : <Fragment key={index}>{part.text}</Fragment>);
+}
+
+// The full emoji picker opens beside the message it reacts to: under it when there is room, else
+// above, and always inside the visible screen (above the keyboard on phones).
+const PICKER_HEIGHT = 380;
+function pickerPlace(anchor: { top: number; bottom: number; left: number; right: number } | null) {
+  const viewWidth = window.innerWidth;
+  const viewHeight = window.visualViewport?.height ?? window.innerHeight;
+  const width = Math.min(330, viewWidth - 32);
+  if (!anchor) return { width, left: (viewWidth - width) / 2, top: Math.max(8, (viewHeight - PICKER_HEIGHT) / 2) };
+  const left = Math.min(Math.max(16, anchor.right - width), viewWidth - width - 16);
+  const below = anchor.bottom + 6;
+  const above = anchor.top - PICKER_HEIGHT - 6;
+  const top = below + PICKER_HEIGHT <= viewHeight - 8 ? below : Math.max(8, Math.min(above, viewHeight - PICKER_HEIGHT - 8));
+  return { width, left, top };
 }

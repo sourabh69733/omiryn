@@ -1064,16 +1064,14 @@ button.omi-drawer-close:hover {
   background: rgba(248, 68, 31, 0.14);
 }
 
+/* Rendered on the page body (a moving message row would carry a fixed box with it); the
+   code places it beside the message. */
 .message-react-picker {
   position: fixed;
-  z-index: 40;
-  top: 50%;
-  left: 50%;
-  width: min(330px, calc(100vw - 32px));
+  z-index: 60;
   overflow: hidden;
   border-radius: 12px;
   box-shadow: var(--shadow-md);
-  transform: translate(-50%, -50%);
 }
 
 .message-menu-list button {
