@@ -134,7 +134,7 @@ class PromptV4Test(unittest.TestCase):
 
         self.assertIn("Line one.\nLine two.", prompt)
 
-    def test_v4_4_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
+    def test_v4_5_is_the_default_and_keeps_its_whole_character_and_goal(self) -> None:
         save_conversation({"id": CONVERSATION_ID, "status": "active", "messages": []}, USER_ID)
         with patch.dict(os.environ, {"AGENT_PIPELINE_VERSION": "v3", "MEMORY_EMBEDDING_MODEL": "off"}):
             os.environ.pop("AGENT_BEHAVIOR_VERSION", None)
@@ -150,7 +150,7 @@ class PromptV4Test(unittest.TestCase):
                 user_message_index=0,
                 assistant_message_index=1,
             )
-        self.assertEqual(package.prompt_version, "v4-4")
+        self.assertEqual(package.prompt_version, "v4-5")
         self.assertIn("Nothing happens to you between messages", package.system_prompt)
         # The character's last line survives its block's limit too.
         self.assertIn("one, then bring an opinion or turn to them.", package.system_prompt)
@@ -232,6 +232,7 @@ class PromptV43Test(unittest.TestCase):
             "v4-2": (True, True, True, True, "context_v4"),
             "v4-3": (True, True, True, True, "context_v4"),
             "v4-4": (True, True, True, True, "context_v4"),
+            "v4-5": (True, True, True, True, "context_v4"),
         }
         actual = {
             v.version_id: (v.blocks_prompt, v.listener_first, v.matching_understanding, v.plans_turn, v.engine_version)
@@ -320,3 +321,16 @@ class PromptV44Test(unittest.TestCase):
         memory = {"source_type": "agent_memories_v3", "title": "Memories", "content": "Has a cat named Biscuit."}
         self.assertNotIn("they are new to you", self._prompt("v4-4", [memory]))
         self.assertNotIn("they are new to you", self._prompt("v4-3"))
+
+    def test_only_v4_5_knows_who_made_it_and_the_app(self) -> None:
+        with patch.dict(os.environ, {"AGENT_TOOLS": "true", "TAVILY_API_KEY": "x", "GOOGLE_PLACES_API_KEY": "x"}):
+            new, old = self._prompt("v4-5"), self._prompt("v4-4")
+        self.assertIn("<who_made_you>", new)
+        self.assertIn("never rule one out", new)
+        self.assertIn("<the_app>", new)
+        self.assertIn("Matches: people you introduce", new)
+        # v4-4 is unchanged, and v4-5 keeps all of it.
+        self.assertNotIn("<who_made_you>", old)
+        self.assertNotIn("<the_app>", old)
+        self.assertIn("<privacy>", new)
+        self.assertNotIn("...\n</omi>", new)
