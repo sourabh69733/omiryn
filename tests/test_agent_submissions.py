@@ -3694,7 +3694,8 @@ class AgentSubmissionApiTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["agent_provider"], "ollama")
         self.assertEqual(data["agent_model"], "llama3.1:8b")
-        self.assertEqual(run_turn.await_args.kwargs["model"], "llama3.1:8b")
+        # No model picked in Profile: the reply uses the provider's current model, not the chat's stored one.
+        self.assertIsNone(run_turn.await_args.kwargs["model"])
 
     def test_subthreshold_message_schedules_idle_cognition(self) -> None:
         conversation = self.client.post("/api/agent/conversations").json()
