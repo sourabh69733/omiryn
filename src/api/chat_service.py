@@ -337,7 +337,7 @@ async def _run_turn(
         user_text=str(pending["content"]),
         user_id=_user_id(user),
         user_profile=_agent_user_context(user),
-        model=preferred_reply_model(_user_id(user), conversation.agent_model),
+        model=preferred_reply_model(_user_id(user)),
         agent_mode=conversation.agent_mode,
         agent_tone=conversation.agent_tone,
         agent_name=conversation.agent_name,

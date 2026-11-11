@@ -36,15 +36,17 @@ def model_choices(runtime: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"default": default, "choices": choices}
 
 
-def preferred_reply_model(user_id: str | None, fallback: str | None) -> str | None:
-    """The user's pick when the server still offers it; otherwise the chat's own model."""
-    if not user_id:
-        return fallback
-    picked = get_reply_model(user_id)
+def preferred_reply_model(user_id: str | None) -> str | None:
+    """The user's pick when the server still offers it; otherwise None, the server's current model.
+
+    A chat's stored model is the default from the day it was made: following it kept old chats on a
+    model the server had moved away from, so changing the default never reached them.
+    """
+    picked = get_reply_model(user_id) if user_id else None
     if not picked:
-        return fallback
+        return None
     offered = {choice["id"] for choice in model_choices()["choices"]}
-    return picked if picked in offered else fallback
+    return picked if picked in offered else None
 
 
 __all__ = ["MODEL_LABELS", "model_choices", "preferred_reply_model"]

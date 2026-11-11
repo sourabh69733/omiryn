@@ -52,13 +52,14 @@ class ReplyModelChoiceTest(unittest.TestCase):
         self.client.put("/api/agent/settings/model", json={"model": "google/gemma-4-31B-it"})
 
         self.assertEqual(self.client.get("/api/agent/settings/model").json()["selected"], "google/gemma-4-31B-it")
-        self.assertEqual(preferred_reply_model(USER_ID, "chat-model"), "google/gemma-4-31B-it")
+        self.assertEqual(preferred_reply_model(USER_ID), "google/gemma-4-31B-it")
 
     def test_back_to_default_and_unknown_models(self) -> None:
         self.assertEqual(self.client.put("/api/agent/settings/model", json={"model": "made/up"}).status_code, 400)
         self.client.put("/api/agent/settings/model", json={"model": "google/gemma-4-31B-it"})
         self.client.put("/api/agent/settings/model", json={"model": None})
-        self.assertEqual(preferred_reply_model(USER_ID, "chat-model"), "chat-model")
+        # No pick means the server's current model, never the model the chat was made with.
+        self.assertIsNone(preferred_reply_model(USER_ID))
 
 
 if __name__ == "__main__":
