@@ -27,6 +27,11 @@ class PageMarkerTest(unittest.TestCase):
         self.assertEqual(strip_open_marker("see [open: Memories]"), ("see", "memories"))
         self.assertIsNone(finish_reply("just words", "hi").open_page)
 
+    def test_a_tool_call_written_as_text_becomes_the_button(self) -> None:
+        finished = finish_reply('Side menu mein jaao. <show_app_page page="matches"/>', "where are my matches")
+        self.assertEqual((finished.parts, finished.open_page), (["Side menu mein jaao."], "matches"))
+        self.assertEqual(strip_open_marker("see <show_app_page page='settings'>"), ("see", None))
+
     def test_a_wordless_reply_gets_no_button(self) -> None:
         finished = finish_reply("<react:👍> <open:vibe>", "ok")
         self.assertEqual(assistant_messages(finished, {}), [])
