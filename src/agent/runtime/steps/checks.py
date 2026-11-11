@@ -15,6 +15,7 @@ from agent.context_engine.policy.freshness import (
     without_repeated_opening,
     without_repeated_questions,
 )
+from agent.context_engine.policy.identity import maker_claim, maker_claim_reason
 from agent.context_engine.policy.requests import (
     asked_question_requests,
     broken_requests,
@@ -40,6 +41,10 @@ def freshness_check_enabled() -> bool:
 
 def request_check_enabled() -> bool:
     return request_check_mode() != "false"
+
+
+def identity_check_enabled() -> bool:
+    return os.getenv("AGENT_IDENTITY_CHECK", "true").strip().lower() != "false"
 
 
 def request_check_mode() -> str:
@@ -135,11 +140,27 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True, "saved_requests": len(saved)}
 
 
+async def check_identity(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
+    """One rewrite when the draft says which company or model made or runs Omi, such as the
+    underlying model's own "I was developed by Google". Code finds the sentence; the model rewrites."""
+    quote = maker_claim(reply) if identity_check_enabled() else None
+    if quote is None:
+        return reply, None
+    try:
+        rewritten = await job.rewrite(rewrite_instruction(reply, maker_claim_reason(quote)), job.reply_messages)
+    except Exception as error:
+        return reply, {"quote": quote, "rewritten": False, "error": type(error).__name__}
+    if not rewritten.strip():
+        return reply, {"quote": quote, "rewritten": False}
+    return rewritten, {"quote": quote, "rewritten": True, "still_claims": maker_claim(rewritten) is not None}
+
+
 # In order; the name is the key of its result in the turn trace. Freshness comes last so it reads
 # the text the user will see: a request rewrite has no repeat check of its own.
 REPLY_CHECKS: tuple[tuple[str, Check], ...] = (
+    ("identity_check", check_identity),
     ("request_check", follow_requests),
     ("freshness", freshen_reply),
 )
 
-__all__ = ["REPLY_CHECKS", "follow_requests", "freshen_reply", "freshness_check_enabled", "request_check_enabled", "request_check_mode"]
+__all__ = ["REPLY_CHECKS", "check_identity", "follow_requests", "freshen_reply", "freshness_check_enabled", "identity_check_enabled", "request_check_enabled", "request_check_mode"]

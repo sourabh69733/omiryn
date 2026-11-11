@@ -268,7 +268,7 @@ class SeesWhatTheUserSeesTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_request_rewrite_that_repeats_is_caught_by_the_repeat_check(self) -> None:
         from agent.runtime.steps import REPLY_CHECKS
 
-        self.assertEqual([name for name, _check in REPLY_CHECKS], ["request_check", "freshness"])
+        self.assertEqual([name for name, _check in REPLY_CHECKS], ["identity_check", "request_check", "freshness"])
         first = SameShapeRepeatTest.FIRST
         job = ReplyJob(
             [{"role": "user", "content": "hmm"}],
