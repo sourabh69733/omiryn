@@ -143,6 +143,11 @@ The sections above are the first sketch. These routes exist in `src/api/routes` 
 | `POST /api/me/omi/clear` | `{"confirm": "clear"}`: delete every chat and everything Omi learned; account and profile stay. |
 | `DELETE /api/me/account-data?confirm=true` | Delete the account's private data. |
 | `GET /api/admin/audit` | Admin only: audit rows, optional `user_id`. |
+| `GET /api/admin/dashboard?days=14` | Admin only: `kpis` (active today/7d/previous 7d, returning, new users, replies and failed replies, cost today/7d/30d, messages), `daily` (active users, replies, failed, cost, new users per UTC day), `omi` (prompt version, reply model, p50/p95 reply latency, ratings, last error), `health` (memories, jobs, batch failures, open data requests, channels), `recent_users`, `attention` (level, title, detail, route, count). No chat or memory text. |
+| `GET /api/admin/people` | Admin only: every user with name, place, joined, last active, replies (total, 7d, failed), spend, chats, memories, profile facts, linked channels. |
+| `GET /api/admin/people/{user_id}` | Admin only, audited as `admin.view_user`: profile basics, settings, linked channels, matching, chats (metadata, replies and spend per chat), memory counts by kind, usage with 30 daily points and ratings, and the admin access log for this user. 404 when unknown. |
+| `GET /api/admin/costs?days=30` | Admin only: totals, daily calls/failures/tokens/cost/replies, `by_kind`, `by_model`, `reply_latency` (p50, p90, p95, max), `recent_failures`, `recent_calls`. |
+| `GET /api/admin/system` | Admin only: runtime flags, jobs by kind and status with failing jobs, memory pipeline counts and failing batches, channel links, eval runs, the latest 30 audit rows. |
 | `GET/POST /api/admin/pools` | Admin only: match pools (name, join code, match weekday). |
 | `GET /api/admin/pools/{id}` | Admin only: the pool's members with readiness and non-private vibe lines, pairs so far, suggested pairs. |
 | `POST /api/admin/pools/{id}/pairs` | Admin only: `{"user_a","user_b"}`; runs the compatibility check, stores the pair as `proposed`. |

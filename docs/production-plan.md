@@ -96,7 +96,7 @@ See [gcp-deployment.md](gcp-deployment.md) and the security checklist for the fu
 | Activation (first real chat with Omi) | Partial | App events exist; the definition and dashboard do not. |
 | Match rate (both accept) | Missing | Needs step 6. |
 | 7-day still-talking rate | Missing | Needs steps 7 and 8. The main success number. |
-| Dashboard for the three numbers | Missing | Admin app is the natural place. |
+| Dashboard for the three numbers | Partial | Admin dashboard (2026-11-12) shows active, returning and new users, replies and failures; match rate and still-talking rate are not on it yet. |
 
 ## 7. UI polish
 
