@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from admin.auth import require_admin_user
+from admin.insights import admin_costs, admin_dashboard, admin_people, admin_person, admin_system
 from admin.service import admin_eval_runs, admin_overview, admin_requests, admin_user_detail
 from security.auth import CurrentUser
 from storage.audit_log import list_audit_events, record_audit_event
@@ -102,3 +103,39 @@ async def admin_audit_endpoint(
 ) -> dict[str, object]:
     record_audit_event("admin.view_audit", actor_id=admin.id, actor_role="admin", target_user_id=user_id)
     return {"events": list_audit_events(target_user_id=user_id, limit=limit)}
+
+
+# Fast page endpoints. Plain functions so FastAPI runs them off the event loop.
+
+
+@router.get("/api/admin/dashboard")
+def admin_dashboard_endpoint(days: int = 14, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_dashboard", actor_id=admin.id, actor_role="admin")
+    return admin_dashboard(days=days)
+
+
+@router.get("/api/admin/people")
+def admin_people_endpoint(limit: int = 500, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_users", actor_id=admin.id, actor_role="admin")
+    return admin_people(limit=limit)
+
+
+@router.get("/api/admin/people/{user_id}")
+def admin_person_endpoint(user_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_user", actor_id=admin.id, actor_role="admin", target_user_id=user_id)
+    detail = admin_person(user_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+    return detail
+
+
+@router.get("/api/admin/costs")
+def admin_costs_endpoint(days: int = 30, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_usage", actor_id=admin.id, actor_role="admin")
+    return admin_costs(days=days)
+
+
+@router.get("/api/admin/system")
+def admin_system_endpoint(admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_system", actor_id=admin.id, actor_role="admin")
+    return admin_system()
