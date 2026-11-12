@@ -19,7 +19,7 @@
     "web:test": "tsx --test apps/web/src/ui/app/*.test.ts apps/web/src/ui/app/*.test.tsx",
     "admin:dev": "vite --config apps/admin/vite.config.js",
     "admin:test": "node --test apps/admin/src/*.test.js",
-    "admin:check": "node --check apps/admin/src/api.js && node --check apps/admin/src/auth.js && node --check apps/admin/src/main.js && node --check apps/admin/src/pools.js",
+    "admin:check": "for f in apps/admin/src/*.js apps/admin/src/pages/*.js; do node --check \"$f\" || exit 1; done",
     "admin:build": "vite build --config apps/admin/vite.config.js",
     "admin:preview": "vite preview --config apps/admin/vite.config.js",
     "admin:deploy": "npx wrangler deploy --config apps/admin/wrangler.jsonc",
