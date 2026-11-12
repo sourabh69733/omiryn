@@ -38,13 +38,16 @@ export function readinessLine(readiness) {
 }
 
 /** Pair status in plain words for the pill and the status select. */
-export const PAIR_STATUSES = ["proposed", "introduced", "met", "no_show", "declined", "still_talking"];
+export const PAIR_STATUSES = ["candidate", "proposed", "asked", "introduced", "met", "no_show", "declined", "still_talking", "expired"];
 
 export function pairStatusLabel(status) {
-  return { proposed: "Proposed", introduced: "Introduced", met: "Met", no_show: "No-show", declined: "Declined", still_talking: "Still talking" }[status] || String(status || "");
+  return {
+    candidate: "Candidate", proposed: "Proposed", asked: "Asked, waiting", introduced: "Introduced", met: "Met",
+    no_show: "No-show", declined: "Declined", still_talking: "Still talking", expired: "No answer in time",
+  }[status] || String(status || "");
 }
 
-const PILL_CLASS = { proposed: "warning", introduced: "active", met: "success", still_talking: "success", no_show: "failed", declined: "deleted" };
+const PILL_CLASS = { candidate: "", proposed: "warning", asked: "warning", introduced: "active", met: "success", still_talking: "success", no_show: "failed", declined: "deleted", expired: "deleted" };
 
 function pill(status) {
   return `<span class="status-pill ${PILL_CLASS[status] || ""}">${esc(pairStatusLabel(status))}</span>`;
@@ -117,6 +120,10 @@ export function renderPairs(view) {
       ${checkBlock(pair.check)}
       ${pair.plan ? `<p class="pool-plan"><strong>Plan:</strong> ${esc(pair.plan.place || "")}${pair.plan.when ? `, ${esc(pair.plan.when)}` : ""}</p>` : ""}
       ${pair.status === "proposed" ? `
+        <div class="pool-ask-row">
+          <button type="button" class="secondary-button" data-ask="${esc(pair.id)}">Ask both in chat</button>
+          <span class="pool-muted">Omi asks each person if they want to meet. Or introduce them directly below.</span>
+        </div>
         <form class="pool-introduce" data-pair-id="${esc(pair.id)}">
           <label>Place <input name="place" maxlength="160" placeholder="Blue Tokai, Sector 29" required></label>
           <label>When, in words <input name="when" maxlength="80" placeholder="Saturday 6 pm" required></label>
@@ -157,7 +164,9 @@ export function renderPoolView(view) {
         <h2>${esc(pool.name || "")}</h2>
         <p class="pool-muted">Join code <code class="mono">${esc(pool.join_code || "")}</code> · matches on ${esc(weekdayName(pool.match_weekday))}s · ${esc(String(view.members?.length ?? 0))} members, ${esc(String(view.ready_count ?? 0))} ready</p>
       </div>
+      <button type="button" data-pick="${esc(pool.id)}" ${(view.ready_count ?? 0) < 2 ? "disabled" : ""}>Pick this week's pairs</button>
     </div>
+    <div id="pool-pick-result"></div>
     <div class="pool-columns">
       <section>
         <h3>Suggested pairs</h3>
@@ -173,4 +182,21 @@ export function renderPoolView(view) {
       <h3>Members</h3>
       <div class="request-list pool-members" id="pool-members">${renderMembers(view)}</div>
     </section>`;
+}
+
+/** What a pick run did, in a few lines: pairs made, who waits, who was dropped and why. */
+export function renderPickResult(result, view) {
+  if (!result) return "";
+  const names = (ids) => (ids || []).map((id) => esc(nameOf(view, id))).join(", ");
+  const pairs = (result.pairs || []).map((pair) => `<li><strong>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}</strong> · fit ${esc(pair.fit || "unknown")}</li>`).join("");
+  const dropped = (result.dropped || []).map((pair) => `<li>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}: ${esc(pair.why || "")}</li>`).join("");
+  return `
+    <div class="request-card pool-pick-result">
+      <strong>Pick done: ${esc(String(result.pairs?.length || 0))} pairs proposed, ${esc(String(result.judged || 0))} checks run.</strong>
+      ${pairs ? `<ul class="pool-reasons">${pairs}</ul>` : ""}
+      ${result.group?.length ? `<p>Group of three: ${names(result.group)}</p>` : ""}
+      ${result.waiting?.length ? `<p class="pool-muted">Waiting: ${names(result.waiting)}</p>` : ""}
+      ${result.busy?.length ? `<p class="pool-muted">Already in a pair: ${names(result.busy)}</p>` : ""}
+      ${dropped ? `<p class="pool-muted">Dropped:</p><ul class="pool-reasons">${dropped}</ul>` : ""}
+    </div>`;
 }
