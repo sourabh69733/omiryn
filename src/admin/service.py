@@ -118,7 +118,7 @@ def admin_overview(limit: int = 30) -> dict[str, Any]:
 
 def admin_requests(limit: int = 100) -> dict[str, Any]:
     limit = max(1, min(limit, 200))
-    snapshot = _load_admin_snapshot()
+    snapshot = _load_request_snapshot()
     feedback = [
         _feedback_submission_detail(row)
         for row in snapshot["feedback_submission_rows"][:limit]
@@ -137,7 +137,7 @@ def admin_requests(limit: int = 100) -> dict[str, Any]:
         for row in feedback
         if (row.get("metadata") or {}).get("request_type") != "community_invite"
     ]
-    client_errors = [row for row in app_activity if row.get("event_name") == "client_error"]
+    client_errors = [_app_event_detail(row) for row in snapshot["client_error_rows"][:limit]]
     return {
         "summary": {
             "feedback_submission_count": len(snapshot["feedback_submission_rows"]),
@@ -155,10 +155,8 @@ def admin_requests(limit: int = 100) -> dict[str, Any]:
             "open_data_request_count": sum(
                 1 for row in snapshot["data_request_rows"] if row["status"] == "open"
             ),
-            "app_event_count": len(snapshot["app_event_rows"]),
-            "client_error_count": sum(
-                1 for row in snapshot["app_event_rows"] if row["event_name"] == "client_error"
-            ),
+            "app_event_count": snapshot["app_event_count"],
+            "client_error_count": snapshot["client_error_count"],
             "public_lead_count": len(snapshot["public_lead_rows"]),
             "public_event_count": len(snapshot["public_event_rows"]),
         },
@@ -171,6 +169,42 @@ def admin_requests(limit: int = 100) -> dict[str, Any]:
         "public_leads": public_leads,
         "public_events": public_activity,
     }
+
+
+def _load_request_snapshot() -> dict[str, Any]:
+    """Only the tables the Requests page shows, read in parallel; app events are capped and counted."""
+    from sqlalchemy import func
+
+    from admin.insights import _run
+
+    def rows(statement: Any) -> Any:
+        return lambda connection: connection.execute(statement).mappings().all()
+
+    def app_counts(connection: Any) -> tuple[int, int]:
+        total = connection.execute(select(func.count()).select_from(app_events)).scalar() or 0
+        errors = connection.execute(
+            select(func.count()).where(app_events.c.event_name == "client_error")
+        ).scalar() or 0
+        return int(total), int(errors)
+
+    data = _run(
+        {
+            "feedback_submission_rows": rows(select(feedback_submissions).order_by(feedback_submissions.c.created_at.desc())),
+            "data_request_rows": rows(select(data_requests).order_by(data_requests.c.created_at.desc())),
+            "app_event_rows": rows(select(app_events).order_by(app_events.c.created_at.desc()).limit(200)),
+            "client_error_rows": rows(
+                select(app_events)
+                .where(app_events.c.event_name == "client_error")
+                .order_by(app_events.c.created_at.desc())
+                .limit(200)
+            ),
+            "public_lead_rows": rows(select(public_leads).order_by(public_leads.c.created_at.desc())),
+            "public_event_rows": rows(select(public_events).order_by(public_events.c.created_at.desc()).limit(200)),
+            "app_counts": app_counts,
+        }
+    )
+    data["app_event_count"], data["client_error_count"] = data.pop("app_counts")
+    return data
 
 
 def admin_eval_runs(limit: int = 50) -> dict[str, Any]:
