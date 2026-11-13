@@ -90,7 +90,7 @@ class PlayerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(match_chat_summaries([pair["id"]], ME)[pair["id"]]["unread"], 1)
         # Both screens are told, by id only; and Aarav does not write twice in a row.
         events = [call.args[0] for call in self.published.await_args_list]
-        self.assertEqual({(e.type, e.scope_id) for e in events}, {("match.message", ME), ("match.message", AARAV)})
+        self.assertEqual({(e.type, e.scope_id) for e in events}, {("match.typing", ME), ("match.message", ME), ("match.message", AARAV)})
         self.assertEqual(await play_once(self.pool["id"]), [])
 
     async def test_a_pairing_with_nothing_in_common_is_not_asked(self) -> None:

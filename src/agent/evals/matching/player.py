@@ -170,6 +170,8 @@ async def play_once(
             )
             transcript = tuple({"role": "user" if m["sender_id"] == user_id else "assistant", "content": m["text"]} for m in messages)
             mine = sum(1 for m in messages if m["sender_id"] == user_id)
+            # Their screen shows the dots while the model writes, as a person's would.
+            await realtime_hub.publish(user_event("match.typing", pair_facts(pair, user_id)["other_id"], payload={"pair_id": pair["id"], "active": True}))
             decision = await ProviderSimulatedUser(provider=provider, model=model).next_turn(
                 scenario=scenario, transcript=transcript, turn_index=mine, conversation_id=f"match-chat:{pair['id']}"
             )
