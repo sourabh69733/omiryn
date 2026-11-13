@@ -93,6 +93,16 @@ class PlayerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual({(e.type, e.scope_id) for e in events}, {("match.message", ME), ("match.message", AARAV)})
         self.assertEqual(await play_once(self.pool["id"]), [])
 
+    async def test_a_pairing_with_nothing_in_common_is_not_asked(self) -> None:
+        thin = {"fit": "unknown", "reasons": [], "why_not": "only 0 areas to compare; needs 3"}
+        with patch("agent.matching.pool.check_compatibility", new=AsyncMock(return_value=type("C", (), {"as_dict": lambda self: thin})())):
+            with self.assertRaises(NotATestSetup) as refused:
+                await pair_and_ask(self.pool["id"], ME, "aarav")
+        self.assertIn("only 0 areas to compare", str(refused.exception))
+        from storage import list_match_pairs
+
+        self.assertEqual([p["status"] for p in list_match_pairs(self.pool["id"])], ["candidate"])
+
     async def test_other_endings_pass_silence_and_writing_first(self) -> None:
         pair = save_match_pair(self.pool["id"], ME, KABIR, CHECK, status="asked")
         _told(pair["id"], KABIR, ME)

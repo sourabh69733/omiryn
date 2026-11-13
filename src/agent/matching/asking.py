@@ -17,7 +17,7 @@ from typing import Any
 from agent.shared.clock import utc_now
 from storage import get_match_pair, set_match_pair_plan, update_match_pair_plan
 
-from .hosting import CLOSED_STATUSES, _defer_to_daytime, _host, hosting_conversation, pair_facts, schedule_hosting_jobs
+from .hosting import CLOSED_STATUSES, _chat_announced, _defer_to_daytime, _host, hosting_conversation, pair_facts, schedule_hosting_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,19 @@ get along. You have not told {name} anything about the user yet. Tell the user, 
 knows both would: who {name} is to them in one line (nothing beyond the reasons below) and why you
 think they would click, in plain words, using only these reasons:
 {reasons}
-{difference}Then ask whether they want you to introduce them, so the two can meet for a chai nearby. They can
+{difference}Then ask whether they want you to introduce them, {purpose}. They can
 say no and that is fine; make that clear without pushing. Share nothing else about {name}: not their
 words to you, not their notes, no contact details. Two or three short bubbles separated by
 <next_message>. Do not mention scores, matching, pools, operators or being automated.
 """
 _ASK_CUE = "(The user has said nothing new. Tell them now.)"
+# What an introduction leads to. With the chat in the app the two talk first and a meet is theirs
+# to arrange later; without it, the only way to talk is to meet.
+_ASK_FOR_MEET = "so the two can meet for a chai nearby"
+_ASK_FOR_CHAT = (
+    "so the two can start writing to each other in the app. It starts as a chat: do not propose a meet, a place or a time; "
+    "meeting is theirs to decide later"
+)
 
 _NOT_THIS_WEEK_INSTRUCTIONS = """
 
@@ -64,6 +71,9 @@ async def ask_pair(pair_id: str, *, created_by: str | None = None) -> dict[str, 
         raise LookupError("pair not found")
     if pair["status"] != "proposed":
         raise ValueError(f"pair is {pair['status']}, not proposed")
+    if not (pair.get("check") or {}).get("reasons"):
+        # Nothing was found in common (or the cards are too thin to compare): Omi would have nothing to say.
+        raise ValueError("pair has no reasons to give, so there is nothing to tell them")
     now = utc_now()
     previous = pair.get("plan") or {}
     plan = {
@@ -95,7 +105,9 @@ async def run_match_ask_job(job: dict[str, Any]) -> bool:
     check = pair.get("check") or {}
     reasons = "\n".join(f"- {reason['text']}" for reason in check.get("reasons") or []) or "- (no written reasons: say the person who runs their group thought they would get along)"
     difference = f"One difference they could live with: {check['difference']['text']}\n" if check.get("difference") else ""
-    instructions = _ASK_INSTRUCTIONS.format(name=facts["name"], group=facts["group"], reasons=reasons, difference=difference)
+    instructions = _ASK_INSTRUCTIONS.format(
+        name=facts["name"], group=facts["group"], reasons=reasons, difference=difference, purpose=_ASK_FOR_CHAT if _chat_announced() else _ASK_FOR_MEET
+    )
     sent = await _host(user_id, pair, kind="match_ask", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_ASK_CUE)
     now = utc_now().isoformat()
 

@@ -106,12 +106,21 @@ async def pair_and_ask(pool_id: str, tester_id: str, persona_id: str) -> dict[st
     """Pair the tester with one made-up person and have Omi ask both, as the operator would."""
     from agent.matching.asking import ask_pair
     from agent.matching.pool import propose_pair
+    from storage import set_match_pair_status
 
     people = _guard(pool_id)
     other = next((user_id for user_id in people if persona_of(user_id).id == persona_id), None)  # type: ignore[union-attr]
     if other is None:
         raise NotATestSetup(f"no made-up person \"{persona_id}\" in this test group")
     pair = await propose_pair(pool_id, tester_id, other, created_by="match-player")
+    check = pair.get("check") or {}
+    if not check.get("reasons"):
+        # Not asked: a candidate does not hold either person back from another pair.
+        set_match_pair_status(pair["id"], "candidate")
+        raise NotATestSetup(
+            f"nothing to tell them yet: {check.get('why_not') or 'the judge found no reasons'}. "
+            "Give the made-up person more chats (seed_match_personas.py --dev-database --more) or fill in your own vibe."
+        )
     return await ask_pair(pair["id"], created_by="match-player")
 
 

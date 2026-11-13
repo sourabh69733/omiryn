@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from agent.context_engine.policy import split_assistant_reply
+from agent.context_engine.policy.replies import strip_quiet_markers
 from agent.context_engine.policy.freshness import (
     recent_assistant_replies,
     rewrite_instruction,
@@ -530,7 +531,12 @@ async def generate_initiative_text(
             cue=cue,
             max_tokens=max_tokens,
         )
-        return None if _is_skip(text) else text
+        if _is_skip(text):
+            return None
+        # The model may answer with the quiet markers it uses in normal replies (<no_reply>, a
+        # reaction). In a message Omi starts itself they mean "nothing to say": never shown raw.
+        cleaned, _reaction, _quiet = strip_quiet_markers(text)
+        return cleaned or None
     finally:
         if show_typing:
             await _publish_typing(conversation["id"], False)
