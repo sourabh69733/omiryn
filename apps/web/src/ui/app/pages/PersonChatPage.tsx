@@ -222,7 +222,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
     } else if (stickRef.current) {
       log.scrollTop = log.scrollHeight;
     }
-  }, [messages, loading, showWhy, theirTyping]);
+  }, [messages, loading, showWhy, theirTyping, picked, error]);
 
   // Menus and pickers close on a click elsewhere or Escape.
   useEffect(() => {

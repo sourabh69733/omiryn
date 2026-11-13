@@ -146,8 +146,9 @@ button.pc-earlier {
   opacity: 0.6;
 }
 
-.pc-error {
-  margin: 0 16px 8px;
+.omi-main .pc-error {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto 8px;
   color: var(--danger, #b3261e);
   font-size: 13.5px;
 }
@@ -224,11 +225,13 @@ div.pc-picture.is-missing {
   cursor: default;
 }
 
-.pc-picked {
+/* The same column as the message box (760px, centred), as the reply bar in the chat with Omi. */
+.omi-main .pc-picked {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 14px;
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto 8px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 14px;
