@@ -1,0 +1,181 @@
+/* People: chats with people Omi introduced. The rows sit under Omi in the chat list; the chat
+   screen reuses the chat with Omi's layout (chat.css) and adds only what differs. */
+
+.omi-person-avatar,
+.pc-avatar,
+.pc-bubble-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--display-font, inherit);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.omi-person-avatar {
+  font-size: 15px;
+}
+
+button.omi-contact.omi-person .omi-contact-copy {
+  flex: 1;
+}
+
+button.omi-contact.omi-person.has-unread .omi-contact-copy strong,
+button.omi-contact.omi-person.has-unread .omi-contact-copy small {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.omi-unread {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--brand-violet);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* The rows inside the phone menu. */
+.omi-mobile-navigation-panel button.omi-contact.omi-person {
+  padding: 9px 10px;
+}
+
+.pc-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+.pc-screen .chat-title-lockup small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Their initial beside their last bubble, where Omi's orb sits in the chat with Omi. */
+.agentic-chat .chat-avatar.agent.pc-bubble-avatar {
+  display: grid;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+}
+
+.pc-menu {
+  position: relative;
+}
+
+.pc-menu .pc-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  z-index: 20;
+  min-width: 230px;
+}
+
+.pc-why {
+  width: min(520px, 100%);
+  margin: 6px auto 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  font-size: 14px;
+}
+
+.pc-why-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.pc-why-title svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pc-why ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.pc-why li + li {
+  margin-top: 4px;
+}
+
+.pc-why p {
+  margin: 0;
+}
+
+.pc-why .pc-why-line {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.pc-why .pc-why-line strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+button.pc-earlier {
+  display: block;
+  margin: 4px auto 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.message-row.is-pending .message {
+  opacity: 0.6;
+}
+
+.pc-error {
+  margin: 0 16px 8px;
+  color: var(--danger, #b3261e);
+  font-size: 13.5px;
+}
+
+/* The Matches page: a person's row opens their chat. */
+button.mt-row-open {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.mt-row-open:hover strong {
+  text-decoration: underline;
+}
+
+/* Two parts, not three: the message and the send button. */
+.agentic-chat .composer.pc-composer {
+  grid-template-columns: minmax(0, 1fr) 42px;
+  padding-left: 16px;
+}
+
+/* Above the message box or the closed bar, never over it. */
+.pc-screen .mt-toast {
+  bottom: 84px;
+}

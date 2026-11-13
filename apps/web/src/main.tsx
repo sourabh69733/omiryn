@@ -16,6 +16,7 @@ import "./styles/shell.css";
 import "./styles/auth-polish.css";
 import "./styles/contact.css";
 import "./styles/matches.css";
+import "./styles/people.css";
 import "./styles/readability.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
