@@ -26,7 +26,8 @@ _STATUS_WORDS = {
 _CLOSED_BY_OTHER = "it is off, and not by this user's choice; you do not know why, so do not guess"
 _CHAT_FACT = (
     "Where the status is introduced, met or still in touch, the two can write to each other directly in the "
-    "app: Matches, then the person. You cannot see that chat."
+    "app: Matches, then the person. You cannot see that chat. They talk there first: where no plan is set, do not "
+    "propose a meet, a place or a time; meeting is theirs to decide."
 )
 
 

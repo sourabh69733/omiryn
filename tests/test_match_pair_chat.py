@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from agent.context_engine.sources.match_hosting import match_hosting_sources
 from agent.jobs.worker import JobWorker
-from agent.matching.asking import MATCH_NOT_THIS_WEEK_JOB, ask_pair
-from agent.matching.hosting import run_match_intro_job
+from agent.matching.asking import MATCH_NOT_THIS_WEEK_JOB, ask_pair, run_match_ask_job
+from agent.matching.hosting import run_match_check_in_job, run_match_intro_job
 from agent.matching.pair_chat import MATCH_CLOSED_JOB, chat_state, close_pair
 from agent.matching.pick import eligible_pairs
 from agent.matching.pool import pool_view, propose_pair
@@ -24,6 +24,7 @@ from storage import (
     create_match_pool,
     delete_user_private_data,
     get_agent_job,
+    get_conversation,
     get_match_pair,
     join_match_pool,
     list_match_messages,
@@ -230,8 +231,50 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
                 await run_match_intro_job(job)
                 self.assertIn("You cannot see that chat", match_hosting_sources("ua")[-1]["content"])
         self.assertNotIn("under Matches, there is a chat", seen[0])
+        self.assertIn("ask what evening suits them", seen[0])  # no chat in the app: a meet is the only way to talk
         self.assertIn("under Matches, there is a chat with Bela", seen[1])
+        # With the chat, they talk first: Omi does not go looking for an evening or a place.
+        self.assertIn("No meet is planned", seen[1])
+        self.assertNotIn("ask what evening suits them", seen[1])
         self.assertNotIn("You cannot see that chat", match_hosting_sources("ua")[-1]["content"])
+
+    async def test_chat_first_ask_and_check_in_and_no_ask_without_reasons(self) -> None:
+        seen: list[str] = []
+
+        async def generate(conversation, user_id, *, instructions, **kwargs):
+            seen.append(instructions)
+            return "ok"
+
+        with patch("agent.matching.asking.utc_now", return_value=DAY), patch("agent.matching.hosting.utc_now", return_value=DAY):
+            await ask_pair(self.pair["id"], created_by="op")
+            with patch("agent.proactive.service.generate_initiative_text", generate):
+                await run_match_ask_job({"user_id": "ua", "kind": "match_ask", "payload": {"pair_id": self.pair["id"]}})
+                with patch.dict(os.environ, {"MATCH_CHAT_IN_APP": "true"}):
+                    await run_match_ask_job({"user_id": "ub", "kind": "match_ask", "payload": {"pair_id": self.pair["id"]}})
+                    self._introduce()
+                    await run_match_check_in_job({"user_id": "ua", "kind": "match_check_in", "payload": {"pair_id": self.pair["id"], "day": 3}})
+                await run_match_check_in_job({"user_id": "ua", "kind": "match_check_in", "payload": {"pair_id": self.pair["id"], "day": 3}})
+        self.assertIn("meet for a chai nearby", seen[0])
+        self.assertIn("start writing to each other in the app", seen[1])
+        self.assertNotIn("chai", seen[1])
+        self.assertIn("HOW IS IT GOING", seen[2])
+        self.assertNotIn("meant to meet", seen[2])
+        self.assertIn("meant to meet", seen[3])
+        # Two people with nothing found in common are never asked: Omi would have nothing to say.
+        empty = save_match_pair(self.pool["id"], "ua", "uc", {"fit": "unknown", "reasons": [], "why_not": "only 0 areas to compare; needs 3"}, created_by="op")
+        with self.assertRaises(ValueError):
+            await ask_pair(empty["id"], created_by="op")
+        self.assertEqual(get_match_pair(empty["id"])["status"], "proposed")
+
+    async def test_a_quiet_marker_is_never_shown_as_a_bubble(self) -> None:
+        with patch("agent.matching.asking.utc_now", return_value=DAY), patch("agent.matching.hosting.utc_now", return_value=DAY):
+            await ask_pair(self.pair["id"], created_by="op")
+            with patch("agent.proactive.service._initiative_text", new=AsyncMock(return_value="<no_reply>")):
+                self.assertFalse(await run_match_ask_job({"user_id": "ua", "kind": "match_ask", "payload": {"pair_id": self.pair["id"]}}))
+            self.assertEqual(len(get_conversation("ua-web", "ua")["messages"]), 1)  # nothing was added
+            with patch("agent.proactive.service._initiative_text", new=AsyncMock(return_value="<no_reply><next_message>There is someone you might like.")):
+                self.assertTrue(await run_match_ask_job({"user_id": "ub", "kind": "match_ask", "payload": {"pair_id": self.pair["id"]}}))
+        self.assertEqual([m["content"] for m in get_conversation("ub-web", "ub")["messages"][1:]], ["There is someone you might like."])
 
     def test_deleting_an_account_removes_the_chat(self) -> None:
         pair_id = self._introduce()

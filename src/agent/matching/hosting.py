@@ -64,6 +64,11 @@ _PLAN_SET = "The plan so far: {place}{when}. Ask whether that works for them."
 _PLAN_OPEN = (
     "No place or time is set yet: ask what evening suits them, and say you will suggest somewhere close by."
 )
+# With the chat in the app and no plan set by the operator, the two talk first; a meet is theirs to arrange.
+_PLAN_CHAT_FIRST = (
+    "No meet is planned and you are not arranging one: the two get to know each other in the chat first. "
+    "Do not ask about an evening or suggest a place; meeting is theirs to decide later."
+)
 # Said only once the app has the chat screen (MATCH_CHAT_IN_APP).
 _CHAT_OPEN = (
     "The two can now write to each other directly: in the Omiryn app, under Matches, there is a chat with {name}. "
@@ -88,6 +93,17 @@ you how it went, or that it did not happen, reply with exactly: SKIP
 Otherwise ask, lightly, how it went, in one or two short bubbles. You want to know whether they met
 and whether they would see {name} again, but ask one thing at a time. No pressure, and do not
 mention check-ins, timers or being automated.
+"""
+# The first check-in when the two talk in the app and no meet was planned.
+_CHECK_IN_3_CHAT_INSTRUCTIONS = """
+
+HOW IS IT GOING
+{when_relative} you introduced the user to {name}. The two can write to each other in the app; you
+cannot see that chat. If the recent chat shows they already told you how it is going with {name}, or
+that it ended, reply with exactly: SKIP
+Otherwise ask, lightly, how it is going with {name}, in one or two short bubbles. Do not assume they
+met or push them to; ask one thing at a time. No pressure, and do not mention check-ins, timers or
+being automated.
 """
 _CHECK_IN_30_INSTRUCTIONS = """
 
@@ -208,7 +224,7 @@ async def run_match_intro_job(job: dict[str, Any]) -> bool:
         difference=difference,
         plan=_PLAN_SET.format(place=plan.get("place") or "somewhere close by", when=f", {plan['when']}" if plan.get("when") else "")
         if plan.get("place") or plan.get("when")
-        else _PLAN_OPEN,
+        else (_PLAN_CHAT_FIRST if _chat_announced() else _PLAN_OPEN),
         chat=_CHAT_OPEN.format(name=facts["name"]) if _chat_announced() else "",
         icebreaker=icebreaker,
     )
@@ -258,11 +274,13 @@ async def run_match_check_in_job(job: dict[str, Any]) -> bool:
         # A user who already said they met has answered the first question; still worth asking how it went.
         meet_at = parse_time(plan.get("meet_at")) or parse_time(pair.get("introduced_at")) or utc_now()
         when_relative = _relative(meet_at, user_id)
-        instructions = _CHECK_IN_3_INSTRUCTIONS.format(
-            name=facts["name"],
-            when_relative=when_relative[0].upper() + when_relative[1:],
-            place=f" at {plan['place']}" if plan.get("place") else "",
-        )
+        when_relative = when_relative[0].upper() + when_relative[1:]
+        if _chat_announced() and not (plan.get("place") or plan.get("when") or plan.get("meet_at")):
+            instructions = _CHECK_IN_3_CHAT_INSTRUCTIONS.format(name=facts["name"], when_relative=when_relative)
+        else:
+            instructions = _CHECK_IN_3_INSTRUCTIONS.format(
+                name=facts["name"], when_relative=when_relative, place=f" at {plan['place']}" if plan.get("place") else ""
+            )
     return await _host(user_id, pair, kind=f"match_check_in_{day}", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_CHECK_IN_CUE)
 
 
