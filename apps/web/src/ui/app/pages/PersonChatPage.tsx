@@ -244,10 +244,12 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
   }
 
   const reasons = card?.reasons ?? [];
+  // Only what Omi actually said: a pair with no written reasons shows no card, never a filler line.
+  const hasWhy = reasons.length > 0;
   const why = (
     <section className="pc-why" aria-label={`Why Omi introduced you to ${name}`}>
       <p className="pc-why-title"><Sparkles aria-hidden="true" />Why Omi introduced you</p>
-      {reasons.length ? <ul>{reasons.map((reason) => <li key={reason.text}>{reason.text}</li>)}</ul> : <p>Omi thought you two would get along.</p>}
+      <ul>{reasons.map((reason) => <li key={reason.text}>{reason.text}</li>)}</ul>
       {card?.difference ? <p className="pc-why-line"><strong>One difference:</strong> {card.difference.text}</p> : null}
       {card?.icebreaker ? <p className="pc-why-line"><strong>An easy start:</strong> {card.icebreaker}</p> : null}
     </section>
@@ -267,7 +269,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
               <button type="button" className="omi-menu-button" aria-haspopup="menu" aria-expanded={menuOpen} aria-label={`More about ${name}`} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>
               {menuOpen ? (
                 <div className="history-menu pc-menu-list" role="menu">
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); stickRef.current = false; setShowWhy((value) => !value); if (logRef.current) logRef.current.scrollTop = 0; }}><Sparkles aria-hidden="true" />{showWhy ? "Hide the introduction" : "Why Omi introduced you"}</button>
+                  {hasWhy ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); stickRef.current = false; setShowWhy((value) => !value); if (logRef.current) logRef.current.scrollTop = 0; }}><Sparkles aria-hidden="true" />{showWhy ? "Hide the introduction" : "Why Omi introduced you"}</button> : null}
                   {card?.status !== "blocked" ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setBlocking(true); }}><Ban aria-hidden="true" />Block {name}</button> : null}
                   {card ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setReporting(true); }}><AlertTriangle aria-hidden="true" />Report {name}</button> : null}
                 </div>
@@ -278,7 +280,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
             {loading ? <StateView kind="loading" title="Opening your chat…" /> : null}
             {!loading && hasMore ? <button type="button" className="pc-earlier" disabled={busy} onClick={() => void loadEarlier()}>{busy ? "Loading…" : "Earlier messages"}</button> : null}
             {!loading ? <p className="omi-chat-notice"><Lock aria-hidden="true" />Only you and {name} can read this chat. Omi can't.</p> : null}
-            {!loading && (showWhy || !messages.length) ? why : null}
+            {!loading && hasWhy && (showWhy || !messages.length) ? why : null}
             {messages.map((message, index) => {
               const cluster = clusterClass(messages, index);
               const showAvatar = cluster === "cluster-single" || cluster.startsWith("cluster-end");
