@@ -49,6 +49,15 @@ class Action:
         return f"{persona_of(self.user_id).name if persona_of(self.user_id) else self.user_id}: {self.kind} ({self.detail}) pair {self.pair_id}"
 
 
+def _words(message: dict[str, Any]) -> str:
+    """What the persona model reads for one message: it cannot see a picture, only that one was sent."""
+    image = message.get("image")
+    if not image:
+        return message["text"]
+    kind = "a GIF" if image.get("content_type") == "image/gif" else "a picture"
+    return f"[sent {kind}, which you cannot see] {message['text']}".strip()
+
+
 def persona_of(user_id: str) -> MatchPersona | None:
     """The made-up person behind a seeded id; None for every real account."""
     if not user_id.startswith(TEST_USER_PREFIX):
@@ -168,7 +177,7 @@ async def play_once(
                 minimum_turns=_NO_FINISH,
                 maximum_turns=_NO_FINISH,
             )
-            transcript = tuple({"role": "user" if m["sender_id"] == user_id else "assistant", "content": m["text"]} for m in messages)
+            transcript = tuple({"role": "user" if m["sender_id"] == user_id else "assistant", "content": _words(m)} for m in messages)
             mine = sum(1 for m in messages if m["sender_id"] == user_id)
             # Their screen shows the dots while the model writes, as a person's would.
             await realtime_hub.publish(user_event("match.typing", pair_facts(pair, user_id)["other_id"], payload={"pair_id": pair["id"], "active": True}))

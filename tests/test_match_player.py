@@ -103,6 +103,13 @@ class PlayerTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([p["status"] for p in list_match_pairs(self.pool["id"])], ["candidate"])
 
+    def test_a_picture_reaches_the_persona_as_words(self) -> None:
+        from agent.evals.matching.player import _words
+
+        self.assertEqual(_words({"text": "hi", "image": None}), "hi")
+        self.assertEqual(_words({"text": "", "image": {"content_type": "image/jpeg"}}), "[sent a picture, which you cannot see]")
+        self.assertEqual(_words({"text": "look", "image": {"content_type": "image/gif"}}), "[sent a GIF, which you cannot see] look")
+
     async def test_other_endings_pass_silence_and_writing_first(self) -> None:
         pair = save_match_pair(self.pool["id"], ME, KABIR, CHECK, status="asked")
         _told(pair["id"], KABIR, ME)
