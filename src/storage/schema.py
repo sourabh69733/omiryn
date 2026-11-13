@@ -837,6 +837,34 @@ match_messages = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 Index("ix_match_messages_pair", match_messages.c.pair_id, match_messages.c.id)
+# A picture or GIF sent in a pair's chat, one per message. The bytes are kept here, base64 and
+# encrypted under the pair's first user's key like the message text: never a public file.
+match_media = Table(
+    "match_media",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("pair_id", String, nullable=False),
+    Column("message_id", Integer, nullable=False),
+    Column("uploader_id", String, nullable=False),
+    Column("content_type", String, nullable=False),
+    Column("width", Integer, nullable=True),
+    Column("height", Integer, nullable=True),
+    Column("size_bytes", Integer, nullable=False),
+    Column("data", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_match_media_message", match_media.c.message_id)
+# One emoji per person per message.
+match_reactions = Table(
+    "match_reactions",
+    metadata,
+    Column("message_id", Integer, primary_key=True),
+    Column("user_id", String, primary_key=True),
+    Column("pair_id", String, nullable=False),
+    Column("emoji", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_match_reactions_pair", match_reactions.c.pair_id)
 # How far each person has read in a pair's chat.
 match_chat_reads = Table(
     "match_chat_reads",

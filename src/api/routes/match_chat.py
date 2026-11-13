@@ -9,8 +9,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from io import BytesIO
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from PIL import Image
 from pydantic import BaseModel, Field
+
+from agent.context_engine.policy.replies import is_one_emoji
 
 from agent.matching.pair_chat import chat_state, close_pair, other_user
 from realtime import realtime_hub
@@ -20,20 +25,29 @@ from storage import (
     MATCH_MESSAGE_CHARS,
     MATCH_REPORT_REASONS,
     add_match_message,
+    get_match_media,
     get_match_pair,
     list_match_messages,
     mark_match_chat_read,
     match_chat_summaries,
     reserve_user_app_event,
+    set_match_reaction,
 )
 
 from ..helpers import _user_id
+from ..photo_processing import sanitize_profile_photo
 from .matches import match_card
 
 router = APIRouter()
 
 # Enough for a fast conversation; only stops a script.
 MESSAGES_PER_MINUTE = 30
+IMAGES_PER_MINUTE = 6
+# What a browser may send; a still picture is re-encoded smaller, a GIF is kept as it is.
+UPLOAD_MAX_BYTES = 8 * 1024 * 1024
+GIF_MAX_BYTES = 4 * 1024 * 1024
+GIF_MAX_FRAMES = 300
+CAPTION_CHARS = 500
 
 
 class ChatMessage(BaseModel):
@@ -43,6 +57,14 @@ class ChatMessage(BaseModel):
 
 class ChatRead(BaseModel):
     upto: int | None = Field(default=None, ge=0)
+
+
+class ChatTyping(BaseModel):
+    active: bool = True
+
+
+class ChatReaction(BaseModel):
+    emoji: str | None = Field(default=None, max_length=16)
 
 
 class MatchReport(BaseModel):
@@ -62,7 +84,41 @@ def _pair_for(pair_id: str, user_id: str) -> tuple[dict[str, Any], dict[str, Any
 
 def _view(message: dict[str, Any], user_id: str) -> dict[str, Any]:
     mine = message["sender_id"] == user_id
-    return {"id": message["id"], "mine": mine, "text": message["text"], "created_at": message["created_at"], "client_id": message["client_id"] if mine else None}
+    reactions = message.get("reactions") or {}
+    return {
+        "id": message["id"], "mine": mine, "text": message["text"], "created_at": message["created_at"], "client_id": message["client_id"] if mine else None,
+        # The picture's id and size; the bytes come from the media call. Never who, beyond mine or theirs.
+        "image": message.get("image"),
+        "reactions": {"mine": reactions.get(user_id), "theirs": next((emoji for who, emoji in reactions.items() if who != user_id), None)},
+    }
+
+
+def _slow_down(user_id: str, event_name: str, limit: int, pair_id: str, what: str) -> None:
+    allowed = reserve_user_app_event(
+        user_id, event_name, {"action": event_name.split(".", 1)[-1], "pair_id": pair_id},
+        burst_since=datetime.now(timezone.utc) - timedelta(seconds=60), burst_limit=limit,
+    )
+    if not allowed["allowed"]:
+        raise HTTPException(status_code=429, detail=f"Too many {what} in a short time. Please wait a minute.", headers={"Retry-After": "60"})
+
+
+def _clean_picture(content: bytes) -> dict[str, Any]:
+    """A picture safe to keep and show: a still one re-encoded as a JPEG without its metadata, a GIF
+    kept moving after its size and frames are checked. 415 for anything else."""
+    try:
+        with Image.open(BytesIO(content)) as candidate:
+            image_format, frames = candidate.format, getattr(candidate, "n_frames", 1)
+            width, height = candidate.size
+    except Exception:
+        raise HTTPException(status_code=415, detail="Send a JPG, PNG, WebP or GIF picture.") from None
+    if image_format == "GIF" and frames > 1:
+        if len(content) > GIF_MAX_BYTES or frames > GIF_MAX_FRAMES or width * height > 4_000_000:
+            raise HTTPException(status_code=413, detail="That GIF is too big. Try one under 4 MB.")
+        return {"data": content, "content_type": "image/gif", "width": width, "height": height}
+    data = sanitize_profile_photo(content)
+    with Image.open(BytesIO(data)) as cleaned:
+        width, height = cleaned.size
+    return {"data": data, "content_type": "image/jpeg", "width": width, "height": height}
 
 
 def _chat(pair: dict[str, Any], user_id: str, state: dict[str, Any]) -> dict[str, Any]:
@@ -101,15 +157,7 @@ async def send_match_message(pair_id: str, payload: ChatMessage, user: CurrentUs
         raise HTTPException(status_code=409, detail="This chat is closed.")
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Write something first.")
-    allowed = reserve_user_app_event(
-        user_id,
-        "quota.match_message",
-        {"action": "match_message", "pair_id": pair_id},
-        burst_since=datetime.now(timezone.utc) - timedelta(seconds=60),
-        burst_limit=MESSAGES_PER_MINUTE,
-    )
-    if not allowed["allowed"]:
-        raise HTTPException(status_code=429, detail="Too many messages in a short time. Please wait a minute.", headers={"Retry-After": "60"})
+    _slow_down(user_id, "quota.match_message", MESSAGES_PER_MINUTE, pair_id, "messages")
     message = add_match_message(pair_id, user_id, payload.text, client_id=payload.client_id)
     if message is None:
         raise HTTPException(status_code=404, detail="No such chat.")
@@ -117,6 +165,72 @@ async def send_match_message(pair_id: str, payload: ChatMessage, user: CurrentUs
     mark_match_chat_read(pair_id, user_id, message["id"])
     await _notify("match.message", pair, {"message_id": message["id"]})
     return {"message": _view(message, user_id)}
+
+
+@router.post("/api/me/matches/{pair_id}/images", status_code=201)
+async def send_match_image(
+    pair_id: str,
+    request: Request,
+    caption: str = Query(default="", max_length=CAPTION_CHARS),
+    client_id: str | None = Query(default=None, max_length=64),
+    user: CurrentUser = Depends(require_user),
+) -> dict[str, object]:
+    """A picture or a GIF as the request body (its bytes, not a form); the words with it go in `caption`."""
+    user_id = _user_id(user)
+    pair, state = _pair_for(pair_id, user_id)
+    if not state["open"]:
+        raise HTTPException(status_code=409, detail="This chat is closed.")
+    if int(request.headers.get("content-length") or 0) > UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="That picture is too big. Try one under 8 MB.")
+    content = await request.body()
+    if not content:
+        raise HTTPException(status_code=400, detail="No picture was sent.")
+    if len(content) > UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="That picture is too big. Try one under 8 MB.")
+    _slow_down(user_id, "quota.match_image", IMAGES_PER_MINUTE, pair_id, "pictures")
+    message = add_match_message(pair_id, user_id, caption, client_id=client_id, media=_clean_picture(content))
+    if message is None:
+        raise HTTPException(status_code=404, detail="No such chat.")
+    mark_match_chat_read(pair_id, user_id, message["id"])
+    await _notify("match.message", pair, {"message_id": message["id"]})
+    return {"message": _view(message, user_id)}
+
+
+@router.get("/api/me/matches/{pair_id}/media/{media_id}")
+async def match_media(pair_id: str, media_id: str, user: CurrentUser = Depends(require_user)) -> Response:
+    """The bytes of one picture, for the two people in the pair only."""
+    _pair_for(pair_id, _user_id(user))
+    media = get_match_media(pair_id, media_id)
+    if media is None:
+        raise HTTPException(status_code=404, detail="No such picture.")
+    return Response(content=media["data"], media_type=media["content_type"], headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"})
+
+
+@router.post("/api/me/matches/{pair_id}/typing")
+async def match_typing(pair_id: str, payload: ChatTyping | None = None, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """"I am writing": told to the other person only, kept nowhere. The app sends it every few seconds while typing."""
+    user_id = _user_id(user)
+    pair, state = _pair_for(pair_id, user_id)
+    if state["open"]:
+        await _notify("match.typing", pair, {"active": payload.active if payload else True}, only=other_user(pair, user_id))
+    return {"ok": True}
+
+
+@router.post("/api/me/matches/{pair_id}/messages/{message_id}/reaction")
+async def react_to_match_message(pair_id: str, message_id: int, payload: ChatReaction, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """`{"emoji": "😂"}` puts or changes this person's one emoji on a message; `null` takes it off."""
+    user_id = _user_id(user)
+    pair, state = _pair_for(pair_id, user_id)
+    if not state["open"]:
+        raise HTTPException(status_code=409, detail="This chat is closed.")
+    emoji = (payload.emoji or "").strip() or None
+    if emoji and not is_one_emoji(emoji):
+        raise HTTPException(status_code=400, detail="A reaction is one emoji.")
+    if not set_match_reaction(pair_id, message_id, user_id, emoji):
+        raise HTTPException(status_code=404, detail="No such message.")
+    await _notify("match.reaction", pair, {"message_id": message_id})
+    rows = list_match_messages(pair_id, before=message_id + 1, limit=1)
+    return {"message": _view(rows[0], user_id) if rows else None}
 
 
 @router.post("/api/me/matches/{pair_id}/read")

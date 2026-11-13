@@ -277,6 +277,61 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(await run_match_ask_job({"user_id": "ub", "kind": "match_ask", "payload": {"pair_id": self.pair["id"]}}))
         self.assertEqual([m["content"] for m in get_conversation("ub-web", "ub")["messages"][1:]], ["There is someone you might like."])
 
+    def test_pictures_gifs_reactions_and_typing(self) -> None:
+        from io import BytesIO
+
+        from PIL import Image
+
+        pair_id = self._introduce()
+        photo = BytesIO()
+        Image.new("RGB", (3000, 1500), (200, 120, 40)).save(photo, format="PNG")
+        gif = BytesIO()
+        frames = [Image.new("RGB", (40, 30), color) for color in ((255, 0, 0), (0, 255, 0), (0, 0, 255))]
+        frames[0].save(gif, format="GIF", save_all=True, append_images=frames[1:], duration=80, loop=0)
+        with _As("ua") as client:
+            sent = client.post(f"/api/me/matches/{pair_id}/images?caption=the%20tapri&client_id=p1", content=photo.getvalue(), headers={"Content-Type": "image/png"})
+            self.assertEqual(sent.status_code, 201)
+            message = sent.json()["message"]
+            # A still picture is re-encoded: a JPEG no wider than the limit, without its metadata.
+            self.assertEqual((message["text"], message["image"]["content_type"], message["image"]["width"], message["image"]["height"]), ("the tapri", "image/jpeg", 2048, 1024))
+            again = client.post(f"/api/me/matches/{pair_id}/images?client_id=p1", content=photo.getvalue()).json()["message"]
+            self.assertEqual(again["id"], message["id"])  # a retried upload is saved once
+            moving = client.post(f"/api/me/matches/{pair_id}/images", content=gif.getvalue()).json()["message"]
+            self.assertEqual((moving["text"], moving["image"]["content_type"]), ("", "image/gif"))
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/images", content=b"not a picture").status_code, 415)
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/images", content=b"").status_code, 400)
+            fetched = client.get(f"/api/me/matches/{pair_id}/media/{message['image']['id']}")
+            self.assertEqual((fetched.status_code, fetched.headers["content-type"], fetched.content[:3]), (200, "image/jpeg", b"\xff\xd8\xff"))
+            self.assertEqual(client.get("/api/me/matches").json()["matches"][0]["chat"]["last_text"], "GIF")  # no words: the row names what it is
+        with _As("uc") as client:  # not in the pair
+            self.assertEqual(client.get(f"/api/me/matches/{pair_id}/media/{message['image']['id']}").status_code, 404)
+        with _As("ub") as client:
+            self.assertEqual(client.get(f"/api/me/matches/{pair_id}/media/{moving['image']['id']}").content[:6], b"GIF89a")
+            self.assertEqual(client.get(f"/api/me/matches/{pair_id}/media/nope").status_code, 404)
+            reacted = client.post(f"/api/me/matches/{pair_id}/messages/{message['id']}/reaction", json={"emoji": "😂"}).json()["message"]
+            self.assertEqual(reacted["reactions"], {"mine": "😂", "theirs": None})
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages/{message['id']}/reaction", json={"emoji": "lol"}).status_code, 400)
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages/999999/reaction", json={"emoji": "👍"}).status_code, 404)
+            self.published.reset_mock()
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/typing", json={"active": True}).status_code, 200)
+            # Typing is told to the other person only, by pair id.
+            events = [call.args[0] for call in self.published.await_args_list]
+            self.assertEqual([(e.type, e.scope_id, e.payload) for e in events], [("match.typing", "ua", {"pair_id": pair_id, "active": True})])
+        with _As("ua") as client:
+            rows = client.get(f"/api/me/matches/{pair_id}/messages").json()["messages"]
+            self.assertEqual(rows[0]["reactions"], {"mine": None, "theirs": "😂"})
+            client.post(f"/api/me/matches/{pair_id}/messages/{message['id']}/reaction", json={"emoji": "❤️"})
+        with _As("ub") as client:
+            rows = client.get(f"/api/me/matches/{pair_id}/messages").json()["messages"]
+            self.assertEqual(rows[0]["reactions"], {"mine": "😂", "theirs": "❤️"})
+            cleared = client.post(f"/api/me/matches/{pair_id}/messages/{message['id']}/reaction", json={"emoji": None}).json()["message"]
+            self.assertEqual(cleared["reactions"], {"mine": None, "theirs": "❤️"})
+        # Deleting an account takes the pictures and reactions with the chat.
+        delete_user_private_data("ub")
+        from storage import get_match_media
+
+        self.assertIsNone(get_match_media(pair_id, message["image"]["id"]))
+
     def test_deleting_an_account_removes_the_chat(self) -> None:
         pair_id = self._introduce()
         add_match_message(pair_id, "ua", "hi")
