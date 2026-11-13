@@ -94,6 +94,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [ ] Add upload/file size limits at proxy/runtime level.
 - [x] Add server-side profile photo decoding/validation, metadata stripping, and safe re-encoding so spoofed or malicious non-image uploads are rejected.
 - [x] Chat between two matched people (2026-11-13): only the two people in the pair can read or write; text encrypted like other user content; realtime events carry ids only; 2000 chars a message and 30 a minute; a block or report closes it for both and the other person is never told who or why; the operator sees counts, never words; deleted with either account.
+- [x] Pictures in a chat between matched people (2026-11-14): JPG, PNG, WebP or GIF only, decoded and re-encoded (metadata and location stripped; GIFs size and frame checked), stored encrypted with the chat, served only to the two people with `nosniff`, deleted with either account.
+- [ ] Pictures between matched strangers are not checked for nudity or abuse. Decide: an image check before delivery, pictures only after both have written a few messages, or report and block only.
 - [ ] Reported chats: the team sees the reason and the reporter's note only. Decide whether a reporter may share the messages with the team, and who reviews reports and how fast.
 - [ ] Add alerts for repeated throttling or safety reports.
 

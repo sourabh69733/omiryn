@@ -14,7 +14,7 @@ import { AgentOrb } from "./AgentOrb";
 import { AvatarImage } from "./AvatarImage";
 import { mainPhoto } from "./profilePhoto";
 import { initialOf, type MatchCard } from "./matches";
-import { MATCH_EVENT, pairFromPath, peopleRows, personPath, previewLine, unreadLabel } from "./people";
+import { MATCH_EVENT, pairFromPath, peopleRows, personPath, previewLine, unreadLabel, type MatchEventDetail } from "./people";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import { useIsMobile } from "./useIsMobile";
 import { useKeyboardA11y } from "./useKeyboardA11y";
@@ -45,14 +45,33 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       .finally(() => setCardsLoaded(true));
   }, []);
 
+  // Who is writing to the user right now, by pair; each entry clears itself.
+  const [typingPairs, setTypingPairs] = useState<Record<string, boolean>>({});
+  const typingTimers = useRef<Record<string, number>>({});
+
   useEffect(() => {
     loadPeople();
     // A message, a read on another device, a block: the socket says so and the list refetches.
+    // Typing and reactions change nothing the list shows beyond the "typing…" line.
+    const onEvent = (event: Event) => {
+      const detail = (event as CustomEvent<MatchEventDetail>).detail;
+      const pairId = detail?.payload?.pair_id;
+      if (detail?.type === "match.reaction") return;
+      if (detail?.type === "match.typing" && pairId) {
+        const active = detail.payload.active !== false;
+        window.clearTimeout(typingTimers.current[pairId]);
+        setTypingPairs((current) => ({ ...current, [pairId]: active }));
+        if (active) typingTimers.current[pairId] = window.setTimeout(() => setTypingPairs((current) => ({ ...current, [pairId]: false })), 6000);
+        return;
+      }
+      if (pairId) setTypingPairs((current) => (current[pairId] ? { ...current, [pairId]: false } : current));
+      loadPeople();
+    };
     const onFocus = () => { if (document.visibilityState === "visible") loadPeople(); };
-    window.addEventListener(MATCH_EVENT, loadPeople);
+    window.addEventListener(MATCH_EVENT, onEvent);
     window.addEventListener("focus", onFocus);
     return () => {
-      window.removeEventListener(MATCH_EVENT, loadPeople);
+      window.removeEventListener(MATCH_EVENT, onEvent);
       window.removeEventListener("focus", onFocus);
     };
   }, [loadPeople]);
@@ -182,7 +201,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     return (
       <button type="button" key={card.pair_id} className={`omi-contact omi-person ${page === "person" && personId === card.pair_id ? "is-active" : ""} ${unread ? "has-unread" : ""}`} onClick={() => openPerson(card.pair_id)}>
         <span className="omi-contact-avatar omi-person-avatar" aria-hidden="true">{initialOf(card.name)}</span>
-        <span className="omi-contact-copy"><strong>{card.name}</strong><small>{previewLine(card)}</small></span>
+        <span className="omi-contact-copy"><strong>{card.name}</strong>{typingPairs[card.pair_id] ? <small className="is-typing">typing…</small> : <small>{previewLine(card)}</small>}</span>
         {unread ? <span className="omi-unread" aria-label={`${card.chat?.unread} unread`}>{unread}</span> : null}
       </button>
     );
