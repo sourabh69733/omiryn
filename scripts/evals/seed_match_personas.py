@@ -13,7 +13,8 @@ in a database of their own, so the judge evaluation can run before any real pair
       --known <a>:<b> ... --random-pairs 6
 
 The seeded ids and the --known arguments are saved under reports/evals/<date>/match-personas.json.
-The development database from .env is never used unless DATABASE_URL is set in the shell.
+The development database from .env is never used unless DATABASE_URL is set in the shell or
+--dev-database is passed (to test the match flow as yourself, see play_match_people.py).
 """
 
 from __future__ import annotations
@@ -37,7 +38,11 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 DEFAULT_DATABASE_URL = "sqlite:///./data/omiryn_match_eval.db"
-os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or DEFAULT_DATABASE_URL
+# --dev-database seeds into the database from .env, for testing the match flow as yourself
+# (scripts/evals/play_match_people.py). Read here because storage binds its engine on import.
+DEV_DATABASE = "--dev-database" in sys.argv and bool(os.environ.get("DATABASE_URL"))
+if not DEV_DATABASE:
+    os.environ["DATABASE_URL"] = EXPLICIT_DATABASE_URL or DEFAULT_DATABASE_URL
 os.environ.setdefault("AUTH_REQUIRED", "false")
 
 from agent.cognition.background.memory_run.service import (  # noqa: E402
@@ -94,6 +99,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Give the people already in today's saved report --sessions more chats instead of making new users.",
     )
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument(
+        "--dev-database",
+        action="store_true",
+        help="Seed into the database from .env instead of the evaluation one, so the people can be played in the app.",
+    )
     return parser
 
 
@@ -146,7 +156,9 @@ def _repeating(turns) -> bool:
 
 
 def _report_path() -> Path:
-    return PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d") / "match-personas.json"
+    # The dev database keeps its own list, so its people are never mistaken for the evaluation ones.
+    name = "match-personas-dev.json" if DEV_DATABASE else "match-personas.json"
+    return PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d") / name
 
 
 def _existing_user(person: MatchPersona) -> str | None:
@@ -235,6 +247,12 @@ async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
 
 
 async def _run(args: argparse.Namespace) -> int:
+    if DEV_DATABASE:
+        from security.auth import production_runtime_enabled
+
+        if production_runtime_enabled():
+            print("Refused: --dev-database does not run in production.", file=sys.stderr)
+            return 2
     init_db()
     wanted = {p.strip() for p in args.only.split(",") if p.strip()}
     people = [p for p in MATCH_PERSONAS if not wanted or p.id in wanted]
@@ -254,7 +272,8 @@ async def _run(args: argparse.Namespace) -> int:
         f"{by_persona[a]}:{by_persona[b]}" for a, b in KNOWN_FRIEND_PAIRS if by_persona.get(a) and by_persona.get(b)
     ]
     payload = {
-        "database_url": os.environ["DATABASE_URL"],
+        # The .env address can hold a password; it is never written to the report.
+        "database_url": "(the database from .env)" if DEV_DATABASE else os.environ["DATABASE_URL"],
         "companion_model": args.model,
         "prompt_version": args.prompt,
         "people": rows,
