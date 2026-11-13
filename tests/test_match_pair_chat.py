@@ -154,6 +154,19 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
             codes = [client.post(f"/api/me/matches/{pair_id}/messages", json={"text": f"m{i}"}).status_code for i in range(3)]
         self.assertEqual(codes, [201, 201, 429])
 
+    def test_calling_it_off_closes_it_with_no_block_and_no_report(self) -> None:
+        pair_id = self._introduce()
+        with _As("ua") as client:
+            ended = client.post(f"/api/me/matches/{pair_id}/end").json()
+            self.assertEqual((ended["status"], ended["match"]["status"], ended["match"]["chat"]["open"]), ("declined", "declined", False))
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "one more"}).status_code, 409)
+            self.assertEqual(client.post(f"/api/me/matches/{pair_id}/end").status_code, 200)  # a second tap changes nothing
+        self.assertEqual(get_match_pair(pair_id)["status"], "declined")
+        self.assertEqual(blocked_match_pairs(), set())
+        self.assertEqual(list_match_reports(), [])
+        # Bela hears only that it is off.
+        self.assertIsNotNone(get_agent_job(f"{MATCH_CLOSED_JOB}:ub:{pair_id}:closed"))
+
     async def test_a_block_closes_it_for_both_and_keeps_them_apart(self) -> None:
         pair_id = self._introduce()
         add_match_message(pair_id, "ub", "hey")

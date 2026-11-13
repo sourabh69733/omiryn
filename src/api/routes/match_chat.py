@@ -255,6 +255,12 @@ async def _close(pair_id: str, user_id: str, *, block: bool, reason: str | None 
     return {"match": match_card(pair, user_id) if pair else None, "status": result["status"]}
 
 
+@router.post("/api/me/matches/{pair_id}/end")
+async def end_match(pair_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """Call it off without a block or a report: the chat closes and the other person hears only that it is off."""
+    return await _close(pair_id, _user_id(user), block=False)
+
+
 @router.post("/api/me/matches/{pair_id}/block")
 async def block_match(pair_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     return await _close(pair_id, _user_id(user), block=True)
