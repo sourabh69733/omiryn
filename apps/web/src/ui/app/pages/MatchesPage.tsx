@@ -38,6 +38,8 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
   const [passReason, setPassReason] = useState<string | null>(null);
   const [reporting, setReporting] = useState<MatchCard | null>(null);
   const [reportSent, setReportSent] = useState("");
+  const [ending, setEnding] = useState<MatchCard | null>(null);
+  const [endBusy, setEndBusy] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [shownAgain, setShownAgain] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -112,6 +114,22 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
     setPassing(null);
     setPassReason(null);
     onPeopleChanged?.();
+  }
+
+  // Call it off: no block, no report. The chat closes and the other person hears only that it is off.
+  async function callOff(card: MatchCard) {
+    if (endBusy) return;
+    setEndBusy(true);
+    setError("");
+    const response = await apiFetch(`/api/me/matches/${card.pair_id}/end`, { method: "POST" }).catch(() => null);
+    setEndBusy(false);
+    if (!response?.ok) {
+      setError(response ? await apiErrorMessage(response, "Could not call it off. Nothing changed.") : "Could not call it off. Nothing changed.");
+      return;
+    }
+    const data = await response.json();
+    reported({ ...card, ...(data.match ?? { status: "declined" }) }, `Called off. ${card.name} is told only that it won't happen.`);
+    setEnding(null);
   }
 
   async function join(event: FormEvent) {
@@ -198,7 +216,7 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
         {loaded ? <span className="mt-label">{matchesLabel(ready, split)}</span> : null}
       </header>
 
-      {error && !passing && !reporting ? <p className="mt-error" role="alert">{error}</p> : null}
+      {error && !passing && !reporting && !ending ? <p className="mt-error" role="alert">{error}</p> : null}
 
       {loaded && readiness && !ready ? (
         <section className="mt-card" aria-labelledby="mt-needs-title">
@@ -266,10 +284,9 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
                     <button className="history-menu-button" type="button" aria-haspopup="menu" aria-expanded={menuId === card.pair_id} aria-label={`More about ${card.name}`} onClick={() => setMenuId(menuId === card.pair_id ? null : card.pair_id)}><MoreHorizontal aria-hidden="true" /></button>
                     {menuId === card.pair_id ? (
                       <div className="history-menu" role="menu">
-                        {card.chat && onOpenPerson ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onOpenPerson(card.pair_id); }}><MessageCircle aria-hidden="true" />Chat with {card.name}</button> : null}
                         <button type="button" role="menuitem" onClick={() => { setMenuId(null); setShownAgain(shownAgain === card.pair_id ? null : card.pair_id); }}><MessageCircle aria-hidden="true" />{shownAgain === card.pair_id ? "Hide the introduction" : "See the introduction again"}</button>
                         {card.status === "introduced" && card.plan ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><CalendarDays aria-hidden="true" />Change the plan with Omi</button> : null}
-                        {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
+                        {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); setError(""); setEnding(card); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
                         <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuId(null); setReporting(card); }}><AlertTriangle aria-hidden="true" />Report or block {card.name}</button>
                       </div>
                     ) : null}
@@ -338,6 +355,21 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
             <div className="confirm-actions">
               <button type="button" className="secondary-button" disabled={Boolean(answering)} onClick={() => { setPassing(null); setPassReason(null); }}>Back</button>
               <button type="button" disabled={Boolean(answering)} onClick={() => { if (passReason === "report") setReporting(passing); else void answer(passing, "pass", passReason ?? undefined); }}>{answering ? "Sending..." : passReason === "report" ? "Continue" : passReason ? "Done" : "Done, no reason"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {ending ? (
+        <div className="confirm-overlay">
+          <section className="confirm-dialog mt-pass" role="dialog" aria-modal="true" aria-labelledby="mt-end-title" onKeyDown={(event) => { if (event.key === "Escape" && !endBusy) setEnding(null); }}>
+            <div className="confirm-copy">
+              <h2 id="mt-end-title">Call it off with {ending.name}?</h2>
+              <p>The chat closes for both of you. {ending.name} is told only that it won't happen, never why. You can still read the old messages.</p>
+            </div>
+            {error ? <p className="mt-error" role="alert">{error}</p> : null}
+            <div className="confirm-actions">
+              <button type="button" className="secondary-button" disabled={endBusy} autoFocus onClick={() => { setEnding(null); setError(""); }}>Back</button>
+              <button type="button" disabled={endBusy} onClick={() => void callOff(ending)}>{endBusy ? "Calling it off..." : "Call it off"}</button>
             </div>
           </section>
         </div>

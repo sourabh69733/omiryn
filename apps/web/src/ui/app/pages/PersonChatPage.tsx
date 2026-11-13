@@ -99,6 +99,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
   const [showWhy, setShowWhy] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -369,6 +370,21 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
     }
   }
 
+  // Call it off: no block, no report. The other person hears only that it is off.
+  async function callOff() {
+    setBusy(true);
+    const response = await apiFetch(`/api/me/matches/${pairId}/end`, { method: "POST" }).catch(() => null);
+    setBusy(false);
+    setEnding(false);
+    if (!response?.ok) {
+      setError("Could not call it off. Nothing changed; try again.");
+      return;
+    }
+    setOpen(false);
+    setToast(`Called off. ${name} is told only that it won't happen.`);
+    onChanged();
+  }
+
   async function block() {
     setBusy(true);
     const response = await apiFetch(`/api/me/matches/${pairId}/block`, { method: "POST" }).catch(() => null);
@@ -429,6 +445,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
               {menuOpen ? (
                 <div className="history-menu pc-menu-list" role="menu">
                   {hasWhy ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); stickRef.current = false; setShowWhy((value) => !value); if (logRef.current) logRef.current.scrollTop = 0; }}><Sparkles aria-hidden="true" />{showWhy ? "Hide the introduction" : "Why Omi introduced you"}</button> : null}
+                  {open ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setEnding(true); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
                   {card?.status !== "blocked" ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setBlocking(true); }}><Ban aria-hidden="true" />Block {name}</button> : null}
                   {card ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setReporting(true); }}><AlertTriangle aria-hidden="true" />Report {name}</button> : null}
                 </div>
@@ -529,6 +546,20 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
         <div className="confirm-overlay pc-viewer" role="dialog" aria-modal="true" aria-label="Picture">
           <img src={viewing} alt="Picture, full size" />
           <button type="button" className="pc-viewer-close" onClick={() => setViewing("")} aria-label="Close picture"><X aria-hidden="true" /></button>
+        </div>
+      ) : null}
+      {ending ? (
+        <div className="confirm-overlay">
+          <section className="confirm-dialog mt-pass" role="dialog" aria-modal="true" aria-labelledby="pc-end-title" onKeyDown={(event) => { if (event.key === "Escape" && !busy) setEnding(false); }}>
+            <div className="confirm-copy">
+              <h2 id="pc-end-title">Call it off with {name}?</h2>
+              <p>The chat closes for both of you. {name} is told only that it won't happen, never why. You can still read the old messages.</p>
+            </div>
+            <div className="confirm-actions">
+              <button type="button" className="secondary-button" disabled={busy} autoFocus onClick={() => setEnding(false)}>Back</button>
+              <button type="button" disabled={busy} onClick={() => void callOff()}>{busy ? "Calling it off..." : "Call it off"}</button>
+            </div>
+          </section>
         </div>
       ) : null}
       {blocking ? (
