@@ -134,8 +134,13 @@ def propose(ready: list[str], candidates: list[Candidate]) -> Proposal:
     return Proposal(pairs=pairs, group=group, waiting=waiting, dropped=dropped, judged=len(candidates))
 
 
-def eligible_pairs(ready: list[str], history: list[dict[str, Any]]) -> list[tuple[str, str, dict[str, Any] | None]]:
-    """Pairs of ready people the pool may still propose, with a fresh stored judgement when one exists."""
+def eligible_pairs(
+    ready: list[str], history: list[dict[str, Any]], blocked: set[frozenset[str]] | None = None
+) -> list[tuple[str, str, dict[str, Any] | None]]:
+    """Pairs of ready people the pool may still propose, with a fresh stored judgement when one exists.
+
+    `blocked` holds every two people where one blocked the other, in any pool: never offered again.
+    """
     past: dict[frozenset[str], list[dict[str, Any]]] = {}
     for pair in history:
         past.setdefault(frozenset((pair["user_a"], pair["user_b"])), []).append(pair)
@@ -143,7 +148,7 @@ def eligible_pairs(ready: list[str], history: list[dict[str, Any]]) -> list[tupl
     out = []
     for a, b in combinations(sorted(ready), 2):
         rows = past.get(frozenset((a, b)), [])
-        if any(row["status"] in NEVER_AGAIN for row in rows):
+        if any(row["status"] in NEVER_AGAIN for row in rows) or (blocked and frozenset((a, b)) in blocked):
             continue
         if sum(1 for row in rows if row["status"] == "expired") >= 1 and any(((row.get("plan") or {}).get("expired_count") or 0) >= 1 and row["status"] == "expired" for row in rows):
             # Asked once and nobody answered: one more try, not more.
@@ -161,7 +166,7 @@ def eligible_pairs(ready: list[str], history: list[dict[str, Any]]) -> list[tupl
 
 async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
     """Judge what needs judging, store candidates, mark the picked pairs proposed, return the proposal."""
-    from storage import get_user_style, list_match_pairs, match_pool_members_of, save_match_pair, set_match_pair_status
+    from storage import blocked_match_pairs, get_user_style, list_match_pairs, match_pool_members_of, save_match_pair, set_match_pair_status
 
     from .compatibility import check_compatibility
     from .readiness import match_readiness
@@ -176,7 +181,7 @@ async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
     styles = {user_id: get_user_style(user_id) or {} for user_id in ready}
     candidates: list[Candidate] = []
     judged = 0
-    for a, b, fresh in eligible_pairs(ready, history):
+    for a, b, fresh in eligible_pairs(ready, history, blocked_match_pairs(ready)):
         if fresh is not None:
             check, pair_id = fresh["check"], fresh["id"]
         else:

@@ -17,7 +17,7 @@ SUGGESTION_LIMIT = 10
 
 
 def pool_view(pool_id: str) -> dict[str, Any] | None:
-    from storage import get_match_pool, get_user_profile, get_vibe_card, list_match_pairs, match_pool_members_of, private_matching_allowed
+    from storage import blocked_match_pairs, get_match_pool, get_user_profile, get_vibe_card, list_match_pairs, match_chat_counts, match_pool_members_of, private_matching_allowed
 
     pool = get_match_pool(pool_id)
     if pool is None:
@@ -42,7 +42,10 @@ def pool_view(pool_id: str) -> dict[str, Any] | None:
             }
         )
     pairs = list_match_pairs(pool_id)
-    paired = {frozenset((pair["user_a"], pair["user_b"])) for pair in pairs}
+    # How much each introduced pair has written to each other: counts and times, never the words.
+    chats = match_chat_counts([pair["id"] for pair in pairs if pair.get("introduced_at")])
+    pairs = [{**pair, "chat": chats.get(pair["id"])} for pair in pairs]
+    paired = {frozenset((pair["user_a"], pair["user_b"])) for pair in pairs} | blocked_match_pairs([m["user_id"] for m in members])
     ready = [m["user_id"] for m in members if m["readiness"]["ready"]]
     suggestions = []
     for a, b in combinations(ready, 2):
@@ -63,11 +66,13 @@ def pool_view(pool_id: str) -> dict[str, Any] | None:
 
 async def propose_pair(pool_id: str, user_a: str, user_b: str, *, created_by: str | None = None) -> dict[str, Any]:
     """Run the compatibility check for two members and record the pair as proposed."""
-    from storage import match_pool_members_of, save_match_pair
+    from storage import match_block_between, match_pool_members_of, save_match_pair
 
     members = {m["user_id"] for m in match_pool_members_of(pool_id)}
     if user_a == user_b or user_a not in members or user_b not in members:
         raise ValueError("both users must be members of the pool, and different")
+    if match_block_between(user_a, user_b):
+        raise ValueError("these two cannot be paired")
     check = await check_compatibility(user_a, user_b)
     return save_match_pair(pool_id, user_a, user_b, check.as_dict(), created_by=created_by)
 

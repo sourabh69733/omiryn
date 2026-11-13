@@ -56,6 +56,7 @@ def _job_handlers() -> dict[str, JobHandler]:
         run_match_intro_job,
         run_match_reminder_job,
     )
+    from agent.matching.pair_chat import MATCH_CLOSED_JOB, run_match_closed_job
     from agent.proactive.service import RETURN_GREETING_JOB, run_return_greeting_job
     from agent.proactive.story import run_story_part_job
     from agent.runtime.story_mode import STORY_PART_JOB
@@ -71,6 +72,7 @@ def _job_handlers() -> dict[str, JobHandler]:
         MATCH_ASK_JOB: run_match_ask_job,
         MATCH_ASK_EXPIRE_JOB: run_match_ask_expire_job,
         MATCH_NOT_THIS_WEEK_JOB: run_match_not_this_week_job,
+        MATCH_CLOSED_JOB: run_match_closed_job,
     }
 
 
