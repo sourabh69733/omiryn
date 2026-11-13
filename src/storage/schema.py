@@ -823,6 +823,51 @@ match_pairs = Table(
 )
 Index("ix_match_pairs_pool", match_pairs.c.pool_id)
 
+# The chat between two introduced people. The text is encrypted under the pair's first user's key,
+# like the pair's check and plan. Omi never reads it and the operator never sees it.
+match_messages = Table(
+    "match_messages",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("pair_id", String, nullable=False),
+    Column("sender_id", String, nullable=False),
+    Column("body", String, nullable=False),
+    # The app's id for a pending bubble: a retried send is saved once.
+    Column("client_id", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_match_messages_pair", match_messages.c.pair_id, match_messages.c.id)
+# How far each person has read in a pair's chat.
+match_chat_reads = Table(
+    "match_chat_reads",
+    metadata,
+    Column("pair_id", String, primary_key=True),
+    Column("user_id", String, primary_key=True),
+    Column("last_read_id", Integer, nullable=False, server_default="0"),
+    Column("read_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+# One person blocked another: the two are never offered to each other again, in any pool.
+match_blocks = Table(
+    "match_blocks",
+    metadata,
+    Column("blocker_id", String, primary_key=True),
+    Column("blocked_id", String, primary_key=True),
+    Column("pair_id", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+# A report for the team. The note is encrypted under the reporter's key; the other person is told nothing.
+match_reports = Table(
+    "match_reports",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("pair_id", String, nullable=False),
+    Column("reporter_id", String, nullable=False),
+    Column("reported_id", String, nullable=False),
+    Column("reason", String, nullable=False),
+    Column("note", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # A short "who this user is" note across all chats, rewritten by background cognition
 # and shown to the companion on every reply. Encrypted like other user content.
 agent_user_cards = Table(

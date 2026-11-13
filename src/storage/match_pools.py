@@ -192,10 +192,15 @@ def update_match_pair_plan(pair_id: str, change: Callable[[dict[str, Any]], dict
 
 
 def delete_match_data_for_user(connection, user_id: str) -> dict[str, int]:
-    """Account deletion: memberships and every pair the user was in."""
+    """Account deletion: memberships, every pair the user was in, and those pairs' chats."""
+    from .match_chat import delete_match_chat_for_user
+
+    mine = or_(match_pairs.c.user_a == user_id, match_pairs.c.user_b == user_id)
+    pair_ids = [row[0] for row in connection.execute(select(match_pairs.c.id).where(mine)).all()]
+    chat = delete_match_chat_for_user(connection, user_id, pair_ids)
     members = connection.execute(match_pool_members.delete().where(match_pool_members.c.user_id == user_id)).rowcount or 0
-    pairs = connection.execute(match_pairs.delete().where(or_(match_pairs.c.user_a == user_id, match_pairs.c.user_b == user_id))).rowcount or 0
-    return {"match_pool_members": int(members), "match_pairs": int(pairs)}
+    pairs = connection.execute(match_pairs.delete().where(mine)).rowcount or 0
+    return {"match_pool_members": int(members), "match_pairs": int(pairs), **chat}
 
 
 def _pool(row: Any) -> dict[str, Any]:
