@@ -108,7 +108,7 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "   "}).status_code, 400)
             self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "x" * 2001}).status_code, 422)
             card = client.get("/api/me/matches").json()["matches"][0]
-            self.assertEqual(card["chat"], {"open": True, "messages": 1, "unread": 0, "last_at": card["chat"]["last_at"]})
+            self.assertEqual(card["chat"], {"open": True, "messages": 1, "unread": 0, "last_at": card["chat"]["last_at"], "last_text": "Hi Bela, chai on Sunday?", "last_mine": True})
         # Both people are told a message exists, by id only: the text never rides on the event.
         events = [call.args[0] for call in self.published.await_args_list if call.args[0].type == "match.message"]
         self.assertEqual({event.scope_id for event in events}, {"ua", "ub"})
@@ -117,7 +117,8 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
             page = client.get(f"/api/me/matches/{pair_id}/messages").json()
             self.assertEqual([(m["mine"], m["text"], m["client_id"]) for m in page["messages"]], [(False, "Hi Bela, chai on Sunday?", None)])
             self.assertEqual((page["chat"]["unread"], page["has_more"]), (1, False))
-            self.assertEqual(client.get("/api/me/matches").json()["matches"][0]["chat"]["unread"], 1)
+            row = client.get("/api/me/matches").json()["matches"][0]["chat"]
+            self.assertEqual((row["unread"], row["last_text"], row["last_mine"]), (1, "Hi Bela, chai on Sunday?", False))
             self.assertEqual(client.post(f"/api/me/matches/{pair_id}/read").json()["chat"]["unread"], 0)
             client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "Sunday works"})
         with _As("uc") as client:  # in the pool, not in the pair

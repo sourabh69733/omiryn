@@ -19,6 +19,7 @@ from .utils import _isoformat_utc, _protect_text, _require_user_id, _unprotect_t
 
 MATCH_MESSAGE_CHARS = 2000
 PAGE_SIZE = 50
+PREVIEW_CHARS = 120
 MATCH_REPORT_REASONS = ("uncomfortable", "not_who_they_said", "spam", "other")
 _NOTE_CHARS = 1000
 
@@ -107,12 +108,26 @@ def match_chat_summaries(pair_ids: list[str], user_id: str) -> dict[str, dict[st
         theirs = connection.execute(
             select(match_messages.c.pair_id, match_messages.c.id).where(match_messages.c.pair_id.in_(pair_ids), match_messages.c.sender_id != user_id)
         ).all()
+        newest = select(func.max(match_messages.c.id)).where(match_messages.c.pair_id.in_(pair_ids)).group_by(match_messages.c.pair_id)
+        last_rows = connection.execute(
+            select(match_messages.c.pair_id, match_messages.c.sender_id, match_messages.c.body, match_pairs.c.user_a)
+            .join(match_pairs, match_pairs.c.id == match_messages.c.pair_id)
+            .where(match_messages.c.id.in_(newest))
+        ).all()
     unread: dict[str, int] = {}
     for pair_id, message_id in theirs:
         if int(message_id) > int(marks.get(pair_id) or 0):
             unread[pair_id] = unread.get(pair_id, 0) + 1
+    # The newest message, cut short, for the row in the chat list.
+    last = {
+        pair_id: {"text": " ".join(_unprotect_text(key_owner, body).split())[:PREVIEW_CHARS], "mine": sender == user_id}
+        for pair_id, sender, body, key_owner in last_rows
+    }
     return {
-        pair_id: {"messages": int(count), "last_at": _isoformat_utc(last_at) if last_at else None, "unread": unread.get(pair_id, 0)}
+        pair_id: {
+            "messages": int(count), "last_at": _isoformat_utc(last_at) if last_at else None, "unread": unread.get(pair_id, 0),
+            "last_text": (last.get(pair_id) or {}).get("text"), "last_mine": (last.get(pair_id) or {}).get("mine"),
+        }
         for pair_id, count, last_at in totals
     }
 

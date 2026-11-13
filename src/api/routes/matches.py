@@ -58,7 +58,7 @@ def match_card(
         if chats is None:
             chats = match_chat_summaries([pair["id"]], user_id)
         summary = chats.get(pair["id"]) or {}
-        chat = {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at")}
+        chat = {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at"), "last_text": summary.get("last_text"), "last_mine": summary.get("last_mine")}
     if other_user(pair, user_id) in blocked:
         # Only the person who blocked sees this; the other person's card says declined.
         status = "blocked"

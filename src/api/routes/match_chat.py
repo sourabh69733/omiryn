@@ -67,7 +67,7 @@ def _view(message: dict[str, Any], user_id: str) -> dict[str, Any]:
 
 def _chat(pair: dict[str, Any], user_id: str, state: dict[str, Any]) -> dict[str, Any]:
     summary = match_chat_summaries([pair["id"]], user_id).get(pair["id"]) or {}
-    return {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at")}
+    return {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at"), "last_text": summary.get("last_text"), "last_mine": summary.get("last_mine")}
 
 
 async def _notify(event_type: str, pair: dict[str, Any], payload: dict[str, Any], *, only: str | None = None) -> None:
