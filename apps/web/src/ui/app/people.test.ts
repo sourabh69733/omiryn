@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { MatchCard } from "./matches";
-import { clusterClass, dayLabel, mergeMessages, newestId, pairFromPath, peopleRows, personPath, previewLine, startsDay, totalUnread, unreadLabel, type PersonMessage } from "./people";
+import { clusterClass, dayLabel, imageProblem, isBigEmoji, mergeMessages, newestId, pairFromPath, peopleRows, personPath, previewLine, startsDay, totalUnread, unreadLabel, type PersonMessage } from "./people";
 
 const card = (pair_id: string, extra: Partial<MatchCard> = {}): MatchCard => ({
   pair_id, status: "introduced", name: pair_id, reasons: [], difference: null, icebreaker: null, plan: null, asked_at: "2026-11-10T10:00:00Z", answer_by: null, ...extra,
@@ -52,4 +52,16 @@ test("a person's chat has its own address", () => {
   assert.equal(personPath("abc-123"), "/people/abc-123");
   assert.equal(pairFromPath("/people/abc-123"), "abc-123");
   assert.equal(pairFromPath("/matches"), null);
+});
+
+test("a message of one to three emoji is shown large; words or more are not", () => {
+  assert.deepEqual(["😂", "❤️🔥", "👍🏽 👍🏽 👍🏽", "🇮🇳"].map(isBigEmoji), [true, true, true, true]);
+  assert.deepEqual(["", "ok 😂", "😂😂😂😂", "123", ":)"].map(isBigEmoji), [false, false, false, false, false]);
+});
+
+test("only pictures the server takes can be picked", () => {
+  assert.equal(imageProblem({ type: "image/png", size: 5_000_000 }), "");
+  assert.equal(imageProblem({ type: "image/gif", size: 1_000_000 }), "");
+  assert.match(imageProblem({ type: "image/gif", size: 6_000_000 }), /GIF is too big/);
+  assert.match(imageProblem({ type: "application/pdf", size: 10 }), /JPG, PNG, WebP or GIF/);
 });

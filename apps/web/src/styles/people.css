@@ -169,10 +169,281 @@ button.mt-row-open:hover strong {
   text-decoration: underline;
 }
 
-/* Two parts, not three: the message and the send button. */
+/* Picture and emoji buttons, the message, the send button. */
 .agentic-chat .composer.pc-composer {
-  grid-template-columns: minmax(0, 1fr) 42px;
-  padding-left: 16px;
+  grid-template-columns: auto minmax(0, 1fr) 42px;
+}
+
+.pc-screen .chat-title-lockup small.is-typing,
+button.omi-contact.omi-person .omi-contact-copy small.is-typing {
+  color: var(--brand-violet);
+  font-weight: 550;
+}
+
+.pc-screen .message {
+  position: relative;
+}
+
+/* Pictures and GIFs */
+.agentic-chat .message.pc-has-picture {
+  padding: 4px;
+}
+
+.pc-has-picture .message-content {
+  padding: 6px 8px 4px;
+}
+
+button.pc-picture,
+div.pc-picture {
+  display: block;
+  width: min(280px, 62vw);
+  min-height: 80px;
+  max-height: 380px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper-2);
+  box-shadow: none;
+  cursor: zoom-in;
+}
+
+.pc-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+div.pc-picture.is-missing {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: default;
+}
+
+.pc-picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.pc-picked img {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.pc-picked span {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-picked button,
+button.pc-viewer-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.pc-picked button svg,
+.pc-viewer-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.legacy-react-shell .confirm-overlay.pc-viewer {
+  display: grid;
+  place-items: center;
+  cursor: zoom-out;
+}
+
+.pc-viewer img {
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: 12px;
+  cursor: default;
+}
+
+button.pc-viewer-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+}
+
+/* One to three emoji: large, no bubble. */
+.agentic-chat .message.pc-big-emoji {
+  padding: 0 2px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.agentic-chat .pc-big-emoji .message-content {
+  color: var(--ink);
+  font-size: 40px;
+  line-height: 1.15;
+}
+
+/* Reactions: one emoji each, tucked under the bubble. */
+.pc-screen .message-row.has-reaction {
+  margin-bottom: 16px;
+}
+
+.pc-reactions {
+  position: absolute;
+  bottom: -15px;
+  left: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+.message.user .pc-reactions {
+  right: 8px;
+  left: auto;
+}
+
+.pc-reaction,
+.agentic-chat button.pc-reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 0;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: none;
+  font-size: 12.5px;
+  line-height: 1;
+}
+
+.agentic-chat button.pc-reaction.is-yours {
+  border-color: var(--brand-violet);
+  cursor: pointer;
+}
+
+.pc-react {
+  position: absolute;
+  top: 50%;
+  right: -36px;
+  transform: translateY(-50%);
+}
+
+.message.user .pc-react {
+  right: auto;
+  left: -36px;
+}
+
+.agentic-chat button.pc-react-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.pc-react-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.message-row:hover .pc-react-button,
+.message-row.is-reacting .pc-react-button,
+.pc-react-button:focus-visible {
+  opacity: 1;
+}
+
+.agentic-chat button.pc-react-button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* No hover on a phone: the button stays faintly visible. */
+@media (hover: none) {
+  .agentic-chat button.pc-react-button {
+    opacity: 0.45;
+  }
+}
+
+.pc-react-row {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(-50%);
+}
+
+.message.user .pc-react-row {
+  left: 0;
+  transform: none;
+}
+
+.message.agent .pc-react-row {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.agentic-chat .pc-react-row button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.agentic-chat .pc-react-row button:hover,
+.agentic-chat .pc-react-row button.is-selected {
+  background: var(--paper-2);
 }
 
 /* Above the message box or the closed bar, never over it. */

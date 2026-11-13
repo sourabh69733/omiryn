@@ -3,11 +3,42 @@
 // decides who may read and write.
 import type { MatchCard } from "./matches";
 
-export type PersonMessage = { id: number; mine: boolean; text: string; created_at: string; client_id?: string | null; pending?: boolean; failed?: boolean };
+export type PersonImage = { id: string; content_type: string; width: number | null; height: number | null };
+export type PersonMessage = {
+  id: number; mine: boolean; text: string; created_at: string; client_id?: string | null; pending?: boolean; failed?: boolean;
+  /** A picture or GIF sent with the message; the bytes come from the media call. */
+  image?: PersonImage | null;
+  /** The one emoji each person put on it. */
+  reactions?: { mine: string | null; theirs: string | null } | null;
+  /** A pending picture's local preview and the file to retry with. */
+  localImage?: { url: string; file: Blob } | null;
+};
+
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+/** What the server takes; a still picture above the resize mark is made smaller in the browser first. */
+export const UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+export const GIF_MAX_BYTES = 4 * 1024 * 1024;
+export const RESIZE_ABOVE_BYTES = 1.5 * 1024 * 1024;
+
+/** One to three emoji and nothing else: shown large, without a bubble. */
+export function isBigEmoji(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 40 || /[\p{L}\p{N}]/u.test(trimmed)) return false;
+  const glyphs = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed)].map((part) => part.segment).filter((part) => part.trim());
+  return glyphs.length >= 1 && glyphs.length <= 3 && glyphs.every((glyph) => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(glyph));
+}
+
+/** Why a chosen file cannot be sent, or "" when it can. */
+export function imageProblem(file: { type: string; size: number }): string {
+  if (!IMAGE_TYPES.includes(file.type)) return "Send a JPG, PNG, WebP or GIF picture.";
+  if (file.type === "image/gif" && file.size > GIF_MAX_BYTES) return "That GIF is too big. Try one under 4 MB.";
+  return "";
+}
 
 /** A realtime event about a match, passed on by the chat page's socket. */
 export const MATCH_EVENT = "omi:match-event";
-export type MatchEventDetail = { type: string; payload: { pair_id?: string; message_id?: number } };
+export type MatchEventDetail = { type: string; payload: { pair_id?: string; message_id?: number; active?: boolean } };
 
 /** People to show in the chat list, newest activity first. An open chat always shows (one nobody
     wrote in yet sorts by its introduction); a closed one only while it holds messages to read; a
