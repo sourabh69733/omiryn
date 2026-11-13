@@ -1,4 +1,4 @@
-export type Page = "chat" | "vibe" | "memories" | "matches" | "profile" | "privacy" | "contact";
+export type Page = "chat" | "person" | "vibe" | "memories" | "matches" | "profile" | "privacy" | "contact";
 /* A card Omi's message can carry while hosting a match: the plan, the number-sharing consent, the
    day-3 check-in, or the ask itself. Tapping an action sends its `reply` as the user's own message,
    so the host reads words as it does on WhatsApp; `answered` holds the action taken. */

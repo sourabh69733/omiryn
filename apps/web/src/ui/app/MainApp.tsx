@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Sparkles, Users, X } from "lucide-react";
 import { apiFetch, signOut } from "../../lib/api";
 import { initAppLogger, trackPageView } from "../../lib/appLogger";
 import { ChatPage, type OmiStatus } from "./pages/ChatPage";
 import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
+import { PersonChatPage } from "./pages/PersonChatPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -12,6 +13,8 @@ import { VibePage } from "./pages/VibePage";
 import { AgentOrb } from "./AgentOrb";
 import { AvatarImage } from "./AvatarImage";
 import { mainPhoto } from "./profilePhoto";
+import { initialOf, type MatchCard } from "./matches";
+import { MATCH_EVENT, pairFromPath, peopleRows, personPath, previewLine, unreadLabel } from "./people";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import { useIsMobile } from "./useIsMobile";
 import { useKeyboardA11y } from "./useKeyboardA11y";
@@ -29,6 +32,30 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const [omiStatus, setOmiStatus] = useState<OmiStatus>({ typing: false, preview: "", away: false });
   const [backToOmi, setBackToOmi] = useState(0);
+  // People Omi introduced: their chats sit beside the chat with Omi.
+  const [cards, setCards] = useState<MatchCard[]>([]);
+  const [cardsLoaded, setCardsLoaded] = useState(false);
+  const [personId, setPersonId] = useState<string | null>(() => pairFromPath(window.location.pathname));
+
+  const loadPeople = useCallback(() => {
+    apiFetch("/api/me/matches")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { matches?: MatchCard[] } | null) => { if (data?.matches) setCards(data.matches); })
+      .catch(() => undefined)
+      .finally(() => setCardsLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    loadPeople();
+    // A message, a read on another device, a block: the socket says so and the list refetches.
+    const onFocus = () => { if (document.visibilityState === "visible") loadPeople(); };
+    window.addEventListener(MATCH_EVENT, loadPeople);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener(MATCH_EVENT, loadPeople);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadPeople]);
 
   const closeMobileNavigation = () => {
     setMobileNavOpen(false);
@@ -46,7 +73,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       .then((response) => response.ok ? response.json() : null)
       .then((data: ProfileResponse | null) => setProfile(data?.profile || null))
       .catch(() => undefined);
-    const sync = () => { setPage(pageFromPath()); setMobileNavOpen(false); };
+    const sync = () => { setPage(pageFromPath()); setPersonId(pairFromPath(window.location.pathname)); setMobileNavOpen(false); };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
@@ -58,6 +85,14 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   function navigate(next: Page) {
     window.history.pushState({}, "", pathForPage[next]);
     setPage(next);
+    setAccountOpen(false);
+    setMobileNavOpen(false);
+  }
+
+  function openPerson(pairId: string) {
+    window.history.pushState({}, "", personPath(pairId));
+    setPersonId(pairId);
+    setPage("person");
     setAccountOpen(false);
     setMobileNavOpen(false);
   }
@@ -127,7 +162,9 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   );
 
   const navItems = [["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const;
-  const chatOpenOnMobile = isMobile && page === "chat";
+  const chatOpenOnMobile = isMobile && (page === "chat" || page === "person");
+  const people = useMemo(() => peopleRows(cards), [cards]);
+  const person = personId ? cards.find((card) => card.pair_id === personId) ?? null : null;
   // Already in chat but on an earlier or temporary chat: go back to the main Omi chat.
   const openOmi = () => {
     if (page === "chat" && omiStatus.away) setBackToOmi((count) => count + 1);
@@ -139,6 +176,17 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       <span className="omi-contact-copy"><strong>Omi</strong>{omiStatus.typing ? <small className="is-typing">typing…</small> : omiStatus.preview ? <small>{omiStatus.preview}</small> : null}</span>
     </button>
   );
+
+  const personRows = people.map((card) => {
+    const unread = unreadLabel(card.chat?.unread);
+    return (
+      <button type="button" key={card.pair_id} className={`omi-contact omi-person ${page === "person" && personId === card.pair_id ? "is-active" : ""} ${unread ? "has-unread" : ""}`} onClick={() => openPerson(card.pair_id)}>
+        <span className="omi-contact-avatar omi-person-avatar" aria-hidden="true">{initialOf(card.name)}</span>
+        <span className="omi-contact-copy"><strong>{card.name}</strong><small>{previewLine(card)}</small></span>
+        {unread ? <span className="omi-unread" aria-label={`${card.chat?.unread} unread`}>{unread}</span> : null}
+      </button>
+    );
+  });
 
   return (
     <div className={`legacy-react-shell omi-shell ${chatOpenOnMobile ? "is-chat-open" : ""}`}>
@@ -157,6 +205,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         <div className="omi-rail-section" aria-label="Chats">
           <p className="omi-rail-label">Chats</p>
           {omiRow}
+          {personRows}
         </div>
         <nav className="omi-rail-section omi-rail-links" aria-label="You">
           <p className="omi-rail-label">You</p>
@@ -182,7 +231,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenPage={navigate} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage /> : null}
-        {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} /> : null}
+        {page === "person" && personId ? <PersonChatPage pairId={personId} card={person} cardsLoaded={cardsLoaded} userAvatar={accountBadge} isMobile={isMobile} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onChanged={loadPeople} onMatches={() => navigate("matches")} /> : null}
+        {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} onOpenPerson={openPerson} onPeopleChanged={loadPeople} /> : null}
         {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} onPrivacy={() => navigate("privacy")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}
         {page === "privacy" ? <PrivacyPage onProfile={() => navigate("profile")} onMemories={() => navigate("memories")} onContact={() => navigate("contact")} /> : null}
         {page === "contact" ? <ContactPage user={user} /> : null}
@@ -207,6 +257,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
               <AgentOrb state={omiStatus.typing ? "thinking" : "idle"} />
               <span>Chat with Omi</span>
             </button>
+            {personRows}
             {navItems.map(([item, Icon, label]) => (
               <a key={item} href={pathForPage[item]} onClick={(event) => { event.preventDefault(); navigate(item); }}>
                 <Icon aria-hidden="true" />{label}

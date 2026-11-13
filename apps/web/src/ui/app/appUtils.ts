@@ -8,6 +8,8 @@ export const pageFromPath = (): Page => {
   // /style is the old name of Memories.
   if (/^\/(memories|style)/.test(window.location.pathname)) return "memories";
   if (window.location.pathname.startsWith("/matches")) return "matches";
+  // A chat with a person Omi introduced: /people/<pair id>.
+  if (window.location.pathname.startsWith("/people/")) return "person";
   if (window.location.pathname.startsWith("/profile/privacy")) return "privacy";
   if (window.location.pathname.startsWith("/profile")) return "profile";
   return "chat";
@@ -18,6 +20,8 @@ export const pathForPage: Record<Page, string> = {
   vibe: "/vibe",
   memories: "/memories",
   matches: "/matches",
+  // The base only; a person's chat adds the pair id (personPath in people.ts).
+  person: "/people",
   profile: "/profile",
   privacy: "/profile/privacy",
   contact: "/contact"

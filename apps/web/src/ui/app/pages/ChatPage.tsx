@@ -12,6 +12,7 @@ import { AgentOrb } from "../AgentOrb";
 import { MessageCard } from "../MessageCard";
 import { nextBubbleDelay } from "../bubbleReveal";
 import { Notice, StateView } from "../StateView";
+import { MATCH_EVENT } from "../people";
 import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCounts } from "../unread";
 import { isFailedMessage } from "../messageDelivery";
 import { NO_TYPING_SIGNAL, nextTypingSignal } from "../typingSignal";
@@ -19,7 +20,7 @@ import { applyMessageAt, withUserReaction, dropLocal, lastFailedIndex, markBurst
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { temporaryName } from "../temporaryName";
-import { canShowUsage, pathForPage } from "../appUtils";
+import { canShowUsage, pathForPage, pageFromPath } from "../appUtils";
 import { type DeletionImpact, deletionImpactLines, milestoneFromEvent, vibeStepNote } from "../vibe";
 import { findEmojiQuery, loadEmojiRecords, replaceEmojiQuery, searchEmojiSuggestions, type EmojiQuery, type EmojiRecord, type EmojiSuggestion } from "../emojiShortcodes";
 import type { ContextSource, Conversation, ConversationSummary, ConversationUsage, Message, MessageRecovery, Page, ReplyQuote, UsageEvent, UsageSummary, ChatCardAction } from "../types";
@@ -173,6 +174,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   useEffect(() => {
     const realtime = new RealtimeClient(
       (event) => {
+        // The one socket also carries news about chats with people; the shell and that screen listen.
+        if (event.type.startsWith("match.")) window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: event }));
         setTypingConversationId((current) => typingAfterEvent(event, current));
         const milestone = milestoneFromEvent(event, event.scope_id ?? null);
         if (milestone && event.scope_id) setVibeNote({ conversationId: event.scope_id, milestone });
@@ -242,10 +245,14 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       setLoading(true);
     }
     window.localStorage.setItem("omiryn.activeConversationId", id);
-    const url = new URL("/", window.location.origin);
-    url.searchParams.set("conversation_id", id);
-    url.hash = targetHash;
-    window.history.replaceState({}, "", url);
+    // This page stays mounted behind the others; only when it is the one on screen does the
+    // address follow the chat, so a reload on Matches or a person's chat stays there.
+    if (pageFromPath() === "chat") {
+      const url = new URL("/", window.location.origin);
+      url.searchParams.set("conversation_id", id);
+      url.hash = targetHash;
+      window.history.replaceState({}, "", url);
+    }
     try {
       const response = await apiFetch(`/api/agent/conversations/${id}`);
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
