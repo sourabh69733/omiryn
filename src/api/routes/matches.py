@@ -14,8 +14,9 @@ from pydantic import BaseModel
 
 from agent.matching.asking import ANSWERS, record_answer
 from agent.matching.hosting import pair_facts
+from agent.matching.pair_chat import chat_state, other_user
 from security.auth import CurrentUser, require_user
-from storage import get_match_pair, match_pairs_for_user
+from storage import blocked_match_pairs, get_match_pair, match_chat_summaries, match_pairs_for_user, match_users_blocked_by
 
 from ..helpers import _user_id
 
@@ -29,7 +30,16 @@ class MatchAnswer(BaseModel):
     answer: str
 
 
-def match_card(pair: dict[str, Any], user_id: str) -> dict[str, Any] | None:
+def match_card(
+    pair: dict[str, Any],
+    user_id: str,
+    *,
+    chats: dict[str, dict[str, Any]] | None = None,
+    blocked: set[str] | None = None,
+    blocks: set[frozenset[str]] | None = None,
+) -> dict[str, Any] | None:
+    """One card. `chats`, `blocked` (people the user blocked) and `blocks` (blocked pairs touching
+    the user, either way) are passed in when many cards are built at once; looked up here otherwise."""
     plan = pair.get("plan") or {}
     told = ((plan.get("told") or {}).get(user_id) or {}).get("sent")
     if pair["status"] not in _VISIBLE or not told:
@@ -40,6 +50,18 @@ def match_card(pair: dict[str, Any], user_id: str) -> dict[str, Any] | None:
     status = pair["status"]
     if status == "asked":
         status = "waiting" if mine == "accept" else "asked"
+    if blocked is None:
+        blocked = match_users_blocked_by(user_id)
+    state = chat_state(pair, user_id, blocks=blocks)
+    chat = None
+    if state["readable"]:
+        if chats is None:
+            chats = match_chat_summaries([pair["id"]], user_id)
+        summary = chats.get(pair["id"]) or {}
+        chat = {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at")}
+    if other_user(pair, user_id) in blocked:
+        # Only the person who blocked sees this; the other person's card says declined.
+        status = "blocked"
     return {
         "pair_id": pair["id"],
         "status": status,
@@ -51,13 +73,18 @@ def match_card(pair: dict[str, Any], user_id: str) -> dict[str, Any] | None:
         "asked_at": plan.get("asked_at"),
         "answer_by": plan.get("answer_by"),
         "introduced_at": pair.get("introduced_at"),
+        "chat": chat,
     }
 
 
 @router.get("/api/me/matches")
 async def my_matches(user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     user_id = _user_id(user)
-    cards = [card for pair in match_pairs_for_user(user_id) if (card := match_card(pair, user_id))]
+    pairs = match_pairs_for_user(user_id)
+    chats = match_chat_summaries([pair["id"] for pair in pairs], user_id)
+    blocked = match_users_blocked_by(user_id)
+    blocks = blocked_match_pairs([user_id])
+    cards = [card for pair in pairs if (card := match_card(pair, user_id, chats=chats, blocked=blocked, blocks=blocks))]
     return {"matches": cards}
 
 

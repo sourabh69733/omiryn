@@ -16,7 +16,7 @@ from agent.matching import pick_pool, pool_view, propose_pair
 from agent.matching.asking import ask_pair
 from agent.matching.hosting import introduce_pair
 from security.auth import CurrentUser
-from storage import PAIR_STATUSES, create_match_pool, list_match_pools, set_match_pair_status
+from storage import PAIR_STATUSES, create_match_pool, list_match_pools, list_match_reports, set_match_pair_status
 from storage.audit_log import record_audit_event
 
 router = APIRouter()
@@ -113,6 +113,14 @@ async def admin_introduce_pair(pair_id: str, payload: PairIntroduction, admin: C
         raise HTTPException(status_code=409, detail=str(error)) from error
     record_audit_event("admin.introduce_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"has_time": payload.meet_at is not None})
     return pair
+
+
+@router.get("/api/admin/match-reports")
+async def admin_match_reports(admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """What people reported about a match, newest first: who, about whom, the reason and their note.
+    Never the chat between the two."""
+    record_audit_event("admin.view_match_reports", actor_id=admin.id, actor_role="admin")
+    return {"reports": list_match_reports()}
 
 
 @router.patch("/api/admin/pairs/{pair_id}")
