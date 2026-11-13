@@ -9,6 +9,9 @@ export type MatchLine = { area: string; text: string };
 
 export type MatchPlan = { place: string; when: string; at?: string | null };
 
+/** The chat between the two people, from the introduction on; null before it. */
+export type MatchChat = { open: boolean; messages: number; unread: number; last_at: string | null; last_text?: string | null; last_mine?: boolean | null };
+
 export type MatchCard = {
   pair_id: string;
   status: MatchStatus;
@@ -26,6 +29,8 @@ export type MatchCard = {
   asked_at: string;
   answer_by: string | null;
   updated_at?: string | null;
+  introduced_at?: string | null;
+  chat?: MatchChat | null;
 };
 
 export type MatchReadiness = {
@@ -77,7 +82,7 @@ export function deadlineLabel(answerBy: string | null | undefined, now: Date = n
 export function statusLine(card: MatchCard): string {
   switch (card.status) {
     case "introduced":
-      return (card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : "You both said hi") + sharedNote(card);
+      return (card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : card.chat?.open ? "You both said hi · tap to chat" : "You both said hi") + sharedNote(card);
     case "met":
       return "Met · how did it go?" + sharedNote(card);
     case "still_talking":
