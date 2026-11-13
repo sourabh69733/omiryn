@@ -32,7 +32,7 @@ test("deadlineLabel counts down from two days to today", () => {
 
 test("statusLine says what Omi is doing for each person", () => {
   assert.equal(statusLine(card("introduced", { plan: { place: "Blue Tokai", when: "Saturday 6 pm" } })), "Meeting Saturday 6 pm · Omi will remind you");
-  assert.equal(statusLine(card("introduced")), "You both said hi · Omi is setting a time");
+  assert.equal(statusLine(card("introduced")), "You both said hi"); // no plan: nothing about a time
   assert.equal(statusLine(card("still_talking")), "Met · still talking");
   assert.equal(statusLine(card("no_show")), "Didn't happen");
   assert.equal(statusLine(card("met", { number_shared: true })), "Met · how did it go? · numbers shared");

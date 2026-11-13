@@ -77,7 +77,7 @@ export function deadlineLabel(answerBy: string | null | undefined, now: Date = n
 export function statusLine(card: MatchCard): string {
   switch (card.status) {
     case "introduced":
-      return (card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : "You both said hi · Omi is setting a time") + sharedNote(card);
+      return (card.plan ? `Meeting ${card.plan.when} · Omi will remind you` : "You both said hi") + sharedNote(card);
     case "met":
       return "Met · how did it go?" + sharedNote(card);
     case "still_talking":

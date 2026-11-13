@@ -274,7 +274,7 @@ export function MatchesPage({ onVibe, onChat }: Props) {
                     {menuId === card.pair_id ? (
                       <div className="history-menu" role="menu">
                         <button type="button" role="menuitem" onClick={() => { setMenuId(null); setShownAgain(shownAgain === card.pair_id ? null : card.pair_id); }}><MessageCircle aria-hidden="true" />{shownAgain === card.pair_id ? "Hide the introduction" : "See the introduction again"}</button>
-                        {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><CalendarDays aria-hidden="true" />Change the plan with Omi</button> : null}
+                        {card.status === "introduced" && card.plan ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><CalendarDays aria-hidden="true" />Change the plan with Omi</button> : null}
                         {card.status === "introduced" ? <button type="button" role="menuitem" onClick={() => { setMenuId(null); onChat(); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
                         <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuId(null); setReporting(card); }}><AlertTriangle aria-hidden="true" />Report or block {card.name}</button>
                       </div>
