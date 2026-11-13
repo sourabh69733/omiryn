@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 from agent.matching.hosting import CLOSED_STATUSES, OPEN_STATUSES, pair_facts
+from agent.matching.pair_chat import chat_announced
 from agent.shared.clock import utc_now
 from agent.shared.timeline import parse_time, relative_day, user_zone
 
@@ -21,6 +22,12 @@ _STATUS_WORDS = {
     "no_show": "it did not happen",
     "declined": "the user said no to it",
 }
+# The other person ended it (a pass after the introduction, a block or a report): no reason is known here.
+_CLOSED_BY_OTHER = "it is off, and not by this user's choice; you do not know why, so do not guess"
+_CHAT_FACT = (
+    "Where the status is introduced, met or still in touch, the two can write to each other directly in the "
+    "app: Matches, then the person. You cannot see that chat."
+)
 
 
 def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
@@ -32,6 +39,7 @@ def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
     zone = user_zone(get_user_timezone(user_id))
     lines = []
     asks = []
+    open_chat = False
     for pair in match_pairs_for_user(user_id):
         plan = pair.get("plan") or {}
         told = (plan.get("told") or {}).get(user_id) or {}
@@ -49,7 +57,11 @@ def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
         facts = pair_facts(pair, user_id)
         when = relative_day(introduced_at.astimezone(zone).date(), now.astimezone(zone).date()) if introduced_at else "recently"
         plan_words = ", ".join(part for part in (plan.get("place"), plan.get("when")) if part) or "no place or time set yet"
-        lines.append(f"- {facts['name']} (pair id {pair['id']}): introduced {when}. Plan: {plan_words}. Status: {_STATUS_WORDS.get(pair['status'], pair['status'])}.")
+        status_words = _STATUS_WORDS.get(pair["status"], pair["status"])
+        if pair["status"] == "declined" and plan.get("closed_by") not in (None, user_id):
+            status_words = _CLOSED_BY_OTHER
+        lines.append(f"- {facts['name']} (pair id {pair['id']}): introduced {when}. Plan: {plan_words}. Status: {status_words}.")
+        open_chat = open_chat or pair["status"] in OPEN_STATUSES
     sources = []
     if asks:
         sources.append(
@@ -84,6 +96,7 @@ def match_hosting_sources(user_id: str | None) -> list[dict[str, Any]]:
                     "still in touch), record it with record_match_outcome and the pair id, in the same turn, then "
                     "answer as a friend would. A change of place or time goes through the person who runs their "
                     "group; say so plainly rather than promising to arrange it.",
+                    *([_CHAT_FACT] if open_chat and chat_announced() else []),
                 ]
             ),
             "metadata": {"pairs": len(lines)},

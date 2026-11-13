@@ -55,7 +55,7 @@ beyond the reasons below), and why you think they would get along, in plain word
 reasons:
 {reasons}
 {difference}{plan}
-{icebreaker}They can say no, and that is fine; make that clear without pushing. Share nothing else about
+{chat}{icebreaker}They can say no, and that is fine; make that clear without pushing. Share nothing else about
 {name}: not their words to you, not their notes, no contact details. Two to four short bubbles
 separated by <next_message>. Do not mention scores, matching, pools, operators or being automated.
 """
@@ -63,6 +63,11 @@ _INTRO_CUE = "(The user has said nothing new. Introduce them now.)"
 _PLAN_SET = "The plan so far: {place}{when}. Ask whether that works for them."
 _PLAN_OPEN = (
     "No place or time is set yet: ask what evening suits them, and say you will suggest somewhere close by."
+)
+# Said only once the app has the chat screen (MATCH_CHAT_IN_APP).
+_CHAT_OPEN = (
+    "The two can now write to each other directly: in the Omiryn app, under Matches, there is a chat with {name}. "
+    "Tell them so. You cannot see that chat and you do not carry messages between them.\n"
 )
 
 _REMINDER_INSTRUCTIONS = """
@@ -204,6 +209,7 @@ async def run_match_intro_job(job: dict[str, Any]) -> bool:
         plan=_PLAN_SET.format(place=plan.get("place") or "somewhere close by", when=f", {plan['when']}" if plan.get("when") else "")
         if plan.get("place") or plan.get("when")
         else _PLAN_OPEN,
+        chat=_CHAT_OPEN.format(name=facts["name"]) if _chat_announced() else "",
         icebreaker=icebreaker,
     )
     sent = await _host(user_id, pair, kind="match_intro", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_INTRO_CUE)
@@ -258,6 +264,13 @@ async def run_match_check_in_job(job: dict[str, Any]) -> bool:
             place=f" at {plan['place']}" if plan.get("place") else "",
         )
     return await _host(user_id, pair, kind=f"match_check_in_{day}", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_CHECK_IN_CUE)
+
+
+def _chat_announced() -> bool:
+    # Imported here: pair_chat imports this module.
+    from .pair_chat import chat_announced
+
+    return chat_announced()
 
 
 def pair_facts(pair: dict[str, Any], user_id: str) -> dict[str, str]:
