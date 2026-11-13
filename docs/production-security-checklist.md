@@ -93,6 +93,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Make per-user chat and import quotas atomic and durable across Cloud Run instances using Postgres transaction locks.
 - [ ] Add upload/file size limits at proxy/runtime level.
 - [x] Add server-side profile photo decoding/validation, metadata stripping, and safe re-encoding so spoofed or malicious non-image uploads are rejected.
+- [x] Chat between two matched people (2026-11-13): only the two people in the pair can read or write; text encrypted like other user content; realtime events carry ids only; 2000 chars a message and 30 a minute; a block or report closes it for both and the other person is never told who or why; the operator sees counts, never words; deleted with either account.
+- [ ] Reported chats: the team sees the reason and the reporter's note only. Decide whether a reporter may share the messages with the team, and who reviews reports and how fast.
 - [ ] Add alerts for repeated throttling or safety reports.
 
 ## Monitoring

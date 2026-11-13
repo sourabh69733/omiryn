@@ -48,7 +48,7 @@ A user can be matched when the vibe card is at `ready_to_match` (every basic are
 Within one pool, every pair of ready members, minus:
 
 - pairs already proposed to either side before (a pass or a no-show is final; a "met" pair is not proposed again as a pair, but may be put in a group);
-- anyone either side has reported or blocked (block path is not built yet; the filter should exist from day one);
+- anyone either side has blocked, in any pool (built 2026-11-13: table `match_blocks`, checked by the pick, the manual pair and the operator's suggestions);
 - pairs whose meet facts cannot work: no overlap at all between stated free times when both are known. Area is not a filter inside one building.
 
 A thin pool stays a pool: with fewer than three ready people the match day says "one more week" and nothing else runs.
@@ -160,7 +160,7 @@ Pool and pair statuses already in the API (`GET /api/me/pools`) stay; the card l
 
 ## 7. Open decisions
 
-1. **Where they talk after the introduction.** A match chat inside the app (what the Matches mock shows) or phone numbers shared once both agree. WhatsApp-first residents have no app open, which argues for numbers; a chat in the app gives a report-and-block path and the day 3 signal for free. Recommendation: numbers with consent first for the building pilot, the in-app chat when the app is the front door.
+1. **Where they talk after the introduction.** Decided 2026-11-13: a chat inside the app. The backend is built (`src/agent/matching/pair_chat.py`, `src/api/routes/match_chat.py`, tables `match_messages`, `match_chat_reads`, `match_blocks`, `match_reports`); the screen is not. Omi never reads the chat and does not carry messages; a block or a report closes it for both. Omi points people to the chat only once `MATCH_CHAT_IN_APP=true` is set, which waits for the screen. Sharing numbers is not planned now.
 2. **Who confirms the proposal.** Operator confirm on every match day for the pilot; automatic once ten match days have gone by without a swap. Recommendation: as written.
 3. **Groups.** Three or four people when pairs are thin, as problem.md says, or pairs only until the pair flow is proven. Recommendation: pairs only for the first two match days.
 4. **Judge model.** The request-check model today. A stronger judge costs more per pair but there are under a thousand pairs a week per building; the evaluation in step 8 decides, not a guess.
