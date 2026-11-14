@@ -175,7 +175,7 @@ def _load_request_snapshot() -> dict[str, Any]:
     """Only the tables the Requests page shows, read in parallel; app events are capped and counted."""
     from sqlalchemy import func
 
-    from admin.insights import _run
+    from admin.queries import run_parallel
 
     def rows(statement: Any) -> Any:
         return lambda connection: connection.execute(statement).mappings().all()
@@ -187,7 +187,7 @@ def _load_request_snapshot() -> dict[str, Any]:
         ).scalar() or 0
         return int(total), int(errors)
 
-    data = _run(
+    data = run_parallel(
         {
             "feedback_submission_rows": rows(select(feedback_submissions).order_by(feedback_submissions.c.created_at.desc())),
             "data_request_rows": rows(select(data_requests).order_by(data_requests.c.created_at.desc())),

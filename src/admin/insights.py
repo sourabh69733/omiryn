@@ -7,13 +7,25 @@ read here: admins see counts, health and timing, not what people said.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable
+from datetime import datetime, timedelta
+from typing import Any
 
 from sqlalchemy import and_, case, distinct, func, literal, literal_column, or_, select, union, union_all
 
-from storage import ENGINE
+from admin.queries import (
+    CHAT_REPLY,
+    activity_union,
+    as_datetime,
+    as_float,
+    as_int,
+    clip,
+    day_key,
+    iso,
+    percentile,
+    run_parallel,
+    utc_day,
+    utc_now,
+)
 from storage.schema import (
     agent_conversations,
     agent_eval_runs,
@@ -44,89 +56,12 @@ from storage.schema import (
     whatsapp_imports,
 )
 
-CHAT_REPLY = "chat_reply"
 BAD_RATINGS = ("off", "bad", "harmful")
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _run(queries: dict[str, Callable[[Any], Any]]) -> dict[str, Any]:
-    """Run each query on its own connection at the same time; the page waits for the slowest."""
-
-    def one(fn: Callable[[Any], Any]) -> Any:
-        with ENGINE.connect() as connection:
-            return fn(connection)
-
-    if ENGINE.dialect.name == "sqlite":
-        # One file, one writer: parallel connections buy nothing and can lock.
-        return {key: one(fn) for key, fn in queries.items()}
-    with ThreadPoolExecutor(max_workers=min(len(queries), 8)) as pool:
-        futures = {key: pool.submit(one, fn) for key, fn in queries.items()}
-        return {key: future.result() for key, future in futures.items()}
-
-
-def _day(column: Any) -> Any:
-    if ENGINE.dialect.name == "postgresql":
-        return func.date(func.timezone(literal_column("'UTC'"), column))
-    return func.date(column)
 
 
 def _channel() -> Any:
     # A literal, not a bound value, so Postgres sees the same expression in SELECT and GROUP BY.
     return func.coalesce(agent_conversations.c.channel, literal_column("'web'"))
-
-
-def _day_key(value: Any) -> str:
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()[:10]
-    return str(value)[:10]
-
-
-def _iso(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).isoformat()
-    return str(value)
-
-
-def _float(value: Any) -> float:
-    return round(float(value or 0), 6)
-
-
-def _int(value: Any) -> int:
-    return int(value or 0)
-
-
-def _clip(value: Any, limit: int = 240) -> str | None:
-    if value is None:
-        return None
-    text = " ".join(str(value).split())
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def _percentile(values: list[int], share: float) -> int | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, round(share * (len(ordered) - 1))))
-    return int(ordered[index])
-
-
-def _activity():
-    """Every signed-in action that counts as someone using Omiryn: app events and Omi's replies."""
-    return union_all(
-        select(app_events.c.user_id.label("user_id"), app_events.c.created_at.label("at")).where(
-            app_events.c.user_id.is_not(None)
-        ),
-        select(agent_usage_events.c.user_id.label("user_id"), agent_usage_events.c.created_at.label("at")).where(
-            agent_usage_events.c.user_id.is_not(None), agent_usage_events.c.request_kind == CHAT_REPLY
-        ),
-    ).subquery("activity")
 
 
 def _known_users():
@@ -140,7 +75,7 @@ def _count(connection: Any, table: Any, *where: Any) -> int:
     statement = select(func.count()).select_from(table)
     if where:
         statement = statement.where(*where)
-    return _int(connection.execute(statement).scalar())
+    return as_int(connection.execute(statement).scalar())
 
 
 # --- Dashboard -----------------------------------------------------------------------------
@@ -148,7 +83,7 @@ def _count(connection: Any, table: Any, *where: Any) -> int:
 
 def admin_dashboard(days: int = 14) -> dict[str, Any]:
     days = max(7, min(days, 90))
-    now = _now()
+    now = utc_now()
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = now - timedelta(days=7)
     two_weeks = now - timedelta(days=14)
@@ -156,7 +91,7 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
     window = today - timedelta(days=days - 1)
 
     def kpis(connection: Any) -> dict[str, Any]:
-        activity = _activity()
+        activity = activity_union()
         first_seen = (
             select(activity.c.user_id, func.min(activity.c.at).label("first_at"))
             .group_by(activity.c.user_id)
@@ -206,14 +141,14 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
                 .label("messages_7d"),
             )
         ).mappings().one()
-        return {key: (_float(value) if key.startswith("cost") else _int(value)) for key, value in row.items()}
+        return {key: (as_float(value) if key.startswith("cost") else as_int(value)) for key, value in row.items()}
 
     def daily(connection: Any) -> list[dict[str, Any]]:
-        activity = _activity()
+        activity = activity_union()
         usage = agent_usage_events.c
-        active_day = _day(activity.c.at)
-        usage_day = _day(usage.created_at)
-        profile_day = _day(user_profiles.c.created_at)
+        active_day = utc_day(activity.c.at)
+        usage_day = utc_day(usage.created_at)
+        profile_day = utc_day(user_profiles.c.created_at)
         rows = connection.execute(
             union_all(
                 select(
@@ -251,7 +186,7 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
         ).all()
         series: dict[str, dict[str, float]] = {}
         for metric, day, value in rows:
-            series.setdefault(_day_key(day), {})[metric] = float(value or 0)
+            series.setdefault(day_key(day), {})[metric] = float(value or 0)
         result = []
         for offset in range(days):
             key = (window + timedelta(days=offset)).date().isoformat()
@@ -305,14 +240,14 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
             "prompt_version": _prompt_version(),
             "reply_provider": latest.provider if latest else None,
             "reply_model": latest.model if latest else None,
-            "last_reply_at": _iso(latest.created_at) if latest else None,
+            "last_reply_at": iso(latest.created_at) if latest else None,
             "feedback_30d": {
-                "good": _int(ratings.get("good")),
-                "bad": sum(_int(ratings.get(rating)) for rating in BAD_RATINGS),
-                "total": sum(_int(value) for value in ratings.values()),
+                "good": as_int(ratings.get("good")),
+                "bad": sum(as_int(ratings.get(rating)) for rating in BAD_RATINGS),
+                "total": sum(as_int(value) for value in ratings.values()),
             },
-            "last_error": _clip(last_error.error) if last_error else None,
-            "last_error_at": _iso(last_error.created_at) if last_error else None,
+            "last_error": clip(last_error.error) if last_error else None,
+            "last_error_at": iso(last_error.created_at) if last_error else None,
         }
 
     def health(connection: Any) -> dict[str, Any]:
@@ -347,7 +282,7 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
                 .label("client_errors_7d"),
             )
         ).mappings().one()
-        result = {key: _int(value) for key, value in row.items()}
+        result = {key: as_int(value) for key, value in row.items()}
         result["oldest_pending_job_minutes"] = _minutes_since(oldest_pending, now)
         return result
 
@@ -363,12 +298,12 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
             ).all()
         )
         result: dict[str, Any] = {}
-        result["linked_channels"] = {str(key): _int(value) for key, value in links.items()}
-        result["chats_by_channel_7d"] = {str(key): _int(value) for key, value in chats.items()}
+        result["linked_channels"] = {str(key): as_int(value) for key, value in links.items()}
+        result["chats_by_channel_7d"] = {str(key): as_int(value) for key, value in chats.items()}
         return result
 
     def recent(connection: Any) -> list[dict[str, Any]]:
-        activity = _activity()
+        activity = activity_union()
         last = (
             select(activity.c.user_id, func.max(activity.c.at).label("last_at"))
             .group_by(activity.c.user_id)
@@ -382,17 +317,17 @@ def admin_dashboard(days: int = 14) -> dict[str, Any]:
             .order_by(last.c.last_at.desc())
         ).all()
         return [
-            {"user_id": row.user_id, "display_name": row.display_name, "last_active_at": _iso(row.last_at)}
+            {"user_id": row.user_id, "display_name": row.display_name, "last_active_at": iso(row.last_at)}
             for row in rows
         ]
 
-    data = _run(
+    data = run_parallel(
         {"kpis": kpis, "daily": daily, "latency": latency, "omi": omi, "health": health, "reach": reach, "recent": recent}
     )
     latencies = data["latency"]
     data["omi"].update(
-        latency_p50_ms=_percentile(latencies, 0.5),
-        latency_p95_ms=_percentile(latencies, 0.95),
+        latency_p50_ms=percentile(latencies, 0.5),
+        latency_p95_ms=percentile(latencies, 0.95),
         latency_samples=len(latencies),
     )
     data["health"].update(data["reach"])
@@ -435,13 +370,8 @@ def _attention(kpis: dict[str, Any], omi: dict[str, Any], health: dict[str, Any]
 
 
 def _minutes_since(value: Any, now: datetime) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        value = datetime.fromisoformat(value)
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return max(0, int((now - value).total_seconds() // 60))
+    moment = as_datetime(value)
+    return None if moment is None else max(0, int((now - moment).total_seconds() // 60))
 
 
 def _prompt_version() -> str | None:
@@ -458,12 +388,12 @@ def _prompt_version() -> str | None:
 
 def admin_people(limit: int = 500) -> dict[str, Any]:
     limit = max(1, min(limit, 1000))
-    now = _now()
+    now = utc_now()
     week = now - timedelta(days=7)
 
     def people(connection: Any) -> list[dict[str, Any]]:
         known = _known_users()
-        activity = _activity()
+        activity = activity_union()
         usage = agent_usage_events.c
         last = (
             select(activity.c.user_id, func.max(activity.c.at).label("last_at"), func.min(activity.c.at).label("first_at"))
@@ -546,28 +476,28 @@ def admin_people(limit: int = 500) -> dict[str, Any]:
                 "user_id": row.user_id,
                 "display_name": row.display_name,
                 "place": ", ".join(part for part in (row.city, row.country) if part) or None,
-                "joined_at": _iso(row.joined_at or row.first_at),
-                "last_active_at": _iso(row.last_at),
-                "replies": _int(row.replies),
-                "replies_7d": _int(row.replies_7d),
-                "failed_replies": _int(row.failed),
-                "cost_usd": _float(row.cost),
-                "chats": _int(row.chats),
-                "memories": _int(row.memories),
-                "profile_facts": _int(row.facts),
-                "linked_channels": _int(row.links),
+                "joined_at": iso(row.joined_at or row.first_at),
+                "last_active_at": iso(row.last_at),
+                "replies": as_int(row.replies),
+                "replies_7d": as_int(row.replies_7d),
+                "failed_replies": as_int(row.failed),
+                "cost_usd": as_float(row.cost),
+                "chats": as_int(row.chats),
+                "memories": as_int(row.memories),
+                "profile_facts": as_int(row.facts),
+                "linked_channels": as_int(row.links),
             }
             for row in rows
         ]
         result.sort(key=lambda person: person["last_active_at"] or "", reverse=True)
         return result
 
-    data = _run({"people": people})
+    data = run_parallel({"people": people})
     return {"generated_at": now.isoformat(), "people": data["people"]}
 
 
 def admin_person(user_id: str) -> dict[str, Any] | None:
-    now = _now()
+    now = utc_now()
     window = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
     usage = agent_usage_events.c
 
@@ -592,8 +522,8 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
                 "country": row["country"],
                 "has_photo": bool(row["profile_photo_url"] or row["profile_photo_urls"]),
                 "adult_confirmed": row["adult_confirmed_at"] is not None,
-                "created_at": _iso(row["created_at"]),
-                "updated_at": _iso(row["updated_at"]),
+                "created_at": iso(row["created_at"]),
+                "updated_at": iso(row["updated_at"]),
             },
             "settings": None
             if settings is None
@@ -602,7 +532,7 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
                 "timezone": settings["timezone"],
                 "reply_model": settings["reply_model"],
             },
-            "channels": [{"channel": channel, "linked_at": _iso(at)} for channel, at in links],
+            "channels": [{"channel": channel, "linked_at": iso(at)} for channel, at in links],
         }
 
     def matching(connection: Any) -> dict[str, Any]:
@@ -619,9 +549,9 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
         pairs = _count(connection, match_pairs, or_(match_pairs.c.user_a == user_id, match_pairs.c.user_b == user_id))
         return {
             "milestone": vibe.milestone if vibe else None,
-            "milestone_reached_at": _iso(vibe.milestone_reached_at) if vibe else None,
+            "milestone_reached_at": iso(vibe.milestone_reached_at) if vibe else None,
             "pools": [
-                {"id": pool_id, "name": name, "joined_at": _iso(joined), "left_at": _iso(left)}
+                {"id": pool_id, "name": name, "joined_at": iso(joined), "left_at": iso(left)}
                 for pool_id, name, joined, left in pools
             ],
             "pairs": pairs,
@@ -666,10 +596,10 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
                 "kind": "upload" if row.import_source_id else "temporary" if row.temporary else "chat",
                 "archived": row.archived_at is not None,
                 "model": row.agent_model,
-                "replies": _int(row.replies),
-                "cost_usd": _float(row.cost),
-                "created_at": _iso(row.created_at),
-                "updated_at": _iso(row.updated_at),
+                "replies": as_int(row.replies),
+                "cost_usd": as_float(row.cost),
+                "created_at": iso(row.created_at),
+                "updated_at": iso(row.updated_at),
             }
             for row in rows
         ]
@@ -684,8 +614,8 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
         kinds: dict[str, dict[str, int]] = {}
         latest = None
         for kind, status, count, updated in by_kind:
-            kinds.setdefault(kind or "other", {})[status or "unknown"] = _int(count)
-            if updated is not None and (latest is None or _iso(updated) > _iso(latest)):
+            kinds.setdefault(kind or "other", {})[status or "unknown"] = as_int(count)
+            if updated is not None and (latest is None or iso(updated) > iso(latest)):
                 latest = updated
         return {
             "by_kind": [
@@ -694,12 +624,12 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
             ],
             "active": sum(counts.get("active", 0) for counts in kinds.values()),
             "total": sum(sum(counts.values()) for counts in kinds.values()),
-            "last_updated_at": _iso(latest),
+            "last_updated_at": iso(latest),
             **_person_counts(connection, user_id),
         }
 
     def spend(connection: Any) -> dict[str, Any]:
-        day = _day(usage.created_at)
+        day = utc_day(usage.created_at)
         totals = connection.execute(
             select(
                 func.sum(case((and_(usage.request_kind == CHAT_REPLY, usage.success), 1), else_=0)).label("replies"),
@@ -722,7 +652,7 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
             .where(usage.user_id == user_id, usage.created_at >= window)
             .group_by(day)
         ).all()
-        by_day = {_day_key(key): (int(replies or 0), float(cost or 0)) for key, replies, cost in daily_rows}
+        by_day = {day_key(key): (int(replies or 0), float(cost or 0)) for key, replies, cost in daily_rows}
         feedback = dict(
             connection.execute(
                 select(agent_message_feedback.c.rating, func.count())
@@ -731,13 +661,13 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
             ).all()
         )
         return {
-            "replies": _int(totals["replies"]),
-            "failed_replies": _int(totals["failed"]),
-            "calls": _int(totals["calls"]),
-            "tokens": _int(totals["tokens"]),
-            "cost_usd": _float(totals["cost"]),
-            "first_at": _iso(totals["first_at"]),
-            "last_at": _iso(totals["last_at"]),
+            "replies": as_int(totals["replies"]),
+            "failed_replies": as_int(totals["failed"]),
+            "calls": as_int(totals["calls"]),
+            "tokens": as_int(totals["tokens"]),
+            "cost_usd": as_float(totals["cost"]),
+            "first_at": iso(totals["first_at"]),
+            "last_at": iso(totals["last_at"]),
             "daily": [
                 {
                     "date": (window + timedelta(days=offset)).date().isoformat(),
@@ -747,9 +677,9 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
                 for offset in range(30)
             ],
             "feedback": {
-                "good": _int(feedback.get("good")),
-                "bad": sum(_int(feedback.get(rating)) for rating in BAD_RATINGS),
-                "total": sum(_int(value) for value in feedback.values()),
+                "good": as_int(feedback.get("good")),
+                "bad": sum(as_int(feedback.get(rating)) for rating in BAD_RATINGS),
+                "total": sum(as_int(value) for value in feedback.values()),
             },
         }
 
@@ -761,11 +691,11 @@ def admin_person(user_id: str) -> dict[str, Any] | None:
             .limit(15)
         ).all()
         return [
-            {"actor_id": actor, "actor_role": role, "action": action, "created_at": _iso(at)}
+            {"actor_id": actor, "actor_role": role, "action": action, "created_at": iso(at)}
             for actor, role, action, at in rows
         ]
 
-    data = _run(
+    data = run_parallel(
         {"profile": profile, "matching": matching, "chats": chats, "memory": memory, "spend": spend, "audit": audit}
     )
     if data["profile"]["profile"] is None and not data["chats"] and not data["spend"]["calls"]:
@@ -799,7 +729,7 @@ def _person_counts(connection: Any, user_id: str) -> dict[str, int]:
             count(profile_facts, profile_facts.c.user_id == user_id).label("profile_facts"),
         )
     ).mappings().one()
-    return {key: _int(value) for key, value in row.items()}
+    return {key: as_int(value) for key, value in row.items()}
 
 
 # --- Costs ---------------------------------------------------------------------------------
@@ -807,7 +737,7 @@ def _person_counts(connection: Any, user_id: str) -> dict[str, int]:
 
 def admin_costs(days: int = 30) -> dict[str, Any]:
     days = max(1, min(days, 90))
-    now = _now()
+    now = utc_now()
     window = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
     usage = agent_usage_events.c
     failed = or_(usage.success.is_(False), usage.success.is_(None))
@@ -825,10 +755,10 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
                 func.count(distinct(usage.user_id)).label("users"),
             ).where(usage.created_at >= window)
         ).mappings().one()
-        return {key: (_float(value) if key == "cost" else _int(value)) for key, value in row.items()}
+        return {key: (as_float(value) if key == "cost" else as_int(value)) for key, value in row.items()}
 
     def daily(connection: Any) -> list[dict[str, Any]]:
-        day = _day(usage.created_at)
+        day = utc_day(usage.created_at)
         rows = connection.execute(
             select(
                 day,
@@ -841,7 +771,7 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
             .where(usage.created_at >= window)
             .group_by(day)
         ).all()
-        by_day = {_day_key(row[0]): row[1:] for row in rows}
+        by_day = {day_key(row[0]): row[1:] for row in rows}
         result = []
         for offset in range(days):
             key = (window + timedelta(days=offset)).date().isoformat()
@@ -849,11 +779,11 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
             result.append(
                 {
                     "date": key,
-                    "calls": _int(calls),
-                    "failed": _int(failures),
-                    "tokens": _int(tokens),
-                    "cost_usd": _float(cost),
-                    "replies": _int(replies),
+                    "calls": as_int(calls),
+                    "failed": as_int(failures),
+                    "tokens": as_int(tokens),
+                    "cost_usd": as_float(cost),
+                    "replies": as_int(replies),
                 }
             )
         return result
@@ -877,10 +807,10 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
         def shape(row: Any, *keys: str) -> dict[str, Any]:
             return {
                 **{key: row[key] for key in keys},
-                "calls": _int(row["calls"]),
-                "failed": _int(row["failed"]),
-                "tokens": _int(row["tokens"]),
-                "cost_usd": _float(row["cost"]),
+                "calls": as_int(row["calls"]),
+                "failed": as_int(row["failed"]),
+                "tokens": as_int(row["tokens"]),
+                "cost_usd": as_float(row["cost"]),
                 "avg_latency_ms": None if row["avg_latency"] is None else int(row["avg_latency"]),
             }
 
@@ -899,9 +829,9 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
         values = [int(value) for (value,) in rows]
         return {
             "samples": len(values),
-            "p50_ms": _percentile(values, 0.5),
-            "p90_ms": _percentile(values, 0.9),
-            "p95_ms": _percentile(values, 0.95),
+            "p50_ms": percentile(values, 0.5),
+            "p90_ms": percentile(values, 0.9),
+            "p95_ms": percentile(values, 0.95),
             "max_ms": max(values) if values else None,
         }
 
@@ -928,11 +858,11 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
                 "provider": row.provider,
                 "model": row.model,
                 "success": bool(row.success),
-                "tokens": _int(row.total_tokens),
+                "tokens": as_int(row.total_tokens),
                 "latency_ms": row.latency_ms,
-                "cost_usd": _float(row.estimated_cost_usd),
-                "error": _clip(row.error),
-                "created_at": _iso(row.created_at),
+                "cost_usd": as_float(row.estimated_cost_usd),
+                "error": clip(row.error),
+                "created_at": iso(row.created_at),
             }
 
         calls = connection.execute(select(*columns).order_by(usage.created_at.desc()).limit(60)).all()
@@ -941,7 +871,7 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
         ).all()
         return {"calls": [shape(row) for row in calls], "failures": [shape(row) for row in failures]}
 
-    data = _run({"totals": totals, "daily": daily, "breakdown": breakdown, "latency": latency, "recent": recent})
+    data = run_parallel({"totals": totals, "daily": daily, "breakdown": breakdown, "latency": latency, "recent": recent})
     return {
         "generated_at": now.isoformat(),
         "days": days,
@@ -958,7 +888,7 @@ def admin_costs(days: int = 30) -> dict[str, Any]:
 
 
 def admin_system() -> dict[str, Any]:
-    now = _now()
+    now = utc_now()
     day_ago = now - timedelta(days=1)
     week = now - timedelta(days=7)
 
@@ -970,7 +900,7 @@ def admin_system() -> dict[str, Any]:
         kinds: dict[str, dict[str, Any]] = {}
         for kind, status, count, oldest in counts:
             entry = kinds.setdefault(kind, {"kind": kind, "pending": 0, "running": 0, "done": 0, "failed": 0, "oldest_pending_minutes": None})
-            entry[status] = _int(count)
+            entry[status] = as_int(count)
             if status == "pending":
                 entry["oldest_pending_minutes"] = _minutes_since(oldest, now)
         failed = connection.execute(
@@ -986,9 +916,9 @@ def admin_system() -> dict[str, Any]:
                     "id": row.id,
                     "kind": row.kind,
                     "user_id": row.user_id,
-                    "attempts": _int(row.attempts),
-                    "last_error": _clip(row.last_error),
-                    "updated_at": _iso(row.updated_at),
+                    "attempts": as_int(row.attempts),
+                    "last_error": clip(row.last_error),
+                    "updated_at": iso(row.updated_at),
                 }
                 for row in failed
             ],
@@ -1022,14 +952,14 @@ def admin_system() -> dict[str, Any]:
             )
         ).mappings().one()
         return {
-            **{key: _int(value) for key, value in row.items()},
+            **{key: as_int(value) for key, value in row.items()},
             "batch_failures": [
                 {
                     "batch_key": row.batch_key,
                     "user_id": row.user_id,
-                    "attempts": _int(row.attempts),
-                    "last_error": _clip(row.last_error),
-                    "updated_at": _iso(row.updated_at),
+                    "attempts": as_int(row.attempts),
+                    "last_error": clip(row.last_error),
+                    "updated_at": iso(row.updated_at),
                 }
                 for row in failures
             ],
@@ -1045,10 +975,10 @@ def admin_system() -> dict[str, Any]:
             .group_by(_channel())
         ).all()
         return {
-            "links": [{"channel": channel, "count": _int(count), "last_linked_at": _iso(at)} for channel, count, at in links],
+            "links": [{"channel": channel, "count": as_int(count), "last_linked_at": iso(at)} for channel, count, at in links],
             "pending_link_codes": _count(connection, channel_link_codes, channel_link_codes.c.expires_at > now),
-            "chats_7d": [{"channel": channel, "count": _int(count)} for channel, count in chats],
-            "online_now": _int(
+            "chats_7d": [{"channel": channel, "count": as_int(count)} for channel, count in chats],
+            "online_now": as_int(
                 connection.execute(
                     select(func.count(distinct(live_presence.c.user_id))).where(
                         live_presence.c.seen_at >= now - timedelta(minutes=5)
@@ -1090,10 +1020,10 @@ def admin_system() -> dict[str, Any]:
                     "suite": row.suite_name,
                     "model": row.model,
                     "status": row.status,
-                    "passed": _int(row.passed),
-                    "failed": _int(row.failed),
-                    "total": _int(row.total),
-                    "created_at": _iso(row.created_at),
+                    "passed": as_int(row.passed),
+                    "failed": as_int(row.failed),
+                    "total": as_int(row.total),
+                    "created_at": iso(row.created_at),
                 }
                 for row in runs
             ],
@@ -1103,13 +1033,13 @@ def admin_system() -> dict[str, Any]:
                     "actor_role": row.actor_role,
                     "action": row.action,
                     "target_user_id": row.target_user_id,
-                    "created_at": _iso(row.created_at),
+                    "created_at": iso(row.created_at),
                 }
                 for row in audit
             ],
         }
 
-    data = _run({"jobs": jobs, "memory": memory, "channels": channels, "rest": evals_and_audit})
+    data = run_parallel({"jobs": jobs, "memory": memory, "channels": channels, "rest": evals_and_audit})
     return {
         "generated_at": now.isoformat(),
         "config": _runtime_config(),
