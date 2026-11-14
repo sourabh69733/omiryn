@@ -228,3 +228,55 @@ Proposed direction, in build order:
 7. Experiment: a practice chat between two stand-ins built from each person's memories and style, rated by a second model (early studies: 64% against 48% for profiles alone).
 
 Open decisions: card no longer a gate; friends first or dating too; counts inside pair chats; budget for the practice chat experiment.
+
+## 10. Judge v3: choosing among candidates (built 15 November 2026, not in the live flow)
+
+Step 1 of section 9. Code: `src/agent/matching/choose.py`; test: `src/agent/evals/matching/choose_eval.py`, run with `scripts/evals/run_match_choose_evals.py`. Judges v1 and v2 are unchanged and v2 still runs the live flow.
+
+### 10.1 What changed
+
+- **One person, up to five candidates.** v1 and v2 look at one pair and say yes, maybe or no. Asked that way the model finds something in common for almost every pair. v3 has to rank the candidates against each other, and "nobody" is an allowed answer.
+- **Notes, not a card.** Each person is a numbered list of notes: every vibe line with proof, then statements from memory. No minimum number of card areas. With more than twenty statements, half the room goes to the ones closest in meaning to what the other side said (stored vectors), the rest to the most important and newest.
+- **A pull level per candidate**: strong, some or none. The first of the order is best only when its pull is strong. Code sorts the order so it agrees with the levels.
+- **A second look.** Ranking grades on a curve: the least bad of a weak set comes out "strong". So each candidate the ranking called strong is shown to the judge again, alone, in order, until one holds (three looks at most). If none holds there is no best.
+- **Clash.** A clash has to name one note from each side. A candidate with a clash goes last and is never best.
+
+### 10.2 What leaves an account, and what a reason may use
+
+The same rules as touchpoints: only active, standard-sensitivity memories that are not how-to-talk rules, names taken out; private vibe areas only when that person allowed it. A reason names one note of the person and one of the best candidate; code keeps it only when both notes may back a reason (a non-private vibe line, or a memory with the `matching` purpose) and the sentence takes a content word from each. User ids never reach the judge: candidates are `c1` to `c5`, shuffled per call.
+
+### 10.3 The test
+
+Nine made-up people: the six in `personas.py` (three planted friend pairs) and three decoys in `choose_eval.py`. A decoy shares the surface with one pair (same hobbies, same hours) and does what they cannot stand. Three tests, three rounds each with a new candidate order:
+
+| Test | Candidates | Right answer |
+|---|---|---|
+| With the friend | the friend, the decoy, three others | the friend is best; the decoy is a clash and last |
+| Without the friend | the decoy, four others | nobody |
+| One at a time | one candidate per call (how v1 and v2 are asked) | approve the friend only |
+
+Two sources. "Fixtures": each person's notes are the persona's own sentences, so the judge is tested alone with good evidence. "Database": the six people seeded on 10 November through the real pipeline (chats with Omi, background memory, vibe card), without decoys.
+
+### 10.4 Results, 15 November 2026 (Qwen3 235B, the default judge model)
+
+| Measure | Fixtures, all notes | Fixtures, 6 notes each | Database |
+|---|---|---|---|
+| Friend chosen as best | 18/18 | 15/18 | 9/18 (guessing: 4 or 5) |
+| Friend's average place | 1.0 of 5 | 1.39 of 5 | 2.17 of 4 |
+| Decoy marked as a clash | 18/18 | 17/18 | no decoys |
+| Without the friend: said nobody | 18/18 | 14/18 (4 wrong picks) | 1/18 |
+| Without the friend: chose the decoy | 0/18 | 0/18 | no decoys |
+| One at a time: friend approved | 6/6 | 5/6 | 6/6 |
+| One at a time: someone else approved | 0/12 | 0/12 | 9/12 |
+
+Before the pull levels and the second look, on the same fixtures: one at a time approved 11 of 12 non-friends (the "yes to everyone" problem), and without the friend the judge still picked someone 15 of 18 times. With pull levels only: 12 of 18. With the second look: 0 of 18.
+
+### 10.5 What it means
+
+- With good notes about each person the judge is right every time, including "nobody" and the decoys. The judge is no longer the weak part.
+- With six notes a person it still finds the friend 15 of 18 times and says "nobody" for the other 3, which is the safe way to fail. Without the friend it made a wrong pick 4 of 18 times: the less Omi knows, the more a thin overlap passes for a match.
+- On the seeded people it is near guessing. Their memories are mostly made-up stories from playful chats ("saw vada pav spawning in PUBG at 2 am"), not who they are, and the person with the most notes looks like a match for everyone. What Omi keeps about a person is now the weak part: step 2 of section 9. The seeded chats are also part of the problem, since the test people drift into games with Omi.
+- No memory of the seeded people carries the `matching` purpose (0 of 119; the background writer never picks it), so today a reason can only come from a vibe line. Whether an ordinary memory may back a reason once a person turned matching on is an open decision.
+- Judge calls are not written to the usage table (no user on the call), for v2 as well. Cost per person is about two calls of 3K to 5K tokens.
+
+Not done: v3 is not wired into the pick, the pool view or the ask. That waits for step 2 and a decision on the reason rule.
