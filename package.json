@@ -16,7 +16,7 @@
     "web:preview": "vite preview --config apps/web/vite.config.js",
     "web:deploy": "npx wrangler deploy --config apps/web/wrangler.jsonc",
     "web:check": "tsc -p apps/web/tsconfig.json --noEmit",
-    "web:test": "tsx --test apps/web/src/ui/app/*.test.ts apps/web/src/ui/app/*.test.tsx",
+    "web:test": "tsx --test apps/web/src/lib/*.test.ts apps/web/src/ui/app/*.test.ts apps/web/src/ui/app/*.test.tsx",
     "admin:dev": "vite --config apps/admin/vite.config.js",
     "admin:test": "node --test apps/admin/src/*.test.js",
     "admin:check": "for f in apps/admin/src/*.js apps/admin/src/pages/*.js; do node --check \"$f\" || exit 1; done",
@@ -43,7 +43,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "web-vitals": "4.2.4"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
