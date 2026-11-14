@@ -23,6 +23,7 @@ from .schema import (
     agent_jobs,
     agent_trace_steps,
     agent_traces,
+    api_request_stats,
     audit_events,
     channel_bursts,
     channel_seen_messages,
@@ -39,6 +40,8 @@ BACKGROUND_DEBUG_DAYS = 90
 # Finished or given-up background jobs, and batch failure notes.
 JOB_DAYS = 30
 AUDIT_DAYS = 365
+# Per-minute API timing summaries (route names and numbers only).
+REQUEST_STATS_DAYS = 30
 
 
 def purge_expired_records() -> dict[str, int]:
@@ -60,6 +63,7 @@ def purge_expired_records() -> dict[str, int]:
             ),
             ("finished_jobs", agent_jobs, job_cutoff, (agent_jobs.c.status.in_([JOB_DONE, JOB_FAILED]),)),
             ("audit_events", audit_events, now - timedelta(days=AUDIT_DAYS), ()),
+            ("request_stats", api_request_stats, now - timedelta(days=REQUEST_STATS_DAYS), ()),
             # Per-instance state nobody closed: a crashed replier, old delivery IDs, a gone instance.
             ("channel_bursts", channel_bursts, now - timedelta(days=1), ()),
             ("channel_seen_messages", channel_seen_messages, now - timedelta(days=2), ()),
@@ -86,4 +90,4 @@ def purge_expired_records() -> dict[str, int]:
     return deleted
 
 
-__all__ = ["AUDIT_DAYS", "BACKGROUND_DEBUG_DAYS", "DEBUG_DAYS", "JOB_DAYS", "purge_expired_records"]
+__all__ = ["AUDIT_DAYS", "BACKGROUND_DEBUG_DAYS", "DEBUG_DAYS", "JOB_DAYS", "REQUEST_STATS_DAYS", "purge_expired_records"]

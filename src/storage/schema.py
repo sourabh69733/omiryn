@@ -687,6 +687,26 @@ audit_events = Table(
 Index("ix_audit_events_created", audit_events.c.created_at)
 Index("ix_audit_events_target_user", audit_events.c.target_user_id)
 
+# API timing, one row per instance, route and minute: counts and a latency histogram, never a user or a body.
+api_request_stats = Table(
+    "api_request_stats",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("bucket_start", DateTime(timezone=True), nullable=False),
+    Column("release", String, nullable=True),
+    Column("method", String, nullable=False),
+    Column("route", String, nullable=False),
+    Column("count", Integer, nullable=False),
+    Column("server_errors", Integer, nullable=False),
+    Column("client_errors", Integer, nullable=False),
+    Column("total_ms", Float, nullable=False),
+    Column("max_ms", Float, nullable=False),
+    # Counts per upper bound in REQUEST_LATENCY_BOUNDS_MS, the last one open-ended.
+    Column("histogram_json", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+Index("ix_api_request_stats_bucket", api_request_stats.c.bucket_start)
+
 agent_user_settings = Table(
     "agent_user_settings",
     metadata,
