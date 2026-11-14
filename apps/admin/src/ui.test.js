@@ -63,3 +63,21 @@ test("dashboard says all clear or lists what needs a look", () => {
   assert.match(html, /Failed replies today/);
   assert.equal(kindLabel("chat_reply"), "Omi reply");
 });
+
+test("funnel bars show the share kept from the step before", async () => {
+  const { funnel } = await import("./ui.js");
+  const html = funnel([{ label: "Saw it", count: 10, unit: "sessions" }, { label: "Signed in", count: 4 }]);
+  assert.match(html, /40% of previous/);
+  assert.match(html, /browser sessions/);
+  assert.match(html, /width:40%/);
+});
+
+test("experience colours speed by Google's limits and growth shades cohort cells", async () => {
+  const { speedTone } = await import("./pages/experience.js");
+  const { cohortCell } = await import("./pages/growth.js");
+  assert.equal(speedTone("LCP", 2400), "good");
+  assert.equal(speedTone("LCP", 3000), "warn");
+  assert.equal(speedTone("CLS", 0.3), "bad");
+  assert.match(cohortCell(0.5), /level-3">50%/);
+  assert.match(cohortCell(null), /future/);
+});

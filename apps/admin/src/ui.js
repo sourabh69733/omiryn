@@ -110,7 +110,7 @@ export function delta(current, previous, { goodWhenUp = true } = {}) {
 const PILL_TONES = {
   good: ["success", "done", "completed", "active", "met", "still_talking", "ok", "passed", "good", "web"],
   bad: ["failed", "error", "client_error", "bad", "harmful", "deleted", "declined", "no_show"],
-  warn: ["pending", "running", "open", "proposed", "asked", "off", "warning", "temporary"],
+  warn: ["pending", "running", "open", "proposed", "asked", "off", "warn", "warning", "temporary"],
 };
 
 export function pill(value, label) {
@@ -223,6 +223,22 @@ export function shareBars(rows, { label, value, format = num }) {
       return `<li><span class="share-label">${label(row)}</span><span class="share-track"><i style="width:${(v / max) * 100}%"></i></span><span class="share-value">${esc(format(v))}</span></li>`;
     })
     .join("")}</ul>`;
+}
+
+/** Steps of a funnel as bars sized against the first step, with the share kept from the step before. */
+export function funnel(steps) {
+  if (!steps?.length) return empty("No data yet.");
+  const top = Math.max(Number(steps[0].count || 0), 1);
+  return `<ol class="funnel">${steps
+    .map((step, index) => {
+      const count = Number(step.count || 0);
+      const previous = index ? Number(steps[index - 1].count || 0) : null;
+      const kept = previous === null ? "" : `<span class="funnel-kept">${previous ? pct(count, previous) : "-"} of previous</span>`;
+      return `<li><span class="funnel-label">${esc(step.label)}${step.unit === "sessions" ? ' <small class="muted">(browser sessions)</small>' : ""}</span>
+        <span class="funnel-track"><i style="width:${Math.min(100, (count / top) * 100)}%"></i></span>
+        <span class="funnel-count">${esc(num(count))}</span>${kept}</li>`;
+    })
+    .join("")}</ol>`;
 }
 
 export function skeleton(blocks = 3) {
