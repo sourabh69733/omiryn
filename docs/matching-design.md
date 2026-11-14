@@ -280,3 +280,65 @@ Before the pull levels and the second look, on the same fixtures: one at a time 
 - Judge calls are not written to the usage table (no user on the call), for v2 as well. Cost per person is about two calls of 3K to 5K tokens.
 
 Not done: v3 is not wired into the pick, the pool view or the ask. That waits for step 2 and a decision on the reason rule.
+
+## 11. Match notes: who a person is, from their own messages (built 15 November 2026, not in the live flow)
+
+Step 2 of section 9. Code: `src/agent/matching/notes.py`, `src/storage/match_notes.py` (table `agent_match_notes`), `scripts/build_match_notes.py`. The judge of section 10 reads them first.
+
+### 11.1 Why
+
+Two things came out of section 10's database test. The seeded chats were one running joke per person (wardens, chutney smuggling, a "Vada Pav OS"), so every made-up person sounded the same and the planted friends could not be told apart. And memory kept the events of the joke as facts. The vibe card was no help either: after 32 turns of plain chat every card is still at "first impressions", so the card gate would block all six.
+
+### 11.2 What a note is
+
+`{"id", "kind", "text", "evidence": [{"conversation_id", "message_index", "sent_at"}]}`: one plain sentence about the person, of one kind, with the person's own messages behind it. Up to five notes a kind, twenty-four in all.
+
+| Kind | Meaning | May back a reason told to the other person |
+|---|---|---|
+| loves | what they do or could talk about for an hour | yes |
+| humour | what makes them laugh and how they joke | yes |
+| wants | what they want from a friend, or from people right now | yes |
+| gives | what they are like to the people around them | yes |
+| rhythm | hours, how they keep in touch, planned or spontaneous, a crowd or a few | yes |
+| cannot_stand | what they cannot stand in people | no; the judge reads it only when the person allowed private matching |
+| views | opinions and beliefs | no; same rule |
+| moment | what is going on in their life now | no, until decided; the judge reads it |
+
+### 11.3 How they are written
+
+One model call (the request-check model, or `MATCH_NOTES_MODEL`) reads the person's own messages since the last build, with the notes so far, and returns the whole list as it should now stand: keep, rewrite, drop, add. Temporary chats are never read. The prompt says not to record the events of a joke as facts, to describe and not quote, and to leave out health, mental health, sexual and financial details.
+
+Code keeps a note only with a known kind, a sentence, and proof: messages the model was shown, or the proof of the note it keeps. A kept note keeps its id. An empty or broken answer changes nothing and the same messages are read again next time. A long history is read in parts of 12,000 characters, the newest four.
+
+When: with the daily user card rebuild, for people in a match group, when there are at least eight new messages. The table is deleted with the account.
+
+Not done: no second model call checks that the cited messages really show the note (the vibe card has one). The judge's reasons are still checked word by word, and notes are never shown to anyone.
+
+### 11.4 Ready to match, from notes
+
+`notes_readiness`: at least six notes over at least three of loves, humour, wants, gives, rhythm. Six notes was where the judge still found the planted friend 15 times in 18 (10.4). This is computed but does not replace the live gate yet; the live flow still asks for a `ready_to_match` vibe card.
+
+### 11.5 Test, 15 November 2026
+
+Six people seeded again with a plain goal (`seed_match_personas.py --goal plain`: talk about your own life, do not build on a joke), four chats of eight turns each through the real pipeline, into `data/omiryn_match_eval_v2.db`. Under the card rule 0 of 6 are ready; under the notes rule 5 of 6 (Aarav has five notes). Then the planted-friend test of 10.3, three rounds each, four candidates a round, no decoys:
+
+| Measure | Vibe lines and memories (before) | Notes and vibe lines | Notes, vibe lines and memories |
+|---|---|---|---|
+| Friend chosen as best | 10/18 | 13/18 | 14/18 |
+| Friend's average place (1 is best) | 1.89 | 1.67 | 1.44 |
+| Without the friend: said nobody | 4/18 | 2/18 | 5/18 |
+| One at a time: friend approved | 4/6 | 6/6 | 5/6 |
+| One at a time: someone else approved | 5/12 | 8/12 | 6/12 |
+
+Guessing puts the friend first 4 or 5 times in 18. For comparison, the first seeded set (joke chats, section 10.4) gave 9/18.
+
+By person, with all three sources: five of the six get their friend in every round where the judge names anyone (14 of 15, one "nobody" with the friend ranked first). The sixth, Aarav, is wrong every time and is the one the notes rule calls not ready. With the old evidence Dev and Rohan, the quiet pair, never found each other; with notes they do every time.
+
+### 11.6 What it means, and what is still weak
+
+- Notes help where the signal is quiet. Right friend 10 to 14 of 18.
+- The readiness rule points the right way: the one person below it is the one the judge gets wrong.
+- When the friend is not among the candidates the judge still names someone 13 times in 18. On fixtures with full notes it said "nobody" 18 of 18. With 32 turns the notes do not yet hold what separates people (how they keep in touch, planner or spontaneous, what they cannot stand: two of six have a cannot_stand note), and the persona model gives everyone a similar sense of humour and even the same incidents (two people got a noisy "spiritual" housemate). So a thin overlap can pass for a match when little is known. The planted design only guarantees the friend is the best match, not that the others are bad ones.
+- The test is small: six people, three rounds each, and the rounds of one person are not independent. Read it as a direction.
+
+Next: pick a pair only when each is high on the other's list (section 9, step 5 of the flow), which is the natural guard against a one-sided thin match; wire notes readiness and judge v3 into the live pick; decide whether `moment` and ordinary memories may back a reason.
