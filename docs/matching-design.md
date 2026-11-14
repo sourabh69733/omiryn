@@ -342,3 +342,45 @@ By person, with all three sources: five of the six get their friend in every rou
 - The test is small: six people, three rounds each, and the rounds of one person are not independent. Read it as a direction.
 
 Next: pick a pair only when each is high on the other's list (section 9, step 5 of the flow), which is the natural guard against a one-sided thin match; wire notes readiness and judge v3 into the live pick; decide whether `moment` and ordinary memories may back a reason.
+
+## 12. The two-sided pick, and what a group shares (built 15 November 2026, behind `MATCH_JUDGE=3`, off by default)
+
+Step 3 of section 9. Code: `src/agent/matching/mutual.py`, `src/agent/matching/common.py`, `pick_pool_mutual` in `pick.py`, the switch `judge_version()` in `choose.py`.
+
+### 12.1 The switch
+
+`MATCH_JUDGE=3` turns on, together: ready from match notes (`match_readiness` reports the card and the meet facts but they hold nobody back), the two-sided pick in `pick_pool`, and the same judge for a pair made by hand (`propose_pair`). Unset, everything runs as before on judge v2. The rules around the pick do not change: who is busy, who was tried before, who is blocked, three ready people at least, the operator confirms before anyone is asked.
+
+Before the switch goes on for real users: the Matches page checklist still lists vibe card areas when someone is not ready; it should read the `notes` block of the readiness call.
+
+### 12.2 The pick
+
+1. Bring notes up to date for every free member with enough new messages. Ready is `notes_readiness`.
+2. Mark what the group shares (12.3), over all members.
+3. Every ready person gets their own ranking of the others (section 10). With more than five others, the five closest in meaning by stored memory vectors (`shortlist`).
+4. A pair goes ahead when both sides call it strong: `both_best` (each is the other's best), or `confirmed_back` (A's best is B, and B, shown A alone, calls the pull strong). A clash seen from either side ends it.
+5. Nobody is in two pairs: `both_best` first, then where B had placed A highest.
+6. The stored check has the shape v2 stores (fit, reasons, difference, icebreaker, chemistry), with reasons from both sides and the same reason told once, plus `mutual` and each side's place and pull. Pairs are saved as `proposed`. The proposal also lists what one side wanted and did not get, and why.
+
+About three model calls a ready person at most (ranking, second look, check back).
+
+### 12.3 What most of the group shares does not count
+
+One person's notes are written without knowing anyone else's. In the seeded group every person had a humour note about turning daily trouble into absurd jokes, and a rhythm note about messaging in bursts; the judge gave these as the reason for almost any two people. So code compares each match note with everyone else's notes of the same kind (one embedding call for the group, names taken out). A note that at least half of the others also have, at cosine 0.70 or more, is marked `common`. The judge is told to read past it, and code drops any reason that names one. Groups under five people with notes are not marked.
+
+Measured on the six seeded people: humour notes matched 3 to 5 of the 5 others at 0.70 or more; rhythm notes 1 to 5; loves, moment, views and cannot_stand notes 0 or 1.
+
+### 12.4 Test on the six seeded people (three rounds each)
+
+| People in the pick | Without the common mark | With it |
+|---|---|---|
+| All six (9 planted pairs possible over the rounds) | 4 right, 2 wrong | 2 right, 1 wrong |
+| The five the notes rule calls ready (6 possible) | 2 right, 2 wrong | 0 right, 3 wrong |
+| One from each planted pair (0 possible, the right answer is no pair) | a wrong pair in 3 of 3 rounds | no pair in 3 of 3 rounds |
+
+### 12.5 What it means
+
+- The common mark does what it is for: with nobody's friend present, three wrong pairs became none.
+- The pick as a whole is not reliable on this data. It makes few pairs, and one pair that was not planted (Rohan and Sanya) keeps choosing each other.
+- The test has reached its limit. In 32 turns the made-up people drift from their scripts: Dev became someone who guards his time alone and Rohan someone who wants company at meals, so the judge sees a clash between two planted friends. All six also write in the voice of the one model that plays them. A wrong answer can no longer be told from drifted test data.
+- So the switch stays off. The next evidence has to come from real people: the friend check of section 3.7 and 8.5 (two people who are friends both talk to Omi for some days; the pick should put them together and not with others), with the operator reading every proposed pair before anyone is asked.
