@@ -181,8 +181,13 @@ def fixture_build(people: dict[str, Person]) -> Build:
     return lambda person, candidates: (people[person], [people[c] for c in candidates], {})
 
 
-def db_build(user_ids: dict[str, str]) -> Build:
-    """Build packs from what is stored, for people named by a short id (persona id -> user id)."""
+EVIDENCE = ("all", "no_notes", "notes_only")
+
+
+def db_build(user_ids: dict[str, str], *, evidence: str = "all") -> Build:
+    """Build packs from what is stored, for people named by a short id (persona id -> user id).
+    `evidence` leaves a source out to compare them: "no_notes" is vibe lines and memory statements
+    (what there was before match notes), "notes_only" is match notes and vibe lines."""
     from agent.matching.choose import Loaded, load_person, notes_toward
     from agent.matching.style import pair_style_lines
 
@@ -190,7 +195,7 @@ def db_build(user_ids: dict[str, str]) -> Build:
 
     def get(ref: str) -> Loaded:
         if ref not in loaded:
-            loaded[ref] = load_person(user_ids[ref])
+            loaded[ref] = load_person(user_ids[ref], notes=evidence != "no_notes", statements=evidence != "notes_only")
         return loaded[ref]
 
     def build(person: str, candidates: list[str]) -> tuple[Person, list[Person], dict[str, list[str]]]:
@@ -375,6 +380,6 @@ def report(results: list[Round], cases: list[Case], *, show_reasons: bool = Fals
 
 
 __all__ = [
-    "DECOYS", "FIXTURE_DECOYS", "FIXTURE_FRIENDS", "TESTS", "Case", "Decoy", "Round",
+    "DECOYS", "EVIDENCE", "FIXTURE_DECOYS", "FIXTURE_FRIENDS", "TESTS", "Case", "Decoy", "Round",
     "build_cases", "db_build", "evaluate", "fixture_build", "fixture_people", "fixture_person", "report", "summarise", "third_person",
 ]

@@ -39,8 +39,8 @@ MATCH_CHOOSE_SYSTEM_PROMPT = """You help a companion decide which one person, if
 
 Input JSON:
 - "person": {"name", "notes": [{"id", "text", "reason_ok", "area"?}]}: what the companion knows about
-  them, from what they said over weeks. A note with "area" is a summary line of that kind (humor,
-  interests, deal_breakers and so on); the others are single things they said. "[name]" stands for a
+  them, from what they said over weeks. A note with "area" is a summary line of that kind (loves,
+  humour, wants, cannot_stand, interests and so on); the others are single things they said. "[name]" stands for a
   name taken out.
 - "candidates": [{"key", "name", "notes": [...], "style": [...]}]: other people, with the same kind of
   notes. "style" lines compare how that candidate and the person write (language, hours, length).
@@ -89,6 +89,8 @@ class Note:
     reason_ok: bool
     area: str | None = None
     memory_id: str | None = None
+    # Set for a match note (agent.matching.notes); area then holds its kind.
+    note_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -325,19 +327,29 @@ class Loaded:
     style: dict[str, Any]
 
 
-def load_person(user_id: str) -> Loaded:
-    from storage import get_user_profile, get_user_style, get_vibe_card, list_agent_memories, private_matching_allowed
+def load_person(user_id: str, *, notes: bool = True, statements: bool = True) -> Loaded:
+    """What is stored about a user, as notes for a pack: their match notes first (who they are,
+    several per kind), then vibe lines, then memory statements. `notes` and `statements` switch a
+    source off, for the evaluation that compares them."""
+    from storage import get_match_notes, get_user_profile, get_user_style, get_vibe_card, list_agent_memories, private_matching_allowed
     from storage.memory_embeddings import list_agent_memory_embeddings
+
+    from .notes import NOTE_KINDS, PRIVATE_KINDS, REASON_KINDS
 
     card = get_vibe_card(user_id)
     areas = card.get("areas") or {}
     private_ok = private_matching_allowed(card)
+    stored = (get_match_notes(user_id) or {}).get("notes") or [] if notes else []
     lines = tuple(
+        Note(str(note["text"]), note["kind"] in REASON_KINDS, area=note["kind"], note_id=str(note.get("id") or ""))
+        for note in stored
+        if isinstance(note, dict) and note.get("kind") in NOTE_KINDS and note.get("text") and (private_ok or note["kind"] not in PRIVATE_KINDS)
+    ) + tuple(
         Note(line_text(areas[area_id]), area_id not in PRIVATE_AREA_IDS, area=area_id)
         for area_id in VIBE_AREA_IDS
         if line_text(areas.get(area_id)) and line_evidence(areas.get(area_id)) and (private_ok or area_id not in PRIVATE_AREA_IDS)
     )
-    memories = tuple(memory for memory in list_agent_memories(user_id) if shareable(memory))
+    memories = tuple(memory for memory in list_agent_memories(user_id) if shareable(memory)) if statements else ()
     vectors = {str(item["memory_id"]): item for item in list_agent_memory_embeddings(user_id, [str(m["id"]) for m in memories])} if memories else {}
     return Loaded(user_id, _first_name(get_user_profile(user_id), "Someone"), lines, memories, vectors, get_user_style(user_id) or {})
 
@@ -394,6 +406,8 @@ def _pair_of_notes(item: Any, best: str, notes: dict[str, Note], *, need_reason_
 
 
 def _source(note: Note) -> str:
+    if note.note_id:
+        return f"note:{note.note_id}"
     return f"area:{note.area}" if note.area else f"memory:{note.memory_id}" if note.memory_id else "note"
 
 

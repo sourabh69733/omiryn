@@ -35,6 +35,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from agent.evals.matching.choose_eval import (  # noqa: E402
+    EVIDENCE,
     FIXTURE_DECOYS,
     FIXTURE_FRIENDS,
     TESTS,
@@ -57,6 +58,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--rounds", type=int, default=3, help="Times each ranking test runs, each with a new candidate order.")
     parser.add_argument("--sample", type=int, default=None, help="Fixtures only: keep this many notes per person, picked at random.")
     parser.add_argument("--model", default=None, help="Judge model id; default is MATCH_REASONS_MODEL or the request-check model.")
+    parser.add_argument("--evidence", choices=EVIDENCE, default="all", help="With --source db: all, no_notes (vibe lines and memories only) or notes_only (match notes and vibe lines).")
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--no-confirm", action="store_true", help="Skip the second look at the first pick, to see the ranking alone.")
     parser.add_argument("--show-reasons", action="store_true")
@@ -79,7 +81,7 @@ async def _run(args: argparse.Namespace) -> int:
             print(f"Only {len(friends)} seeded people have their friend seeded too; need at least 4.", file=sys.stderr)
             return 2
         # The decoys were never seeded, so the database source runs without them.
-        build = db_build(seeded)
+        build = db_build(seeded, evidence=args.evidence)
         cases = build_cases(friends, {}, seed=args.seed)
 
     def progress(result: Round) -> None:
@@ -93,7 +95,7 @@ async def _run(args: argparse.Namespace) -> int:
     if not args.no_save:
         folder = PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d")
         folder.mkdir(parents=True, exist_ok=True)
-        name = "match-choose" + ("-db" if args.source == "db" else "") + (f"-sample{args.sample}" if args.sample else "") + ("-no-confirm" if args.no_confirm else "") + ".md"
+        name = "match-choose" + ("-db" if args.source == "db" else "") + (f"-{args.evidence}" if args.source == "db" and args.evidence != "all" else "") + (f"-sample{args.sample}" if args.sample else "") + ("-no-confirm" if args.no_confirm else "") + ".md"
         model = args.model or os.environ.get("MATCH_REASONS_MODEL") or "default"
         (folder / name).write_text(f"# Choosing judge eval\n\nModel `{model}` · source {args.source} · {datetime.now():%Y-%m-%d %H:%M}\n\n{text}\n", encoding="utf-8")
         print(f"saved {(folder / name).relative_to(PROJECT_ROOT)}")
