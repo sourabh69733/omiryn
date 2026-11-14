@@ -1,6 +1,11 @@
 {
   "name": "omiryn-admin",
   "compatibility_date": "2026-08-25",
+  // Served only at admin.omiryn.com, which Cloudflare Access guards (scripts/cloudflare_admin_access.py).
+  // The free workers.dev and preview addresses are off: Access does not cover them.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "admin.omiryn.com", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
