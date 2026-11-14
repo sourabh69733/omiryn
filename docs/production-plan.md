@@ -93,10 +93,10 @@ See [gcp-deployment.md](gcp-deployment.md) and the security checklist for the fu
 
 | Metric | Status | Notes |
 |---|---|---|
-| Activation (first real chat with Omi) | Partial | App events exist; the definition and dashboard do not. |
+| Activation (first real chat with Omi) | Built | Admin Growth page (2026-11-14): getting-started funnel from the sign-in screen to Omi's first reply and coming back, and time to first reply. |
 | Match rate (both accept) | Missing | Needs step 6. |
 | 7-day still-talking rate | Missing | Needs steps 7 and 8. The main success number. |
-| Dashboard for the three numbers | Partial | Admin dashboard (2026-11-12) shows active, returning and new users, replies and failures; match rate and still-talking rate are not on it yet. |
+| Dashboard for the three numbers | Built | Admin Growth page (2026-11-14): return rates and return by join week, the getting-started funnel, and the matching funnel to still talking. Real numbers need real users. |
 
 ## 7. UI polish
 

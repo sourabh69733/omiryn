@@ -43,6 +43,8 @@ This checklist tracks the privacy and security layer required before a real publ
 - [x] Daily retention job in the API job worker (`src/storage/retention.py`): reply traces and context snapshots 30 days, background debug rows 90 days (free text scrubbed after 7), finished jobs and batch failures 30 days, stale temporary chats 24 hours, audit rows 365 days.
 - [x] Chats, memories, vibe lines and profiles are never removed by retention; only the user's own deletes remove them.
 - [x] `audit_events` table records chat, message, memory and upload deletes, Clear Omi, account delete, data requests, every admin view and each retention run. IDs and counts only, never text. Kept when an account is deleted.
+- [x] Experience tracking (2026-11-14) keeps names, numbers and codes only: sign-in steps with the provider's error code, page names with active and visible time, Web Vitals values, rage-click elements as tag and class, app errors as a code with file and line, and the build release. No typed text, no chat or memory content, no screen recording. API timing is kept per route template (never the real path) in `api_request_stats` for 30 days.
+- [ ] Privacy page: say that usage and speed data is kept to improve the app (needs the owner's wording).
 - [x] Admins can list audit rows at `GET /api/admin/audit`.
 - [x] Names on memories (`about_json`: people, places) are encrypted like the memory value and go with the memory on any delete.
 - [ ] Encryption key rotation plan for `ENCRYPTION_MASTER_KEY`.
