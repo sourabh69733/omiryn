@@ -22,6 +22,7 @@ PERSON_CARD = "person_card"
 SEARCH_QUERIES = "search_queries"
 MATCH_REASONS = "match_reasons"
 MATCH_JUDGE = "match_judge"
+MATCH_CHOOSE = "match_choose"
 
 PROFILE_SIGNAL_EXTRACT = "profile_signal_extract"
 PROFILE_SIGNAL_BACKFILL = "profile_signal_backfill"

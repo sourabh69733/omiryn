@@ -40,6 +40,7 @@ from agent.observability.usage import (
     REPLY_REQUEST_CHECK,
     CARD_REBUILD,
     PERSON_CARD,
+    MATCH_CHOOSE,
     MATCH_JUDGE,
     MATCH_REASONS,
     SEARCH_QUERIES,
@@ -247,6 +248,21 @@ async def judge_match(
 
     model = model or os.getenv("MATCH_REASONS_MODEL", "").strip() or request_check_model(_provider_name())
     return await _upload_call(MATCH_JUDGE_SYSTEM_PROMPT, MATCH_JUDGE, text, conversation_id, model, timeout_seconds)
+
+
+async def choose_match(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 60,
+) -> dict[str, Any]:
+    """Judge v3: one person and several candidates in, {"order", "best", "reasons" with note ids,
+    "difference", "icebreaker", "chemistry", "why_not", "clash"} out (agent.matching.choose)."""
+    from agent.matching.choose import MATCH_CHOOSE_SYSTEM_PROMPT
+
+    model = model or os.getenv("MATCH_REASONS_MODEL", "").strip() or request_check_model(_provider_name())
+    return await _upload_call(MATCH_CHOOSE_SYSTEM_PROMPT, MATCH_CHOOSE, text, conversation_id, model, timeout_seconds)
 
 
 async def rebuild_user_card_text(
