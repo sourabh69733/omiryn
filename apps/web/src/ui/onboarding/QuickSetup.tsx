@@ -1,6 +1,7 @@
 import { ArrowRight, MapPin } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
+import { trackAppEvent } from "../../lib/appLogger";
 import { OmirynLogo } from "../brand/OmirynLogo";
 
 type AuthUser = { display_name?: string | null };
@@ -74,6 +75,8 @@ export function QuickSetup() {
       });
       if (!created.ok) throw new Error(await apiErrorMessage(created, "Could not start your first chat."));
       const conversation = (await created.json()) as { id: string };
+      // Queued in storage, so it is sent after the reload below.
+      trackAppEvent("setup_completed", {}, { page: "setup" });
       const nextUrl = new URL("/", window.location.origin);
       nextUrl.searchParams.set("conversation_id", conversation.id);
       window.location.replace(nextUrl.toString());

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, Sparkles, Users } from "lucide-react";
 import { apiFetch, ensureAuthenticatedSession, signInWithGoogle } from "../lib/api";
+import { trackSignInFailed, trackSignInReturn, trackSignInScreen, trackSignInStarted } from "../lib/signInTracking";
 import { MainApp } from "./app/MainApp";
 import { AgentOrb } from "./app/AgentOrb";
 import { OmirynLogo } from "./brand/OmirynLogo";
@@ -40,9 +41,11 @@ export function App() {
     window.addEventListener("omiryn:auth-required", requireAuth);
     ensureAuthenticatedSession()
       .then((ready) => {
+        trackSignInReturn(ready);
         if (!cancelled) setAuthState(ready ? "signed_in" : "signed_out");
       })
       .catch((caught: unknown) => {
+        trackSignInFailed("session_restore_failed");
         if (!cancelled) {
           setAuthError(caught instanceof Error ? caught.message : "Could not check sign in.");
           setAuthState("signed_out");
@@ -53,6 +56,10 @@ export function App() {
       window.removeEventListener("omiryn:auth-required", requireAuth);
     };
   }, []);
+
+  useEffect(() => {
+    if (authState === "signed_out") trackSignInScreen();
+  }, [authState]);
 
   useEffect(() => {
     if (authState !== "signed_in") return;
@@ -72,9 +79,11 @@ export function App() {
     if (isSigningIn) return;
     setAuthError(null);
     setIsSigningIn(true);
+    trackSignInStarted();
     try {
       await signInWithGoogle();
     } catch (caught) {
+      trackSignInFailed("start_failed");
       setAuthError(caught instanceof Error ? caught.message : "Could not start Google sign-in.");
       setIsSigningIn(false);
     }

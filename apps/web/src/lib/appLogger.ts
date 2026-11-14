@@ -23,7 +23,12 @@ type AppEventName =
   | "match_answered"
   | "pool_joined"
   | "match_card_answered"
-  | "match_reported";
+  | "match_reported"
+  | "sign_in_succeeded"
+  | "setup_completed"
+  | "page_left"
+  | "page_speed"
+  | "rage_click";
 
 type AppEventMetadata = Record<string, string | number | boolean | null | undefined>;
 
@@ -36,6 +41,9 @@ type QueuedAppEvent = {
   metadata: AppEventMetadata;
   client_created_at: string;
 };
+
+// The build this browser runs, so a problem can be tied to the release that brought it.
+export const APP_RELEASE: string = import.meta.env.VITE_APP_RELEASE || "dev";
 
 const STORAGE_KEY = "omiryn.appEventQueue";
 const SESSION_KEY = "omiryn.appSessionId";
@@ -64,15 +72,15 @@ export function initAppLogger() {
 
 function initClientErrorMonitoring() {
   window.addEventListener("error", (event) => {
-    trackClientError("window_error", errorCode(event.message || "unknown_error"));
+    trackClientError("window_error", errorCode(event.message || "unknown_error"), errorSource(event.filename, event.lineno));
   });
   window.addEventListener("unhandledrejection", (event) => {
-    trackClientError("unhandled_rejection", errorCode(rejectionReason(event.reason)));
+    trackClientError("unhandled_rejection", errorCode(rejectionReason(event.reason)), stackSource(event.reason));
   });
 }
 
-function trackClientError(area: string, messageCode: string) {
-  trackAppEvent("client_error", { area, message_code: messageCode }, { page: currentPage() });
+function trackClientError(area: string, messageCode: string, source?: string) {
+  trackAppEvent("client_error", { area, message_code: messageCode, source }, { page: currentPage() });
   void flushAppEvents();
 }
 
@@ -92,7 +100,7 @@ export function trackAppEvent(
     page: options.page || currentPage(),
     target_type: options.target_type,
     target_id: options.target_id,
-    metadata: safeMetadata(metadata),
+    metadata: safeMetadata({ ...metadata, release: APP_RELEASE }),
     client_created_at: new Date().toISOString(),
   });
   queue = queue.slice(-MAX_STORED_EVENTS);
@@ -150,7 +158,7 @@ function persistQueue() {
   }
 }
 
-function sessionId() {
+export function sessionId() {
   const existing = window.sessionStorage.getItem(SESSION_KEY);
   if (existing) return existing;
   const id = crypto.randomUUID();
@@ -158,7 +166,7 @@ function sessionId() {
   return id;
 }
 
-function currentPage() {
+export function currentPage() {
   const path = window.location.pathname;
   if (path.startsWith("/contact")) return "contact";
   if (path.startsWith("/vibe")) return "vibe";
@@ -180,6 +188,20 @@ function safeMetadata(metadata: AppEventMetadata) {
     "page",
     "category",
     "channel",
+    "decision",
+    "reason",
+    "kind",
+    "action",
+    "block",
+    "release",
+    "duration_ms",
+    "active_ms",
+    "visible_ms",
+    "metric",
+    "value",
+    "nav_type",
+    "target",
+    "source",
   ]);
   return Object.fromEntries(
     Object.entries(metadata)
@@ -192,6 +214,20 @@ function rejectionReason(reason: unknown) {
   if (reason instanceof Error) return reason.message;
   if (typeof reason === "string") return reason;
   return "unhandled_rejection";
+}
+
+/** Which file and line threw, without the host or query: "index-3fa2.js:120". */
+export function errorSource(filename?: string, line?: number) {
+  if (!filename) return undefined;
+  const file = filename.split("?")[0].split("/").pop() || "";
+  return file ? `${file}${line ? `:${line}` : ""}`.slice(0, 80) : undefined;
+}
+
+/** The first file and line in an error's stack, in the same form as errorSource. */
+export function stackSource(reason: unknown) {
+  if (!(reason instanceof Error) || !reason.stack) return undefined;
+  const match = /([^/\s(]+\.[jt]sx?)(?:\?[^:\s)]*)?:(\d+)/.exec(reason.stack);
+  return match ? errorSource(match[1], Number(match[2])) : undefined;
 }
 
 function errorCode(message: string) {

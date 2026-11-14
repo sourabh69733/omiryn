@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Sparkles, Users, X } from "lucide-react";
 import { apiFetch, signOut } from "../../lib/api";
-import { initAppLogger, trackPageView } from "../../lib/appLogger";
+import { initAppLogger } from "../../lib/appLogger";
+import { enterPage, initExperienceTracking } from "../../lib/experience";
 import { ChatPage, type OmiStatus } from "./pages/ChatPage";
 import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
@@ -83,6 +84,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
 
   useEffect(() => {
     initAppLogger();
+    initExperienceTracking();
     if (!canShowUsage && window.location.pathname.startsWith("/usage")) {
       window.history.replaceState({}, "", "/");
     }
@@ -98,7 +100,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   }, []);
 
   useEffect(() => {
-    trackPageView(page);
+    enterPage(page);
   }, [page]);
 
   function navigate(next: Page) {
