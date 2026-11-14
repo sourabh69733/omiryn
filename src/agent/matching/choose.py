@@ -54,7 +54,9 @@ is in; one needing what the other gives; a way of keeping in touch that fits. Wh
 and the other does is a clash, and a clash outweighs shared interests.
 What does not count: anything true of most candidates (same city, same age, both new in town, both in
 tech), and being free at the same hours, which only makes talking easier. If a reason would fit several
-candidates, it is not a reason for this one.
+candidates, it is not a reason for this one. A note marked "common": true is something most people in
+this group share: read past it. It is never a reason and adds nothing to a pull, however alike two
+such notes sound.
 
 Return JSON only:
 {"pull": {"<key>": "strong" | "some" | "none"},
@@ -91,6 +93,9 @@ class Note:
     memory_id: str | None = None
     # Set for a match note (agent.matching.notes); area then holds its kind.
     note_id: str | None = None
+    # Most people in the group have a note that says the same (agent.matching.common): it tells
+    # nothing about a pair and cannot back a reason.
+    common: bool = False
 
 
 @dataclass(frozen=True)
@@ -149,9 +154,11 @@ def choose_pack(person: Person, candidates: list[Person], *, style: dict[str, li
         for n, note in enumerate(items, start=1):
             note_id = f"{prefix}:{n}"
             notes[note_id] = note
-            item: dict[str, Any] = {"id": note_id, "text": note.text, "reason_ok": note.reason_ok}
+            item: dict[str, Any] = {"id": note_id, "text": note.text, "reason_ok": note.reason_ok and not note.common}
             if note.area:
                 item["area"] = note.area
+            if note.common:
+                item["common"] = True
             out.append(item)
         return out
 
@@ -296,7 +303,10 @@ async def _ask(person: Person, candidates: list[Person], style: dict[str, list[s
 
     def sourced(item: dict[str, str] | None) -> dict[str, str] | None:
         """Pack ids mean nothing outside this call: name each side by its area or memory instead."""
-        return {"text": item["text"], "mine": _source(index["notes"][item["mine"]]), "theirs": _source(index["notes"][item["theirs"]])} if item else None
+        if not item:
+            return None
+        mine = index["notes"][item["mine"]]
+        return {"text": item["text"], "mine": _source(mine), "theirs": _source(index["notes"][item["theirs"]]), **({"area": mine.area} if mine.area else {})}
 
     best = ref(checked["best"]) if checked["best"] else None
     return Choice(
@@ -378,18 +388,33 @@ def notes_toward(own: Loaded, others: list[Loaded], *, limit: int = MAX_STATEMEN
     return own.lines + tuple(Note(memory_text(memory), reason_allowed(memory), memory_id=str(memory["id"])) for memory in memories)
 
 
-async def choose_for(user_id: str, candidate_ids: list[str], *, model: str | None = None, rng: random.Random | None = None) -> Choice:
-    """Load what is stored about the user and up to five candidates and ask the judge."""
+async def choose_loaded(
+    person: Loaded, candidates: list[Loaded], *, model: str | None = None, rng: random.Random | None = None, timeout_seconds: float | None = 60
+) -> Choice:
+    """Ask the judge about people already loaded: cut each one's notes for this pack, add the
+    lines on how the two write, and choose."""
     from .style import pair_style_lines
 
-    person = load_person(user_id)
-    candidates = [load_person(candidate_id) for candidate_id in candidate_ids[:MAX_CANDIDATES]]
+    candidates = candidates[:MAX_CANDIDATES]
     style = {candidate.ref: pair_style_lines(person.style, candidate.style, person.name, candidate.name) for candidate in candidates}
     return await choose_among(
         Person(person.ref, person.name, notes_toward(person, candidates)),
         [Person(candidate.ref, candidate.name, notes_toward(candidate, [person])) for candidate in candidates],
-        style=style, model=model, rng=rng,
+        style=style, model=model, rng=rng, timeout_seconds=timeout_seconds,
     )
+
+
+async def choose_for(user_id: str, candidate_ids: list[str], *, model: str | None = None, rng: random.Random | None = None) -> Choice:
+    """Load what is stored about the user and up to five candidates and ask the judge."""
+    return await choose_loaded(load_person(user_id), [load_person(candidate_id) for candidate_id in candidate_ids[:MAX_CANDIDATES]], model=model, rng=rng)
+
+
+def judge_version() -> int:
+    """Which judge runs the live pick: 2 (one pair at a time, needs a ready vibe card) unless
+    MATCH_JUDGE=3 turns on the choosing judge with match notes and the two-sided pick."""
+    import os
+
+    return 3 if os.getenv("MATCH_JUDGE", "").strip() == "3" else 2
 
 
 def _pair_of_notes(item: Any, best: str, notes: dict[str, Note], *, need_reason_ok: bool) -> dict[str, str] | None:
@@ -400,7 +425,7 @@ def _pair_of_notes(item: Any, best: str, notes: dict[str, Note], *, need_reason_
     mine, theirs, text = str(item.get("mine") or ""), str(item.get("theirs") or ""), _clean(item.get("text"))
     if not (text and mine.startswith("p:") and theirs.startswith(f"{best}:") and mine in notes and theirs in notes):
         return None
-    if need_reason_ok and not (notes[mine].reason_ok and notes[theirs].reason_ok):
+    if need_reason_ok and not (notes[mine].reason_ok and notes[theirs].reason_ok and not notes[mine].common and not notes[theirs].common):
         return None
     return {"mine": mine, "theirs": theirs, "text": text}
 
@@ -429,6 +454,8 @@ __all__ = [
     "Person",
     "choose_among",
     "choose_for",
+    "choose_loaded",
+    "judge_version",
     "choose_pack",
     "load_person",
     "notes_toward",
