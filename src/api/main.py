@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -24,6 +25,7 @@ from .config import (
     PROFILE_UPLOAD_DIR,
 )
 from .helpers import _agent_user_context, _smart_reply_context_sources
+from .request_timing import request_timer
 from .routes import run_agent_turn
 from .routes import router as api_router
 
@@ -61,6 +63,7 @@ class NoCacheStaticFiles(StaticFiles):
 @app.middleware("http")
 async def request_monitoring_middleware(request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid4())
+    started = time.perf_counter()
     try:
         response = await call_next(request)
     except Exception as error:
@@ -76,6 +79,10 @@ async def request_monitoring_middleware(request, call_next):
             content={"detail": "Something went wrong.", "request_id": request_id},
         )
     response.headers["X-Request-ID"] = request_id
+    if request.url.path.startswith("/api/") and request.method != "OPTIONS":
+        # The route template, so every chat's URL counts as one route; time to the first byte.
+        route = getattr(request.scope.get("route"), "path", None) or "unmatched"
+        request_timer.record(request.method, route, response.status_code, (time.perf_counter() - started) * 1000)
     if request.url.path.startswith("/api/admin/"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -107,12 +114,14 @@ async def start_proactive_messaging() -> None:
     job_worker.start()
     realtime_hub.start_heartbeat()
     realtime_fanout.start()
+    request_timer.start()
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
     await proactive_scheduler.shutdown()
     await job_worker.shutdown()
+    await request_timer.shutdown()
     await realtime_fanout.stop()
     await realtime_hub.stop_heartbeat()
 

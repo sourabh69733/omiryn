@@ -2698,7 +2698,7 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertNotIn("secret user message", str(event))
 
     def test_unhandled_error_log_omits_exception_message(self) -> None:
-        request = SimpleNamespace(headers={}, method="POST", url=SimpleNamespace(path="/api/agent/messages"))
+        request = SimpleNamespace(headers={}, method="POST", url=SimpleNamespace(path="/api/agent/messages"), scope={})
 
         async def fail(_request):
             raise RuntimeError("secret user message")
