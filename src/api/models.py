@@ -35,6 +35,12 @@ AppEventName = Literal[
     "pool_joined",
     "match_card_answered",
     "match_reported",
+    # Experience tracking: names, numbers and codes only, never what was typed or shown.
+    "sign_in_succeeded",
+    "setup_completed",
+    "page_left",
+    "page_speed",
+    "rage_click",
 ]
 ContextSourceType = Literal[
     "llm_profile",

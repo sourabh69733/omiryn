@@ -75,6 +75,21 @@ _APP_EVENT_METADATA_ALLOWLIST = {
     "page",
     "category",
     "channel",
+    "decision",
+    "reason",
+    "kind",
+    "action",
+    "block",
+    # Experience tracking.
+    "release",
+    "duration_ms",
+    "active_ms",
+    "visible_ms",
+    "metric",
+    "value",
+    "nav_type",
+    "target",
+    "source",
 }
 
 
