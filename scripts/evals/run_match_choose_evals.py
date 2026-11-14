@@ -43,9 +43,11 @@ from agent.evals.matching.choose_eval import (  # noqa: E402
     build_cases,
     db_build,
     evaluate,
+    evaluate_mutual,
     fixture_build,
     fixture_people,
     report,
+    report_mutual,
 )
 from agent.evals.matching.personas import MATCH_PERSONAS  # noqa: E402
 
@@ -59,6 +61,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample", type=int, default=None, help="Fixtures only: keep this many notes per person, picked at random.")
     parser.add_argument("--model", default=None, help="Judge model id; default is MATCH_REASONS_MODEL or the request-check model.")
     parser.add_argument("--evidence", choices=EVIDENCE, default="all", help="With --source db: all, no_notes (vibe lines and memories only) or notes_only (match notes and vibe lines).")
+    parser.add_argument("--mutual", action="store_true", help="With --source db: run the two-sided pick (the live flow's pick) instead of the ranking tests.")
+    parser.add_argument("--no-common", action="store_true", help="With --mutual: do not mark the notes most of the group shares.")
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--no-confirm", action="store_true", help="Skip the second look at the first pick, to see the ranking alone.")
     parser.add_argument("--show-reasons", action="store_true")
@@ -80,6 +84,17 @@ async def _run(args: argparse.Namespace) -> int:
         if len(friends) < 4:
             print(f"Only {len(friends)} seeded people have their friend seeded too; need at least 4.", file=sys.stderr)
             return 2
+        if args.mutual:
+            print(f"{len(seeded)} people, the two-sided pick, rounds: {args.rounds}")
+            text = report_mutual(await evaluate_mutual(seeded, friends, rounds=args.rounds, model=args.model, seed=args.seed, common=not args.no_common), show_reasons=args.show_reasons)
+            print()
+            print(text)
+            if not args.no_save:
+                folder = PROJECT_ROOT / "reports" / "evals" / datetime.now().strftime("%Y-%m-%d")
+                folder.mkdir(parents=True, exist_ok=True)
+                (folder / ("match-mutual-db-no-common.md" if args.no_common else "match-mutual-db.md")).write_text(f"# Two-sided pick eval\n\nModel `{args.model or os.environ.get('MATCH_REASONS_MODEL') or 'default'}` · {datetime.now():%Y-%m-%d %H:%M}\n\n{text}\n", encoding="utf-8")
+                print("saved reports/evals/" + datetime.now().strftime("%Y-%m-%d") + "/match-mutual-db.md")
+            return 0
         # The decoys were never seeded, so the database source runs without them.
         build = db_build(seeded, evidence=args.evidence)
         cases = build_cases(friends, {}, seed=args.seed)

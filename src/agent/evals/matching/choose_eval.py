@@ -314,6 +314,77 @@ def summarise(results: list[Round], cases: list[Case]) -> dict[str, dict[str, in
     return out
 
 
+# ---- the two-sided pick (agent.matching.mutual) on seeded people ----
+
+MUTUAL_SETS = ("everyone", "ready_only", "no_friends")
+
+
+async def evaluate_mutual(user_ids: dict[str, str], friends: dict[str, str], *, rounds: int = 3, model: str | None = None, seed: int = 7, common: bool = True) -> list[dict]:
+    """Run the pick the live flow would run, on three sets of the seeded people:
+
+    - everyone: every planted pair is there, so the right answer is exactly those pairs;
+    - ready_only: only people the notes rule calls ready, so a friend whose friend is not ready should wait;
+    - no_friends: one person from each planted pair, so nobody has a friend there and the right answer is no pair.
+    """
+    from agent.matching.choose import load_person
+    from agent.matching.mutual import mutual_pick
+    from agent.matching.notes import match_notes_readiness
+
+    loaded = {ref: load_person(user_id) for ref, user_id in user_ids.items()}
+    # mutual_pick names people by their Loaded.ref, which is the user id; work in persona ids instead.
+    people = {ref: type(person)(ref, person.name, person.lines, person.memories, person.vectors, person.style) for ref, person in loaded.items()}
+    if common:
+        # As the live pick does: what is ordinary is judged over the whole group.
+        from agent.matching.common import mark_common
+
+        people = await mark_common(people)
+    ready = {ref for ref, user_id in user_ids.items() if match_notes_readiness(user_id)["ready"]}
+    sets = {
+        "everyone": sorted(people),
+        "ready_only": sorted(ready),
+        "no_friends": sorted(ref for ref in people if ref < friends.get(ref, "")),
+    }
+    planted = {frozenset((ref, friend)) for ref, friend in friends.items()}
+    out = []
+    for name in MUTUAL_SETS:
+        members = sets[name]
+        possible = sorted(tuple(sorted(pair)) for pair in planted if pair <= set(members))
+        for round_index in range(rounds):
+            result = await mutual_pick({ref: people[ref] for ref in members}, model=model, seed=seed * 100 + round_index, timeout_seconds=TIMEOUT_SECONDS)
+            made = [(pair.user_a, pair.user_b, pair.kind) for pair in result.pairs]
+            out.append({
+                "set": name, "members": members, "possible": possible,
+                "right": [pair for pair in made if frozenset(pair[:2]) in planted],
+                "wrong": [pair for pair in made if frozenset(pair[:2]) not in planted],
+                "waiting": list(result.waiting), "not_taken": list(result.not_taken), "errors": dict(result.errors),
+                "wanted": {ref: look.best for ref, look in sorted(result.looks.items())},
+                "reasons": {f"{pair.user_a}+{pair.user_b}": [reason["text"] for reason in pair.check["reasons"]] for pair in result.pairs},
+            })
+    return out
+
+
+def report_mutual(rounds: list[dict], *, show_reasons: bool = False) -> str:
+    lines = ["## The two-sided pick", "", "| people | planted pairs possible | right pairs made | wrong pairs made | rounds with no wrong pair |", "|---|---|---|---|---|"]
+    for name in MUTUAL_SETS:
+        group = [r for r in rounds if r["set"] == name]
+        if not group:
+            continue
+        possible = sum(len(r["possible"]) for r in group)
+        lines.append(f"| {name} ({len(group[0]['members'])}) | {possible} | {sum(len(r['right']) for r in group)} | {sum(len(r['wrong']) for r in group)} | {sum(1 for r in group if not r['wrong'])}/{len(group)} |")
+    lines += ["", "| people | pairs made | waiting | each person's own first pick | not taken |", "|---|---|---|---|---|"]
+    for r in rounds:
+        made = ", ".join(f"{a}+{b} ({kind})" for a, b, kind in r["right"] + r["wrong"]) or "none"
+        wanted = ", ".join(f"{ref}→{best or 'nobody'}" for ref, best in r["wanted"].items())
+        not_taken = "; ".join(f"{a}→{b}: {why}" for a, b, why in r["not_taken"]) or "-"
+        lines.append(f"| {r['set']} | {made} | {', '.join(r['waiting']) or '-'} | {wanted} | {not_taken} |")
+    if show_reasons:
+        lines.append("")
+        for r in rounds:
+            for pair, reasons in r["reasons"].items():
+                lines += [f"- {r['set']} · {pair}: {text}" for text in reasons]
+    return "\n".join(lines)
+
+
 def report(results: list[Round], cases: list[Case], *, show_reasons: bool = False) -> str:
     """Markdown. Reasons and why-nots only when asked: with real people they quote what was said."""
     summary = summarise(results, cases)
@@ -381,5 +452,5 @@ def report(results: list[Round], cases: list[Case], *, show_reasons: bool = Fals
 
 __all__ = [
     "DECOYS", "EVIDENCE", "FIXTURE_DECOYS", "FIXTURE_FRIENDS", "TESTS", "Case", "Decoy", "Round",
-    "build_cases", "db_build", "evaluate", "fixture_build", "fixture_people", "fixture_person", "report", "summarise", "third_person",
+    "MUTUAL_SETS", "build_cases", "db_build", "evaluate", "evaluate_mutual", "report_mutual", "fixture_build", "fixture_people", "fixture_person", "report", "summarise", "third_person",
 ]
