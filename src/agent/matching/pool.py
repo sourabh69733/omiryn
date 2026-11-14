@@ -73,6 +73,21 @@ async def propose_pair(pool_id: str, user_a: str, user_b: str, *, created_by: st
         raise ValueError("both users must be members of the pool, and different")
     if match_block_between(user_a, user_b):
         raise ValueError("these two cannot be paired")
+    from .choose import judge_version
+
+    if judge_version() == 3:
+        # The choosing judge, each looking at the other alone; notes first, so it reads today's.
+        from .choose import load_person
+        from .mutual import check_two
+        from .notes import rebuild_due, rebuild_match_notes
+
+        for user_id in (user_a, user_b):
+            if rebuild_due(user_id):
+                await rebuild_match_notes(user_id)
+        from .common import mark_common
+
+        everyone = await mark_common({user_id: load_person(user_id) for user_id in members})
+        return save_match_pair(pool_id, user_a, user_b, await check_two(everyone[user_a], everyone[user_b]), created_by=created_by)
     check = await check_compatibility(user_a, user_b)
     return save_match_pair(pool_id, user_a, user_b, check.as_dict(), created_by=created_by)
 

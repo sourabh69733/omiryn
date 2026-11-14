@@ -8,6 +8,10 @@ The operator sees the proposal and confirms, swaps or drops before anyone hears 
 
 Every judged pair is stored as a `candidate` so a rerun reuses the judgement for a week, and so
 "never propose this pair again" has a record to check. Picked pairs become `proposed`.
+
+With MATCH_JUDGE=3 the pick is the two-sided one instead (pick_pool_mutual): ready means enough
+match notes, each person ranks the others, and a pair is made only when both sides call it strong
+(agent.matching.mutual). The rules around it stay: who is busy, who was tried before, who is blocked.
 """
 
 from __future__ import annotations
@@ -77,6 +81,9 @@ class Proposal:
     busy: list[str] = field(default_factory=list)
     dropped: list[tuple[Candidate, str]] = field(default_factory=list)
     judged: int = 0
+    # Two-sided pick only: pairs one side wanted that did not go ahead, and why; people whose call failed.
+    not_taken: list[dict[str, str]] = field(default_factory=list)
+    errors: dict[str, str] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +93,8 @@ class Proposal:
             "busy": list(self.busy),
             "dropped": [{"pair_id": c.pair_id, "user_a": c.user_a, "user_b": c.user_b, "why": why} for c, why in self.dropped],
             "judged": self.judged,
+            "not_taken": list(self.not_taken),
+            "errors": dict(self.errors),
         }
 
 
@@ -168,10 +177,13 @@ async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
     """Judge what needs judging, store candidates, mark the picked pairs proposed, return the proposal."""
     from storage import blocked_match_pairs, get_user_style, list_match_pairs, match_pool_members_of, save_match_pair, set_match_pair_status
 
+    from .choose import judge_version
     from .compatibility import check_compatibility
     from .readiness import match_readiness
     from .style import style_gaps
 
+    if judge_version() == 3:
+        return await pick_pool_mutual(pool_id, created_by=created_by)
     members = [m["user_id"] for m in match_pool_members_of(pool_id)]
     history = list_match_pairs(pool_id)
     busy = {user for pair in history if pair["status"] in BUSY for user in (pair["user_a"], pair["user_b"])}
@@ -198,4 +210,45 @@ async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
     return proposal
 
 
-__all__ = ["BUSY", "CANDIDATE_FRESH", "GROUP_SIZE", "MIN_READY", "NEVER_AGAIN", "Candidate", "Proposal", "eligible_pairs", "greedy_pairs", "pick_pool", "propose", "rank_candidates", "thin_week_group"]
+async def pick_pool_mutual(pool_id: str, *, created_by: str | None = None) -> Proposal:
+    """The two-sided pick for a pool: bring everyone's match notes up to date, rank for each ready
+    person, keep the pairs both sides call strong, store them as proposed."""
+    from storage import blocked_match_pairs, get_user_style, list_match_pairs, match_pool_members_of, save_match_pair
+
+    from .choose import load_person
+    from .common import mark_common
+    from .mutual import mutual_pick
+    from .notes import match_notes_readiness, rebuild_due, rebuild_match_notes
+    from .style import style_gaps
+
+    members = [m["user_id"] for m in match_pool_members_of(pool_id)]
+    history = list_match_pairs(pool_id)
+    busy = {user for pair in history if pair["status"] in BUSY for user in (pair["user_a"], pair["user_b"])}
+    free = [user_id for user_id in members if user_id not in busy]
+    for user_id in free:
+        # Notes are refreshed once a day; a pick should not run on yesterday's.
+        try:
+            if rebuild_due(user_id):
+                await rebuild_match_notes(user_id)
+        except Exception as error:
+            logger.warning("agent.matching.pick.notes_failed error_type=%s", type(error).__name__)
+    ready = [user_id for user_id in free if match_notes_readiness(user_id)["ready"]]
+    if len(ready) < MIN_READY:
+        return Proposal(waiting=ready, busy=sorted(busy & set(members)))
+    may_pair = {frozenset((a, b)) for a, b, _ in eligible_pairs(ready, history, blocked_match_pairs(ready))}
+    # What is ordinary is judged over the whole group, busy people included; only the ready are ranked.
+    everyone = await mark_common({user_id: load_person(user_id) for user_id in members})
+    result = await mutual_pick({user_id: everyone[user_id] for user_id in ready}, lambda a, b: frozenset((a, b)) in may_pair)
+    styles = {user_id: get_user_style(user_id) or {} for user_id in ready}
+    proposal = Proposal(
+        waiting=list(result.waiting), busy=sorted(busy & set(members)), judged=len(result.looks),
+        not_taken=[{"user_a": a, "user_b": b, "why": why} for a, b, why in result.not_taken], errors=dict(result.errors),
+    )
+    for pair in result.pairs:
+        stored = save_match_pair(pool_id, pair.user_a, pair.user_b, pair.check, created_by=created_by, status="proposed")
+        proposal.pairs.append(Candidate(stored["id"], pair.user_a, pair.user_b, pair.check, style_gaps(styles[pair.user_a], styles[pair.user_b])))
+    logger.info("agent.matching.pick_mutual pool_id=%s ready=%s ranked=%s pairs=%s waiting=%s errors=%s", pool_id, len(ready), len(result.looks), len(proposal.pairs), len(proposal.waiting), len(result.errors))
+    return proposal
+
+
+__all__ = ["BUSY", "CANDIDATE_FRESH", "GROUP_SIZE", "MIN_READY", "NEVER_AGAIN", "Candidate", "Proposal", "eligible_pairs", "greedy_pairs", "pick_pool", "pick_pool_mutual", "propose", "rank_candidates", "thin_week_group"]

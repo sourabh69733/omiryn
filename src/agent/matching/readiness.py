@@ -4,6 +4,9 @@ Two things must be true. The vibe card has reached "ready_to_match" (every basic
 least three deeper ones). And the plain facts a first meet needs are known from memories: where
 they live and when they are free; what they eat and what they like to spend are good to have.
 Nothing here asks the user anything: the companion gets the missing items as a goal.
+
+With MATCH_JUDGE=3 ready comes from the match notes instead (six notes over three core kinds); the
+card and the meet facts are still reported but hold nobody back.
 """
 
 from __future__ import annotations
@@ -41,6 +44,9 @@ class MatchReadiness:
     private_allowed: bool = False
     # Plain words for the operator view and the user's own page.
     blockers: tuple[str, ...] = ()
+    # With MATCH_JUDGE=3: what the match notes hold (agent.matching.notes.notes_readiness); ready
+    # then comes from this and not from the card.
+    notes: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +56,7 @@ class MatchReadiness:
             "facts": {"known": dict(self.facts_known), "missing": list(self.facts_missing)},
             "private_allowed": self.private_allowed,
             "blockers": list(self.blockers),
+            **({"notes": {**self.notes, "kinds": list(self.notes["kinds"]), "missing_core": list(self.notes["missing_core"])}} if self.notes else {}),
         }
 
 
@@ -57,12 +64,28 @@ def match_readiness(user_id: str) -> MatchReadiness:
     from storage import get_user_profile, get_vibe_card, list_agent_memories, private_matching_allowed
 
     card = get_vibe_card(user_id)
-    return readiness_from(
+    readiness = readiness_from(
         card["areas"],
         [m for m in list_agent_memories(user_id) if m.get("status") == "active"],
         get_user_profile(user_id) or {},
         private_allowed=private_matching_allowed(card),
     )
+    from .choose import judge_version
+
+    if judge_version() != 3:
+        return readiness
+    # The choosing judge reads match notes, not the card, and people talk in the app before any
+    # meet, so neither the card's milestone nor the meet facts hold anyone back.
+    from dataclasses import replace
+
+    from .notes import CORE_KINDS, match_notes_readiness
+
+    notes = match_notes_readiness(user_id)
+    blockers: tuple[str, ...] = ()
+    if not notes["ready"]:
+        have = len([kind for kind in CORE_KINDS if kind in notes["kinds"]])
+        blockers = (f"Omi has {notes['notes']} notes on who they are over {have} kinds; it needs {notes['needs']['notes']} over {notes['needs']['core_kinds']}",)
+    return replace(readiness, ready=notes["ready"], blockers=blockers, notes=notes)
 
 
 def readiness_from(
