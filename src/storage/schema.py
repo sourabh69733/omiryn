@@ -939,6 +939,18 @@ agent_user_style = Table(
     Column("built_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+# Who the user is, for finding people they would enjoy talking to (agent.matching.notes): an open
+# list of short notes by kind, each with the user's own messages behind it. JSON, encrypted like the
+# user card; never shown to another user.
+agent_match_notes = Table(
+    "agent_match_notes",
+    metadata,
+    Column("user_id", String, primary_key=True),
+    Column("notes", String, nullable=False),
+    Column("note_count", Integer, nullable=False, server_default="0"),
+    Column("built_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
 # The user's friend vibe: one line per compatibility area, written by background cognition from
 # what the user said (JSON, encrypted). The milestone is computed from how many areas are filled.
 agent_vibe_cards = Table(

@@ -17,6 +17,7 @@ from .match_pools import *
 from .match_chat import *
 from .user_cards import *
 from .user_style import *
+from .match_notes import *
 from .vibe_cards import *
 from .self_notes import *
 from .open_questions import *
