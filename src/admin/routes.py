@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from admin.auth import require_admin_user
+from admin.experience import admin_experience, admin_growth
 from admin.insights import admin_costs, admin_dashboard, admin_people, admin_person, admin_system
 from admin.service import admin_eval_runs, admin_overview, admin_requests, admin_user_detail
 from security.auth import CurrentUser
@@ -139,3 +140,15 @@ def admin_costs_endpoint(days: int = 30, admin: CurrentUser = Depends(require_ad
 def admin_system_endpoint(admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
     record_audit_event("admin.view_system", actor_id=admin.id, actor_role="admin")
     return admin_system()
+
+
+@router.get("/api/admin/experience")
+def admin_experience_endpoint(days: int = 7, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_experience", actor_id=admin.id, actor_role="admin")
+    return admin_experience(days=days)
+
+
+@router.get("/api/admin/growth")
+def admin_growth_endpoint(weeks: int = 8, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    record_audit_event("admin.view_growth", actor_id=admin.id, actor_role="admin")
+    return admin_growth(weeks=weeks)
