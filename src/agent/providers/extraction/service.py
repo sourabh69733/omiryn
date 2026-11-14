@@ -42,6 +42,7 @@ from agent.observability.usage import (
     PERSON_CARD,
     MATCH_CHOOSE,
     MATCH_JUDGE,
+    MATCH_NOTES,
     MATCH_REASONS,
     SEARCH_QUERIES,
     UPLOAD_MERGE,
@@ -263,6 +264,21 @@ async def choose_match(
 
     model = model or os.getenv("MATCH_REASONS_MODEL", "").strip() or request_check_model(_provider_name())
     return await _upload_call(MATCH_CHOOSE_SYSTEM_PROMPT, MATCH_CHOOSE, text, conversation_id, model, timeout_seconds)
+
+
+async def write_match_notes(
+    text: str,
+    *,
+    conversation_id: str = "",
+    model: str | None = None,
+    timeout_seconds: float | None = 120,
+) -> dict[str, Any]:
+    """Who a person is, from their own messages and the notes so far; {"notes": [{"kind", "text",
+    "from", "keeps"}]} (agent.matching.notes)."""
+    from agent.matching.notes import MATCH_NOTES_SYSTEM_PROMPT
+
+    model = model or os.getenv("MATCH_NOTES_MODEL", "").strip() or request_check_model(_provider_name())
+    return await _upload_call(MATCH_NOTES_SYSTEM_PROMPT, MATCH_NOTES, text, conversation_id, model, timeout_seconds)
 
 
 async def rebuild_user_card_text(
