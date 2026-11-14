@@ -207,3 +207,24 @@ The judge's job is to find pairs who will click. The first ground truth is pairs
 | D5 | Patterns from the memory graph as judge context | `matching/patterns.py` | later |
 
 D1 to D3 come before the flow pieces in section 5, since they change what the judge returns and what the pick orders on.
+
+## 9. Research of 14 November 2026: where matching should go next
+
+Full notes: `reports/matching-research-2026-11-14.md` (not in git; the page is https://claude.ai/artifact/VdgmvFrVmPmKM3iAZzM28K). Nothing here is built or decided yet.
+
+What the research found:
+
+- From profiles, nobody can predict which two people will click (Joel, Eastwick, Finkel 2017). Models that read real speed-date talks do only slightly better than chance (Matz and others 2024). So a judge's "yes" is a weak signal, and the system that wins is the one that knows people best, gives a true reason, makes a try cheap, and learns from outcomes.
+- Other products either introduce people but know them from swipes, a quiz or one interview (Tinder, Hinge, Bumble, Timeleft, 222, Known, Sitch, Amata, Ditto, Series, Boardy), or know people deeply but introduce nobody (Replika, Pi, Tolan). None found does both.
+
+Proposed direction, in build order:
+
+1. The judge chooses among several candidates instead of approving one pair; "nobody this week" is allowed. Tested on made-up people with planted good and bad pairs.
+2. Readiness from memories (enough matchable memories plus the basics). The vibe card stays for the person to read but is no longer a gate.
+3. A "what I want now" view per person from current-focus memories, and scoring in both directions (what one wants against what the other gives).
+4. Open matching with filters (language, city or anywhere, age band, friend or dating, blocks); no join code. The shortlist uses stored memory vectors, top 20 per person.
+5. Rules for several matches at once, and outcome counts (said hi, messages in three days, still talking on day 7 and 30, called off, blocked). Omi never reads the chat.
+6. Learning each person's taste from outcomes, once about fifty real pairs exist.
+7. Experiment: a practice chat between two stand-ins built from each person's memories and style, rated by a second model (early studies: 64% against 48% for profiles alone).
+
+Open decisions: card no longer a gate; friends first or dating too; counts inside pair chats; budget for the practice chat experiment.
