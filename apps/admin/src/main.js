@@ -5,6 +5,8 @@ import { apiErrorMessage, esc } from "./ui.js";
 import * as dashboard from "./pages/dashboard.js";
 import * as people from "./pages/people.js";
 import * as usage from "./pages/usage.js";
+import * as experience from "./pages/experience.js";
+import * as growth from "./pages/growth.js";
 import * as system from "./pages/system.js";
 import * as requests from "./pages/requests.js";
 import * as pools from "./pages/pools.js";
@@ -13,6 +15,8 @@ const ROUTES = [
   { name: "dashboard", path: /^\/$/, page: dashboard, title: "Dashboard", subtitle: "How Omiryn is doing today and this week." },
   { name: "users", path: /^\/users(?:\/([^/]+))?\/?$/, page: people, title: "Users", subtitle: "Everyone who uses Omi. Counts and timing only: chat and memory text stay private." },
   { name: "usage", path: /^\/usage\/?$/, page: usage, title: "Usage & cost", subtitle: "Model calls, spend, speed and failures." },
+  { name: "experience", path: /^\/experience\/?$/, page: experience, title: "Experience", subtitle: "Sign-in health, page and API speed, where people spend time, and what breaks." },
+  { name: "growth", path: /^\/growth\/?$/, page: growth, title: "Growth", subtitle: "How new people get started, whether they come back, and how matches turn out." },
   { name: "system", path: /^\/system\/?$/, page: system, title: "System", subtitle: "Background jobs, memory pipeline, channels, evals and the admin access log." },
   { name: "requests", path: /^\/requests\/?$/, page: requests, title: "Requests", subtitle: "Feedback, invites, data requests and app errors." },
   { name: "pools", path: /^\/pools\/?$/, page: pools, title: "Pools", subtitle: "Match pools: who is ready, suggested pairs and the introductions you confirmed." },

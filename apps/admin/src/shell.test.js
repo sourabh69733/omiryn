@@ -10,7 +10,7 @@ test("standalone admin shell provides the required auth and app controls", async
   }
   assert.ok(html.includes("/src/main.js"), "expected /src/main.js in standalone admin shell");
   assert.ok(!html.includes("/admin/static/"), "standalone shell must not load backend static assets");
-  for (const href of ["/", "/users", "/usage", "/system", "/requests", "/pools"]) {
+  for (const href of ["/", "/users", "/experience", "/growth", "/usage", "/system", "/requests", "/pools"]) {
     assert.ok(html.includes(`href="${href}"`), "expected route link " + href);
   }
   assert.ok(!html.includes('href="/admin'), "standalone shell must not link to backend admin routes");
@@ -23,6 +23,8 @@ test("admin shell keeps the auth contract and talks to the fast endpoints", asyn
     read("./pages/dashboard.js"),
     read("./pages/people.js"),
     read("./pages/usage.js"),
+    read("./pages/experience.js"),
+    read("./pages/growth.js"),
     read("./pages/system.js"),
     read("./pages/requests.js"),
     read("./pages/pools.js"),
@@ -36,7 +38,7 @@ test("admin shell keeps the auth contract and talks to the fast endpoints", asyn
   assert.doesNotMatch(all, /\bfetch\(/, "pages go through adminFetch only");
   assert.doesNotMatch(all, /\/api\/admin\/overview/, "the slow overview endpoint is no longer used");
 
-  for (const path of ["/api/admin/dashboard", "/api/admin/people", "/api/admin/costs", "/api/admin/system", "/api/admin/requests", "/api/admin/pools"]) {
+  for (const path of ["/api/admin/dashboard", "/api/admin/people", "/api/admin/experience", "/api/admin/growth", "/api/admin/costs", "/api/admin/system", "/api/admin/requests", "/api/admin/pools"]) {
     assert.ok(all.includes(path), "expected a call to " + path);
   }
 });

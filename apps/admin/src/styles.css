@@ -329,6 +329,26 @@ tr.selected td { background: var(--primary-soft); }
 .id-line code { color: var(--muted); }
 .close-detail { position: absolute; top: 12px; right: 14px; color: var(--muted); font-size: 16px; }
 
+/* ---------- Funnels, cohorts, reasons ---------- */
+.funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.funnel li { display: grid; grid-template-columns: minmax(0, 1fr) 64px; grid-template-areas: "label count" "track track" "kept kept"; gap: 3px 10px; }
+.funnel-label { grid-area: label; font-weight: 550; }
+.funnel-count { grid-area: count; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+.funnel-track { grid-area: track; height: 10px; border-radius: 5px; background: var(--panel-2); overflow: hidden; }
+.funnel-track i { display: block; height: 100%; border-radius: 5px; background: var(--primary); }
+.funnel-kept { grid-area: kept; color: var(--muted); font-size: 12px; }
+.small-note { margin: 12px 0 0; font-size: 12.5px; }
+.reason-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; }
+.reason-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.cohorts td.cohort-cell { text-align: center; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.cohort-cell.future { background: transparent; }
+.cohort-cell.level-0 { color: var(--faint); }
+.cohort-cell.level-1 { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.cohort-cell.level-2 { background: color-mix(in srgb, var(--primary) 24%, transparent); }
+.cohort-cell.level-3 { background: color-mix(in srgb, var(--primary) 38%, transparent); }
+.cohort-cell.level-4 { background: color-mix(in srgb, var(--primary) 55%, transparent); color: var(--on-primary); }
+.cohort-cell.level-5 { background: var(--primary); color: var(--on-primary); }
+
 /* ---------- Lists of errors and cards ---------- */
 .error-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .error-list li { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: 8px; }
