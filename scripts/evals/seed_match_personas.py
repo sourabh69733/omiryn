@@ -71,6 +71,23 @@ GOAL = (
     "rather than all at once. Never describe yourself in a list, and never repeat a line you already sent. "
     "Write like a person on a phone: one to three short lines a message. Keep going until the turns run out."
 )
+# The first goal let the persona model and Omi build one running joke for forty turns (wardens,
+# chutney smuggling, a router with an agenda). Every person ended up sounding the same and the
+# memories were about the joke, so the planted friends could not be told apart (matching-design
+# section 11). This goal keeps the person on their own life. The first one stays for comparison.
+GOAL_PLAIN = (
+    "You are a real person using a companion app in your first weeks in a new city. Talk about your actual life "
+    "as your persona describes it: work today, what you ate, the match or the book or the trek, a plan for the "
+    "weekend, something that annoyed you, people at the PG or the office, home, what you miss, the kind of people "
+    "you get on with and the kind you cannot stand. Say real things plainly, in your own words and language mix, "
+    "with your own humour in passing. This is not a comedy bit: do not invent a running story, characters, "
+    "conspiracies or games, and do not keep building on a joke. When Omi jokes, react in one line and go back to "
+    "your life or change the subject. When Omi asks something, answer honestly from your persona. Across the chats "
+    "let most of what your persona says about you come up, a little each time, never as a list, and never repeat a "
+    "line you already sent. Write like a person on a phone: one to three short lines a message. Keep going until "
+    "the turns run out."
+)
+GOALS = {"plain": GOAL_PLAIN, "playful": GOAL}
 # A chat that fails in the persona model (a message too long, a bad reply) is tried again this often.
 SESSION_ATTEMPTS = 3
 # The persona model gets no memory between chats, so it is told what it already said.
@@ -98,6 +115,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Give the people already in today's saved report --sessions more chats instead of making new users.",
     )
+    parser.add_argument("--goal", choices=sorted(GOALS), default="plain", help="How the made-up person is told to chat: plain (their own life) or playful (the first version).")
     parser.add_argument("--no-save", action="store_true")
     parser.add_argument(
         "--dev-database",
@@ -107,8 +125,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _scenario(person: MatchPersona, turns: int, session: int, told: list[str]) -> SimulatedUserScenario:
-    goal = GOAL
+def _scenario(person: MatchPersona, turns: int, session: int, told: list[str], goal: str = GOAL) -> SimulatedUserScenario:
     if session:
         said = ""
         for line in reversed(told):
@@ -196,7 +213,7 @@ async def _seed(person: MatchPersona, args: argparse.Namespace) -> dict:
         for attempt in range(SESSION_ATTEMPTS):
             try:
                 result = await run_simulated_conversation(
-                    scenario=_scenario(person, args.turns, session, told),
+                    scenario=_scenario(person, args.turns, session, told, GOALS[args.goal]),
                     simulated_user=ProviderSimulatedUser(provider=args.provider, model=args.user_model),
                     companion=companion,
                     user_id=user_id,
@@ -276,6 +293,7 @@ async def _run(args: argparse.Namespace) -> int:
         "database_url": "(the database from .env)" if DEV_DATABASE else os.environ["DATABASE_URL"],
         "companion_model": args.model,
         "prompt_version": args.prompt,
+        "goal": args.goal,
         "people": rows,
         "known": known,
     }
