@@ -496,6 +496,16 @@ def delete_import_conversations(user_id: str, source_id: str) -> int:
     return sum(1 for conversation_id in ids if delete_conversation(conversation_id, owner_id))
 
 
+def import_conversation(user_id: str, source_id: str) -> dict[str, Any] | None:
+    """The hidden chat made from one upload, with its messages; None when there is none."""
+    owner_id = _require_user_id(user_id, "conversation")
+    with ENGINE.begin() as connection:
+        conversation_id = connection.execute(
+            select(agent_conversations.c.id).where(agent_conversations.c.user_id == owner_id, agent_conversations.c.import_source_id == source_id).limit(1)
+        ).scalar_one_or_none()
+    return get_conversation(conversation_id, owner_id) if conversation_id else None
+
+
 def import_conversation_ids(user_id: str) -> set[str]:
     """IDs of this user's hidden chats made from uploads."""
     owner_id = _require_user_id(user_id, "conversation")

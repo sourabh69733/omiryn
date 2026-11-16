@@ -16,16 +16,24 @@ from .database import ENGINE
 from .schema import upload_digests
 from .utils import _require_user_id
 
+# Where the read of a chat (agent.cognition.background.uploads.chat_read) sits inside a digest.
+CHAT_READ_KEY = "chat_read"
+
 
 def save_upload_digest(source_id: str, user_id: str, conversation_id: str, partner_name: str | None, digest: dict[str, Any]) -> None:
     owner_id = _require_user_id(user_id, "upload digest")
-    values = {
-        "user_id": owner_id,
-        "conversation_id": conversation_id,
-        "partner_name": partner_name,
-        "digest_json": maybe_encrypt_json(owner_id, digest),
-    }
     with ENGINE.begin() as connection:
+        # A chat read made before the digest was ready stays: it is stored in the same row.
+        earlier = connection.execute(select(upload_digests.c.digest_json).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id)).scalar_one_or_none()
+        kept = (decrypt_json(owner_id, earlier) or {}).get(CHAT_READ_KEY) if earlier is not None else None
+        if kept is not None and CHAT_READ_KEY not in digest:
+            digest = {**digest, CHAT_READ_KEY: kept}
+        values = {
+            "user_id": owner_id,
+            "conversation_id": conversation_id,
+            "partner_name": partner_name,
+            "digest_json": maybe_encrypt_json(owner_id, digest),
+        }
         connection.execute(delete(upload_digests).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id))
         connection.execute(upload_digests.insert().values(source_id=source_id, **values))
 
@@ -48,10 +56,31 @@ def list_upload_digests(user_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def get_upload_digest(source_id: str, user_id: str) -> dict[str, Any] | None:
+    """One upload's digest, or None when Omi has not stored anything for it yet."""
+    owner_id = _require_user_id(user_id, "upload digest")
+    with ENGINE.begin() as connection:
+        row = connection.execute(select(upload_digests).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id)).mappings().first()
+    return (decrypt_json(owner_id, row["digest_json"]) or {}) if row else None
+
+
+def set_upload_digest_part(source_id: str, user_id: str, conversation_id: str, partner_name: str | None, key: str, value: Any) -> None:
+    """Store one part of a digest (the chat read) without touching the rest; makes the row when
+    the upload has no digest yet."""
+    owner_id = _require_user_id(user_id, "upload digest")
+    with ENGINE.begin() as connection:
+        row = connection.execute(select(upload_digests).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id)).mappings().first()
+        if row:
+            digest = {**(decrypt_json(owner_id, row["digest_json"]) or {}), key: value}
+            connection.execute(upload_digests.update().where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id).values(digest_json=maybe_encrypt_json(owner_id, digest)))
+        else:
+            connection.execute(upload_digests.insert().values(source_id=source_id, user_id=owner_id, conversation_id=conversation_id, partner_name=partner_name, digest_json=maybe_encrypt_json(owner_id, {key: value})))
+
+
 def delete_upload_digest(source_id: str, user_id: str) -> None:
     owner_id = _require_user_id(user_id, "upload digest")
     with ENGINE.begin() as connection:
         connection.execute(delete(upload_digests).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id))
 
 
-__all__ = ["delete_upload_digest", "list_upload_digests", "save_upload_digest"]
+__all__ = ["CHAT_READ_KEY", "delete_upload_digest", "get_upload_digest", "list_upload_digests", "save_upload_digest", "set_upload_digest_part"]

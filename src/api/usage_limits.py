@@ -32,6 +32,13 @@ CONTEXT_IMPORT_LIMIT = UserActionLimit(
     monthly_default=10,
     label="memory imports",
 )
+CHAT_READ_LIMIT = UserActionLimit(
+    action="chat_read",
+    event_name="quota.chat_read",
+    monthly_env="USER_CHAT_READ_MONTHLY_LIMIT",
+    monthly_default=20,
+    label="chat reads",
+)
 WHATSAPP_IMPORT_LIMIT = UserActionLimit(
     action="whatsapp_import",
     event_name="quota.whatsapp_import",
