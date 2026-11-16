@@ -1,19 +1,38 @@
 // Memories page: what the user shared with Omi (from 📎 in chat), with Delete.
-// Deleting an upload removes what Omi learned only from it.
+// Deleting an upload removes what Omi learned only from it; a prompt says exactly what goes first.
 import { useState } from "react";
-import { apiFetch } from "../../lib/api";
+import { Trash2 } from "lucide-react";
+import { apiErrorMessage, apiFetch } from "../../lib/api";
+import { Notice } from "./StateView";
+import { uploadDeleteLines } from "./uploadDelete";
 import type { ContextSource } from "./types";
 
 export function MemoryUploads({ sources, onChanged, onOpenRead }: { sources: ContextSource[]; onChanged: () => Promise<void>; onOpenRead?: (sourceId: string) => void }) {
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pending, setPending] = useState<ContextSource | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  function ask(source: ContextSource) {
+    setError("");
+    setPending(source);
+  }
+
+  function close() {
+    if (!deleting) setPending(null);
+  }
 
   async function remove(id: string) {
-    setDeletingId(id);
+    setDeleting(true);
+    setError("");
     try {
       const response = await apiFetch(`/api/me/context-sources/${id}`, { method: "DELETE" });
-      if (response.ok) await onChanged();
+      if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not delete it. Try again."));
+      setPending(null);
+      await onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete it. Try again.");
     } finally {
-      setDeletingId(null);
+      setDeleting(false);
     }
   }
 
@@ -44,10 +63,31 @@ export function MemoryUploads({ sources, onChanged, onOpenRead }: { sources: Con
               </div>
               <div className="mem-row-actions">
                 {onOpenRead && source.source_type === "whatsapp_chat" ? <button className="mem-link" type="button" onClick={() => onOpenRead(source.id)}>What it says about you two</button> : null}
-                <button className="mem-link is-muted" type="button" onClick={() => void remove(source.id)} disabled={deletingId === source.id}>{deletingId === source.id ? "Deleting…" : "Delete"}</button>
+                <button className="mem-link is-muted" type="button" onClick={() => ask(source)}>Delete</button>
               </div>
             </article>
           ))}
+        </div>
+      ) : null}
+      {pending ? (
+        <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-upload-title" aria-describedby="delete-upload-copy" onKeyDown={(event) => { if (event.key === "Escape") close(); }}>
+            <div className="confirm-icon" aria-hidden="true"><Trash2 /></div>
+            <div className="confirm-copy">
+              <h2 id="delete-upload-title">Delete this shared chat?</h2>
+              <p id="delete-upload-copy">This deletes:</p>
+              <ul className="delete-impact">
+                {uploadDeleteLines(pending).map((line) => <li key={line}>{line}</li>)}
+              </ul>
+              <p>What you also told Omi in your chats stays. This can't be undone.</p>
+              <p className="confirm-session">{pending.title || "Upload"}</p>
+              {error ? <Notice tone="error">{error}</Notice> : null}
+            </div>
+            <div className="confirm-actions">
+              <button className="secondary-button" type="button" autoFocus onClick={close} disabled={deleting}>Cancel</button>
+              <button className="danger-button" type="button" onClick={() => void remove(pending.id)} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button>
+            </div>
+          </section>
         </div>
       ) : null}
     </section>
