@@ -276,10 +276,23 @@ async def write_chat_read(
 ) -> dict[str, Any]:
     """What a two-person chat is like, from a sample of its lines and code's counts; {"headline",
     "you_two", "roles", "running_jokes", "keep_coming_back_to", "friction", "green_flag", "roast"}."""
-    from agent.cognition.background.uploads.chat_read import CHAT_READ_SYSTEM_PROMPT
+    from agent.cognition.background.uploads.chat_read import CHAT_READ_SCHEMA, CHAT_READ_SYSTEM_PROMPT
+    from agent.providers.claude import ClaudeUnavailable, claude_json, is_claude
 
-    model = model or os.getenv("CHAT_READ_MODEL", "").strip() or request_check_model(_provider_name())
-    return await _upload_call(CHAT_READ_SYSTEM_PROMPT, CHAT_READ, text, conversation_id, model, timeout_seconds)
+    model = model or os.getenv("CHAT_READ_MODEL", "").strip() or None
+    if is_claude(model) and _provider_name() != "mock":
+        # A Claude model writes the read through Anthropic's own SDK; when it cannot (no key, a
+        # refusal, an outage) the usual model writes it instead.
+        try:
+            written, _usage = await claude_json(
+                CHAT_READ_SYSTEM_PROMPT, text, model=str(model), schema=CHAT_READ_SCHEMA, request_kind=CHAT_READ,
+                conversation_id=conversation_id, timeout_seconds=timeout_seconds,
+            )
+            return written
+        except ClaudeUnavailable as error:
+            logger.warning("agent.chat_read.claude_unavailable reason=%s", error)
+            model = None
+    return await _upload_call(CHAT_READ_SYSTEM_PROMPT, CHAT_READ, text, conversation_id, model or request_check_model(_provider_name()), timeout_seconds)
 
 
 async def write_match_notes(

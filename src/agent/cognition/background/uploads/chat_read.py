@@ -35,7 +35,7 @@ _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 SAMPLE_LINES = 260
 SAMPLE_LINE_CHARS = 160
 FIRST_MESSAGE_CHARS = 140
-_TEXT_LIMITS = {"headline": 90, "you_two": 260, "roast": 280, "green_flag": 180, "role": 40, "item": 140}
+_TEXT_LIMITS = {"headline": 90, "you_two": 340, "roast": 320, "green_flag": 200, "role": 40, "item": 140}
 MAX_ITEMS = 3
 
 CHAT_READ_SYSTEM_PROMPT = """You read a chat between two people and tell them, warmly and honestly, what it is like. One of them uploaded it and will read your answer, and may show it to the other.
@@ -54,6 +54,30 @@ Return JSON only:
  "roast": "<two sentences teasing both of them, never cruel>"}
 
 Rules: only what is in the lines. Every running joke, subject and friction names the line numbers it comes from; a joke needs at least two. At most three jokes and three subjects; leave a list empty or friction null when the lines do not show one. Describe in your own words, in plain English even when they write Hindi or Hinglish; you may use a word or short phrase of theirs for a joke, never a whole message. Use their names. Tease about habits (late replies, long voice-note energy, one-word answers), never about looks, body, money, health, religion, caste or family. Leave out anything about health, sex or money even when it is in the lines. This may be shared: write nothing either of them would mind the other reading."""
+
+
+# The same shape as the prompt's "Return JSON", for providers that take a schema (Claude).
+_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}, "lines": {"type": "array", "items": {"type": "integer"}}},
+    "required": ["text", "lines"],
+    "additionalProperties": False,
+}
+CHAT_READ_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "headline": {"type": "string"},
+        "you_two": {"type": "string"},
+        "roles": {"type": "object", "properties": {"me": {"type": "string"}, "them": {"type": "string"}}, "required": ["me", "them"], "additionalProperties": False},
+        "running_jokes": {"type": "array", "items": _ITEM_SCHEMA},
+        "keep_coming_back_to": {"type": "array", "items": _ITEM_SCHEMA},
+        "friction": {"anyOf": [_ITEM_SCHEMA, {"type": "null"}]},
+        "green_flag": {"type": "string"},
+        "roast": {"type": "string"},
+    },
+    "required": ["headline", "you_two", "roles", "running_jokes", "keep_coming_back_to", "friction", "green_flag", "roast"],
+    "additionalProperties": False,
+}
 
 
 def two_sides(messages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str | None, int]:
@@ -167,7 +191,7 @@ def validate_written(raw: Any, shown: set[int]) -> dict[str, Any]:
     data = raw if isinstance(raw, dict) else {}
 
     def text(value: Any, kind: str) -> str:
-        return " ".join(str(value).split())[: _TEXT_LIMITS[kind]] if isinstance(value, str) else ""
+        return _fit(" ".join(value.split()), _TEXT_LIMITS[kind]) if isinstance(value, str) else ""
 
     def lines_of(item: Any) -> list[int]:
         cited = item.get("lines") if isinstance(item, dict) else None
@@ -223,6 +247,18 @@ async def build_chat_read(messages: list[dict[str, Any]], *, me: str, zone: tzin
     return {"state": "ready", "version": READ_VERSION, "me": me, "them": them, "counts": counts, "written": written, "built_at": utc_now_iso()}
 
 
+def _fit(text: str, limit: int) -> str:
+    """Text that is too long ends at its last whole sentence that fits, else at a whole word with
+    a mark; never in the middle of a word."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    sentence = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if sentence >= limit // 2:
+        return cut[: sentence + 1]
+    return cut[: cut.rfind(" ")].rstrip(",;:") + "…" if " " in cut else cut
+
+
 def _longest_streak(days: list[str]) -> int:
     best = run = 0
     previous = None
@@ -235,6 +271,7 @@ def _longest_streak(days: list[str]) -> int:
 
 
 __all__ = [
+    "CHAT_READ_SCHEMA",
     "CHAT_READ_SYSTEM_PROMPT",
     "MIN_MESSAGES_EACH",
     "READ_VERSION",

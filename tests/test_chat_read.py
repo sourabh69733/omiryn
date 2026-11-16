@@ -84,7 +84,7 @@ class WrittenTest(unittest.TestCase):
     def test_only_what_the_shown_lines_support_is_kept(self) -> None:
         checked = validate_written({
             "headline": "Two night owls   who plan treks and never sleep",
-            "you_two": "x" * 500,
+            "you_two": "They plan treks. " * 40,
             "roles": {"me": "the one awake at 2am", "them": 7},
             "running_jokes": [
                 {"text": "the lost bottle", "lines": [3, 4]},
@@ -98,7 +98,9 @@ class WrittenTest(unittest.TestCase):
             "roast": "One never sleeps, the other never stops laughing.",
         }, shown=set(range(9)))
         self.assertEqual(checked["headline"], "Two night owls who plan treks and never sleep")
-        self.assertEqual(len(checked["you_two"]), 260)
+        self.assertTrue(checked["you_two"].endswith("They plan treks."))  # cut at a whole sentence, not mid-word
+        self.assertLessEqual(len(checked["you_two"]), 340)
+        self.assertEqual(validate_written({"headline": "one " * 60}, set())["headline"][-1], "…")
         self.assertEqual(checked["roles"], {"me": "the one awake at 2am", "them": ""})
         self.assertEqual(checked["running_jokes"], [{"text": "the lost bottle", "lines": [3, 4]}])
         self.assertEqual(checked["keep_coming_back_to"], [{"text": "the Sunday trek", "lines": [7]}])
