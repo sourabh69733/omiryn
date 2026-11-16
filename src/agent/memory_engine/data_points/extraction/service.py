@@ -25,6 +25,8 @@ from storage import list_profile_facts, save_data_point_extraction_debug, upsert
 
 logger = logging.getLogger(__name__)
 
+WHATSAPP_CAPTURE_TIMEOUT_SECONDS = 120.0
+
 LLM_CONTEXT_CHAR_LIMIT = int(os.getenv("DATA_POINT_LLM_CONTEXT_CHAR_LIMIT", "9000"))
 LLM_MAX_POINTS = int(os.getenv("DATA_POINT_LLM_MAX_POINTS", "12"))
 VALID_CATEGORIES = {
@@ -253,11 +255,15 @@ async def capture_llm_whatsapp_data_points(
             _whatsapp_data_point_prompt(memory, title),
             conversation_id=conversation_id,
             model=model,
+            # A whole chat's worth of facts in one answer: the usual 45 seconds ran out every time.
+            timeout_seconds=WHATSAPP_CAPTURE_TIMEOUT_SECONDS,
         )
         for point in normalize_llm_data_points(raw, user_id, source_id, import_id, title):
             upsert_profile_fact(normalize_data_point(point))
-    except Exception:
-        logger.exception("agent.data_points.llm_capture_failed source_id=%s", source_id)
+    except Exception as error:
+        # A side step of an upload: the upload, its reading and the read do not depend on it. One
+        # line, no stack trace, so a slow model does not look like a broken upload.
+        logger.warning("agent.data_points.llm_capture_failed source_id=%s error_type=%s", source_id, type(error).__name__)
 
 
 async def capture_hybrid_whatsapp_data_points(

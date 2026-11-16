@@ -584,6 +584,7 @@ async def extract_llm_data_point_candidates(
     *,
     conversation_id: str | None = None,
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     provider = _provider_name()
     logger.info("agent.data_points.extract provider=%s chars=%s", provider, len(extraction_text))
@@ -607,6 +608,7 @@ async def extract_llm_data_point_candidates(
         conversation_id=conversation_id,
         request_kind=DATA_POINT_EXTRACT,
         model=model,
+        timeout_seconds=timeout_seconds,
     )
 
     return _parse_json_object(content)
