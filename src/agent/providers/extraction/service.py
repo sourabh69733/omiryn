@@ -39,6 +39,7 @@ from agent.observability.usage import (
     PROFILE_FACT_EXTRACT,
     REPLY_REQUEST_CHECK,
     CARD_REBUILD,
+    CHAT_READ,
     PERSON_CARD,
     MATCH_CHOOSE,
     MATCH_JUDGE,
@@ -264,6 +265,21 @@ async def choose_match(
 
     model = model or os.getenv("MATCH_REASONS_MODEL", "").strip() or request_check_model(_provider_name())
     return await _upload_call(MATCH_CHOOSE_SYSTEM_PROMPT, MATCH_CHOOSE, text, conversation_id, model, timeout_seconds)
+
+
+async def write_chat_read(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 90,
+) -> dict[str, Any]:
+    """What a two-person chat is like, from a sample of its lines and code's counts; {"headline",
+    "you_two", "roles", "running_jokes", "keep_coming_back_to", "friction", "green_flag", "roast"}."""
+    from agent.cognition.background.uploads.chat_read import CHAT_READ_SYSTEM_PROMPT
+
+    model = model or os.getenv("CHAT_READ_MODEL", "").strip() or request_check_model(_provider_name())
+    return await _upload_call(CHAT_READ_SYSTEM_PROMPT, CHAT_READ, text, conversation_id, model, timeout_seconds)
 
 
 async def write_match_notes(
