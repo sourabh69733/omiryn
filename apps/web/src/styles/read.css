@@ -1,0 +1,406 @@
+/* The read of an uploaded chat: one column on the paper, like Matches. Big numbers in the mono
+   face, Omi's words in the display face, cards on the surface rule (white, soft shadow). */
+.cr-screen {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.cr-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 6px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cr-back:hover,
+.cr-back:focus-visible {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.cr-eyebrow {
+  color: var(--ember-deep);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cr-head {
+  display: grid;
+  gap: 6px;
+}
+
+.cr-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 6vw, 46px);
+  font-weight: 500;
+  font-variation-settings: "opsz" 144;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.cr-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.cr-head .cr-headline {
+  margin-top: 10px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(21px, 3.6vw, 26px);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.cr-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cr-tile {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.cr-tile strong {
+  font-family: var(--font-mono);
+  font-size: clamp(24px, 6vw, 32px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.cr-tile span {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.cr-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.cr-roles div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--paper-2);
+  min-width: 0;
+}
+
+.cr-roles span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.cr-roles strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.cr-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.cr-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.cr-card p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+
+.cr-versus-head,
+.cr-versus-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cr-versus-head {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cr-versus {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+
+.cr-versus li {
+  display: grid;
+  gap: 5px;
+}
+
+.cr-versus-label {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cr-versus-values span {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  min-width: 0;
+}
+
+.cr-versus-values span:last-child {
+  text-align: right;
+}
+
+.cr-versus-values .is-lead {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* One bar for both: the ink part is "you", the rest is them. */
+.cr-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ember);
+  overflow: hidden;
+}
+
+.cr-bar span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-right: 2px solid var(--card);
+}
+
+.cr-facts,
+.cr-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.cr-facts {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.cr-list li {
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 15px;
+}
+
+.cr-first blockquote {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.cr-first blockquote::before {
+  content: "“";
+}
+
+.cr-first blockquote::after {
+  content: "”";
+}
+
+.cr-first p {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.cr-green {
+  background: var(--success-bg);
+}
+
+.cr-roast {
+  background: var(--ink);
+}
+
+.cr-roast .cr-eyebrow {
+  color: var(--ember);
+}
+
+.cr-roast p {
+  color: var(--on-ink);
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.4;
+}
+
+.cr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cr-share,
+.cr-again {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cr-share {
+  flex: 1 1 220px;
+  border: 0;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.cr-share:hover,
+.cr-share:focus-visible {
+  background: var(--ember-deep);
+}
+
+.cr-again {
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--ink);
+}
+
+.cr-again:hover:not(:disabled),
+.cr-again:focus-visible {
+  background: var(--hover);
+}
+
+.cr-again:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cr-again .is-spinning {
+  animation: cr-spin 1s linear infinite;
+}
+
+.cr-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cr-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.cr-canvas {
+  display: none;
+}
+
+.cr-state {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 28px 0;
+}
+
+.cr-state h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.cr-state p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 44ch;
+}
+
+.cr-pulse {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ember);
+  animation: cr-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cr-pulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes cr-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-pulse,
+  .cr-again .is-spinning {
+    animation: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .cr-tiles {
+    gap: 8px;
+  }
+
+  .cr-tile {
+    padding: 12px 10px;
+  }
+}
