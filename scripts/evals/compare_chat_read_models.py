@@ -44,7 +44,7 @@ from agent.cognition.background.uploads.chat_read import (  # noqa: E402
 )
 from agent.observability.usage import CHAT_READ  # noqa: E402
 from agent.providers import write_chat_read  # noqa: E402
-from agent.providers.claude import ClaudeUnavailable, claude_json, is_claude  # noqa: E402
+from agent.providers.gateway.claude import ClaudeUnavailable, claude_json, is_claude  # noqa: E402
 from ingestion.upload_chat import whatsapp_upload_messages  # noqa: E402
 
 DEFAULT_MODELS = "default,claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5"

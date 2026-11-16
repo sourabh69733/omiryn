@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 import anthropic
 
 from agent.providers import write_chat_read
-from agent.providers.claude import ClaudeUnavailable, claude_json, claude_key, cost_usd, is_claude
+from agent.providers.gateway.claude import ClaudeUnavailable, claude_json, claude_key, cost_usd, is_claude
 
 SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"}}, "required": ["headline"], "additionalProperties": False}
 
@@ -86,18 +86,18 @@ class ReadRoutingTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_claude_model_writes_the_read_and_the_usual_model_steps_in_when_it_cannot(self) -> None:
         usual = AsyncMock(return_value={"headline": "from the usual model"})
         with patch.dict(os.environ, {"AGENT_PROVIDER": "deepinfra", "CHAT_READ_MODEL": "claude-sonnet-5-5"}), patch("agent.providers.extraction.service._upload_call", usual):
-            with patch("agent.providers.claude.claude_json", AsyncMock(return_value=({"headline": "from Claude"}, {}))) as claude:
+            with patch("agent.providers.gateway.claude.claude_json", AsyncMock(return_value=({"headline": "from Claude"}, {}))) as claude:
                 self.assertEqual(await write_chat_read("payload", conversation_id="c"), {"headline": "from Claude"})
                 self.assertEqual(claude.await_args.kwargs["model"], "claude-sonnet-5-5")
                 usual.assert_not_awaited()
-            with patch("agent.providers.claude.claude_json", AsyncMock(side_effect=ClaudeUnavailable("down"))):
+            with patch("agent.providers.gateway.claude.claude_json", AsyncMock(side_effect=ClaudeUnavailable("down"))):
                 self.assertEqual(await write_chat_read("payload", conversation_id="c"), {"headline": "from the usual model"})
             # The fallback call does not carry the Claude model id to the other provider.
             self.assertFalse(str(usual.await_args.args[4] or "").startswith("claude-"))
 
     async def test_without_the_setting_claude_is_never_called(self) -> None:
         usual = AsyncMock(return_value={})
-        with patch.dict(os.environ, {"AGENT_PROVIDER": "deepinfra", "CHAT_READ_MODEL": ""}), patch("agent.providers.extraction.service._upload_call", usual), patch("agent.providers.claude.claude_json", AsyncMock()) as claude:
+        with patch.dict(os.environ, {"AGENT_PROVIDER": "deepinfra", "CHAT_READ_MODEL": ""}), patch("agent.providers.extraction.service._upload_call", usual), patch("agent.providers.gateway.claude.claude_json", AsyncMock()) as claude:
             await write_chat_read("payload", conversation_id="c")
         claude.assert_not_awaited()
         usual.assert_awaited_once()

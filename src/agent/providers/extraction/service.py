@@ -277,7 +277,7 @@ async def write_chat_read(
     """What a two-person chat is like, from a sample of its lines and code's counts; {"headline",
     "you_two", "roles", "running_jokes", "keep_coming_back_to", "friction", "green_flag", "roast"}."""
     from agent.cognition.background.uploads.chat_read import CHAT_READ_SCHEMA, CHAT_READ_SYSTEM_PROMPT
-    from agent.providers.claude import ClaudeUnavailable, claude_json, is_claude
+    from agent.providers.gateway.claude import ClaudeUnavailable, claude_json, is_claude
 
     model = model or os.getenv("CHAT_READ_MODEL", "").strip() or None
     if is_claude(model) and _provider_name() != "mock":
