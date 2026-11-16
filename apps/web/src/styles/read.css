@@ -240,6 +240,17 @@
   font-size: 15px;
 }
 
+.cr-list li strong {
+  font-weight: 600;
+}
+
+.cr-list li span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
 .cr-first blockquote {
   margin: 0;
   font-family: var(--font-display);

@@ -16,7 +16,7 @@ export type ReadSide = {
   top_emoji: string[];
 };
 
-export type ReadItem = { text: string; lines: number[] };
+export type ReadItem = { text: string; about?: string; lines: number[] };
 
 export type ReadWritten = {
   headline: string;

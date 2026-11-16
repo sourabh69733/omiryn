@@ -175,7 +175,7 @@ export function ChatReadPage({ sourceId, onBack }: Props) {
         <>
           {written.you_two ? <article className="cr-card"><h2>What this chat is like</h2><p>{written.you_two}</p></article> : null}
           {written.running_jokes.length ? (
-            <article className="cr-card"><h2>Your running jokes</h2><ul className="cr-list">{written.running_jokes.map((item) => <li key={item.text}>{item.text}</li>)}</ul></article>
+            <article className="cr-card"><h2>Your running jokes</h2><ul className="cr-list">{written.running_jokes.map((item) => <li key={item.text}><strong>{item.text}</strong>{item.about ? <span>{item.about}</span> : null}</li>)}</ul></article>
           ) : null}
           {written.keep_coming_back_to.length ? (
             <article className="cr-card"><h2>What you keep coming back to</h2><ul className="cr-list">{written.keep_coming_back_to.map((item) => <li key={item.text}>{item.text}</li>)}</ul></article>
