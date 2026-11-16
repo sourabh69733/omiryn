@@ -10,7 +10,12 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
-from agent.cognition.background.uploads.chat_read import build_chat_read, chat_counts, read_input, sample_lines, two_sides, validate_written
+from agent.cognition.background.uploads.chat_read import (
+    NEWEST_LINES, READ_VERSION, SPREAD_LINES, build_chat_read, chat_counts, laugh_lines, read_input, recurring_phrases, sample_lines, two_sides, validate_written,
+)
+from agent.evals.memory.planted_chat import ME as PLANTED_ME, PLANTED_JOKES, planted_export
+from ingestion.upload_chat import whatsapp_upload_messages
+from storage.upload_digests import CHAT_READ_KEY, set_upload_digest_part
 from api.main import app
 from security.auth import CurrentUser, current_user
 from storage import reset_db, save_conversation, save_context_source, save_user_profile
@@ -67,17 +72,61 @@ class CountsTest(unittest.TestCase):
         kept, partner, others = two_sides(CHAT + [{"role": "other", "speaker": "Dev", "content": "yo"}, msg("other", "  ", 5), msg("other", "hey all", 9 * DAY, speaker="Dev")])
         self.assertEqual((len(kept), partner, others), (10, "Riya Shah", 2))
 
-    def test_the_sample_keeps_the_newest_half_and_spreads_the_rest(self) -> None:
-        long = [msg("user" if i % 2 else "other", f"line {i}", i) for i in range(1000)]
-        lines = sample_lines(long, IST, limit=100)
+    def test_the_sample_keeps_the_newest_lines_spreads_the_rest_and_marks_what_got_a_laugh(self) -> None:
+        long = [msg("user" if i % 2 else "other", f"line {i}", i * 3) for i in range(1000)]
+        long[100] = msg("other", "the bottle again", 300)
+        long[101] = msg("user", "hahaha stop", 303)
+        lines = sample_lines(long, IST)
         numbers = [line["n"] for line in lines]
-        self.assertEqual((len(numbers), numbers[-1], numbers[-50]), (100, 999, 950))
-        self.assertEqual(numbers, sorted(numbers))
-        self.assertLess(numbers[0], 20)
-        self.assertEqual(lines[-1], {"n": 999, "who": "me", "day": "2026-03-02", "text": "line 999"})
+        self.assertEqual(numbers, sorted(set(numbers)))
+        self.assertEqual(numbers[-NEWEST_LINES:], list(range(1000 - NEWEST_LINES, 1000)))  # the newest in full
+        self.assertLessEqual(len(numbers), NEWEST_LINES + SPREAD_LINES + 4)
+        self.assertLess(numbers[0], 20)  # and something from the very start
+        by_n = {line["n"]: line for line in lines}
+        self.assertEqual((by_n[100]["laughed"], by_n[100]["who"], "laughed" in by_n[101]), (True, "them", False))  # the joke and the laugh after it are both shown
         self.assertEqual(len(sample_lines(CHAT, IST)), 9)
-        pack = json.loads(read_input("Aman", "Riya", self.counts, sample_lines(self.kept, IST)))
+        pack = json.loads(read_input("Aman", "Riya", self.counts, sample_lines(self.kept, IST), [{"phrase": "bottle", "times": 4}]))
         self.assertNotIn("first_message", pack["counts"])  # the model is not handed a line to quote
+        self.assertEqual(pack["phrases"], [{"phrase": "bottle", "times": 4}])
+
+
+class JokesTest(unittest.TestCase):
+    """What the two keep saying, found over the whole chat: a made-up chat with planted jokes."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.messages, _, _ = two_sides(whatsapp_upload_messages(planted_export(), PLANTED_ME, IST))
+        cls.phrases = recurring_phrases(cls.messages, IST)
+
+    def test_a_laugh_line_is_one_the_other_person_laughed_at(self) -> None:
+        chat = [
+            msg("user", "tera paanch minute matlab ek ghanta", 0),
+            msg("other", "hahaha 😂😂", 2),            # she laughs: line 0 landed
+            msg("user", "haha", 3),                     # a laugh answering a laugh is not a joke
+            msg("other", "lol", 4),
+            msg("other", "ok serious now", 30),
+            msg("user", "haha fine", 9 * 60),           # nine hours later: not a reaction
+        ]
+        self.assertEqual(laugh_lines(chat), [0])
+        self.assertEqual(laugh_lines(chat, limit=0), [])
+
+    def test_the_planted_jokes_are_found_and_come_first(self) -> None:
+        top = [phrase["phrase"] for phrase in self.phrases[:6]]
+        for joke in PLANTED_JOKES:
+            self.assertTrue(any(joke in phrase or phrase in joke for phrase in top), (joke, top))
+        first = self.phrases[0]
+        self.assertGreaterEqual(first["got_laughs"], 10)
+        self.assertEqual(first["times"], first["me"] + first["them"])
+        self.assertTrue(all(0 <= n < len(self.messages) for n in first["lines"]))
+        self.assertLessEqual(len(first["lines"]), 3)
+
+    def test_ordinary_talk_and_one_off_lines_are_not_phrases(self) -> None:
+        names = {phrase["phrase"] for phrase in self.phrases}
+        self.assertFalse(names & {"hai", "ka", "ke", "rajmachi", "link", "phone"})  # filler, a word said once, what masking leaves
+        self.assertTrue(all(phrase["times"] >= 4 and phrase["days"] >= 3 for phrase in self.phrases))
+        # Pieces of one repeated sentence are told once, not as five overlapping phrases.
+        self.assertEqual(sum(1 for name in names if "paanch" in name or "ghanta" in name), 1)
+        self.assertEqual(recurring_phrases([], IST), [])
 
 
 class WrittenTest(unittest.TestCase):
@@ -87,7 +136,7 @@ class WrittenTest(unittest.TestCase):
             "you_two": "They plan treks. " * 40,
             "roles": {"me": "the one awake at 2am", "them": 7},
             "running_jokes": [
-                {"text": "the lost bottle", "lines": [3, 4]},
+                {"text": "the lost bottle", "about": "she still has it  ", "lines": [3, 4]},
                 {"text": "only one line", "lines": [3]},          # a joke needs two
                 {"text": "made up", "lines": [77, 78]},            # lines never shown
                 {"text": "The Lost Bottle", "lines": [3, 4]},      # said twice
@@ -102,7 +151,7 @@ class WrittenTest(unittest.TestCase):
         self.assertLessEqual(len(checked["you_two"]), 340)
         self.assertEqual(validate_written({"headline": "one " * 60}, set())["headline"][-1], "…")
         self.assertEqual(checked["roles"], {"me": "the one awake at 2am", "them": ""})
-        self.assertEqual(checked["running_jokes"], [{"text": "the lost bottle", "lines": [3, 4]}])
+        self.assertEqual(checked["running_jokes"], [{"text": "the lost bottle", "about": "she still has it", "lines": [3, 4]}])
         self.assertEqual(checked["keep_coming_back_to"], [{"text": "the Sunday trek", "lines": [7]}])
         self.assertIsNone(checked["friction"])
         self.assertEqual(validate_written("nonsense", set())["running_jokes"], [])
@@ -124,7 +173,8 @@ class BuildTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((read["state"], read["me"], read["them"], read["counts"]["messages"]), ("ready", "Aman", "Riya", 30))
         self.assertEqual(read["written"]["running_jokes"], [{"text": "numbers", "lines": [1, 2]}])
         sent = json.loads(writer.await_args.args[0])
-        self.assertEqual((sent["me"], sent["them"], len(sent["lines"])), ("Aman", "Riya", 30))
+        self.assertEqual((sent["me"], sent["them"], len(sent["lines"]), read["version"]), ("Aman", "Riya", 30, READ_VERSION))
+        self.assertIn("phrases", sent)
 
     async def test_the_numbers_stand_when_the_model_fails(self) -> None:
         with patch("agent.providers.write_chat_read", AsyncMock(side_effect=RuntimeError("down"))):
@@ -171,6 +221,15 @@ class ApiTest(unittest.TestCase):
         with _As("someone-else") as client:
             self.assertEqual(client.get(url).status_code, 404)
             self.assertEqual(client.post(url).status_code, 404)
+
+    def test_a_read_made_by_an_older_version_is_made_again(self) -> None:
+        url = f"/api/me/context-sources/{self.source}/chat-read"
+        set_upload_digest_part(self.source, "ua", "hidden-1", "Riya", CHAT_READ_KEY, {"state": "ready", "version": READ_VERSION - 1, "written": {"headline": "old"}})
+        writer = AsyncMock(return_value={"headline": "new", "roast": "r"})
+        with _As("ua") as client, patch("agent.providers.write_chat_read", writer):
+            self.assertEqual(client.get(url).json(), {"state": "none"})
+            self.assertEqual(client.post(url).json()["written"]["headline"], "new")
+            self.assertEqual(client.get(url).json()["version"], READ_VERSION)
 
     def test_the_read_survives_the_digest_being_written_and_goes_with_the_upload(self) -> None:
         url = f"/api/me/context-sources/{self.source}/chat-read"
