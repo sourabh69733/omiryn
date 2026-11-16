@@ -83,6 +83,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   // Picked fresh for each Temporary Chat and shown as its title.
   const [temporaryTitle, setTemporaryTitle] = useState("");
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
+  // The model that writes replies: the Profile pick, or the app default when none (null).
+  const [replyModel, setReplyModel] = useState<{ default: string; selected: string | null } | null>(null);
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [usage, setUsage] = useState<ConversationUsage | null>(null);
@@ -853,18 +855,20 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     }
   }
 
-  async function updateModel(model: string) {
-    await updateSettings({ agent_model: model });
+  async function loadReplyModel() {
+    const response = await apiFetch("/api/agent/settings/model").catch(() => null);
+    if (response?.ok) setReplyModel((await response.json()) as { default: string; selected: string | null });
   }
 
-  async function updateSettings(settings: Record<string, string>) {
-    if (!conversation) return;
-    const response = await apiFetch(`/api/agent/conversations/${conversation.id}/settings`, {
-      method: "PATCH",
+  // Replies follow the Profile pick, not the model saved on the chat, so this changes the pick
+  // (the same setting as Profile > Reply model); choosing the default clears it.
+  async function updateModel(model: string) {
+    const response = await apiFetch("/api/agent/settings/model", {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings)
+      body: JSON.stringify({ model: replyModel && model === replyModel.default ? null : model })
     });
-    if (response.ok) setConversation((await response.json()) as Conversation);
+    if (response.ok) setReplyModel((await response.json()) as { default: string; selected: string | null });
   }
 
   async function toggleContext(sourceId: string) {
@@ -1323,7 +1327,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 </button>
               )}
               {canShowUsage ? (
-                <button type="button" className="omi-menu-button" aria-label="Usage, developers only" data-tip="Usage (dev only): tokens and cost for this chat." onClick={() => { setDrawer("usage"); if (conversation) void loadConversationUsage(conversation.id); }}>
+                <button type="button" className="omi-menu-button" aria-label="Usage, developers only" data-tip="Usage (dev only): tokens and cost for this chat." onClick={() => { setDrawer("usage"); void loadReplyModel(); if (conversation) void loadConversationUsage(conversation.id); }}>
                   <BarChart3 aria-hidden="true" />
                 </button>
               ) : null}
@@ -1444,7 +1448,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 </>
               ) : (
                 <div className="omi-drawer-usage">
-                  {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={conversation?.agent_model || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
+                  {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={replyModel?.selected || replyModel?.default || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
                   <div className="usage-summary">
                 {!conversation ? "Usage will appear after you select a conversation." : null}
                 {conversation && usageLoading ? "Loading usage..." : null}
