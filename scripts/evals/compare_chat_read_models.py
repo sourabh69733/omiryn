@@ -8,6 +8,9 @@ roast) and what each model costs for it.
   # a made-up sample chat, with the usual model and three Claude models
   .venv/bin/python scripts/evals/compare_chat_read_models.py
 
+  # a long made-up chat with running jokes planted in it: does the read find them?
+  .venv/bin/python scripts/evals/compare_chat_read_models.py --planted --models claude-sonnet-5-5
+
   # your own WhatsApp export (the reads print in your terminal; nothing is stored)
   .venv/bin/python scripts/evals/compare_chat_read_models.py --file ~/Downloads/chat.txt --me "Your Name"
 
@@ -38,6 +41,7 @@ from agent.cognition.background.uploads.chat_read import (  # noqa: E402
     CHAT_READ_SYSTEM_PROMPT,
     chat_counts,
     read_input,
+    recurring_phrases,
     sample_lines,
     two_sides,
     validate_written,
@@ -84,7 +88,7 @@ def _show(result: dict, me: str, them: str) -> str:
     lines += ["", f"**{written['headline']}**", "", written["you_two"], ""]
     lines.append(f"- {me}: {written['roles']['me']}")
     lines.append(f"- {them}: {written['roles']['them']}")
-    lines.append("- Running jokes: " + ("; ".join(item["text"] for item in written["running_jokes"]) or "none"))
+    lines.append("- Running jokes: " + ("; ".join(item["text"] + (f" ({item['about']})" if item.get("about") else "") for item in written["running_jokes"]) or "none"))
     lines.append("- Keep coming back to: " + ("; ".join(item["text"] for item in written["keep_coming_back_to"]) or "none"))
     lines.append("- Where they bump: " + (written["friction"]["text"] if written["friction"] else "none"))
     lines.append(f"- The good thing: {written['green_flag']}")
@@ -99,6 +103,10 @@ async def _run(args: argparse.Namespace) -> int:
         if not me_name:
             print("--file needs --me \"your name as it appears in the chat\"", file=sys.stderr)
             return 2
+    elif args.planted:
+        from agent.evals.memory.planted_chat import ME, planted_export
+
+        export, me_name = planted_export(), ME
     else:
         from agent.evals.memory.upload_chats import EXPORT, USER
 
@@ -109,10 +117,11 @@ async def _run(args: argparse.Namespace) -> int:
         return 2
     me, them = me_name.split()[0], partner.split()[0]
     counts = chat_counts(messages, zone)
-    lines = sample_lines(messages, zone)
-    payload = read_input(me, them, counts, lines)
+    phrases = recurring_phrases(messages, zone)
+    lines = sample_lines(messages, zone, phrases=phrases)
+    payload = read_input(me, them, counts, lines, phrases)
     models = [model.strip() for model in args.models.split(",") if model.strip()]
-    print(f"{len(messages)} messages, {len(lines)} lines shown to each model, models: {', '.join(models)}", flush=True)
+    print(f"{len(messages)} messages, {len(lines)} lines and {len(phrases)} repeated phrases shown to each model, models: {', '.join(models)}", flush=True)
     results = await asyncio.gather(*(_one(model, payload, {line["n"] for line in lines}) for model in models))
     text = "\n".join(_show(result, me, them) for result in results)
     print()
@@ -130,6 +139,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--models", default=DEFAULT_MODELS, help=f"Comma-separated; \"default\" is the usual read model (default: {DEFAULT_MODELS}).")
     parser.add_argument("--file", default=None, help="A WhatsApp export (.txt) of a chat between two people.")
+    parser.add_argument("--planted", action="store_true", help="Use the long made-up chat with planted running jokes (src/agent/evals/memory/planted_chat.py).")
     parser.add_argument("--me", default=None, help="With --file: your name as it appears in the chat.")
     parser.add_argument("--timezone", default="Asia/Kolkata")
     parser.add_argument("--no-save", action="store_true")

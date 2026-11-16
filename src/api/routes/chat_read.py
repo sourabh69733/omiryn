@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agent.cognition.background.uploads.chat_read import build_chat_read
+from agent.cognition.background.uploads.chat_read import READ_VERSION, build_chat_read
 from agent.shared.timeline import user_zone
 from security.auth import CurrentUser, require_user
 from storage import get_user_profile, get_user_timezone
@@ -27,18 +27,24 @@ def _own_upload(source_id: str, user: CurrentUser) -> None:
         raise HTTPException(status_code=404, detail="Upload not found.")
 
 
+def _stored(source_id: str, user_id: str) -> dict[str, object] | None:
+    """The stored read, unless it was made by an older version of the read: that one is made again."""
+    stored = (get_upload_digest(source_id, user_id) or {}).get(CHAT_READ_KEY)
+    return stored if isinstance(stored, dict) and stored.get("version") == READ_VERSION else None
+
+
 @router.get("/api/me/context-sources/{source_id}/chat-read")
 def get_chat_read(source_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     _own_upload(source_id, user)
-    stored = (get_upload_digest(source_id, user.id) or {}).get(CHAT_READ_KEY)
-    return stored if isinstance(stored, dict) else {"state": "none"}
+    stored = _stored(source_id, user.id)
+    return stored if stored is not None else {"state": "none"}
 
 
 @router.post("/api/me/context-sources/{source_id}/chat-read")
 async def make_chat_read(source_id: str, again: bool = False, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     _own_upload(source_id, user)
-    stored = (get_upload_digest(source_id, user.id) or {}).get(CHAT_READ_KEY)
-    if isinstance(stored, dict) and stored.get("state") == "ready" and not again:
+    stored = _stored(source_id, user.id)
+    if stored is not None and stored.get("state") == "ready" and not again:
         return stored
     conversation = import_conversation(user.id, source_id)
     if conversation is None:
