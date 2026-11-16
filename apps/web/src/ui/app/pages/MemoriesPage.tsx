@@ -16,7 +16,7 @@ const memoryReviewReasons = [
 
 type OpenQuestion = { id: string; text: string; about_memory_ids?: string[]; created_at?: string };
 
-export function MemoriesPage() {
+export function MemoriesPage({ onOpenRead }: { onOpenRead?: (sourceId: string) => void } = {}) {
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [canonicalMemories, setCanonicalMemories] = useState<CanonicalMemory[]>([]);
   const [error, setError] = useState("");
@@ -276,7 +276,7 @@ export function MemoriesPage() {
         </section>
       ) : null}
       {canonicalSections.length ? canonicalSections.map(renderCanonicalSection) : <StateView kind="empty" title="No memories yet" detail="Omi remembers things as you chat. Check back after a few conversations." />}
-      <MemoryUploads sources={sources} onChanged={load} />
+      <MemoryUploads sources={sources} onChanged={load} onOpenRead={onOpenRead} />
       {canonicalMemoryGroups.old.length || canonicalMemoryGroups.rejected.length ? (
         <div className="mem-footer-links">
           {canonicalMemoryGroups.old.length ? <button className="mem-link is-muted" type="button" onClick={() => toggleSection("old-canonical", showOldCanonical)}>{showOldCanonical ? "Hide old memories" : `Old memories (${canonicalMemoryGroups.old.length})`}</button> : null}

@@ -7,6 +7,8 @@ import { ChatPage, type OmiStatus } from "./pages/ChatPage";
 import { ContactPage } from "./pages/ContactPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { PersonChatPage } from "./pages/PersonChatPage";
+import { ChatReadPage } from "./pages/ChatReadPage";
+import { readFromPath, readPath } from "./chatRead";
 import { MemoriesPage } from "./pages/MemoriesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -37,6 +39,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const [cards, setCards] = useState<MatchCard[]>([]);
   const [cardsLoaded, setCardsLoaded] = useState(false);
   const [personId, setPersonId] = useState<string | null>(() => pairFromPath(window.location.pathname));
+  const [readId, setReadId] = useState<string | null>(() => readFromPath(window.location.pathname));
 
   const loadPeople = useCallback(() => {
     apiFetch("/api/me/matches")
@@ -94,7 +97,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       .then((response) => response.ok ? response.json() : null)
       .then((data: ProfileResponse | null) => setProfile(data?.profile || null))
       .catch(() => undefined);
-    const sync = () => { setPage(pageFromPath()); setPersonId(pairFromPath(window.location.pathname)); setMobileNavOpen(false); };
+    const sync = () => { setPage(pageFromPath()); setPersonId(pairFromPath(window.location.pathname)); setReadId(readFromPath(window.location.pathname)); setMobileNavOpen(false); };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
@@ -114,6 +117,14 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     window.history.pushState({}, "", personPath(pairId));
     setPersonId(pairId);
     setPage("person");
+    setAccountOpen(false);
+    setMobileNavOpen(false);
+  }
+
+  function openRead(sourceId: string) {
+    window.history.pushState({}, "", readPath(sourceId));
+    setReadId(sourceId);
+    setPage("read");
     setAccountOpen(false);
     setMobileNavOpen(false);
   }
@@ -251,7 +262,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
       <main className="omi-main">
         <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenPage={navigate} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
-        {page === "memories" ? <MemoriesPage /> : null}
+        {page === "memories" ? <MemoriesPage onOpenRead={openRead} /> : null}
+        {page === "read" && readId ? <ChatReadPage sourceId={readId} onBack={() => navigate("memories")} /> : null}
         {page === "person" && personId ? <PersonChatPage pairId={personId} card={person} cardsLoaded={cardsLoaded} userAvatar={accountBadge} isMobile={isMobile} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onChanged={loadPeople} onMatches={() => navigate("matches")} /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} onOpenPerson={openPerson} onPeopleChanged={loadPeople} /> : null}
         {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} onPrivacy={() => navigate("privacy")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "../../lib/api";
 import type { ContextSource } from "./types";
 
-export function MemoryUploads({ sources, onChanged }: { sources: ContextSource[]; onChanged: () => Promise<void> }) {
+export function MemoryUploads({ sources, onChanged, onOpenRead }: { sources: ContextSource[]; onChanged: () => Promise<void>; onOpenRead?: (sourceId: string) => void }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function remove(id: string) {
@@ -43,6 +43,7 @@ export function MemoryUploads({ sources, onChanged }: { sources: ContextSource[]
                 ) : null}
               </div>
               <div className="mem-row-actions">
+                {onOpenRead && source.source_type === "whatsapp_chat" ? <button className="mem-link" type="button" onClick={() => onOpenRead(source.id)}>What it says about you two</button> : null}
                 <button className="mem-link is-muted" type="button" onClick={() => void remove(source.id)} disabled={deletingId === source.id}>{deletingId === source.id ? "Deleting…" : "Delete"}</button>
               </div>
             </article>

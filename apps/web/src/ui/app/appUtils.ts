@@ -10,6 +10,8 @@ export const pageFromPath = (): Page => {
   if (window.location.pathname.startsWith("/matches")) return "matches";
   // A chat with a person Omi introduced: /people/<pair id>.
   if (window.location.pathname.startsWith("/people/")) return "person";
+  // The read of one uploaded chat: /read/<upload id>.
+  if (window.location.pathname.startsWith("/read/")) return "read";
   if (window.location.pathname.startsWith("/profile/privacy")) return "privacy";
   if (window.location.pathname.startsWith("/profile")) return "profile";
   return "chat";
@@ -22,6 +24,8 @@ export const pathForPage: Record<Page, string> = {
   matches: "/matches",
   // The base only; a person's chat adds the pair id (personPath in people.ts).
   person: "/people",
+  // The base only; a read adds the upload id (readPath in chatRead.ts).
+  read: "/read",
   profile: "/profile",
   privacy: "/profile/privacy",
   contact: "/contact"
