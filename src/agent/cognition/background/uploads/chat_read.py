@@ -420,6 +420,64 @@ async def build_chat_read(messages: list[dict[str, Any]], *, me: str, zone: tzin
     return {"state": "ready", "version": READ_VERSION, "me": me, "them": them, "counts": counts, "written": written, "built_at": utc_now_iso()}
 
 
+# ---- the stored read: made once, when the chat is uploaded ----
+
+# A read that has been "being made" for longer than this was lost (a restart); it is made again.
+MAKING_FOR = timedelta(seconds=150)
+_NO_READ_STATES = frozenset({"group_chat", "too_short"})
+
+
+def read_state_of(digest: dict[str, Any] | None) -> str | None:
+    """Where an upload's read stands, from its stored digest: "ready", "making", "group_chat",
+    "too_short", or None when there is nothing current (never made, or made by an older version)."""
+    stored = (digest or {}).get("chat_read")
+    if not isinstance(stored, dict):
+        return None
+    state = stored.get("state")
+    if state == "making":
+        started = datetime.fromisoformat(stored["started_at"]) if isinstance(stored.get("started_at"), str) else None
+        return "making" if started and datetime.now(started.tzinfo) - started <= MAKING_FOR else None
+    return state if stored.get("version") == READ_VERSION and (state == "ready" or state in _NO_READ_STATES) else None
+
+
+def read_status(source_id: str, user_id: str) -> dict[str, Any] | None:
+    """What to answer without making anything: the ready read, {"state": "making"} while one is
+    being made, the reason this chat has none, or None when it has to be made."""
+    from storage.upload_digests import get_upload_digest
+
+    digest = get_upload_digest(source_id, user_id)
+    state = read_state_of(digest)
+    if state == "ready":
+        return digest["chat_read"]  # type: ignore[index]
+    return {"state": state} if state else None
+
+
+async def make_stored_read(user_id: str, source_id: str) -> dict[str, Any]:
+    """Make the read of one upload and store it with the upload's digest. Called when the chat is
+    uploaded, so the read is waiting when the person opens it, and again from the page for an older
+    upload or a new version. While it runs the digest says "making", so nobody starts a second one."""
+    from agent.shared.timeline import user_zone
+    from storage import get_user_profile, get_user_timezone
+    from storage.conversations import import_conversation
+    from storage.upload_digests import CHAT_READ_KEY, set_upload_digest_part
+
+    conversation = import_conversation(user_id, source_id)
+    if conversation is None:
+        # A notes upload or a friend's style import: no chat of theirs to read.
+        return {"state": "no_chat"}
+    conversation_id = str(conversation["id"])
+    set_upload_digest_part(source_id, user_id, conversation_id, None, CHAT_READ_KEY, {"state": "making", "started_at": utc_now_iso()})
+    me = str((get_user_profile(user_id) or {}).get("display_name") or "You").split()[0]
+    try:
+        read = await build_chat_read(list(conversation.get("messages") or []), me=me, zone=user_zone(get_user_timezone(user_id)), conversation_id=conversation_id)
+    except Exception:
+        set_upload_digest_part(source_id, user_id, conversation_id, None, CHAT_READ_KEY, None)
+        raise
+    # A chat with no read keeps the reason, with the version, so it is not tried again on every visit.
+    set_upload_digest_part(source_id, user_id, conversation_id, read.get("them"), CHAT_READ_KEY, read if read["state"] == "ready" else {**read, "version": READ_VERSION})
+    return read
+
+
 def _fit(text: str, limit: int) -> str:
     """Text that is too long ends at its last whole sentence that fits, else at a whole word with
     a mark; never in the middle of a word."""
@@ -451,7 +509,10 @@ __all__ = [
     "build_chat_read",
     "chat_counts",
     "laugh_lines",
+    "make_stored_read",
     "read_input",
+    "read_state_of",
+    "read_status",
     "recurring_phrases",
     "sample_lines",
     "two_sides",

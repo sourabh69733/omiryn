@@ -1,21 +1,19 @@
 """The read of an uploaded chat: what it says about the two people in it.
 
-`GET /api/me/context-sources/{source_id}/chat-read` returns the stored read, or {"state": "none"}.
-`POST` makes it (one model call for the written half) and stores it with the upload's digest.
-Only the person who uploaded the chat can ask; the read is deleted with the upload.
+The read is made when the chat is uploaded (see the WhatsApp upload route), so it is usually
+waiting. `GET /api/me/context-sources/{source_id}/chat-read` returns it, or {"state": "making"}
+while it is being made, or why this chat has none, or {"state": "none"} for an older upload.
+`POST` makes it when there is none (one model call for the written half) or again with
+`?again=true`. Only the person who uploaded the chat can ask; the read is deleted with the upload.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agent.cognition.background.uploads.chat_read import READ_VERSION, build_chat_read
-from agent.shared.timeline import user_zone
+from agent.cognition.background.uploads.chat_read import make_stored_read, read_status
 from security.auth import CurrentUser, require_user
-from storage import get_user_profile, get_user_timezone
 from storage.context_sources import get_context_source_metadata
-from storage.conversations import import_conversation
-from storage.upload_digests import CHAT_READ_KEY, get_upload_digest, set_upload_digest_part
 
 from ..usage_limits import CHAT_READ_LIMIT, enforce_user_action_limit
 
@@ -27,37 +25,22 @@ def _own_upload(source_id: str, user: CurrentUser) -> None:
         raise HTTPException(status_code=404, detail="Upload not found.")
 
 
-def _stored(source_id: str, user_id: str) -> dict[str, object] | None:
-    """The stored read, unless it was made by an older version of the read: that one is made again."""
-    stored = (get_upload_digest(source_id, user_id) or {}).get(CHAT_READ_KEY)
-    return stored if isinstance(stored, dict) and stored.get("version") == READ_VERSION else None
-
-
 @router.get("/api/me/context-sources/{source_id}/chat-read")
 def get_chat_read(source_id: str, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     _own_upload(source_id, user)
-    stored = _stored(source_id, user.id)
-    return stored if stored is not None else {"state": "none"}
+    return read_status(source_id, user.id) or {"state": "none"}
 
 
 @router.post("/api/me/context-sources/{source_id}/chat-read")
 async def make_chat_read(source_id: str, again: bool = False, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
     _own_upload(source_id, user)
-    stored = _stored(source_id, user.id)
-    if stored is not None and stored.get("state") == "ready" and not again:
-        return stored
-    conversation = import_conversation(user.id, source_id)
-    if conversation is None:
-        # A notes upload or a friend's style import: no chat of theirs to read.
-        return {"state": "no_chat"}
+    status = read_status(source_id, user.id)
+    if status is not None and (not again or status["state"] == "making"):
+        return status
+    # Made on request (an older upload, a new version, "read it again") counts towards the month's
+    # reads; the one made at upload does not.
     enforce_user_action_limit(user.id, CHAT_READ_LIMIT)
-    me = str((get_user_profile(user.id) or {}).get("display_name") or "You").split()[0]
-    read = await build_chat_read(
-        list(conversation.get("messages") or []), me=me, zone=user_zone(get_user_timezone(user.id)), conversation_id=str(conversation["id"])
-    )
-    if read["state"] == "ready":
-        set_upload_digest_part(source_id, user.id, str(conversation["id"]), read["them"], CHAT_READ_KEY, read)
-    return read
+    return await make_stored_read(user.id, source_id)
 
 
 __all__ = ["router"]

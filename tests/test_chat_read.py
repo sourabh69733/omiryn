@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 from fastapi.testclient import TestClient
 
 from agent.cognition.background.uploads.chat_read import (
-    NEWEST_LINES, READ_VERSION, SPREAD_LINES, build_chat_read, chat_counts, laugh_lines, read_input, recurring_phrases, sample_lines, two_sides, validate_written,
+    NEWEST_LINES, READ_VERSION, SPREAD_LINES, build_chat_read, chat_counts, laugh_lines, make_stored_read, read_input, read_state_of, recurring_phrases,
+    sample_lines, two_sides, validate_written,
 )
 from agent.evals.memory.planted_chat import ME as PLANTED_ME, PLANTED_JOKES, planted_export
 from ingestion.upload_chat import whatsapp_upload_messages
@@ -221,6 +222,57 @@ class ApiTest(unittest.TestCase):
         with _As("someone-else") as client:
             self.assertEqual(client.get(url).status_code, 404)
             self.assertEqual(client.post(url).status_code, 404)
+
+    def test_the_read_made_at_upload_is_waiting_and_costs_no_second_call(self) -> None:
+        import asyncio
+
+        url = f"/api/me/context-sources/{self.source}/chat-read"
+        writer = AsyncMock(return_value={"headline": "Made at upload", "roast": "r"})
+        with patch("agent.providers.write_chat_read", writer):
+            made = asyncio.run(make_stored_read("ua", self.source))  # what the upload route runs in the background
+            self.assertEqual((made["state"], made["them"]), ("ready", "Riya"))
+            with _As("ua") as client:
+                self.assertEqual(client.get(url).json()["written"]["headline"], "Made at upload")
+                self.assertEqual(client.post(url).json()["written"]["headline"], "Made at upload")
+        self.assertEqual(writer.await_count, 1)
+        self.assertEqual(read_state_of(get_upload_digest(self.source, "ua")), "ready")
+        self.assertEqual(asyncio.run(make_stored_read("ua", self.notes)), {"state": "no_chat"})
+
+    def test_while_one_is_being_made_nobody_starts_another(self) -> None:
+        url = f"/api/me/context-sources/{self.source}/chat-read"
+        now = datetime.now(timezone.utc)
+        writer = AsyncMock(return_value={"headline": "late"})
+        with _As("ua") as client, patch("agent.providers.write_chat_read", writer):
+            set_upload_digest_part(self.source, "ua", "hidden-1", None, CHAT_READ_KEY, {"state": "making", "started_at": now.isoformat()})
+            self.assertEqual(client.get(url).json(), {"state": "making"})
+            self.assertEqual(client.post(url).json(), {"state": "making"})
+            self.assertEqual(client.post(url + "?again=true").json(), {"state": "making"})
+            writer.assert_not_awaited()
+            # A read that has been "being made" for ten minutes was lost in a restart: made again.
+            set_upload_digest_part(self.source, "ua", "hidden-1", None, CHAT_READ_KEY, {"state": "making", "started_at": (now - timedelta(minutes=10)).isoformat()})
+            self.assertEqual(client.get(url).json(), {"state": "none"})
+            self.assertEqual(client.post(url).json()["state"], "ready")
+        self.assertEqual(writer.await_count, 1)
+
+    def test_a_chat_with_no_read_keeps_the_reason_and_is_not_tried_again(self) -> None:
+        save_conversation({"id": "hidden-2", "status": "active", "import_source_id": self.notes, "messages": CHAT}, "ua")  # nine messages: too short
+        url = f"/api/me/context-sources/{self.notes}/chat-read"
+        with _As("ua") as client, patch("agent.cognition.background.uploads.chat_read.build_chat_read", AsyncMock(return_value={"state": "too_short"})) as build:
+            self.assertEqual(client.post(url).json(), {"state": "too_short"})
+            self.assertEqual(client.get(url).json(), {"state": "too_short"})
+            self.assertEqual(client.post(url).json(), {"state": "too_short"})
+        self.assertEqual(build.await_count, 1)
+        self.assertEqual(read_state_of(get_upload_digest(self.notes, "ua")), "too_short")
+        self.assertIsNone(read_state_of(None))
+        self.assertIsNone(read_state_of({"chat_read": {"state": "ready", "version": READ_VERSION - 1}}))
+
+    def test_a_failed_read_at_upload_never_fails_the_upload(self) -> None:
+        import asyncio
+
+        from api.routes.context import _make_read
+
+        with patch("agent.cognition.background.uploads.chat_read.make_stored_read", AsyncMock(side_effect=RuntimeError("down"))):
+            asyncio.run(_make_read("ua", self.source))  # logged, not raised
 
     def test_a_read_made_by_an_older_version_is_made_again(self) -> None:
         url = f"/api/me/context-sources/{self.source}/chat-read"

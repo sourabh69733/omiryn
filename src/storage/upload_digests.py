@@ -72,7 +72,7 @@ def set_upload_digest_part(source_id: str, user_id: str, conversation_id: str, p
         row = connection.execute(select(upload_digests).where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id)).mappings().first()
         if row:
             digest = {**(decrypt_json(owner_id, row["digest_json"]) or {}), key: value}
-            connection.execute(upload_digests.update().where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id).values(digest_json=maybe_encrypt_json(owner_id, digest)))
+            connection.execute(upload_digests.update().where(upload_digests.c.source_id == source_id, upload_digests.c.user_id == owner_id).values(digest_json=maybe_encrypt_json(owner_id, digest)))  # the row's partner name stays as the reader wrote it
         else:
             connection.execute(upload_digests.insert().values(source_id=source_id, user_id=owner_id, conversation_id=conversation_id, partner_name=partner_name, digest_json=maybe_encrypt_json(owner_id, {key: value})))
 
