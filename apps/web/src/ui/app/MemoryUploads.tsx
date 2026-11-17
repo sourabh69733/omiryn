@@ -1,8 +1,9 @@
 // Memories page: what the user shared with Omi (from 📎 in chat), with Delete.
 // Deleting an upload removes what Omi learned only from it; a prompt says exactly what goes first.
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ArrowRight, Sparkles, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
+import { readButton, readLabel } from "./chatRead";
 import { Notice } from "./StateView";
 import { uploadDeleteLines } from "./uploadDelete";
 import type { ContextSource } from "./types";
@@ -62,7 +63,12 @@ export function MemoryUploads({ sources, onChanged, onOpenRead }: { sources: Con
                 ) : null}
               </div>
               <div className="mem-row-actions">
-                {onOpenRead && source.source_type === "whatsapp_chat" ? <button className="mem-link" type="button" onClick={() => onOpenRead(source.id)}>What it says about you two</button> : null}
+                {onOpenRead && readButton(source.source_type, source.digest?.read) === "open" ? (
+                  <button className="mem-read" type="button" onClick={() => onOpenRead(source.id)} aria-label={`What this chat says about you two: ${source.title || "this chat"}`}>
+                    <Sparkles aria-hidden="true" size={15} /><span>{readLabel(source.title)}</span><ArrowRight aria-hidden="true" size={15} />
+                  </button>
+                ) : null}
+                {onOpenRead && readButton(source.source_type, source.digest?.read) === "making" ? <span className="mem-read is-making" role="status"><span className="mem-read-dot" aria-hidden="true" />Getting your read ready</span> : null}
                 <button className="mem-link is-muted" type="button" onClick={() => ask(source)}>Delete</button>
               </div>
             </article>
