@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent.cognition.background.uploads.chat_read import read_state_of
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from agent.context_engine.assembly import STYLE_CONTEXT_SOURCE_TYPES
@@ -735,6 +736,8 @@ def _digest_overview(digest: dict[str, object]) -> dict[str, object]:
     return {
         "summary": digest.get("summary") or "",
         "chat_dates": digest.get("chat_dates") or {},
+        # Where the read of this chat stands: ready, making, group_chat, too_short, or null.
+        "read": read_state_of(digest),
         "topics": [
             {"title": topic.get("title"), "started": topic.get("started"), "ended": topic.get("ended")}
             for topic in digest.get("threads") or []

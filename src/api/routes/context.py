@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from agent.config import agent_pipeline_config
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
@@ -48,6 +50,17 @@ from ..usage_limits import CONTEXT_IMPORT_LIMIT, WHATSAPP_IMPORT_LIMIT, enforce_
 LEARNED_SOURCE_TYPES = {"llm_profile", "manual_notes"}
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _make_read(user_id: str, source_id: str) -> None:
+    """The read of a just-uploaded chat, in the background; a failure never fails the upload."""
+    from agent.cognition.background.uploads.chat_read import make_stored_read
+
+    try:
+        await make_stored_read(user_id, source_id)
+    except Exception as error:
+        logger.warning("agent.chat_read.at_upload_failed source_id=%s error_type=%s", source_id, type(error).__name__)
 
 
 @router.get("/api/context-import-prompt")
@@ -325,6 +338,9 @@ def create_whatsapp_context_source(
             learn_from_whatsapp_upload(_user_id(user), source["id"], payload.content, payload.user_sender)
         except ValueError:
             pass  # No lines of theirs to learn from; the style import still works.
+        else:
+            # The read of the chat is made now, so it is waiting when they open it.
+            background_tasks.add_task(_make_read, _user_id(user), source["id"])
     extractor_mode = data_point_extractor_mode()
     if user and extractor_mode == "rules":
         for point in extract_whatsapp_data_points(
