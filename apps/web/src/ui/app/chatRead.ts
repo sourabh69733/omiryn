@@ -48,7 +48,21 @@ export type ReadCounts = {
 
 export type ChatRead =
   | { state: "ready"; version: number; me: string; them: string; counts: ReadCounts; written: ReadWritten | null; built_at: string }
-  | { state: "none" | "group_chat" | "too_short" | "no_chat" };
+  | { state: "none" | "making" | "group_chat" | "too_short" | "no_chat" };
+
+/** What the upload row in Memories shows for the read, from the state the server gives:
+    a button to open it, a quiet "getting ready" while it is being made, or nothing for a chat that has no read. */
+export function readButton(sourceType: string | undefined, state: string | null | undefined): "open" | "making" | "none" {
+  if (sourceType !== "whatsapp_chat" || state === "group_chat" || state === "too_short") return "none";
+  return state === "making" ? "making" : "open";
+}
+
+/** The words on the button that opens a read: "You & Farheen", from the upload's title (the other person's name). */
+export function readLabel(title: string | undefined): string {
+  const first = (title || "").trim().split(/\s+/)[0] || "";
+  // A name, not a file name or a phrase: letters only, and short enough for a button.
+  return /^[\p{L}\p{M}]{3,14}$/u.test(first) ? `You & ${first}` : "You two";
+}
 
 export const readPath = (sourceId: string) => `/read/${encodeURIComponent(sourceId)}`;
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type ChatRead, type ReadCounts, type ReadSide, dateRange, duration, hourLabel, readFromPath, readPath, shareLines, sideFacts, versus, wrapText } from "./chatRead";
+import { type ChatRead, type ReadCounts, type ReadSide, dateRange, duration, hourLabel, readButton, readFromPath, readLabel, readPath, shareLines, sideFacts, versus, wrapText } from "./chatRead";
 
 const side = (extra: Partial<ReadSide> = {}): ReadSide => ({
   messages: 10, words: 60, words_per_message: 6, starts: 2, last_words: 2, double_texts: 1, reply_median_seconds: 120, laughs: 3, questions: 2, night_messages: 0, top_emoji: [], ...extra,
@@ -65,4 +65,18 @@ test("text wraps to a width and ends with a mark when it does not fit", () => {
   assert.deepEqual(wrapText("one two three four", 9, measure), ["one two", "three", "four"]);
   assert.deepEqual(wrapText("one two three four five six", 9, measure, 2), ["one two", "three…"]);
   assert.deepEqual(wrapText("", 9, measure), []);
+});
+
+test("the upload row shows a way into the read only when there can be one", () => {
+  assert.equal(readButton("whatsapp_chat", "ready"), "open");
+  assert.equal(readButton("whatsapp_chat", undefined), "open");  // an older upload: made on the first visit
+  assert.equal(readButton("whatsapp_chat", "making"), "making");
+  assert.equal(readButton("whatsapp_chat", "group_chat"), "none");
+  assert.equal(readButton("whatsapp_chat", "too_short"), "none");
+  assert.equal(readButton("notes", "ready"), "none");
+  assert.equal(readLabel("Farheen Parvez"), "You & Farheen");
+  assert.equal(readLabel("  ऋतु शर्मा"), "You & ऋतु");
+  assert.equal(readLabel("+91 98765 43210"), "You two");
+  assert.equal(readLabel("chat_2026.txt"), "You two");
+  assert.equal(readLabel(undefined), "You two");
 });

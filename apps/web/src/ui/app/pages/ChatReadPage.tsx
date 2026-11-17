@@ -12,6 +12,10 @@ type Props = {
 
 type Ready = Extract<ChatRead, { state: "ready" }>;
 
+// A read being made at upload is polled this often, this many times, before the page makes it itself.
+const WAIT_MS = 2500;
+const WAIT_TRIES = 36;
+
 const WHY_NOT: Record<string, { title: string; detail: string }> = {
   group_chat: { title: "This one is a group chat", detail: "The read works on a chat between two people. Share a one-to-one chat from 📎 in chat." },
   too_short: { title: "Too little to read", detail: "Both of you need at least ten messages in the chat for a read." },
@@ -36,8 +40,18 @@ export function ChatReadPage({ sourceId, onBack }: Props) {
         setError(response.status === 404 ? "This upload is gone." : await apiErrorMessage(response, "Could not load the read."));
         return;
       }
-      const stored: ChatRead = await response.json();
-      if (stored.state !== "none") {
+      let stored: ChatRead = await response.json();
+      // The read is made while the chat uploads. If that is still going, wait for it; never start a second one.
+      for (let tries = 0; stored.state === "making" && tries < WAIT_TRIES && !cancelled; tries += 1) {
+        setRead(stored);
+        await new Promise((resolve) => window.setTimeout(resolve, WAIT_MS));
+        if (cancelled) return;
+        const again = await apiFetch(`/api/me/context-sources/${sourceId}/chat-read`);
+        if (!again.ok) break;
+        stored = await again.json();
+      }
+      if (cancelled) return;
+      if (stored.state !== "none" && stored.state !== "making") {
         setRead(stored);
         return;
       }
@@ -100,14 +114,15 @@ export function ChatReadPage({ sourceId, onBack }: Props) {
   if (error && !read) {
     return <section className="screen cr-screen">{back}<div className="cr-state" role="alert"><h1>{error}</h1></div></section>;
   }
-  if (!read || (making && read.state !== "ready")) {
+  if (!read || read.state === "making" || (making && read.state !== "ready")) {
+    const waiting = read?.state === "making";
     return (
       <section className="screen cr-screen" aria-busy="true">
         {back}
         <div className="cr-state">
           <span className="cr-pulse" aria-hidden="true" />
-          <h1>{making ? "Reading your chat" : "Loading"}</h1>
-          <p>{making ? "Counting who writes first, who laughs more, and what you two keep coming back to. About half a minute." : ""}</p>
+          <h1>{waiting ? "Almost ready" : making ? "Putting it together" : "Loading"}</h1>
+          <p>{waiting ? "Omi started on this when you shared the chat. A few more seconds." : making ? "Omi already has the chat. It is finding your running jokes and writing the roast. About fifteen seconds." : ""}</p>
         </div>
       </section>
     );
