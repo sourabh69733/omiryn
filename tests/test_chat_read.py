@@ -238,6 +238,16 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(read_state_of(get_upload_digest(self.source, "ua")), "ready")
         self.assertEqual(asyncio.run(make_stored_read("ua", self.notes)), {"state": "no_chat"})
 
+    def test_the_note_in_the_chat_is_told_when_the_read_is_ready(self) -> None:
+        import asyncio
+
+        with _As("ua") as client:
+            self.assertIsNone(client.get(f"/api/me/context-sources/{self.source}/reading").json()["read"])
+            with patch("agent.providers.write_chat_read", AsyncMock(return_value={"headline": "h"})):
+                asyncio.run(make_stored_read("ua", self.source))
+            body = client.get(f"/api/me/context-sources/{self.source}/reading").json()
+            self.assertEqual((body["read"], body["state"]), ("ready", "none"))
+
     def test_while_one_is_being_made_nobody_starts_another(self) -> None:
         url = f"/api/me/context-sources/{self.source}/chat-read"
         now = datetime.now(timezone.utc)

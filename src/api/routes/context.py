@@ -18,7 +18,8 @@ from ingestion.whatsapp import build_whatsapp_structured_memory, build_whatsapp_
 from security.auth import CurrentUser, require_user
 from agent.cognition.background.uploads.hidden_chat import learn_from_notes_upload, learn_from_whatsapp_upload
 from storage.context_sources import get_context_source_metadata
-from storage.upload_digests import delete_upload_digest
+from storage.upload_digests import delete_upload_digest, get_upload_digest
+from agent.cognition.background.uploads.chat_read import read_state_of
 from storage.conversations import delete_import_conversations
 from storage.audit_log import record_audit_event
 from storage import (
@@ -54,13 +55,20 @@ logger = logging.getLogger(__name__)
 
 
 async def _make_read(user_id: str, source_id: str) -> None:
-    """The read of a just-uploaded chat, in the background; a failure never fails the upload."""
+    """What a just-uploaded chat is used for besides memories, in the background: the read of the
+    chat, then the person's own side of it into Omi's notes about them. A failure in either never
+    fails the upload or the other."""
     from agent.cognition.background.uploads.chat_read import make_stored_read
+    from agent.matching.notes import add_upload_to_notes
 
     try:
         await make_stored_read(user_id, source_id)
     except Exception as error:
         logger.warning("agent.chat_read.at_upload_failed source_id=%s error_type=%s", source_id, type(error).__name__)
+    try:
+        await add_upload_to_notes(user_id, source_id)
+    except Exception as error:
+        logger.warning("agent.match_notes.at_upload_failed source_id=%s error_type=%s", source_id, type(error).__name__)
 
 
 @router.get("/api/context-import-prompt")
@@ -171,7 +179,9 @@ def get_me_context_source_reading(
     metadata = get_context_source_metadata(source_id, user.id)
     if metadata is None:
         raise HTTPException(status_code=404, detail="Context source not found.")
-    return {"source_id": source_id, **(metadata.get("reading") or {"state": "none"})}
+    # "read": where the read of this chat stands (ready, making, group_chat, too_short or null), so
+    # the note in the chat can offer it as soon as it is there.
+    return {"source_id": source_id, **(metadata.get("reading") or {"state": "none"}), "read": read_state_of(get_upload_digest(source_id, user.id))}
 
 
 @router.put("/api/agent/conversations/{conversation_id}/context-sources/attachments")
