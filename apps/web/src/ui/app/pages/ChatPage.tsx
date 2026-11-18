@@ -4,6 +4,8 @@ import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
 import { Archive, ArchiveRestore, BarChart3, Check, ChevronRight, Copy, MessageCircleDashed, ListChecks, Lock, Menu, MoreHorizontal, Plus, Reply, RotateCw, Smile, Sparkles, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { ChatUpload } from "../ChatUpload";
 import { rememberedUpload, rememberUpload, type SharedUpload, UploadReading } from "../UploadReading";
+import { shareHeldTry } from "../keepTry";
+import { takeTry } from "../tryRead";
 import { BAD_REPLY_REASONS, type ReplyRating, ratingsByMessage, withRating } from "../replyRatings";
 import { apiErrorDetail, apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
@@ -124,6 +126,16 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     setSharedUpload(upload);
   }, []);
   const dismissUpload = useCallback(() => showUpload(null), [showUpload]);
+  // A chat tried before sign-in (/try) is shared now, once, with the read they already saw.
+  useEffect(() => {
+    if (!conversation || conversation.temporary) return;
+    const held = takeTry();
+    if (!held) return;
+    shareHeldTry(conversation.id, held)
+      .then(showUpload)
+      .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Couldn't keep your chat. Share it again from 📎."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation?.id]);
   useEffect(() => {
     // A selection, an open menu and a reply belong to one chat.
     setSelecting(false);
