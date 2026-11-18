@@ -40,6 +40,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const [cardsLoaded, setCardsLoaded] = useState(false);
   const [personId, setPersonId] = useState<string | null>(() => pairFromPath(window.location.pathname));
   const [readId, setReadId] = useState<string | null>(() => readFromPath(window.location.pathname));
+  // Where a read was opened from, so its back button returns there: the chat with Omi, or Memories.
+  const [readFrom, setReadFrom] = useState<Page>("memories");
 
   const loadPeople = useCallback(() => {
     apiFetch("/api/me/matches")
@@ -123,6 +125,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
 
   function openRead(sourceId: string) {
     window.history.pushState({}, "", readPath(sourceId));
+    setReadFrom(page === "chat" ? "chat" : "memories");
     setReadId(sourceId);
     setPage("read");
     setAccountOpen(false);
@@ -260,10 +263,10 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         </div>
       </aside>
       <main className="omi-main">
-        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenPage={navigate} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
+        <ChatPage active={page === "chat"} backToOmi={backToOmi} onOpenPage={navigate} onOpenRead={openRead} initialConversationId={initialConversationId} userAvatar={accountBadge} userNames={userNames} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onOmiStatus={(next) => setOmiStatus((current) => ({ ...next, preview: next.preview || current.preview }))} />
         {page === "vibe" ? <VibePage onChat={openOmi} /> : null}
         {page === "memories" ? <MemoriesPage onOpenRead={openRead} /> : null}
-        {page === "read" && readId ? <ChatReadPage sourceId={readId} onBack={() => navigate("memories")} /> : null}
+        {page === "read" && readId ? <ChatReadPage sourceId={readId} backLabel={readFrom === "chat" ? "Omi" : "Memories"} onBack={() => (readFrom === "chat" ? openOmi() : navigate("memories"))} /> : null}
         {page === "person" && personId ? <PersonChatPage pairId={personId} card={person} cardsLoaded={cardsLoaded} userAvatar={accountBadge} isMobile={isMobile} onOpenNavigation={isMobile ? () => setMobileNavOpen(true) : undefined} onChanged={loadPeople} onMatches={() => navigate("matches")} /> : null}
         {page === "matches" ? <MatchesPage onVibe={() => navigate("vibe")} onChat={openOmi} onOpenPerson={openPerson} onPeopleChanged={loadPeople} /> : null}
         {page === "profile" ? <ProfilePage onVibe={() => navigate("vibe")} onPrivacy={() => navigate("privacy")} fallbackAvatar={user?.avatar_url || null} onProfileChange={setProfile} /> : null}

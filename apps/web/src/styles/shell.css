@@ -1422,6 +1422,44 @@ button.omi-drawer-close:hover {
   font-size: 12.5px;
 }
 
+/* The read of the shared chat, offered in the note as soon as it is there. */
+.upload-read {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--on-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.upload-read:hover,
+.upload-read:focus-visible {
+  background: var(--ember-deep);
+}
+
+.upload-read svg {
+  flex: none;
+}
+
+.upload-read svg:first-child {
+  color: var(--ember);
+}
+
+.upload-read:hover svg:first-child,
+.upload-read:focus-visible svg:first-child {
+  color: var(--on-ink);
+}
+
 .upload-progress-bar {
   height: 4px;
   overflow: hidden;

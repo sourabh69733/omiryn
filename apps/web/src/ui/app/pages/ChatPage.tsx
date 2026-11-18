@@ -40,7 +40,7 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 export type OmiStatus = { typing: boolean; preview: string; away: boolean };
 
 // Stays mounted while another page is open (`active` false), so a pending reply still lands and the rail stays current.
-export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenPage }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenPage?: (page: Page) => void }) {
+export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenNavigation, onOmiStatus, active = true, backToOmi = 0, onOpenPage, onOpenRead }: { initialConversationId?: string | null; userAvatar?: ReactNode; userNames?: string[]; onOpenNavigation?: () => void; onOmiStatus?: (status: OmiStatus) => void; active?: boolean; backToOmi?: number; onOpenPage?: (page: Page) => void; onOpenRead?: (sourceId: string) => void }) {
   const [summaries, setSummaries] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
@@ -1374,7 +1374,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 <button type="button" onClick={endTemporaryChat}>End chat</button>
               </div>
             ) : null}
-            {sharedUpload ? <UploadReading upload={sharedUpload} onDismiss={dismissUpload} /> : null}
+            {sharedUpload ? <UploadReading upload={sharedUpload} onDismiss={dismissUpload} onOpenRead={onOpenRead} /> : null}
             {replyTo ? (
               <div className="reply-preview" role="status">
                 <Reply aria-hidden="true" />

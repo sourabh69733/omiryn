@@ -1,7 +1,7 @@
 // The note above the composer while Omi reads a shared chat: real progress from the server, then
 // how much it learned. The upload is remembered in this browser, so a reload shows it again.
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ArrowRight, Sparkles, X } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 
 export type SharedUpload = { sourceId: string; label: string };
@@ -13,6 +13,8 @@ type Reading = {
   topics?: number;
   started_at?: string;
   finished_at?: string;
+  /** Where the read of this chat stands: ready, making, group_chat, too_short or null. */
+  read?: string | null;
 };
 
 const STORAGE_KEY = "omiryn.upload_reading";
@@ -36,7 +38,7 @@ export function rememberedUpload(): SharedUpload | null {
   }
 }
 
-export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onDismiss: () => void }) {
+export function UploadReading({ upload, onDismiss, onOpenRead }: { upload: SharedUpload; onDismiss: () => void; onOpenRead?: (sourceId: string) => void }) {
   const [reading, setReading] = useState<Reading>({ state: "queued" });
   const [now, setNow] = useState(() => Date.now());
 
@@ -51,8 +53,9 @@ export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onD
           const next = (await response.json()) as Reading;
           if (stopped) return;
           setReading(next);
-          // A failed read is retried by the server, so keep checking.
-          if (next.state === "done" || next.state === "none") return;
+          // A failed read is retried by the server, so keep checking. The read of the chat is
+          // made apart from this and is usually ready first; keep checking while it is not.
+          if ((next.state === "done" || next.state === "none") && next.read !== "making") return;
         }
       } catch {
         // Offline for a moment: try again on the next tick.
@@ -99,6 +102,11 @@ export function UploadReading({ upload, onDismiss }: { upload: SharedUpload; onD
               );
             })}
           </ol>
+        ) : null}
+        {onOpenRead && reading.read === "ready" ? (
+          <button type="button" className="upload-read" onClick={() => onOpenRead(upload.sourceId)}>
+            <Sparkles aria-hidden="true" size={15} /><span>{finished ? "See what it says about you two" : "Meanwhile, see what it says about you two"}</span><ArrowRight aria-hidden="true" size={15} />
+          </button>
         ) : null}
       </div>
       <button type="button" className="upload-note-close" onClick={onDismiss} aria-label="Dismiss"><X aria-hidden="true" /></button>

@@ -8,6 +8,8 @@ import { type ChatRead, dateRange, dayText, drawReadCard, sideFacts, versus } fr
 type Props = {
   sourceId: string;
   onBack: () => void;
+  /** Where back leads: "Memories", or "Omi" when the read was opened from the chat. */
+  backLabel?: string;
 };
 
 type Ready = Extract<ChatRead, { state: "ready" }>;
@@ -22,7 +24,7 @@ const WHY_NOT: Record<string, { title: string; detail: string }> = {
   no_chat: { title: "Nothing to read here", detail: "This upload is notes, not a chat between two people." },
 };
 
-export function ChatReadPage({ sourceId, onBack }: Props) {
+export function ChatReadPage({ sourceId, onBack, backLabel = "Memories" }: Props) {
   const [read, setRead] = useState<ChatRead | null>(null);
   const [making, setMaking] = useState(false);
   const [error, setError] = useState("");
@@ -109,7 +111,7 @@ export function ChatReadPage({ sourceId, onBack }: Props) {
     setShared("Picture saved. Send it to them.");
   }
 
-  const back = <button type="button" className="cr-back" onClick={onBack}><ArrowLeft aria-hidden="true" size={16} />Memories</button>;
+  const back = <button type="button" className="cr-back" onClick={onBack}><ArrowLeft aria-hidden="true" size={16} />{backLabel}</button>;
 
   if (error && !read) {
     return <section className="screen cr-screen">{back}<div className="cr-state" role="alert"><h1>{error}</h1></div></section>;
