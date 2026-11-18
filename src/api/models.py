@@ -298,6 +298,15 @@ class WhatsappChatImportCreate(BaseModel):
     style_kind: WhatsappStyleKind = "user_style"
     # A whole chat is stored and searchable; a longer export keeps its newest part (the app sends that).
     content: str = Field(min_length=50, max_length=1_000_000)
+    # The seal of a read of this chat made before sign-in (POST /api/public/chat-read), so it is kept.
+    kept_read: str | None = Field(default=None, max_length=40_000)
+
+
+class PublicChatRead(BaseModel):
+    """A chat tried without an account: read once, never stored."""
+
+    content: str = Field(min_length=50, max_length=1_000_000)
+    user_sender: str = Field(min_length=1, max_length=120)
 
 
 class SetupBasics(BaseModel):

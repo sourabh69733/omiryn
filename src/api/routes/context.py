@@ -54,15 +54,17 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-async def _make_read(user_id: str, source_id: str) -> None:
+async def _make_read(user_id: str, source_id: str, kept_read: str | None = None) -> None:
     """What a just-uploaded chat is used for besides memories, in the background: the read of the
     chat, then the person's own side of it into Omi's notes about them. A failure in either never
-    fails the upload or the other."""
+    fails the upload or the other. `kept_read` is the seal of a read they were shown before they
+    signed in; when it is of this chat it is kept instead of writing a new one."""
     from agent.cognition.background.uploads.chat_read import make_stored_read
+    from agent.cognition.background.uploads.sealed_read import open_sealed_read
     from agent.matching.notes import add_upload_to_notes
 
     try:
-        await make_stored_read(user_id, source_id)
+        await make_stored_read(user_id, source_id, kept=open_sealed_read(kept_read))
     except Exception as error:
         logger.warning("agent.chat_read.at_upload_failed source_id=%s error_type=%s", source_id, type(error).__name__)
     try:
@@ -350,7 +352,7 @@ def create_whatsapp_context_source(
             pass  # No lines of theirs to learn from; the style import still works.
         else:
             # The read of the chat is made now, so it is waiting when they open it.
-            background_tasks.add_task(_make_read, _user_id(user), source["id"])
+            background_tasks.add_task(_make_read, _user_id(user), source["id"], payload.kept_read)
     extractor_mode = data_point_extractor_mode()
     if user and extractor_mode == "rules":
         for point in extract_whatsapp_data_points(

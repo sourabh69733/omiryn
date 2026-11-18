@@ -18,6 +18,7 @@ from . import (
     public,
     realtime,
     telegram,
+    try_read,
     whatsapp,
     usage,
     vibe,
@@ -41,6 +42,7 @@ router.include_router(pools.router)
 router.include_router(matches.router)
 router.include_router(match_chat.router)
 router.include_router(chat_read.router)
+router.include_router(try_read.router)
 router.include_router(telegram.router)
 router.include_router(whatsapp.router)
 
