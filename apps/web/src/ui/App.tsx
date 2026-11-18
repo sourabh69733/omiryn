@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Sparkles, Users } from "lucide-react";
+import { ArrowRight, MessageCircle, Sparkles, Users } from "lucide-react";
 import { apiFetch, ensureAuthenticatedSession, signInWithGoogle } from "../lib/api";
 import { trackSignInFailed, trackSignInReturn, trackSignInScreen, trackSignInStarted } from "../lib/signInTracking";
 import { MainApp } from "./app/MainApp";
 import { AgentOrb } from "./app/AgentOrb";
+import { TryReadPage } from "./app/pages/TryReadPage";
+import { isTryPath, TRY_PATH } from "./app/tryRead";
 import { OmirynLogo } from "./brand/OmirynLogo";
 import { QuickSetup } from "./onboarding/QuickSetup";
 
@@ -31,6 +33,24 @@ export function App() {
   const [profileState, setProfileState] = useState<ProfileState>("checking");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  // /try: the read of a chat before sign-in. Signed in, the chat is the place for it.
+  const [onTryPage, setOnTryPage] = useState(() => isTryPath(window.location.pathname));
+
+  useEffect(() => {
+    const follow = () => setOnTryPage(isTryPath(window.location.pathname));
+    window.addEventListener("popstate", follow);
+    return () => window.removeEventListener("popstate", follow);
+  }, []);
+
+  useEffect(() => {
+    if (authState === "signed_in" && isTryPath(window.location.pathname)) window.history.replaceState(null, "", "/");
+  }, [authState]);
+
+  function goTo(path: string) {
+    window.history.pushState(null, "", path);
+    setAuthError(null);
+    setOnTryPage(isTryPath(path));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +113,10 @@ export function App() {
     return <AppLoader />;
   }
 
+  if (authState === "signed_out" && onTryPage) {
+    return <TryReadPage onSignIn={beginGoogleSignIn} signingIn={isSigningIn} authError={authError} onClose={() => goTo("/")} />;
+  }
+
   if (authState === "signed_out") {
     return (
       <main className="auth-screen-page">
@@ -116,6 +140,10 @@ export function App() {
               {isSigningIn ? "Opening Google..." : "Continue with Google"}
             </button>
             {authError ? <p className="auth-error" role="alert">{authError}</p> : null}
+            <a className="auth-try" href={TRY_PATH} onClick={(event) => { event.preventDefault(); goTo(TRY_PATH); }}>
+              <span><strong>Try it first</strong>See what a WhatsApp chat says about you two. No sign in.</span>
+              <ArrowRight aria-hidden="true" size={18} />
+            </a>
             <small>By continuing, you agree to Omiryn's <a href="https://omiryn.com/terms">Terms</a> and <a href="https://omiryn.com/privacy">Privacy Policy</a>.</small>
           </section>
         </div>
