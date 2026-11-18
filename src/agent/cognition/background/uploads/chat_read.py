@@ -394,18 +394,28 @@ def validate_written(raw: Any, shown: set[int]) -> dict[str, Any]:
     }
 
 
+def why_no_read(messages: list[dict[str, Any]]) -> str | None:
+    """"group_chat" or "too_short" when this chat cannot have a read; None when it can. Code only,
+    so it can be asked before anything is paid for."""
+    kept, partner, others = two_sides(messages)
+    if others > 1:
+        return "group_chat"
+    mine = sum(1 for m in kept if m["role"] == "user")
+    if partner is None or mine < MIN_MESSAGES_EACH or len(kept) - mine < MIN_MESSAGES_EACH:
+        return "too_short"
+    return None
+
+
 async def build_chat_read(messages: list[dict[str, Any]], *, me: str, zone: tzinfo, conversation_id: str, model: str | None = None) -> dict[str, Any]:
     """The whole read for one stored upload. {"state": "ready", ...} or why there is none:
     "group_chat", or "too_short" when either side wrote too little. The counts stand on their
     own: when the model call fails the read is still ready, with "written" null."""
     from agent.providers import write_chat_read
 
-    kept, partner, others = two_sides(messages)
-    if others > 1:
-        return {"state": "group_chat"}
-    mine = sum(1 for m in kept if m["role"] == "user")
-    if partner is None or mine < MIN_MESSAGES_EACH or len(kept) - mine < MIN_MESSAGES_EACH:
-        return {"state": "too_short"}
+    kept, partner, _others = two_sides(messages)
+    why_not = why_no_read(messages)
+    if why_not or partner is None:
+        return {"state": why_not or "too_short"}
     counts = chat_counts(kept, zone)
     phrases = recurring_phrases(kept, zone)
     lines = sample_lines(kept, zone, phrases=phrases)
@@ -452,10 +462,13 @@ def read_status(source_id: str, user_id: str) -> dict[str, Any] | None:
     return {"state": state} if state else None
 
 
-async def make_stored_read(user_id: str, source_id: str) -> dict[str, Any]:
+async def make_stored_read(user_id: str, source_id: str, *, kept: dict[str, Any] | None = None) -> dict[str, Any]:
     """Make the read of one upload and store it with the upload's digest. Called when the chat is
     uploaded, so the read is waiting when the person opens it, and again from the page for an older
-    upload or a new version. While it runs the digest says "making", so nobody starts a second one."""
+    upload or a new version. While it runs the digest says "making", so nobody starts a second one.
+
+    `kept` is a read this person was shown before they signed in (sealed_read). When it was counted
+    from this same chat it is stored as it is: they keep what they saw and nothing is written twice."""
     from agent.shared.timeline import user_zone
     from storage import get_user_profile, get_user_timezone
     from storage.conversations import import_conversation
@@ -466,16 +479,31 @@ async def make_stored_read(user_id: str, source_id: str) -> dict[str, Any]:
         # A notes upload or a friend's style import: no chat of theirs to read.
         return {"state": "no_chat"}
     conversation_id = str(conversation["id"])
+    messages = list(conversation.get("messages") or [])
+    zone = user_zone(get_user_timezone(user_id))
+    if kept is not None and _is_read_of(kept, messages, zone):
+        set_upload_digest_part(source_id, user_id, conversation_id, kept.get("them"), CHAT_READ_KEY, kept)
+        return kept
     set_upload_digest_part(source_id, user_id, conversation_id, None, CHAT_READ_KEY, {"state": "making", "started_at": utc_now_iso()})
     me = str((get_user_profile(user_id) or {}).get("display_name") or "You").split()[0]
     try:
-        read = await build_chat_read(list(conversation.get("messages") or []), me=me, zone=user_zone(get_user_timezone(user_id)), conversation_id=conversation_id)
+        read = await build_chat_read(messages, me=me, zone=zone, conversation_id=conversation_id)
     except Exception:
         set_upload_digest_part(source_id, user_id, conversation_id, None, CHAT_READ_KEY, None)
         raise
     # A chat with no read keeps the reason, with the version, so it is not tried again on every visit.
     set_upload_digest_part(source_id, user_id, conversation_id, read.get("them"), CHAT_READ_KEY, read if read["state"] == "ready" else {**read, "version": READ_VERSION})
     return read
+
+
+def _is_read_of(kept: dict[str, Any], messages: list[dict[str, Any]], zone: tzinfo) -> bool:
+    """Whether a read shown before sign-in was counted from this stored chat."""
+    from .sealed_read import same_chat
+
+    if why_no_read(messages) is not None:
+        return False
+    sides, _partner, _others = two_sides(messages)
+    return same_chat(kept, chat_counts(sides, zone))
 
 
 def _fit(text: str, limit: int) -> str:
@@ -517,4 +545,5 @@ __all__ = [
     "sample_lines",
     "two_sides",
     "validate_written",
+    "why_no_read",
 ]
