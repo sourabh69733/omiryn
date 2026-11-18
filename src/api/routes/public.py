@@ -17,12 +17,17 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _RATE_LIMIT_WINDOW_SECONDS = 60
 _EVENT_LIMIT_PER_WINDOW = 90
 _LEAD_LIMIT_PER_WINDOW = 5
+# Events only the server writes (for example the count of reads made without an account).
+SERVER_EVENT_PREFIX = "server."
 _public_rate_buckets: dict[tuple[str, str], Deque[float]] = defaultdict(deque)
 
 
 @router.post("/api/public/events", status_code=201)
 async def create_public_event(payload: PublicEventCreate, request: Request) -> dict[str, object]:
     _check_public_rate_limit(request, "events", _EVENT_LIMIT_PER_WINDOW)
+    if payload.event_name.strip().lower().startswith(SERVER_EVENT_PREFIX):
+        # Names the server counts limits by; a browser cannot write them.
+        raise HTTPException(status_code=422, detail="That event name is not allowed.")
     metadata = _with_request_metadata(payload.metadata, request)
     event = save_public_event({**payload.model_dump(), "metadata": metadata})
     return {"event": event}

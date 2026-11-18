@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .database import ENGINE
 from .schema import public_events, public_leads
@@ -25,6 +25,25 @@ def save_public_event(event: dict[str, Any]) -> dict[str, Any]:
             select(public_events).where(public_events.c.id == payload["id"])
         ).mappings().first()
     return _public_event_from_row(row)
+
+
+def reserve_public_event(event_name: str, session_id: str, *, since: Any, total_limit: int, session_limit: int, metadata: dict[str, Any] | None = None, path: str = "/") -> str | None:
+    """Count one more of something done without an account, unless a limit since `since` is
+    already used up. Returns None when it was counted, "session" when this session has had its
+    share, "total" when everyone together has. Checked and written in one transaction."""
+    with ENGINE.begin() as connection:
+        def count(*where: Any) -> int:
+            query = select(func.count()).select_from(public_events).where(public_events.c.event_name == event_name, public_events.c.created_at >= since, *where)
+            return int(connection.execute(query).scalar() or 0)
+
+        if count() >= total_limit:
+            return "total"
+        if count(public_events.c.session_id == session_id) >= session_limit:
+            return "session"
+        connection.execute(public_events.insert().values(
+            id=str(uuid4()), session_id=session_id[:120], event_name=event_name[:80], path=path[:300], referrer=None, metadata_json=metadata or {},
+        ))
+    return None
 
 
 def save_public_lead(lead: dict[str, Any]) -> dict[str, Any]:
