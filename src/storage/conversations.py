@@ -448,6 +448,9 @@ def delete_conversation(conversation_id: str, user_id: str | None = None) -> boo
     from .vibe_cards import drop_vibe_proof_from_conversation
 
     drop_vibe_proof_from_conversation(owner_id, conversation_id)
+    from .match_notes import drop_match_note_proof_from_conversation
+
+    drop_match_note_proof_from_conversation(owner_id, conversation_id)
     return True
 
 
@@ -493,7 +496,11 @@ def delete_import_conversations(user_id: str, source_id: str) -> int:
                 agent_conversations.c.import_source_id == source_id,
             )
         ).scalars().all()
-    return sum(1 for conversation_id in ids if delete_conversation(conversation_id, owner_id))
+    deleted = sum(1 for conversation_id in ids if delete_conversation(conversation_id, owner_id))
+    from .match_notes import forget_upload_in_match_notes
+
+    forget_upload_in_match_notes(owner_id, source_id)
+    return deleted
 
 
 def import_conversation(user_id: str, source_id: str) -> dict[str, Any] | None:

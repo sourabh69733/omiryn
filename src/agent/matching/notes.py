@@ -61,10 +61,11 @@ MIN_NEW_MESSAGES = 8
 READY_NOTES = 6
 READY_CORE_KINDS = 3
 
-MATCH_NOTES_SYSTEM_PROMPT = """You read what one person wrote to their companion app and note who they are, so the companion can find people they would enjoy talking to.
+MATCH_NOTES_SYSTEM_PROMPT = """You read what one person wrote and note who they are, so their companion app can find people they would enjoy talking to.
 
-Input JSON: {"name", "today", "current_notes": [{"id", "kind", "text"}], "messages": [{"n", "day", "text"}]}.
-"messages" are only their own messages, oldest first, written since the current notes. "current_notes" is what was noted before.
+Input JSON: {"name", "today", "source", "current_notes": [{"id", "kind", "text"}], "messages": [{"n", "day", "text"}]}.
+"messages" are only their own messages, oldest first. "current_notes" is what was noted before.
+"source" says where the messages are from. "companion": what they wrote to the companion app since the current notes. "friend_chat": their own side of a chat with someone they know, which they shared; the other person's lines are not shown, so a line may answer something you cannot see. Note only what their own line shows, and never guess what the other person said or who they are.
 
 People joke, exaggerate and play running games with a companion. Never record the events of a joke or a made-up story as facts about them. Read through the jokes to what they show about the person: the kind of humour, what they keep coming back to, when they are awake, what they do and eat and watch, how they treat people, how they write.
 
@@ -83,12 +84,14 @@ MATCH_NOTES_SYSTEM_PROMPT = (
 )
 
 
-def own_messages(conversations: list[dict[str, Any]], *, after: str | None = None) -> list[dict[str, Any]]:
+def own_messages(conversations: list[dict[str, Any]], *, after: str | None = None, uploads: bool = False) -> list[dict[str, Any]]:
     """The user's own messages across their chats with Omi, oldest first, each with where it is
-    (conversation and index) and when. Temporary chats are left out, as everywhere."""
+    (conversation and index) and when. Temporary chats are left out, as everywhere. A shared chat
+    (an upload) is left out too unless `uploads` is set: its lines carry their old dates, so it is
+    read once on its own (add_upload_to_notes), not by date with the rest."""
     out: list[dict[str, Any]] = []
     for conversation in conversations:
-        if conversation.get("temporary"):
+        if conversation.get("temporary") or (bool(conversation.get("import_source_id")) != uploads):
             continue
         for index, message in enumerate(conversation.get("messages") or []):
             text = " ".join(str(message.get("content") or "").split())
@@ -116,12 +119,13 @@ def message_parts(messages: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     return [part for part in parts if part][-MAX_CALLS:]
 
 
-def notes_input(name: str, today: str, current: list[dict[str, Any]], messages: list[dict[str, Any]]) -> tuple[str, dict[int, dict[str, Any]]]:
+def notes_input(name: str, today: str, current: list[dict[str, Any]], messages: list[dict[str, Any]], source: str = "companion") -> tuple[str, dict[int, dict[str, Any]]]:
     """The JSON the model reads for one part, and what each message number stands for."""
     numbered = {n: message for n, message in enumerate(messages, start=1)}
     payload = {
         "name": name,
         "today": today,
+        "source": source,
         "current_notes": [{"id": note["id"], "kind": note["kind"], "text": note["text"]} for note in current],
         "messages": [{"n": n, "day": (message["sent_at"] or "")[:10], "text": message["text"]} for n, message in numbered.items()],
     }
@@ -142,7 +146,7 @@ def validate_notes(raw: Any, current: list[dict[str, Any]], numbered: dict[int, 
         if not isinstance(item, dict):
             continue
         kind = str(item.get("kind") or "").strip().lower()
-        text = " ".join(str(item.get("text") or "").split())[:MAX_NOTE_CHARS]
+        text = _whole(" ".join(str(item.get("text") or "").split()))
         if kind not in NOTE_KINDS or not text or text.casefold() in seen_text or per_kind.get(kind, 0) >= MAX_PER_KIND:
             continue
         keeps = item.get("keeps") if isinstance(item.get("keeps"), str) and item.get("keeps") in by_id and item.get("keeps") not in used_keeps else None
@@ -202,32 +206,72 @@ def rebuild_due(user_id: str) -> bool:
 
 async def rebuild_match_notes(user_id: str, *, force: bool = False, model: str | None = None) -> dict[str, Any]:
     """Read the messages since the last build and write the notes as they should now stand."""
-    from agent.providers import write_match_notes
-    from storage import get_match_notes, get_user_profile, list_conversations, set_match_notes
+    from storage import get_match_notes, list_conversations, set_match_notes
 
     stored = get_match_notes(user_id) or {"notes": [], "covered_upto": None, "messages_seen": 0}
-    current = [note for note in stored["notes"] if isinstance(note, dict) and note.get("id") and note.get("kind") in NOTE_KINDS]
+    current = _current(stored)
     messages = own_messages(list_conversations(user_id), after=stored.get("covered_upto"))
     if not messages or (len(messages) < MIN_NEW_MESSAGES and not force):
         return {"status": "nothing_new", "notes": len(current), "new_messages": len(messages)}
+    notes = await _fold(user_id, current, messages, "companion", model)
+    if notes is None:
+        return {"status": "kept", "notes": len(current), "new_messages": len(messages)}
+    if not notes:
+        return {"status": "nothing_found", "notes": 0, "new_messages": len(messages)}
+    covered = max((message["sent_at"] for message in messages if message.get("sent_at")), default=stored.get("covered_upto"))
+    set_match_notes(user_id, {**stored, "version": NOTES_VERSION, "notes": notes, "covered_upto": covered, "messages_seen": int(stored.get("messages_seen") or 0) + len(messages)})
+    logger.info("agent.match_notes.rebuilt user_id=%s notes=%s new_messages=%s", user_id, len(notes), len(messages))
+    return {"status": "rebuilt", "notes": len(notes), "new_messages": len(messages), "ready": notes_readiness(notes)["ready"]}
+
+
+async def add_upload_to_notes(user_id: str, source_id: str, *, model: str | None = None) -> dict[str, Any]:
+    """Read the person's own side of a chat they shared into their notes, once. This is how Omi
+    knows someone after one upload instead of after weeks: a real chat with a friend shows their
+    humour, what they love and how they keep in touch far faster than first chats with Omi do.
+    The proof points at the stored upload, so deleting the upload takes the proof with it."""
+    from storage import get_match_notes, set_match_notes
+    from storage.conversations import import_conversation
+
+    stored = get_match_notes(user_id) or {"notes": [], "covered_upto": None, "messages_seen": 0}
+    done = list(stored.get("uploads") or [])
+    if source_id in done:
+        return {"status": "already_read", "notes": len(_current(stored))}
+    conversation = import_conversation(user_id, source_id)
+    messages = own_messages([conversation], uploads=True) if conversation else []
+    if len(messages) < MIN_NEW_MESSAGES:
+        return {"status": "nothing_new", "notes": len(_current(stored)), "new_messages": len(messages)}
+    current = _current(stored)
+    notes = await _fold(user_id, current, messages, "friend_chat", model)
+    if notes is None:
+        return {"status": "kept", "notes": len(current), "new_messages": len(messages)}
+    # Read again by now? Another writer may have saved meanwhile; take the newest stored state for the rest.
+    latest = get_match_notes(user_id) or stored
+    set_match_notes(user_id, {**latest, "version": NOTES_VERSION, "notes": notes or current, "uploads": sorted({*(latest.get("uploads") or []), source_id}), "messages_seen": int(latest.get("messages_seen") or 0) + len(messages)})
+    logger.info("agent.match_notes.upload_read user_id=%s notes=%s lines=%s", user_id, len(notes or current), len(messages))
+    return {"status": "rebuilt" if notes else "nothing_found", "notes": len(notes or current), "new_messages": len(messages), "ready": notes_readiness(notes or current)["ready"]}
+
+
+def _current(stored: dict[str, Any]) -> list[dict[str, Any]]:
+    return [note for note in stored["notes"] if isinstance(note, dict) and note.get("id") and note.get("kind") in NOTE_KINDS]
+
+
+async def _fold(user_id: str, current: list[dict[str, Any]], messages: list[dict[str, Any]], source: str, model: str | None) -> list[dict[str, Any]] | None:
+    """Read the messages in parts, each folding into the notes. None when an answer was empty or
+    broken while there were notes: nothing is to be saved, so the same messages are read again."""
+    from agent.providers import write_match_notes
+    from storage import get_user_profile
+
     name = str((get_user_profile(user_id) or {}).get("display_name") or "They").split()[0]
     today = utc_now().date().isoformat()
     notes = current
     for part in message_parts(messages):
-        text, numbered = notes_input(name, today, notes, part)
+        text, numbered = notes_input(name, today, notes, part, source)
         written = validate_notes(await write_match_notes(text, model=model), notes, numbered)
         if not written and notes:
-            # An empty or broken answer must not wipe what was known. Nothing is saved, so the
-            # same messages are read again next time.
             logger.warning("agent.match_notes.empty_answer user_id=%s kept=%s", user_id, len(current))
-            return {"status": "kept", "notes": len(current), "new_messages": len(messages)}
+            return None
         notes = written
-    if not notes:
-        return {"status": "nothing_found", "notes": 0, "new_messages": len(messages)}
-    covered = max((message["sent_at"] for message in messages if message.get("sent_at")), default=stored.get("covered_upto"))
-    set_match_notes(user_id, {"version": NOTES_VERSION, "notes": notes, "covered_upto": covered, "messages_seen": int(stored.get("messages_seen") or 0) + len(messages)})
-    logger.info("agent.match_notes.rebuilt user_id=%s notes=%s new_messages=%s", user_id, len(notes), len(messages))
-    return {"status": "rebuilt", "notes": len(notes), "new_messages": len(messages), "ready": notes_readiness(notes)["ready"]}
+    return notes
 
 
 async def refresh_match_notes(user_id: str) -> dict[str, Any]:
@@ -240,6 +284,14 @@ async def refresh_match_notes(user_id: str) -> dict[str, Any]:
     if not rebuild_due(user_id):
         return {"status": "nothing_new"}
     return await rebuild_match_notes(user_id)
+
+
+def _whole(text: str) -> str:
+    """A note that runs long ends at a whole word, never in the middle of one."""
+    if len(text) <= MAX_NOTE_CHARS:
+        return text
+    cut = text[:MAX_NOTE_CHARS]
+    return cut[: cut.rfind(" ")].rstrip(",;:") + "…" if " " in cut else cut
 
 
 def _new_id(taken: set[str]) -> str:
@@ -257,6 +309,7 @@ __all__ = [
     "NOTE_KINDS",
     "PRIVATE_KINDS",
     "REASON_KINDS",
+    "add_upload_to_notes",
     "match_notes_readiness",
     "message_parts",
     "notes_input",

@@ -14,7 +14,8 @@ from .utils import _protect_text, _require_user_id, _unprotect_text
 
 
 def get_match_notes(user_id: str) -> dict[str, Any] | None:
-    """{"version", "notes": [...], "covered_upto", "messages_seen"} or None when never built."""
+    """{"version", "notes": [...], "covered_upto", "messages_seen", "uploads"?} or None when never
+    built. "uploads" lists the shared chats already read into the notes."""
     owner_id = _require_user_id(user_id, "agent match notes")
     with ENGINE.begin() as connection:
         value = connection.execute(select(agent_match_notes.c.notes).where(agent_match_notes.c.user_id == owner_id)).scalar_one_or_none()
@@ -38,6 +39,34 @@ def set_match_notes(user_id: str, stored: dict[str, Any]) -> dict[str, Any]:
     return stored
 
 
+def drop_match_note_proof_from_conversation(user_id: str, conversation_id: str) -> int:
+    """A chat was deleted: its messages stop being proof. A note left with no proof goes with it,
+    the same rule memories and vibe lines follow. Returns how many notes were removed."""
+    stored = get_match_notes(user_id)
+    if not stored:
+        return 0
+    kept, removed, changed = [], 0, False
+    for note in stored["notes"]:
+        proof = [item for item in note.get("evidence") or [] if item.get("conversation_id") != conversation_id]
+        if len(proof) != len(note.get("evidence") or []):
+            changed = True
+        if proof:
+            kept.append({**note, "evidence": proof})
+        else:
+            removed += 1
+    if changed:
+        set_match_notes(user_id, {**stored, "notes": kept})
+    return removed
+
+
+def forget_upload_in_match_notes(user_id: str, source_id: str) -> None:
+    """An upload was deleted: it is no longer one the notes were built from, so sharing it again
+    is read again."""
+    stored = get_match_notes(user_id)
+    if stored and source_id in (stored.get("uploads") or []):
+        set_match_notes(user_id, {**stored, "uploads": [item for item in stored["uploads"] if item != source_id]})
+
+
 def match_notes_built_at(user_id: str) -> datetime | None:
     owner_id = _require_user_id(user_id, "agent match notes")
     with ENGINE.begin() as connection:
@@ -47,4 +76,4 @@ def match_notes_built_at(user_id: str) -> datetime | None:
     return value
 
 
-__all__ = ["get_match_notes", "match_notes_built_at", "set_match_notes"]
+__all__ = ["drop_match_note_proof_from_conversation", "forget_upload_in_match_notes", "get_match_notes", "match_notes_built_at", "set_match_notes"]

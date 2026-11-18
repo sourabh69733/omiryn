@@ -137,5 +137,80 @@ class RebuildTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(store["u"]["covered_upto"], "2026-11-04T09:00:00+00:00")
 
 
+def friend_chat(n: int = 12) -> list[dict]:
+    """A stored upload: the user's lines are role "user", the friend's are role "other", with old dates."""
+    out = []
+    for i in range(n):
+        out.append({"role": "other", "speaker": "Riya", "content": f"friend line {i}", "imported": True, "created_at": f"2025-03-{i + 1:02d}T20:00:00+05:30"})
+        out.append({"role": "user", "content": f"my line {i} about treks", "imported": True, "created_at": f"2025-03-{i + 1:02d}T20:05:00+05:30"})
+    return out
+
+
+class UploadTest(unittest.IsolatedAsyncioTestCase):
+    """A shared chat is read into the notes once, on its own, and its proof goes when it is deleted."""
+
+    def setUp(self) -> None:
+        from storage import reset_db, save_context_source, save_conversation, save_user_profile
+
+        reset_db()
+        save_user_profile("ua", "male", "female", display_name="Aman Verma", city="Pune")
+        save_conversation({"id": "omi-chat", "status": "active", "messages": [{"role": "user", "content": f"to omi {i}", "created_at": f"2026-11-{i + 1:02d}T10:00:00+00:00"} for i in range(9)]}, "ua")
+        self.source = save_context_source({"user_id": "ua", "conversation_id": "omi-chat", "source_type": "whatsapp_chat", "title": "Riya", "content": "x", "metadata": {}})["id"]
+        save_conversation({"id": "hidden-1", "status": "active", "import_source_id": self.source, "messages": friend_chat()}, "ua")
+
+    def test_a_shared_chat_is_kept_apart_from_the_chats_with_omi(self) -> None:
+        from storage import list_conversations
+
+        chats = list_conversations("ua")
+        self.assertEqual({m["conversation_id"] for m in own_messages(chats)}, {"omi-chat"})
+        shared = own_messages(chats, uploads=True)
+        self.assertEqual(({m["conversation_id"] for m in shared}, len(shared)), ({"hidden-1"}, 12))  # only the user's own side
+
+    async def test_it_is_read_once_as_a_friend_chat_and_does_not_move_the_date_mark(self) -> None:
+        from agent.matching.notes import add_upload_to_notes, rebuild_match_notes
+        from storage import get_match_notes
+
+        async def writer(text: str, **_: object) -> dict:
+            sent = json.loads(text)
+            kept = [{"kind": note["kind"], "text": note["text"], "keeps": note["id"]} for note in sent["current_notes"]]
+            return {"notes": kept + [{"kind": "loves" if sent["source"] == "friend_chat" else "rhythm", "text": f"From {sent['source']}.", "from": [1, 2]}]}
+
+        calls = AsyncMock(side_effect=writer)
+        with patch("agent.providers.write_match_notes", calls):
+            self.assertEqual((await rebuild_match_notes("ua"))["status"], "rebuilt")       # nine lines to Omi
+            mark = get_match_notes("ua")["covered_upto"]
+            first = await add_upload_to_notes("ua", self.source)
+            self.assertEqual((first["status"], first["notes"], first["new_messages"]), ("rebuilt", 2, 12))
+            self.assertEqual(json.loads(calls.await_args.args[0])["source"], "friend_chat")
+            self.assertEqual((await add_upload_to_notes("ua", self.source))["status"], "already_read")
+            self.assertEqual(calls.await_count, 2)
+            stored = get_match_notes("ua")
+            self.assertEqual((stored["uploads"], stored["covered_upto"]), ([self.source], mark))  # the old dates of the upload moved nothing
+            self.assertEqual({e["conversation_id"] for n in stored["notes"] if n["kind"] == "loves" for e in n["evidence"]}, {"hidden-1"})
+            # The daily pass keeps the list of uploads it did not read itself.
+            self.assertEqual((await rebuild_match_notes("ua", force=True))["status"], "nothing_new")
+            self.assertEqual(get_match_notes("ua")["uploads"], [self.source])
+            self.assertEqual((await add_upload_to_notes("ua", "no-such-upload"))["status"], "nothing_new")
+
+    async def test_deleting_the_upload_takes_its_proof_and_lets_it_be_read_again(self) -> None:
+        from agent.matching.notes import add_upload_to_notes
+        from storage import get_match_notes, set_match_notes
+        from storage.conversations import delete_import_conversations
+
+        proof_here = {"conversation_id": "hidden-1", "message_index": 1}
+        proof_omi = {"conversation_id": "omi-chat", "message_index": 0}
+        set_match_notes("ua", {"version": 1, "covered_upto": None, "messages_seen": 0, "uploads": [self.source], "notes": [
+            {"id": "n1", "kind": "loves", "text": "Only from the shared chat.", "evidence": [proof_here]},
+            {"id": "n2", "kind": "humour", "text": "From both.", "evidence": [proof_omi, proof_here]},
+            {"id": "n3", "kind": "rhythm", "text": "Only from Omi.", "evidence": [proof_omi]},
+        ]})
+        self.assertEqual(delete_import_conversations("ua", self.source), 1)
+        stored = get_match_notes("ua")
+        self.assertEqual([(n["id"], len(n["evidence"])) for n in stored["notes"]], [("n2", 1), ("n3", 1)])
+        self.assertEqual(stored["uploads"], [])
+        with patch("agent.providers.write_match_notes", AsyncMock(return_value={})):
+            self.assertEqual((await add_upload_to_notes("ua", self.source))["status"], "nothing_new")  # the chat is gone
+
+
 if __name__ == "__main__":
     unittest.main()
