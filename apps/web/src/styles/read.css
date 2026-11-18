@@ -415,3 +415,263 @@
     padding: 12px 10px;
   }
 }
+
+/* ---- The read before sign-in (/try): the same column on the paper, with a way in at the top
+   and "keep this read" at the end. ---- */
+.try-page {
+  min-height: 100dvh;
+  padding: clamp(16px, 4vw, 36px) 16px 64px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.try-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(560px, 100%);
+  margin: 0 auto clamp(28px, 7vw, 56px);
+}
+
+.try-top a {
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.try-top a:hover,
+.try-top a:focus-visible {
+  background: var(--hover);
+}
+
+.try-hero h1 {
+  font-size: clamp(40px, 9vw, 60px);
+  line-height: 1;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+
+.try-hero h1 em {
+  color: var(--ember);
+  font-weight: 400;
+}
+
+.try-hero p {
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: 17px;
+  line-height: 1.45;
+  max-width: 40ch;
+}
+
+.try-gets {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.try-gets li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 550;
+}
+
+.try-gets svg {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--ember-soft);
+  color: var(--ember-deep);
+}
+
+.try-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--on-ink);
+  font: inherit;
+  font-size: 16.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.try-pick:hover:not(:disabled),
+.try-pick:focus-visible {
+  background: var(--ember-deep);
+}
+
+.try-pick:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.try-quiet {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.try-how {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--paper-2);
+  font-size: 14.5px;
+}
+
+.try-how summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.try-how ol {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 2px;
+  padding-left: 20px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.cr-head .try-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.try-file svg {
+  flex: none;
+}
+
+.try-file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.try-names {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.try-names button {
+  display: grid;
+  gap: 3px;
+  padding: 16px 18px;
+  border: 1.5px solid transparent;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.try-names button strong {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.try-names button span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.try-names button:hover,
+.try-names button:focus-visible {
+  border-color: var(--line-strong);
+}
+
+.try-names button.is-active {
+  border-color: var(--ember);
+  background: color-mix(in srgb, var(--ember) 7%, var(--card));
+}
+
+.try-link {
+  justify-self: center;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.try-link:hover,
+.try-link:focus-visible {
+  color: var(--ink);
+}
+
+.try-keep {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: clamp(20px, 5vw, 28px);
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.try-keep h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.try-keep > p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15.5px;
+  line-height: 1.45;
+}
+
+.try-keep .google-signin-button {
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.try-keep > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.try-keep > small a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.try-keep > .try-quiet {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-align: left;
+}

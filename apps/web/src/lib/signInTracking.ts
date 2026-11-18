@@ -8,8 +8,10 @@ import { signInErrorFromUrl } from "./experienceMetrics";
 const STARTED_KEY = "omiryn.signInStartedAt";
 
 type PublicSignInEvent = "sign_in_screen_viewed" | "sign_in_started" | "sign_in_failed" | "sign_in_abandoned";
+// The read tried before sign-in (/try): opened, a chat picked, the read shown, sign-in started from it.
+type PublicTryEvent = "try_page_viewed" | "try_chat_picked" | "try_read_shown" | "try_keep_started";
 
-function trackPublicEvent(eventName: PublicSignInEvent, metadata: Record<string, string | number> = {}) {
+function trackPublicEvent(eventName: PublicSignInEvent | PublicTryEvent, metadata: Record<string, string | number> = {}) {
   void apiFetch("/api/public/events", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,6 +23,11 @@ function trackPublicEvent(eventName: PublicSignInEvent, metadata: Record<string,
       metadata: { ...metadata, source: "app", release: APP_RELEASE },
     }),
   }).catch(() => undefined);
+}
+
+/** Steps on the try page. Counts and states only: nothing from the chat. */
+export function trackTry(eventName: PublicTryEvent, metadata: Record<string, string | number> = {}) {
+  trackPublicEvent(eventName, metadata);
 }
 
 export function trackSignInScreen() {
