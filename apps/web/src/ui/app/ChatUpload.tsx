@@ -4,11 +4,10 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { Paperclip, X } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../lib/api";
 import { trackAppEvent } from "../../lib/appLogger";
+import { CHAT_FILE_ACCEPT, chatFileText } from "./chatFile";
 import type { SharedUpload } from "./UploadReading";
 import { type ChatSender, chatSenders, chatTitle, senderForUser } from "./whatsappSenders";
 
-// The API's limit (about months of a busy chat); a longer export keeps its most recent part.
-const MAX_CHARS = 1_000_000;
 const MAX_NAMES = 6;
 
 type Picked = { fileName: string; text: string; senders: ChatSender[] };
@@ -41,8 +40,16 @@ export function ChatUpload({ conversationId, disabled, userNames = [], onShared 
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const text = (await file.text()).slice(-MAX_CHARS);
     setError("");
+    let text: string;
+    try {
+      // The .txt itself, or the chat inside an iPhone's export .zip; a longer export keeps its newest part.
+      text = await chatFileText(file);
+    } catch (caught) {
+      setPicked({ fileName: file.name, text: "", senders: [] });
+      setError(caught instanceof Error ? caught.message : "Couldn't open that file.");
+      return;
+    }
     const senders = chatSenders(text);
     const found = senderForUser(senders, userNames);
     setMe(found);
@@ -84,27 +91,31 @@ export function ChatUpload({ conversationId, disabled, userNames = [], onShared 
   return (
     <div className="chat-upload" ref={panelRef}>
       <button type="button" className="chat-upload-button" disabled={disabled || !conversationId} aria-label="Share a WhatsApp chat" title="Share a WhatsApp chat" onClick={() => inputRef.current?.click()}><Paperclip aria-hidden="true" /></button>
-      <input ref={inputRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => void choose(event)} />
+      <input ref={inputRef} type="file" accept={CHAT_FILE_ACCEPT} hidden onChange={(event) => void choose(event)} />
       {picked ? (
         <div className="chat-upload-panel" role="dialog" aria-label="Share with Omi">
           <div className="chat-upload-head">
-            <strong>{!isChat ? "Share these notes?" : matched ? "Share this chat?" : "Which one is you?"}</strong>
+            <strong>{!picked.text ? "Couldn't open that file" : !isChat ? "Share these notes?" : matched ? "Share this chat?" : "Which one is you?"}</strong>
             <button type="button" aria-label="Cancel" onClick={() => setPicked(null)} disabled={sharing}><X aria-hidden="true" /></button>
           </div>
-          {isChat && matched ? (
-            <p className="chat-upload-note">Sharing as <strong>{me}</strong>. <button type="button" className="chat-upload-change" onClick={() => setMatched(false)} disabled={sharing}>Not you?</button></p>
-          ) : isChat ? (
-            <div className="chat-upload-names" role="radiogroup" aria-label="Your name in this chat">
-              {picked!.senders.slice(0, MAX_NAMES).map((sender) => (
-                <button type="button" role="radio" aria-checked={me === sender.name} className={me === sender.name ? "is-active" : ""} key={sender.name} onClick={() => setMe(sender.name)}>{sender.name}</button>
-              ))}
-            </div>
-          ) : (
-            <p className="chat-upload-note">This isn't a WhatsApp chat, so Omi will read it as notes about you.</p>
-          )}
-          <p className="chat-upload-note">Only your messages teach Omi. Numbers, emails and links are hidden. Delete it any time in Memories.</p>
+          {picked.text ? (
+            <>
+              {isChat && matched ? (
+                <p className="chat-upload-note">Sharing as <strong>{me}</strong>. <button type="button" className="chat-upload-change" onClick={() => setMatched(false)} disabled={sharing}>Not you?</button></p>
+              ) : isChat ? (
+                <div className="chat-upload-names" role="radiogroup" aria-label="Your name in this chat">
+                  {picked!.senders.slice(0, MAX_NAMES).map((sender) => (
+                    <button type="button" role="radio" aria-checked={me === sender.name} className={me === sender.name ? "is-active" : ""} key={sender.name} onClick={() => setMe(sender.name)}>{sender.name}</button>
+                  ))}
+                </div>
+              ) : (
+                <p className="chat-upload-note">This isn't a WhatsApp chat, so Omi will read it as notes about you.</p>
+              )}
+              <p className="chat-upload-note">Only your messages teach Omi. Numbers, emails and links are hidden. Delete it any time in Memories.</p>
+            </>
+          ) : null}
           {error ? <p className="chat-upload-error" role="alert">{error}</p> : null}
-          <button type="button" className="chat-upload-share" disabled={sharing || (isChat && !me)} onClick={() => void share()}>{sharing ? "Sharing…" : "Share with Omi"}</button>
+          {picked.text ? <button type="button" className="chat-upload-share" disabled={sharing || (isChat && !me)} onClick={() => void share()}>{sharing ? "Sharing…" : "Share with Omi"}</button> : null}
         </div>
       ) : null}
     </div>

@@ -22,6 +22,9 @@ test("the title comes from the file name, else the other person", () => {
   const senders = chatSenders(ANDROID);
   assert.equal(chatTitle("WhatsApp Chat with Riya.txt", senders, "Sourabh"), "Riya");
   assert.equal(chatTitle("_chat.txt", senders, "Sourabh"), "Riya");
+  // An iPhone export is a zip named after the other person.
+  assert.equal(chatTitle("WhatsApp Chat - Riya Shah.zip", senders, "Sourabh"), "Riya Shah");
+  assert.equal(chatTitle("export.zip", senders, "Sourabh"), "Riya");
 });
 
 const PEOPLE = [{ name: "Farheen Parvez", count: 120 }, { name: "Sourabh sahu", count: 110 }];

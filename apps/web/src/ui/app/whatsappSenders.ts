@@ -18,10 +18,11 @@ export function chatSenders(text: string): ChatSender[] {
   return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 }
 
-// "WhatsApp Chat with Riya.txt" -> "Riya"; otherwise the person who wrote most besides the user.
+// "WhatsApp Chat with Riya.txt" or "WhatsApp Chat - Riya.zip" -> "Riya"; otherwise the person who wrote most besides the user.
 export function chatTitle(fileName: string, senders: ChatSender[], me: string | null): string {
-  const fromFile = fileName.replace(/\.txt$/i, "").replace(/^WhatsApp Chat( with| -)?\s*/i, "").trim();
-  if (fromFile && fromFile.toLowerCase() !== "_chat" && fromFile !== fileName.replace(/\.txt$/i, "")) return fromFile;
+  const bare = fileName.replace(/\.(txt|zip)$/i, "");
+  const fromFile = bare.replace(/^WhatsApp Chat( with| -)?\s*/i, "").trim();
+  if (fromFile && fromFile.toLowerCase() !== "_chat" && fromFile !== bare) return fromFile;
   return senders.find((sender) => sender.name !== me)?.name || "WhatsApp chat";
 }
 
