@@ -312,6 +312,8 @@ Code keeps a note only with a known kind, a sentence, and proof: messages the mo
 
 When: with the daily user card rebuild, for people in a match group, when there are at least eight new messages. The table is deleted with the account.
 
+Added 18 November 2026: a shared WhatsApp chat is read into the notes once, right after the upload (`add_upload_to_notes`): only the person's own side, marked to the model as `friend_chat` so it does not guess at lines it cannot see. It is kept apart from the chats with Omi because its lines carry old dates. Deleting a chat (an upload or a chat with Omi) drops its proof from the notes, and a note left with no proof goes.
+
 Not done: no second model call checks that the cited messages really show the note (the vibe card has one). The judge's reasons are still checked word by word, and notes are never shown to anyone.
 
 ### 11.4 Ready to match, from notes
