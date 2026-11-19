@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { MatchCard } from "./matches";
-import { clusterClass, dayLabel, imageProblem, isBigEmoji, mergeMessages, newestId, pairFromPath, peopleRows, personPath, previewLine, startsDay, totalUnread, unreadLabel, type PersonMessage } from "./people";
+import { archivedRows, clusterClass, dayLabel, imageProblem, isBigEmoji, mergeMessages, newestId, pairFromPath, peopleRows, personPath, previewLine, startsDay, totalUnread, unreadLabel, type PersonMessage } from "./people";
 
 const card = (pair_id: string, extra: Partial<MatchCard> = {}): MatchCard => ({
   pair_id, status: "introduced", name: pair_id, reasons: [], difference: null, icebreaker: null, plan: null, asked_at: "2026-11-10T10:00:00Z", answer_by: null, ...extra,
@@ -19,6 +19,16 @@ test("only people with a chat are listed, newest activity first", () => {
     card("closed-empty", { status: "declined", chat: chat({ open: false }) }),
   ]);
   assert.deepEqual(rows.map((row) => row.pair_id), ["new", "quiet", "old"]);
+});
+
+test("archived chats leave the list for their own group", () => {
+  const cards = [
+    card("kept", { chat: chat({ last_at: "2026-11-13T09:00:00Z", messages: 2 }) }),
+    card("away", { chat: chat({ last_at: "2026-11-14T09:00:00Z", messages: 5, archived_at: "2026-11-14T10:00:00Z" }) }),
+    card("away-blocked", { status: "blocked", chat: chat({ open: false, messages: 1, archived_at: "2026-11-14T10:00:00Z" }) }),
+  ];
+  assert.deepEqual(peopleRows(cards).map((row) => row.pair_id), ["kept"]);
+  assert.deepEqual(archivedRows(cards).map((row) => row.pair_id), ["away"]);
 });
 
 test("the row shows the last message, whose it was, and how many are unread", () => {

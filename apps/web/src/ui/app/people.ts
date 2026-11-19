@@ -44,6 +44,15 @@ export type MatchEventDetail = { type: string; payload: { pair_id?: string; mess
     wrote in yet sorts by its introduction); a closed one only while it holds messages to read; a
     person the user blocked never does. */
 export function peopleRows(cards: MatchCard[]): MatchCard[] {
+  return chatRows(cards).filter((card) => !card.chat?.archived_at);
+}
+
+/** Chats the user archived: kept out of the list, shown under "Archived", newest activity first. */
+export function archivedRows(cards: MatchCard[]): MatchCard[] {
+  return chatRows(cards).filter((card) => Boolean(card.chat?.archived_at));
+}
+
+function chatRows(cards: MatchCard[]): MatchCard[] {
   const at = (card: MatchCard) => card.chat?.last_at || card.introduced_at || card.asked_at || "";
   return cards
     .filter((card) => card.chat && card.status !== "blocked" && (card.chat.open || card.chat.messages > 0))

@@ -10,7 +10,7 @@ export type MatchLine = { area: string; text: string };
 export type MatchPlan = { place: string; when: string; at?: string | null };
 
 /** The chat between the two people, from the introduction on; null before it. */
-export type MatchChat = { open: boolean; messages: number; unread: number; last_at: string | null; last_text?: string | null; last_mine?: boolean | null };
+export type MatchChat = { open: boolean; messages: number; unread: number; last_at: string | null; last_text?: string | null; last_mine?: boolean | null; archived_at?: string | null };
 
 export type MatchCard = {
   pair_id: string;
