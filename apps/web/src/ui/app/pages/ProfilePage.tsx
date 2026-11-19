@@ -64,7 +64,13 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
   }, []);
   // Keep the saved copy's intro current, including after an edit or a rewrite.
   useEffect(() => { if (lastProfile && intro) lastProfile = { ...lastProfile, intro }; }, [intro, data]);
-  async function save(event: FormEvent) { event.preventDefault(); setStatus("Saving profile…"); const response = await apiFetch("/api/me/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.display_name || null, age: Number(form.age), gender: form.gender, city: form.city || null, phone: form.phone || null }) }); if (!response.ok) { setStatus(await apiErrorMessage(response, "Could not save profile.")); return; } trackAppEvent("profile_saved", {}, { page: "profile" }); setStatus("Profile saved."); setEditing(false); await load(); }
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    // Age is optional: an empty box sends nothing (it used to send 0, which the server refuses).
+    const age = form.age ? Number(form.age) : null;
+    if (age !== null && (!Number.isInteger(age) || age < 18 || age > 100)) { setStatus("Age must be a whole number from 18 to 100, or left empty."); return; }
+    setStatus("Saving profile…");
+    const response = await apiFetch("/api/me/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: form.display_name || null, age, gender: form.gender || "prefer_not_to_say", city: form.city || null, phone: form.phone || null }) }); if (!response.ok) { setStatus(await apiErrorMessage(response, "Could not save profile.")); return; } trackAppEvent("profile_saved", {}, { page: "profile" }); setStatus("Profile saved."); setEditing(false); await load(); }
   async function submitDataRequest(requestType: "export" | "deletion") {
     setSendingRequest(true);
     setRequestStatus("");
@@ -232,7 +238,7 @@ export function ProfilePage({ onVibe, onPrivacy, fallbackAvatar, onProfileChange
       {editing ? (
         <form className="pf-panel pf-edit" onSubmit={save}>
           <label>Name<input value={form.display_name || ""} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></label>
-          <label>Age<input type="number" min="18" max="100" value={form.age || ""} onChange={(e) => setForm({ ...form, age: Number(e.target.value) })} /></label>
+          <label>Age<input type="number" min="18" max="100" value={form.age || ""} onChange={(e) => setForm({ ...form, age: e.target.value === "" ? undefined : Number(e.target.value) })} /></label>
           <label>Location<input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></label>
           <label title="Optional. Helps Omi address you correctly in Hindi.">Gender (optional)<select value={form.gender || "prefer_not_to_say"} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="prefer_not_to_say">Prefer not to say</option><option value="woman">Woman</option><option value="man">Man</option><option value="non_binary">Non-binary</option></select></label>
           <label>Mobile (optional)<input type="tel" value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
