@@ -893,6 +893,8 @@ match_chat_reads = Table(
     Column("user_id", String, primary_key=True),
     Column("last_read_id", Integer, nullable=False, server_default="0"),
     Column("read_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    # Set when this person archived the chat; it leaves their chat list for the Archived group.
+    Column("archived_at", DateTime(timezone=True), nullable=True),
 )
 # One person blocked another: the two are never offered to each other again, in any pool.
 match_blocks = Table(

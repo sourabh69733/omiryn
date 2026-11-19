@@ -175,6 +175,7 @@ def _ensure_runtime_columns() -> None:
         "channel_bursts": ("typing_at",),
         "agent_jobs": ("payload_json",),
         "match_pairs": ("plan_json", "introduced_at"),
+        "match_chat_reads": ("archived_at",),
         "agent_conversations": (
             "user_id",
             "agent_provider",

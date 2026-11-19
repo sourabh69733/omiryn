@@ -128,6 +128,25 @@ def mark_match_chat_read(pair_id: str, user_id: str, upto: int | None = None) ->
         return int(current)
 
 
+def set_match_chat_archived(pair_id: str, user_id: str, archived: bool) -> str | None:
+    """Archive or unarchive the chat for this person only; returns when it was archived, or None."""
+    owner_id = _require_user_id(user_id, "match chat archive")
+    stamp = utc_now() if archived else None
+    with ENGINE.begin() as connection:
+        found = connection.execute(
+            select(match_chat_reads.c.pair_id).where(match_chat_reads.c.pair_id == pair_id, match_chat_reads.c.user_id == owner_id).with_for_update()
+        ).first()
+        if found is None:
+            connection.execute(match_chat_reads.insert().values(pair_id=pair_id, user_id=owner_id, last_read_id=0, read_at=utc_now(), archived_at=stamp))
+        else:
+            connection.execute(
+                match_chat_reads.update()
+                .where(match_chat_reads.c.pair_id == pair_id, match_chat_reads.c.user_id == owner_id)
+                .values(archived_at=stamp)
+            )
+    return _isoformat_utc(stamp) if stamp else None
+
+
 def match_chat_summaries(pair_ids: list[str], user_id: str) -> dict[str, dict[str, Any]]:
     """Per pair: how many messages, when the last one came, and how many the user has not read."""
     if not pair_ids:
@@ -138,13 +157,13 @@ def match_chat_summaries(pair_ids: list[str], user_id: str) -> dict[str, dict[st
             .where(match_messages.c.pair_id.in_(pair_ids))
             .group_by(match_messages.c.pair_id)
         ).all()
-        marks = dict(
-            connection.execute(
-                select(match_chat_reads.c.pair_id, match_chat_reads.c.last_read_id).where(
-                    match_chat_reads.c.pair_id.in_(pair_ids), match_chat_reads.c.user_id == user_id
-                )
-            ).all()
-        )
+        read_rows = connection.execute(
+            select(match_chat_reads.c.pair_id, match_chat_reads.c.last_read_id, match_chat_reads.c.archived_at).where(
+                match_chat_reads.c.pair_id.in_(pair_ids), match_chat_reads.c.user_id == user_id
+            )
+        ).all()
+        marks = {pair_id: mark for pair_id, mark, _ in read_rows}
+        archived = {pair_id: _isoformat_utc(at) for pair_id, _, at in read_rows if at is not None}
         theirs = connection.execute(
             select(match_messages.c.pair_id, match_messages.c.id).where(match_messages.c.pair_id.in_(pair_ids), match_messages.c.sender_id != user_id)
         ).all()
@@ -169,13 +188,18 @@ def match_chat_summaries(pair_ids: list[str], user_id: str) -> dict[str, dict[st
         pair_id: {"text": " ".join(_unprotect_text(key_owner, body).split())[:PREVIEW_CHARS] or media_words.get(int(message_id)), "mine": sender == user_id}
         for pair_id, sender, body, key_owner, message_id in last_rows
     }
-    return {
+    summaries = {
         pair_id: {
             "messages": int(count), "last_at": _isoformat_utc(last_at) if last_at else None, "unread": unread.get(pair_id, 0),
             "last_text": (last.get(pair_id) or {}).get("text"), "last_mine": (last.get(pair_id) or {}).get("mine"),
+            "archived_at": archived.get(pair_id),
         }
         for pair_id, count, last_at in totals
     }
+    # A chat can be archived before anyone wrote in it.
+    for pair_id, at in archived.items():
+        summaries.setdefault(pair_id, {"messages": 0, "last_at": None, "unread": 0, "last_text": None, "last_mine": None, "archived_at": at})
+    return summaries
 
 
 def match_chat_counts(pair_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -302,6 +326,6 @@ def _report(row: Any) -> dict[str, Any]:
 
 __all__ = [
     "MATCH_MESSAGE_CHARS", "MATCH_REPORT_REASONS", "add_match_message", "block_match_user", "blocked_match_pairs", "delete_match_chat_for_user",
-    "get_match_media", "list_match_messages", "list_match_reports", "set_match_reaction", "mark_match_chat_read", "match_block_between", "match_chat_counts", "match_chat_summaries",
+    "get_match_media", "list_match_messages", "list_match_reports", "set_match_reaction", "set_match_chat_archived", "mark_match_chat_read", "match_block_between", "match_chat_counts", "match_chat_summaries",
     "match_users_blocked_by", "save_match_report",
 ]
