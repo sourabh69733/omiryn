@@ -89,6 +89,29 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
         set_match_pair_plan(self.pair["id"], dict(TOLD), status="introduced", introduced_at=DAY)
         return self.pair["id"]
 
+    def test_archive_is_for_one_person_and_comes_back(self) -> None:
+        pair_id = self.pair["id"]
+        with _As("ua") as client:
+            # No chat before the introduction, so nothing to archive.
+            self.assertEqual(client.patch(f"/api/me/matches/{pair_id}/archive", json={"archived": True}).status_code, 404)
+        self._introduce()
+        with _As("ua") as client:
+            # Archived before anyone wrote: the card still says so.
+            archived = client.patch(f"/api/me/matches/{pair_id}/archive", json={"archived": True}).json()
+            self.assertTrue(archived["archived_at"])
+            self.assertEqual(archived["chat"]["archived_at"], archived["archived_at"])
+            client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "hi"})
+            self.assertTrue(client.get("/api/me/matches").json()["matches"][0]["chat"]["archived_at"])
+        with _As("ub") as client:
+            # The other person's chat is untouched, and messages still arrive.
+            chat = client.get("/api/me/matches").json()["matches"][0]["chat"]
+            self.assertEqual((chat["archived_at"], chat["unread"]), (None, 1))
+        with _As("ua") as client:
+            self.assertIsNone(client.patch(f"/api/me/matches/{pair_id}/archive", json={"archived": False}).json()["archived_at"])
+            self.assertIsNone(client.get("/api/me/matches").json()["matches"][0]["chat"]["archived_at"])
+        updates = [call.args[0] for call in self.published.await_args_list if call.args[0].type == "match.updated"]
+        self.assertEqual({event.scope_id for event in updates}, {"ua"})
+
     def test_only_the_two_write_and_read_after_the_introduction(self) -> None:
         pair_id = self.pair["id"]
         with _As("ua") as client:
@@ -108,7 +131,7 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "   "}).status_code, 400)
             self.assertEqual(client.post(f"/api/me/matches/{pair_id}/messages", json={"text": "x" * 2001}).status_code, 422)
             card = client.get("/api/me/matches").json()["matches"][0]
-            self.assertEqual(card["chat"], {"open": True, "messages": 1, "unread": 0, "last_at": card["chat"]["last_at"], "last_text": "Hi Bela, chai on Sunday?", "last_mine": True})
+            self.assertEqual(card["chat"], {"open": True, "messages": 1, "unread": 0, "last_at": card["chat"]["last_at"], "last_text": "Hi Bela, chai on Sunday?", "last_mine": True, "archived_at": None})
         # Both people are told a message exists, by id only: the text never rides on the event.
         events = [call.args[0] for call in self.published.await_args_list if call.args[0].type == "match.message"]
         self.assertEqual({event.scope_id for event in events}, {"ua", "ub"})

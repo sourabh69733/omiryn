@@ -29,6 +29,7 @@ from storage import (
     get_match_pair,
     list_match_messages,
     mark_match_chat_read,
+    set_match_chat_archived,
     match_chat_summaries,
     reserve_user_app_event,
     set_match_reaction,
@@ -57,6 +58,10 @@ class ChatMessage(BaseModel):
 
 class ChatRead(BaseModel):
     upto: int | None = Field(default=None, ge=0)
+
+
+class ChatArchive(BaseModel):
+    archived: bool
 
 
 class ChatTyping(BaseModel):
@@ -123,7 +128,7 @@ def _clean_picture(content: bytes) -> dict[str, Any]:
 
 def _chat(pair: dict[str, Any], user_id: str, state: dict[str, Any]) -> dict[str, Any]:
     summary = match_chat_summaries([pair["id"]], user_id).get(pair["id"]) or {}
-    return {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at"), "last_text": summary.get("last_text"), "last_mine": summary.get("last_mine")}
+    return {"open": state["open"], "messages": summary.get("messages", 0), "unread": summary.get("unread", 0), "last_at": summary.get("last_at"), "last_text": summary.get("last_text"), "last_mine": summary.get("last_mine"), "archived_at": summary.get("archived_at")}
 
 
 async def _notify(event_type: str, pair: dict[str, Any], payload: dict[str, Any], *, only: str | None = None) -> None:
@@ -241,6 +246,18 @@ async def read_match_chat(pair_id: str, payload: ChatRead | None = None, user: C
     # Their other devices clear the badge; the other person is not told what was read.
     await _notify("match.read", pair, {"last_read_id": mark}, only=user_id)
     return {"last_read_id": mark, "chat": _chat(pair, user_id, state)}
+
+
+@router.patch("/api/me/matches/{pair_id}/archive")
+async def archive_match_chat(pair_id: str, payload: ChatArchive, user: CurrentUser = Depends(require_user)) -> dict[str, object]:
+    """Archive or unarchive the chat for this person only. The other person is not told, and new
+    messages still arrive; the chat stays in the Archived group until it is unarchived."""
+    user_id = _user_id(user)
+    pair, state = _pair_for(pair_id, user_id)
+    archived_at = set_match_chat_archived(pair_id, user_id, payload.archived)
+    # Their other devices move the row too.
+    await _notify("match.updated", pair, {}, only=user_id)
+    return {"archived_at": archived_at, "chat": _chat(pair, user_id, state)}
 
 
 async def _close(pair_id: str, user_id: str, *, block: bool, reason: str | None = None, note: str | None = None) -> dict[str, object]:
