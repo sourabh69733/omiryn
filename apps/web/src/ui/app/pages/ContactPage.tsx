@@ -104,7 +104,6 @@ export function ContactPage({ user }: { user: AuthUser | null }) {
           </label>
           <div className="contact-actions">
             <button className="contact-send-button" type="submit" disabled={!canSend || sending}>{sending ? "Sending..." : "Send"}</button>
-            <p className="contact-note">We reply to <strong>{email}</strong>.</p>
           </div>
           {feedbackStatus ? <p className="contact-status" role="status">{feedbackStatus}</p> : null}
         </form>
