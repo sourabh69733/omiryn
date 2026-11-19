@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, Sparkles, Users, X } from "lucide-react";
+import { Bookmark, Sparkles, Users, X, ChevronDown } from "lucide-react";
 import { apiFetch, signOut } from "../../lib/api";
 import { initAppLogger } from "../../lib/appLogger";
 import { enterPage, initExperienceTracking } from "../../lib/experience";
@@ -17,7 +17,7 @@ import { AgentOrb } from "./AgentOrb";
 import { AvatarImage } from "./AvatarImage";
 import { mainPhoto } from "./profilePhoto";
 import { initialOf, type MatchCard } from "./matches";
-import { MATCH_EVENT, pairFromPath, peopleRows, personPath, previewLine, unreadLabel, type MatchEventDetail } from "./people";
+import { MATCH_EVENT, pairFromPath, archivedRows, peopleRows, personPath, previewLine, unreadLabel, type MatchEventDetail } from "./people";
 import { assetUrl, canShowUsage, pageFromPath, pathForPage } from "./appUtils";
 import { useIsMobile } from "./useIsMobile";
 import { useKeyboardA11y } from "./useKeyboardA11y";
@@ -199,6 +199,8 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
   const navItems = [["vibe", Sparkles, "Vibe"], ["memories", Bookmark, "Memories"], ["matches", Users, "Matches"]] as const;
   const chatOpenOnMobile = isMobile && (page === "chat" || page === "person");
   const people = useMemo(() => peopleRows(cards), [cards]);
+  const archived = useMemo(() => archivedRows(cards), [cards]);
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const person = personId ? cards.find((card) => card.pair_id === personId) ?? null : null;
   // Already in chat but on an earlier or temporary chat: go back to the main Omi chat.
   const openOmi = () => {
@@ -212,7 +214,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
     </button>
   );
 
-  const personRows = people.map((card) => {
+  const personRow = (card: MatchCard) => {
     const unread = unreadLabel(card.chat?.unread);
     return (
       <button type="button" key={card.pair_id} className={`omi-contact omi-person ${page === "person" && personId === card.pair_id ? "is-active" : ""} ${unread ? "has-unread" : ""}`} onClick={() => openPerson(card.pair_id)}>
@@ -221,7 +223,18 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
         {unread ? <span className="omi-unread" aria-label={`${card.chat?.unread} unread`}>{unread}</span> : null}
       </button>
     );
-  });
+  };
+  const personRows = people.map(personRow);
+  // Archived chats sit in their own group, closed unless opened or one of them is on screen.
+  const showArchived = archivedOpen || archived.some((card) => page === "person" && card.pair_id === personId);
+  const archivedGroup = archived.length ? (
+    <>
+      <button type="button" className="omi-archived-toggle" aria-expanded={showArchived} onClick={() => setArchivedOpen(!showArchived)}>
+        <ChevronDown aria-hidden="true" className={showArchived ? "is-open" : ""} />Archived <span>{archived.length}</span>
+      </button>
+      {showArchived ? archived.map(personRow) : null}
+    </>
+  ) : null;
 
   return (
     <div className={`legacy-react-shell omi-shell ${chatOpenOnMobile ? "is-chat-open" : ""}`}>
@@ -241,6 +254,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
           <p className="omi-rail-label">Chats</p>
           {omiRow}
           {personRows}
+          {archivedGroup}
         </div>
         <nav className="omi-rail-section omi-rail-links" aria-label="You">
           <p className="omi-rail-label">You</p>
@@ -294,6 +308,7 @@ export function MainApp({ initialConversationId }: { initialConversationId?: str
               <span>Chat with Omi</span>
             </button>
             {personRows}
+            {archivedGroup}
             {navItems.map(([item, Icon, label]) => (
               <a key={item} href={pathForPage[item]} onClick={(event) => { event.preventDefault(); navigate(item); }}>
                 <Icon aria-hidden="true" />{label}

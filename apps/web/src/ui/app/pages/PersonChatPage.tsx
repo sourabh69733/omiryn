@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { EmojiClickData, EmojiStyle, Theme } from "emoji-picker-react";
-import { AlertTriangle, Ban, Check, ImagePlus, Lock, Menu, MoreHorizontal, Smile, SmilePlus, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, Ban, Check, ImagePlus, Lock, Menu, MoreHorizontal, Smile, SmilePlus, Sparkles, X } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { ReportDialog } from "../ReportDialog";
 import { StateView } from "../StateView";
@@ -99,6 +99,9 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
   const [showWhy, setShowWhy] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  // Archived for this person only; set at once on a tap, then kept in step with the card.
+  const [archived, setArchived] = useState(Boolean(card?.chat?.archived_at));
+  useEffect(() => setArchived(Boolean(card?.chat?.archived_at)), [card?.chat?.archived_at]);
   const [ending, setEnding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
@@ -385,6 +388,24 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
     onChanged();
   }
 
+  // Archive moves the chat out of the list into "Archived"; messages still arrive. Only this
+  // person's list changes; the other person is not told.
+  async function archive(next: boolean) {
+    setArchived(next);
+    const response = await apiFetch(`/api/me/matches/${pairId}/archive`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: next }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setArchived(!next);
+      setError(next ? "Could not archive this chat. Try again." : "Could not unarchive this chat. Try again.");
+      return;
+    }
+    setToast(next ? `Archived. ${name} is under Archived in your chats; new messages still arrive.` : `Back in your chats.`);
+    onChanged();
+  }
+
   async function block() {
     setBusy(true);
     const response = await apiFetch(`/api/me/matches/${pairId}/block`, { method: "POST" }).catch(() => null);
@@ -445,6 +466,7 @@ export function PersonChatPage({ pairId, card, cardsLoaded, userAvatar, isMobile
               {menuOpen ? (
                 <div className="history-menu pc-menu-list" role="menu">
                   {hasWhy ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); stickRef.current = false; setShowWhy((value) => !value); if (logRef.current) logRef.current.scrollTop = 0; }}><Sparkles aria-hidden="true" />{showWhy ? "Hide the introduction" : "Why Omi introduced you"}</button> : null}
+                  {card?.chat ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void archive(!archived); }}>{archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}{archived ? "Unarchive chat" : "Archive chat"}</button> : null}
                   {open ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setEnding(true); }}><X aria-hidden="true" />Call it off, kindly</button> : null}
                   {card?.status !== "blocked" ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setBlocking(true); }}><Ban aria-hidden="true" />Block {name}</button> : null}
                   {card ? <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setReporting(true); }}><AlertTriangle aria-hidden="true" />Report {name}</button> : null}

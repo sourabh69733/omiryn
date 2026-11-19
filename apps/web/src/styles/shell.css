@@ -1640,3 +1640,42 @@ button.omi-menu-button[data-tip]:focus-visible::after {
 @media (hover: none) {
   button.omi-menu-button[data-tip]::after { display: none; }
 }
+
+/* "Archived" under the chats: a quiet toggle that opens the archived people. */
+button.omi-archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+button.omi-archived-toggle:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.omi-archived-toggle svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.omi-archived-toggle svg.is-open {
+  transform: none;
+}
+
+.omi-archived-toggle span {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
