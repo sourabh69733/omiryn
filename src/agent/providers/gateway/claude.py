@@ -3,7 +3,8 @@
 Everything else in the app talks to OpenAI-compatible providers through the gateway. This is a
 separate, small path: one request that returns JSON matching a schema. A caller picks it by naming
 a Claude model (CHAT_READ_MODEL=claude-sonnet-5-5); without a key or on any failure the caller
-falls back to its usual model, so nothing depends on Claude being reachable.
+falls back to its usual model, so nothing depends on Claude being reachable. A chat reply written
+by Claude is in claude_chat.py.
 
 The key is read by the SDK from ANTHROPIC_API_KEY (CLAUDE_API_KEY is accepted as a second name).
 """
@@ -114,7 +115,7 @@ async def claude_json(
     return data, usage
 
 
-def _record(request_kind: str, conversation_id: str | None, model: str, started: float, *, success: bool, usage: dict[str, Any] | None = None) -> None:
+def _record(request_kind: str, conversation_id: str | None, model: str, started: float, *, success: bool, usage: dict[str, Any] | None = None, raw_usage: dict[str, Any] | None = None) -> None:
     """The same usage row every other model call writes, so spend shows up in one place."""
     from storage import save_agent_usage_event
 
@@ -138,7 +139,7 @@ def _record(request_kind: str, conversation_id: str | None, model: str, started:
             "latency_ms": int((perf_counter() - started) * 1000),
             "estimated_cost_usd": usage.get("cost_usd"),
             "error": None if success else "provider_error",
-            "raw_usage": {},
+            "raw_usage": raw_usage or {},
         })
     except Exception as error:
         logger.error("agent.usage.persist_failed error_type=%s", type(error).__name__)
