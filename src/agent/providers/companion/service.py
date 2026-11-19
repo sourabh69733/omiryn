@@ -9,6 +9,8 @@ from typing import Any
 import httpx
 
 from agent.observability.usage import CHAT_REPLY, INPUT_GUARDRAIL
+from agent.providers.gateway.claude import claude_key, is_claude
+from agent.providers.gateway.claude_chat import claude_chat
 from agent.providers.gateway.registry import provider_model
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
 
@@ -63,18 +65,38 @@ async def generate_agent_reply(
             latency_ms=0,
         )
         return _mock_reply(messages, user_profile, agent_name)
+    if is_claude(model) and not claude_key():
+        # A Claude reply model with no key set: the usual model replies, as if none was named.
+        logger.warning("agent.reply.claude_without_key model=%s", model)
+        model = None
+
     async def call(chosen_model: str | None) -> str:
+        prompt = system_prompt or _system_prompt_with_context(
+            ONBOARDING_SYSTEM_PROMPT,
+            context_sources,
+            agent_mode,
+            agent_tone,
+            user_profile,
+            agent_name,
+        )
+        output_tokens = max_tokens or int(os.getenv("AGENT_CHAT_MAX_OUTPUT_TOKENS", "1200"))
+        wait_seconds = timeout_seconds if timeout_seconds is not None else reply_timeout_seconds()
+        if is_claude(chosen_model):
+            # Claude has its own path: same prompt, history and tools, sent in Claude's format.
+            return await claude_chat(
+                prompt,
+                messages,
+                model=str(chosen_model),
+                conversation_id=conversation_id,
+                request_kind=CHAT_REPLY,
+                tools=tools,
+                tool_choice=tool_choice,
+                max_tokens=output_tokens,
+                timeout_seconds=wait_seconds,
+            )
         return await provider_chat(
             provider=provider,
-            system_prompt=system_prompt
-            or _system_prompt_with_context(
-                ONBOARDING_SYSTEM_PROMPT,
-                context_sources,
-                agent_mode,
-                agent_tone,
-                user_profile,
-                agent_name,
-            ),
+            system_prompt=prompt,
             messages=messages,
             conversation_id=conversation_id,
             request_kind=CHAT_REPLY,
@@ -82,8 +104,8 @@ async def generate_agent_reply(
             response_format=response_format,
             tools=tools,
             tool_choice=tool_choice,
-            max_tokens=max_tokens or int(os.getenv("AGENT_CHAT_MAX_OUTPUT_TOKENS", "1200")),
-            timeout_seconds=timeout_seconds if timeout_seconds is not None else reply_timeout_seconds(),
+            max_tokens=output_tokens,
+            timeout_seconds=wait_seconds,
         )
 
     try:
@@ -123,5 +145,6 @@ def reply_fallback_model(provider: str, model: str | None) -> str | None:
     configured = os.getenv("AGENT_REPLY_FALLBACK_MODEL", "").strip()
     if configured.lower() in {"off", "none", "false"}:
         return None
-    fallback = configured or _DEFAULT_FALLBACK_MODELS.get(provider)
+    # When Claude was the reply model, the provider's own model is the natural backup.
+    fallback = configured or (provider_model(provider) if is_claude(primary) else _DEFAULT_FALLBACK_MODELS.get(provider))
     return fallback if fallback and fallback != primary else None
