@@ -1,0 +1,327 @@
+<title>Omiryn Agent Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column. Three diagrams (whole system, one reply, learning), then two tables and a ranked list of what to improve. */
+:root {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --surface-2: #eaf0ee;
+  --line: #cfd9d6;
+  --fg: #16221f;
+  --muted: #5d6f6a;
+  --accent: #0f766e;
+  --accent-soft: #d3ece8;
+  --warn: #b45309;
+  --warn-soft: #fbe9d2;
+  --good: #1f7a4d;
+  --good-soft: #d9f0e3;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1716; --surface: #15201e; --surface-2: #1c2a27; --line: #2d3f3b; --fg: #e6efec; --muted: #93a7a2;
+    --accent: #3fc1b4; --accent-soft: #163b37; --warn: #f0a04b; --warn-soft: #3b2a14; --good: #5ad08f; --good-soft: #163a28;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1716; --surface: #15201e; --surface-2: #1c2a27; --line: #2d3f3b; --fg: #e6efec; --muted: #93a7a2;
+  --accent: #3fc1b4; --accent-soft: #163b37; --warn: #f0a04b; --warn-soft: #3b2a14; --good: #5ad08f; --good-soft: #163a28;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; margin: 0; }
+.wrap { max-width: 1020px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 44px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+h1 { font: 700 clamp(1.6rem, 3vw, 2.2rem) var(--font-display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 66ch; }
+.asof { font: 500 0.78rem var(--font-mono); color: var(--muted); margin: 0; }
+nav { display: flex; flex-wrap: wrap; gap: 6px; }
+nav a { font: 600 0.82rem var(--font-display); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; }
+nav a:hover { border-color: var(--accent); }
+a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; scroll-margin-top: 16px; }
+h2 { font: 600 1.25rem var(--font-display); margin: 0; text-wrap: balance; }
+section > p { margin: 0; max-width: 68ch; }
+.muted { color: var(--muted); }
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.draw { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 10px; }
+.draw svg { display: block; width: 100%; min-width: 720px; height: auto; }
+figcaption { color: var(--muted); font-size: 0.9rem; max-width: 70ch; }
+svg text { font-family: var(--font-body); fill: var(--fg); }
+svg .tt { font: 600 13px var(--font-display); }
+svg .ts { font-size: 11px; fill: var(--muted); }
+svg .tl { font: 500 10.5px var(--font-mono); fill: var(--muted); }
+svg .b { fill: var(--surface); stroke: var(--line); }
+svg .bh { fill: var(--accent-soft); stroke: var(--accent); }
+svg .bs { fill: var(--surface-2); stroke: var(--line); }
+svg .a { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+svg .ad { stroke-dasharray: 4 3; }
+svg .ahead { fill: var(--muted); }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.9rem; }
+th { font: 600 0.72rem var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+th.num { text-align: right; }
+code { font: 500 0.82rem var(--font-mono); color: var(--muted); }
+td b { font-family: var(--font-display); font-weight: 600; }
+
+.plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.plan li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.plan li:last-child { border-bottom: 0; }
+.plan .n { font: 600 0.9rem var(--font-display); width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); }
+.plan h3 { font: 600 1rem var(--font-display); margin: 0 0 4px; }
+.plan p { margin: 0 0 6px; }
+.plan .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font: 500 0.72rem var(--font-mono); padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.tag.code { background: var(--accent-soft); color: var(--accent); }
+.tag.hub { background: var(--warn-soft); color: var(--warn); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.two > div { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px 16px; min-width: 0; }
+.two h3 { font: 600 0.78rem var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; margin: 0 0 8px; }
+.two .ok h3 { color: var(--good); } .two .weak h3 { color: var(--warn); }
+.two ul { margin: 0; padding-left: 18px; }
+.two li { margin-bottom: 5px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>How Omi is built today</h1>
+    <p class="lede">One brain behind every door. A message comes in, one turn writes the reply, and Omi learns from it later in the background. This page shows the parts, how they talk, and what I would improve next.</p>
+    <p class="asof">Code on main, 20 November 2026, commit dc9ecf3f. The live server still runs the 3 November code.</p>
+    <nav aria-label="Sections">
+      <a href="#system">Whole system</a>
+      <a href="#reply">One reply</a>
+      <a href="#learning">Learning</a>
+      <a href="#code">Code map</a>
+      <a href="#models">Models</a>
+      <a href="#improve">What to improve</a>
+    </nav>
+  </header>
+
+  <section id="system">
+    <h2>The whole system</h2>
+    <p>The left side is the reply path, where a person is waiting. The right side is background work, where nobody waits. They meet in only two places: the model gateway and the database.</p>
+    <figure>
+      <div class="draw">
+        <svg viewBox="0 0 960 536" role="img" aria-label="Five doors send messages to the API. The API runs the turn, which uses tools and the context engine and calls models through the gateway. Background jobs run the memory engine and matching, which save to Postgres. The context engine recalls from the memory engine.">
+          <defs><marker id="ah1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="ahead"/></marker></defs>
+          <!-- doors -->
+          <rect class="b" x="20" y="24" width="124" height="44" rx="8"/><text class="tt" x="82" y="43" text-anchor="middle">Web app</text><text class="ts" x="82" y="58" text-anchor="middle">browser</text>
+          <rect class="b" x="164" y="24" width="124" height="44" rx="8"/><text class="tt" x="226" y="43" text-anchor="middle">Android app</text><text class="ts" x="226" y="58" text-anchor="middle">on its own branch</text>
+          <rect class="b" x="308" y="24" width="124" height="44" rx="8"/><text class="tt" x="370" y="43" text-anchor="middle">Try page</text><text class="ts" x="370" y="58" text-anchor="middle">no sign-in</text>
+          <rect class="b" x="452" y="24" width="124" height="44" rx="8"/><text class="tt" x="514" y="43" text-anchor="middle">Telegram</text><text class="ts" x="514" y="58" text-anchor="middle">bot</text>
+          <rect class="b" x="596" y="24" width="124" height="44" rx="8"/><text class="tt" x="658" y="43" text-anchor="middle">WhatsApp</text><text class="ts" x="658" y="58" text-anchor="middle">Cloud API</text>
+          <line class="a" x1="82" y1="68" x2="82" y2="116" marker-end="url(#ah1)"/><text class="tl" x="90" y="96">message</text>
+          <line class="a" x1="226" y1="68" x2="226" y2="116" marker-end="url(#ah1)"/>
+          <line class="a" x1="370" y1="68" x2="370" y2="116" marker-end="url(#ah1)"/><text class="tl" x="378" y="96">chat file</text>
+          <line class="a" x1="514" y1="68" x2="514" y2="116" marker-end="url(#ah1)"/>
+          <line class="a" x1="658" y1="68" x2="658" y2="116" marker-end="url(#ah1)"/><text class="tl" x="666" y="96">webhook</text>
+          <!-- api -->
+          <rect class="b" x="20" y="118" width="700" height="52" rx="8"/><text class="tt" x="370" y="140" text-anchor="middle">API and chat service</text><text class="ts" x="370" y="157" text-anchor="middle">saves your message first, runs the turn, saves the reply</text>
+          <rect class="b" x="770" y="118" width="170" height="52" rx="8"/><text class="tt" x="855" y="140" text-anchor="middle">Realtime hub</text><text class="ts" x="855" y="157" text-anchor="middle">bubbles to open apps</text>
+          <line class="a" x1="720" y1="144" x2="768" y2="144" marker-end="url(#ah1)"/><text class="tl" x="744" y="136" text-anchor="middle">events</text>
+          <line class="a" x1="230" y1="172" x2="230" y2="224" marker-start="url(#ah1)" marker-end="url(#ah1)"/><text class="tl" x="238" y="201">message in, bubbles out</text>
+          <line class="a" x1="620" y1="170" x2="620" y2="224" marker-end="url(#ah1)"/><text class="tl" x="628" y="201">queues jobs</text>
+          <!-- turn and jobs -->
+          <rect class="bh" x="20" y="226" width="420" height="56" rx="8"/><text class="tt" x="230" y="249" text-anchor="middle">The turn</text><text class="ts" x="230" y="267" text-anchor="middle">guard, context, draft with tools, checks, bubbles</text>
+          <rect class="b" x="520" y="226" width="420" height="56" rx="8"/><text class="tt" x="730" y="249" text-anchor="middle">Background jobs</text><text class="ts" x="730" y="267" text-anchor="middle">memory run, card rebuild, uploads, nudges, match steps</text>
+          <line class="a" x1="115" y1="284" x2="115" y2="338" marker-start="url(#ah1)" marker-end="url(#ah1)"/><text class="tl" x="123" y="314">calls, results</text>
+          <line class="a" x1="335" y1="282" x2="335" y2="338" marker-end="url(#ah1)"/><text class="tl" x="343" y="314">asks for context</text>
+          <line class="a" x1="620" y1="282" x2="620" y2="338" marker-end="url(#ah1)"/><text class="tl" x="628" y="314">proposes memories</text>
+          <line class="a" x1="840" y1="282" x2="840" y2="338" marker-end="url(#ah1)"/><text class="tl" x="848" y="314">match jobs</text>
+          <!-- engines -->
+          <rect class="b" x="20" y="340" width="190" height="56" rx="8"/><text class="tt" x="115" y="363" text-anchor="middle">Tools</text><text class="ts" x="115" y="381" text-anchor="middle">chats, web, places, dates</text>
+          <rect class="b" x="230" y="340" width="210" height="56" rx="8"/><text class="tt" x="335" y="363" text-anchor="middle">Context engine</text><text class="ts" x="335" y="381" text-anchor="middle">builds the prompt each turn</text>
+          <rect class="b" x="520" y="340" width="200" height="56" rx="8"/><text class="tt" x="620" y="363" text-anchor="middle">Memory engine</text><text class="ts" x="620" y="381" text-anchor="middle">memories with proof, recall</text>
+          <rect class="b" x="740" y="340" width="200" height="56" rx="8"/><text class="tt" x="840" y="363" text-anchor="middle">Matching</text><text class="ts" x="840" y="381" text-anchor="middle">notes, judge, ask both, host</text>
+          <line class="a" x1="520" y1="368" x2="442" y2="368" marker-end="url(#ah1)"/><text class="tl" x="481" y="360" text-anchor="middle">recall</text>
+          <line class="a" x1="280" y1="396" x2="280" y2="454" marker-end="url(#ah1)"/><text class="tl" x="288" y="432">prompt, history</text>
+          <path class="a" d="M560 396 V426 H400 V454" marker-end="url(#ah1)"/><text class="tl" x="480" y="419" text-anchor="middle">background calls</text>
+          <line class="a" x1="660" y1="396" x2="660" y2="454" marker-end="url(#ah1)"/><text class="tl" x="668" y="432">saves</text>
+          <line class="a" x1="840" y1="396" x2="840" y2="454" marker-end="url(#ah1)"/><text class="tl" x="848" y="432">pairs, notes</text>
+          <!-- base -->
+          <rect class="bs" x="20" y="456" width="420" height="60" rx="8"/><text class="tt" x="230" y="480" text-anchor="middle">Model gateway</text><text class="ts" x="230" y="498" text-anchor="middle">DeepInfra models as usual; Claude optional for replies and the read</text>
+          <rect class="bs" x="520" y="456" width="420" height="60" rx="8"/><text class="tt" x="730" y="480" text-anchor="middle">Postgres</text><text class="ts" x="730" y="498" text-anchor="middle">chats, memories, cards, traces; encrypted per user</text>
+        </svg>
+      </div>
+      <figcaption>The reply path never writes memories, and background work never blocks a reply. The try page is the one door that stores nothing: it sends a chat file, gets the read back, and keeps it only if the person signs in.</figcaption>
+    </figure>
+  </section>
+
+  <section id="reply">
+    <h2>One reply, step by step</h2>
+    <p>A normal reply costs one reply call and one embedding call. Everything else runs only when a fact from code says it is needed.</p>
+    <figure>
+      <div class="draw">
+        <svg viewBox="0 0 820 524" role="img" aria-label="Six steps of one reply: save the message, build the context with recall, draft with the reply model and tools, check, finish into bubbles, then save and queue learning.">
+          <defs><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="ahead"/></marker></defs>
+          <!-- steps -->
+          <rect class="b" x="240" y="20" width="300" height="54" rx="8"/><text class="tt" x="256" y="42">1  Save the message</text><text class="ts" x="256" y="60">stored before any model runs</text>
+          <rect class="b" x="240" y="106" width="300" height="54" rx="8"/><text class="tt" x="256" y="128">2  Build the context</text><text class="ts" x="256" y="146">card, memories, past lines, dates, turn notes</text>
+          <rect class="bh" x="240" y="192" width="300" height="54" rx="8"/><text class="tt" x="256" y="214">3  Draft</text><text class="ts" x="256" y="232">the reply model writes; tools for up to 3 rounds</text>
+          <rect class="b" x="240" y="278" width="300" height="54" rx="8"/><text class="tt" x="256" y="300">4  Check</text><text class="ts" x="256" y="318">repeats, your how-to-talk requests, identity</text>
+          <rect class="b" x="240" y="364" width="300" height="54" rx="8"/><text class="tt" x="256" y="386">5  Finish</text><text class="ts" x="256" y="404">hidden markers out, split into bubbles</text>
+          <rect class="b" x="240" y="450" width="300" height="54" rx="8"/><text class="tt" x="256" y="472">6  Save and schedule</text><text class="ts" x="256" y="490">reply and trace saved; learning queued</text>
+          <line class="a" x1="390" y1="74" x2="390" y2="104" marker-end="url(#ah2)"/>
+          <line class="a" x1="390" y1="160" x2="390" y2="190" marker-end="url(#ah2)"/>
+          <line class="a" x1="390" y1="246" x2="390" y2="276" marker-end="url(#ah2)"/>
+          <line class="a" x1="390" y1="332" x2="390" y2="362" marker-end="url(#ah2)"/>
+          <line class="a" x1="390" y1="418" x2="390" y2="448" marker-end="url(#ah2)"/>
+          <!-- left -->
+          <rect class="b" x="10" y="20" width="170" height="54" rx="8"/><text class="tt" x="95" y="42" text-anchor="middle">Doors</text><text class="ts" x="95" y="60" text-anchor="middle">web, Telegram, WhatsApp</text>
+          <line class="a" x1="180" y1="47" x2="238" y2="47" marker-end="url(#ah2)"/><text class="tl" x="209" y="40" text-anchor="middle">message</text>
+          <rect class="bs" x="10" y="106" width="170" height="54" rx="8"/><text class="tt" x="95" y="128" text-anchor="middle">Memory and storage</text><text class="ts" x="95" y="146" text-anchor="middle">found by words and meaning</text>
+          <line class="a" x1="180" y1="133" x2="238" y2="133" marker-end="url(#ah2)"/><text class="tl" x="209" y="126" text-anchor="middle">recall</text>
+          <rect class="b" x="10" y="192" width="170" height="54" rx="8"/><text class="tt" x="95" y="214" text-anchor="middle">Tools</text><text class="ts" x="95" y="232" text-anchor="middle">chats, web, places, pages</text>
+          <line class="a" x1="182" y1="219" x2="238" y2="219" marker-start="url(#ah2)" marker-end="url(#ah2)"/><text class="tl" x="209" y="212" text-anchor="middle">calls</text>
+          <rect class="b" x="10" y="450" width="170" height="54" rx="8"/><text class="tt" x="95" y="472" text-anchor="middle">Open apps</text><text class="ts" x="95" y="490" text-anchor="middle">bubbles arrive live</text>
+          <line class="a" x1="240" y1="477" x2="182" y2="477" marker-end="url(#ah2)"/><text class="tl" x="211" y="470" text-anchor="middle">bubbles</text>
+          <!-- right -->
+          <rect class="bs" x="600" y="106" width="210" height="54" rx="8"/><text class="tt" x="705" y="128" text-anchor="middle">Embedding model</text><text class="ts" x="705" y="146" text-anchor="middle">one call per reply</text>
+          <line class="a" x1="540" y1="133" x2="598" y2="133" marker-end="url(#ah2)"/><text class="tl" x="569" y="126" text-anchor="middle">query</text>
+          <rect class="bs" x="600" y="192" width="210" height="54" rx="8"/><text class="tt" x="705" y="214" text-anchor="middle">Reply model</text><text class="ts" x="705" y="232" text-anchor="middle">usual or Claude; backup after 25 s</text>
+          <line class="a" x1="542" y1="219" x2="598" y2="219" marker-start="url(#ah2)" marker-end="url(#ah2)"/><text class="tl" x="570" y="212" text-anchor="middle">prompt</text>
+          <rect class="bs" x="600" y="278" width="210" height="54" rx="8"/><text class="tt" x="705" y="300" text-anchor="middle">Check model</text><text class="ts" x="705" y="318" text-anchor="middle">only when a fact calls for it</text>
+          <line class="a ad" x1="540" y1="305" x2="598" y2="305" marker-end="url(#ah2)"/><text class="tl" x="569" y="298" text-anchor="middle">maybe</text>
+          <rect class="b" x="600" y="450" width="210" height="54" rx="8"/><text class="tt" x="705" y="472" text-anchor="middle">Background jobs</text><text class="ts" x="705" y="490" text-anchor="middle">memory run after 2 quiet minutes</text>
+          <line class="a" x1="540" y1="477" x2="598" y2="477" marker-end="url(#ah2)"/><text class="tl" x="569" y="470" text-anchor="middle">queue</text>
+        </svg>
+      </div>
+      <figcaption>The dashed arrow is a call that happens only sometimes. If the reply model is slow, fails or declines, a backup model writes the reply, so the person always gets an answer. Tool results go back to the model as tool results, never with the weight of the prompt.</figcaption>
+    </figure>
+  </section>
+
+  <section id="learning">
+    <h2>How Omi learns, after the reply</h2>
+    <p>Nothing here runs while a person waits. Each row is one trigger, the work it starts, what gets saved, and how the next reply uses it.</p>
+    <figure>
+      <div class="draw">
+        <svg viewBox="0 0 960 376" role="img" aria-label="Four background flows. A quiet chat starts the memory run, which writes memories. An upload starts the upload read, which writes a digest and the read. A daily job rebuilds the user card. Match day runs pick, ask both and introduce, which records pairs. The next reply reads from all four.">
+          <defs><marker id="ah3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="ahead"/></marker></defs>
+          <!-- triggers -->
+          <rect class="b" x="20" y="24" width="170" height="58" rx="8"/><text class="tt" x="105" y="48" text-anchor="middle">Chat goes quiet</text><text class="ts" x="105" y="66" text-anchor="middle">2 minutes, nothing new</text>
+          <rect class="b" x="20" y="114" width="170" height="58" rx="8"/><text class="tt" x="105" y="138" text-anchor="middle">Chat uploaded</text><text class="ts" x="105" y="156" text-anchor="middle">a WhatsApp export</text>
+          <rect class="b" x="20" y="204" width="170" height="58" rx="8"/><text class="tt" x="105" y="228" text-anchor="middle">Once a day</text><text class="ts" x="105" y="246" text-anchor="middle">per person</text>
+          <rect class="b" x="20" y="294" width="170" height="58" rx="8"/><text class="tt" x="105" y="318" text-anchor="middle">Match day</text><text class="ts" x="105" y="336" text-anchor="middle">the operator starts it</text>
+          <!-- work -->
+          <rect class="bh" x="270" y="24" width="210" height="58" rx="8"/><text class="tt" x="375" y="48" text-anchor="middle">Memory run</text><text class="ts" x="375" y="66" text-anchor="middle">model proposes, code checks proof</text>
+          <rect class="bh" x="270" y="114" width="210" height="58" rx="8"/><text class="tt" x="375" y="138" text-anchor="middle">Upload read</text><text class="ts" x="375" y="156" text-anchor="middle">both sides read, in parts</text>
+          <rect class="bh" x="270" y="204" width="210" height="58" rx="8"/><text class="tt" x="375" y="228" text-anchor="middle">Card rebuild</text><text class="ts" x="375" y="246" text-anchor="middle">from every active memory</text>
+          <rect class="bh" x="270" y="294" width="210" height="58" rx="8"/><text class="tt" x="375" y="318" text-anchor="middle">Pick, ask both, introduce</text><text class="ts" x="375" y="336" text-anchor="middle">a judge picks, Omi hosts</text>
+          <!-- stores -->
+          <rect class="bs" x="560" y="24" width="210" height="58" rx="8"/><text class="tt" x="665" y="48" text-anchor="middle">Memories</text><text class="ts" x="665" y="66" text-anchor="middle">proof lines, dates, links</text>
+          <rect class="bs" x="560" y="114" width="210" height="58" rx="8"/><text class="tt" x="665" y="138" text-anchor="middle">Chat digest and the read</text><text class="ts" x="665" y="156" text-anchor="middle">what the chat says of you two</text>
+          <rect class="bs" x="560" y="204" width="210" height="58" rx="8"/><text class="tt" x="665" y="228" text-anchor="middle">User card and vibe card</text><text class="ts" x="665" y="246" text-anchor="middle">who you are, in short</text>
+          <rect class="bs" x="560" y="294" width="210" height="58" rx="8"/><text class="tt" x="665" y="318" text-anchor="middle">Match notes and pairs</text><text class="ts" x="665" y="336" text-anchor="middle">who fits whom, and why</text>
+          <!-- next reply -->
+          <rect class="b" x="850" y="24" width="90" height="328" rx="8"/><text class="tt" x="895" y="178" text-anchor="middle">Next reply</text><text class="ts" x="895" y="196" text-anchor="middle">picks a few</text>
+          <!-- arrows -->
+          <line class="a" x1="190" y1="53" x2="268" y2="53" marker-end="url(#ah3)"/><text class="tl" x="229" y="46" text-anchor="middle">job</text>
+          <line class="a" x1="190" y1="143" x2="268" y2="143" marker-end="url(#ah3)"/><text class="tl" x="229" y="136" text-anchor="middle">at upload</text>
+          <line class="a" x1="190" y1="233" x2="268" y2="233" marker-end="url(#ah3)"/><text class="tl" x="229" y="226" text-anchor="middle">job</text>
+          <line class="a" x1="190" y1="323" x2="268" y2="323" marker-end="url(#ah3)"/><text class="tl" x="229" y="316" text-anchor="middle">jobs</text>
+          <line class="a" x1="480" y1="53" x2="558" y2="53" marker-end="url(#ah3)"/><text class="tl" x="519" y="46" text-anchor="middle">writes</text>
+          <line class="a" x1="480" y1="143" x2="558" y2="143" marker-end="url(#ah3)"/><text class="tl" x="519" y="136" text-anchor="middle">writes</text>
+          <line class="a" x1="480" y1="233" x2="558" y2="233" marker-end="url(#ah3)"/><text class="tl" x="519" y="226" text-anchor="middle">rewrites</text>
+          <line class="a" x1="480" y1="323" x2="558" y2="323" marker-end="url(#ah3)"/><text class="tl" x="519" y="316" text-anchor="middle">records</text>
+          <line class="a" x1="770" y1="53" x2="848" y2="53" marker-end="url(#ah3)"/><text class="tl" x="809" y="46" text-anchor="middle">by meaning</text>
+          <line class="a" x1="770" y1="143" x2="848" y2="143" marker-end="url(#ah3)"/><text class="tl" x="809" y="136" text-anchor="middle">when asked</text>
+          <line class="a" x1="770" y1="233" x2="848" y2="233" marker-end="url(#ah3)"/><text class="tl" x="809" y="226" text-anchor="middle">always</text>
+          <line class="a" x1="770" y1="323" x2="848" y2="323" marker-end="url(#ah3)"/><text class="tl" x="809" y="316" text-anchor="middle">if active</text>
+        </svg>
+      </div>
+      <figcaption>The memory run also updates the user card, the vibe card, Omi's notes about what it said, open questions and a dated line per session. An upload also teaches Omi about you: your own side of the chat goes through the same memory run.</figcaption>
+    </figure>
+  </section>
+
+  <section id="code">
+    <h2>Code map</h2>
+    <p class="muted">Where each part lives and how big it is. Sizes are lines of Python on main today.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Part</th><th>What it does</th><th>Where</th><th class="num">Files</th><th class="num">Lines</th></tr></thead>
+        <tbody>
+          <tr><td><b>The turn</b></td><td>Runs one reply: guard, context, draft, checks, bubbles, trace.</td><td><code>src/agent/runtime</code></td><td class="num">9</td><td class="num">880</td></tr>
+          <tr><td><b>Context engine</b></td><td>Builds the prompt: 18 sources, the prompt versions, reply rules.</td><td><code>src/agent/context_engine</code></td><td class="num">80</td><td class="num">8,973</td></tr>
+          <tr><td><b>Tools</b></td><td>Search chats, web search, places, memories by date, app pages, match answers.</td><td><code>src/agent/tools</code></td><td class="num">10</td><td class="num">826</td></tr>
+          <tr><td><b>Model gateway</b></td><td>Every model call: chat, JSON extraction, embeddings, Claude, retries, usage rows.</td><td><code>src/agent/providers</code></td><td class="num">19</td><td class="num">3,363</td></tr>
+          <tr><td><b>Memory engine</b></td><td>Memories with proof and dates, recall, links, chat search.</td><td><code>src/agent/memory_engine</code></td><td class="num">47</td><td class="num">7,592</td></tr>
+          <tr><td><b>Background work</b></td><td>Memory run, card rebuild, upload read, the read, vibe checks.</td><td><code>src/agent/cognition</code></td><td class="num">23</td><td class="num">3,897</td></tr>
+          <tr><td><b>Jobs</b></td><td>A jobs table and a worker inside the API process. 11 job kinds.</td><td><code>src/agent/jobs</code></td><td class="num">2</td><td class="num">208</td></tr>
+          <tr><td><b>Omi reaching out</b></td><td>Nudges, return greetings, follow-ups, story parts.</td><td><code>src/agent/proactive</code></td><td class="num">4</td><td class="num">1,021</td></tr>
+          <tr><td><b>Matching</b></td><td>Match notes, the judge, the two-sided pick, ask both, hosting, pair chat.</td><td><code>src/agent/matching</code></td><td class="num">13</td><td class="num">3,079</td></tr>
+          <tr><td><b>API</b></td><td>Routes, the chat service, the try page route.</td><td><code>src/api</code></td><td class="num"></td><td class="num">6,285</td></tr>
+          <tr><td><b>Storage</b></td><td>Postgres tables, encryption per user, retention.</td><td><code>src/storage</code></td><td class="num"></td><td class="num">10,078</td></tr>
+          <tr><td><b>Realtime and channels</b></td><td>Sockets across instances; Telegram and WhatsApp senders.</td><td><code>src/realtime</code> <code>src/channels</code></td><td class="num">6</td><td class="num">736</td></tr>
+          <tr><td><b>Admin</b></td><td>Operator pages: people, costs, experience, match pools.</td><td><code>src/admin</code></td><td class="num">7</td><td class="num">3,241</td></tr>
+          <tr><td><b>Tests</b></td><td>1,587 passing on the last full run.</td><td><code>tests</code></td><td class="num"></td><td class="num">35,129</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="models">
+    <h2>Which model does what</h2>
+    <p class="muted">Each job has its own setting, so one can change without touching the others. Model names live in the server settings, not in code.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Job</th><th>Setting</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><b>Reply</b></td><td><code>AGENT_REPLY_MODEL</code>, or a person's pick</td><td>The provider's model unless set. Claude is possible since 19 November, off by default.</td></tr>
+          <tr><td><b>Reply backup</b></td><td><code>AGENT_REPLY_FALLBACK_MODEL</code></td><td>Steps in after 25 seconds or an error.</td></tr>
+          <tr><td><b>Request check, match reasons, match notes</b></td><td><code>REQUEST_CHECK_MODEL</code></td><td>A stronger reader, called only when needed.</td></tr>
+          <tr><td><b>Memory run</b></td><td><code>MEMORY_BACKGROUND_V2_MODEL</code></td><td>Reads new messages and proposes memories.</td></tr>
+          <tr><td><b>Upload read</b></td><td><code>MEMORY_UPLOAD_MODEL</code></td><td>Reads an uploaded chat in parts, then merges.</td></tr>
+          <tr><td><b>The read</b></td><td><code>CHAT_READ_MODEL</code></td><td>One call per upload. A Claude model can write it.</td></tr>
+          <tr><td><b>Vibe proof check</b></td><td><code>VIBE_VERIFY_MODEL</code></td><td>A second model keeps only proof that really shows the line.</td></tr>
+          <tr><td><b>Meaning search</b></td><td><code>MEMORY_EMBEDDING_MODEL</code></td><td>One call per reply, plus one per saved memory.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="improve">
+    <h2>What to improve</h2>
+    <div class="two">
+      <div class="ok">
+        <h3>What is solid</h3>
+        <ul>
+          <li>Reply and learning are separate, so learning never slows a reply.</li>
+          <li>Every memory carries proof lines and dates, checked by code.</li>
+          <li>One function calls the reply model, so swapping models is one setting.</li>
+          <li>Tool results reach the model as data, never as instructions.</li>
+          <li>Each step of a turn is traced and each model call is counted.</li>
+        </ul>
+      </div>
+      <div class="weak">
+        <h3>What is weak</h3>
+        <ul>
+          <li>Background jobs run inside the API process, so they stop when the server sleeps.</li>
+          <li>The context engine is the largest part and still mixes old rule code with the new prompt.</li>
+          <li>The full prompt is sent fresh on every reply. Nothing is cached.</li>
+          <li>Nothing here has been judged on real people yet.</li>
+        </ul>
+      </div>
+    </div>
+    <p>In the order I would do them. The first three are small and make everything after them easier to trust.</p>
+    <ol class="plan">
+      <li><span class="n">1</span><div><h3>Record what really happened in a turn</h3><p>The trace saves the model that was asked for, not the one that replied, so a backup reply is invisible. Cost uses one price per provider for the usual models and a per-model table for Claude. Save the real model and use one price table, so cost per reply is right before any model comparison.</p><div class="tags"><span class="tag code">seen in code</span><span class="tag">small</span></div></div></li>
+      <li><span class="n">2</span><div><h3>Cache the stable part of the prompt</h3><p>Prompt v4 already puts the parts that never change first and this turn's facts last. No request marks that first part for caching. Turning it on cuts most of the input cost of a reply, and matters most if Claude writes replies.</p><div class="tags"><span class="tag hub">on the hub</span><span class="tag code">seen in code</span><span class="tag">small</span></div></div></li>
+      <li><span class="n">3</span><div><h3>Give background work its own worker</h3><p>Jobs run in a loop inside the API. On a server that sleeps between requests, memory runs, reminders and nudges stall. A separate worker, or a scheduled wake-up, fixes it. This comes with deploying current main.</p><div class="tags"><span class="tag hub">on the hub</span><span class="tag">medium</span></div></div></li>
+      <li><span class="n">4</span><div><h3>Mark what is live in the context engine</h3><p>80 files and about 9,000 lines. Old keyword rules for intent, emotion and stance still sit beside the v4 prompt, and intent rules still feed recall. That goes against letting the model decide. Keep the old code, as agreed, but mark each file live or kept, and move intent off keywords.</p><div class="tags"><span class="tag code">seen in code</span><span class="tag">large</span></div></div></li>
+      <li><span class="n">5</span><div><h3>Better recall: keyword index and a daily reflection</h3><p>Memory recall is meaning search plus a simple word score. A proper keyword index finds names and rare words that meaning search misses. A daily reflection would turn many small memories into a few lasting ones.</p><div class="tags"><span class="tag hub">on the hub</span><span class="tag">medium</span></div></div></li>
+      <li><span class="n">6</span><div><h3>Carry Claude's own blocks through the tool loop</h3><p>The reply path speaks one chat format and the Claude path converts it. Between tool rounds, Claude's thinking is dropped. Fine at low effort. Worth doing only if Claude becomes the main reply model.</p><div class="tags"><span class="tag code">seen in code</span><span class="tag">medium</span><span class="tag">only if Claude stays</span></div></div></li>
+      <li><span class="n">7</span><div><h3>Quiet hours before Omi reaches out more</h3><p>Follow-ups on events are built but switched off. They need quiet hours and a per-person schedule first.</p><div class="tags"><span class="tag hub">on the hub</span><span class="tag">medium</span></div></div></li>
+      <li><span class="n">8</span><div><h3>Judge it on real chats</h3><p>Evals run on made-up people. The plan is 100 real traces labelled by you, and a simple side-by-side review of replies. Both need real users first.</p><div class="tags"><span class="tag hub">on the hub</span><span class="tag">needs users</span></div></div></li>
+    </ol>
+    <p class="muted">Safety items (crisis replies, consent for sensitive areas, checks on pictures between matched people) are tracked on the hub and are not architecture changes.</p>
+  </section>
+</div>

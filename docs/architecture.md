@@ -1,5 +1,9 @@
 # Omiryn Architecture
 
+> This is the first plan, from before the code existed. For how the code works today (the parts, one
+> reply step by step, how Omi learns, and what to improve), see `docs/diagrams/agent-map.html`, published as
+> the Omiryn Agent Map on the hub.
+
 ## Goal
 
 Build a high-trust AI matchmaking platform where agent conversations create
