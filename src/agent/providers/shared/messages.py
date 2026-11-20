@@ -14,8 +14,10 @@ from agent.context_engine.policy.replies import (
     STORY_NOTE_PREFIX,
     has_story_marker,
     normalize_part_separators,
+    without_thinking,
 )
 
+from .errors import AgentProviderError
 from .config import (
     CHAT_ADVICE_REPLY_WORD_LIMIT,
     CHAT_REPLY_WORD_LIMIT,
@@ -355,7 +357,17 @@ def _conversation_and_context_text(
         return conversation_text
     return f"{context_text}\n\nConversation:\n{conversation_text}"
 
+def reply_without_thinking(content: str) -> str:
+    """The reply without any thinking the model wrote into it. When the thinking cannot be cut out
+    safely, or nothing is left, this is a failed reply: the caller's other model writes it."""
+    cleaned = without_thinking(content)
+    if cleaned is None or (content.strip() and not cleaned.strip()):
+        raise AgentProviderError("The model wrote its thinking into the reply.")
+    return cleaned
+
+
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
+    content = reply_without_thinking(content)
     cleaned = " ".join(normalize_part_separators(content).strip().split())
     if not cleaned:
         return cleaned

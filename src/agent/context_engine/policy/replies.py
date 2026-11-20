@@ -25,6 +25,27 @@ def normalize_part_separators(text: str) -> str:
     return _SEPARATOR_VARIANTS.sub(REPLY_PART_SEPARATOR, text)
 
 
+# A model's private thinking, when it writes that into the reply itself instead of keeping it apart.
+_THINKING_NAMES = r"(?:think|thinking|thought|thoughts|reasoning|reflection|scratchpad)"
+_THINKING_BLOCK = re.compile(rf"<\s*{_THINKING_NAMES}\s*>.*?<\s*/\s*{_THINKING_NAMES}\s*>", re.IGNORECASE | re.DOTALL)
+_THINKING_OPEN = re.compile(rf"<\s*{_THINKING_NAMES}\s*>", re.IGNORECASE)
+_THINKING_CLOSE = re.compile(rf"<\s*/\s*{_THINKING_NAMES}\s*>", re.IGNORECASE)
+
+
+def without_thinking(text: str) -> str | None:
+    """The reply with the model's thinking cut out, or None when the two cannot be told apart.
+
+    A closed <think>...</think> block is cut. With only a closing tag, everything before it is
+    thinking. With only an opening tag nothing marks where the reply starts, so the caller must
+    treat the whole text as a failed reply, never show it.
+    """
+    cleaned = _THINKING_BLOCK.sub(" ", text)
+    closes = list(_THINKING_CLOSE.finditer(cleaned))
+    if closes:
+        cleaned = cleaned[closes[-1].end():]
+    return None if _THINKING_OPEN.search(cleaned) else cleaned
+
+
 # Written by the model after the last part of a story; never shown to the user.
 STORY_END_MARKER = "<story_end>"
 _STORY_END_VARIANTS = re.compile(r"[<\[]\s*/?\s*story[\s_-]*end\s*/?\s*[>\]]", re.IGNORECASE)

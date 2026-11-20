@@ -17,6 +17,7 @@ from typing import Any
 
 from agent.observability.usage import CHAT_REPLY
 from agent.providers.shared.errors import AgentProviderError, AgentProviderTruncationError
+from agent.context_engine.policy.replies import without_thinking
 from agent.providers.shared.messages import _compact_chat_reply, _provider_messages
 from agent.providers.shared.usage_events import _emit_prompt_debug, _prompt_debug
 
@@ -97,7 +98,8 @@ async def claude_chat(
     }
     usage["cost_usd"] = cost_usd(model, usage["input_tokens"], usage["output_tokens"])
     stopped = str(response.stop_reason or "")
-    raw_usage = {"finish_reason": stopped, "prompt_debug": prompt_debug}
+    # The kinds of block in the answer, in order: shows a reply that came in more than one piece.
+    raw_usage = {"finish_reason": stopped, "blocks": [str(block.type) for block in response.content], "prompt_debug": prompt_debug}
     _record(request_kind, conversation_id, model, started, success=stopped not in {"refusal", "max_tokens"}, usage=usage, raw_usage=raw_usage)
     if stopped == "refusal":
         raise AgentProviderError("Claude declined this request")
@@ -112,8 +114,22 @@ async def claude_chat(
         return json.dumps(calls[0]["arguments"])  # a named tool: its arguments are the answer
     if calls:
         return TOOL_CALL_MARKER + json.dumps({"calls": calls})
-    content = "".join(block.text for block in response.content if block.type == "text")
-    return _compact_chat_reply(content, messages) if request_kind == CHAT_REPLY else content
+    texts = [block.text for block in response.content if block.type == "text"]
+    if request_kind != CHAT_REPLY:
+        return "".join(texts)
+    return _compact_chat_reply(_spoken_text(texts), messages)
+
+
+def _spoken_text(texts: list[str]) -> str:
+    """The text blocks of a reply as one text, without a block that is only the model's thinking.
+
+    Thinking belongs in its own kind of block, which is never read here. Seen once on a rewrite: a
+    text block that opened with <think> and held notes on how to reply, then the reply in a second
+    text block. Such a block is dropped whole; thinking mixed into the reply itself is left for
+    the shared check, which cuts it or fails the reply.
+    """
+    spoken = [text for text in texts if without_thinking(text) is not None]
+    return "".join(spoken if spoken else texts)
 
 
 def claude_messages(provider_messages: list[dict[str, Any]], model: str) -> tuple[list[str], list[dict[str, Any]]]:
