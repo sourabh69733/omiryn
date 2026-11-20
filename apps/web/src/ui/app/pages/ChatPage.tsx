@@ -86,7 +86,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const [temporaryTitle, setTemporaryTitle] = useState("");
   const [runtime, setRuntime] = useState<{ provider?: string; model?: string; available_models?: string[] }>({});
   // The model that writes replies: the Profile pick, or the app default when none (null).
-  const [replyModel, setReplyModel] = useState<{ default: string; selected: string | null } | null>(null);
+  const [replyModel, setReplyModel] = useState<ReplyModelSetting | null>(null);
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [usage, setUsage] = useState<ConversationUsage | null>(null);
@@ -869,7 +869,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
 
   async function loadReplyModel() {
     const response = await apiFetch("/api/agent/settings/model").catch(() => null);
-    if (response?.ok) setReplyModel((await response.json()) as { default: string; selected: string | null });
+    if (response?.ok) setReplyModel((await response.json()) as ReplyModelSetting);
   }
 
   // Replies follow the Profile pick, not the model saved on the chat, so this changes the pick
@@ -880,7 +880,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: replyModel && model === replyModel.default ? null : model })
     });
-    if (response.ok) setReplyModel((await response.json()) as { default: string; selected: string | null });
+    if (response.ok) setReplyModel((await response.json()) as ReplyModelSetting);
   }
 
   async function toggleContext(sourceId: string) {
@@ -1460,7 +1460,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                 </>
               ) : (
                 <div className="omi-drawer-usage">
-                  {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={replyModel?.selected || replyModel?.default || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{(runtime.available_models || [runtime.model]).filter(Boolean).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>}
+                  {(/(localhost|127.0.0.1)/i).test(window.origin) && <label className="model-picker"><span>Model</span><select value={replyModel?.selected || replyModel?.default || runtime.model || ""} onChange={(event) => void updateModel(event.target.value)}>{replyModelOptions(replyModel, runtime).map((model) => <option value={model} key={model}>{model === replyModel?.default ? `${model} (default)` : model}</option>)}</select></label>}
                   <div className="usage-summary">
                 {!conversation ? "Usage will appear after you select a conversation." : null}
                 {conversation && usageLoading ? "Loading usage..." : null}
@@ -1693,6 +1693,15 @@ function startOfDay(date: Date) {
 
 function titleize(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+type ReplyModelSetting = { default: string; selected: string | null; choices?: Array<{ id: string }> };
+
+// The same list as Profile > Reply model, so a Claude model or a new server default shows here too.
+// Before that list loads, the provider's own models stand in.
+function replyModelOptions(setting: ReplyModelSetting | null, runtime: { model?: string; available_models?: string[] }) {
+  const offered = setting?.choices?.map((choice) => choice.id) || [];
+  return offered.length ? offered : (runtime.available_models || [runtime.model]).filter((model): model is string => Boolean(model));
 }
 
 function usageRequestKindLabel(kind?: string) {
