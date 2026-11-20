@@ -58,6 +58,7 @@ from agent.cognition.background.uploads.notes import (
     gather,
     merge_input,
     merged_memories,
+    one_change_each,
     part_input,
     relationship_memory,
 )
@@ -118,6 +119,7 @@ async def read_upload(conversation: dict[str, Any], user_id: str) -> dict[str, A
         merge = await _merge(conversation_id, gathered, partner, whole, context)
         operations = merged_memories(gathered, merge, context["memories"])
         operations += relationship_memory(partner, merge, gathered, whole, context["memories"])
+        operations = one_change_each(operations)
         applied = None
         if operations:
             applied = apply_validated_memory_analysis_v3(

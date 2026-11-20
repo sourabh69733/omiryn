@@ -216,6 +216,27 @@ def relationship_memory(partner: str | None, merge: dict[str, Any], gathered: Ga
     return (MemorySupersedeProposal(target_memory_id=str(earlier["id"]), replacement=memory),) if earlier else (memory,)
 
 
+def one_change_each(operations: tuple[Any, ...]) -> tuple[Any, ...]:
+    """A stored memory can be changed once per batch; a second change to it is refused whole.
+
+    Two changes meet on one memory when a chat with the same person is uploaded again: a note
+    matches the earlier memory about them (a reinforce), and that same memory is being replaced by
+    what this upload shows (a supersede). The replacement is kept, since it already says it; apart
+    from that, the first change to a memory stays.
+    """
+    replaced = {operation.target_memory_id for operation in operations if isinstance(operation, MemorySupersedeProposal)}
+    kept: list[Any] = []
+    seen: set[str] = set()
+    for operation in operations:
+        target = getattr(operation, "target_memory_id", None)
+        if target and (target in seen or (target in replaced and not isinstance(operation, MemorySupersedeProposal))):
+            continue
+        if target:
+            seen.add(target)
+        kept.append(operation)
+    return tuple(kept)
+
+
 def build_digest(partner: str | None, merge: dict[str, Any], gathered: Gathered, whole: MemoryBatch) -> dict[str, Any]:
     """The stored digest: summary, index line, topics, the other person, plans; every item with lines."""
     sent = {message.message_index: parse_time(message.sent_at) for message in whole.messages}

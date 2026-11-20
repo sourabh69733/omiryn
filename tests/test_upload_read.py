@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from agent.cognition.background.idle import run_memory_flush_job
-from agent.cognition.background.uploads.notes import Gathered, check_part, merged_memories
+from agent.cognition.background.uploads.notes import Gathered, check_part, merged_memories, one_change_each, relationship_memory
 from agent.cognition.background.uploads.read import card_lines, merge_vibe, upload_parts
 from agent.cognition.background.uploads.hidden_chat import learn_from_whatsapp_upload
 from agent.memory_engine.memories.models import MemoryKind, MemoryPurpose, MemorySensitivity
-from agent.memory_engine.memories.operations import MemoryAddProposal, MemoryReinforceProposal
+from agent.memory_engine.memories.operations import MemoryAddProposal, MemoryReinforceProposal, MemorySupersedeProposal
 from api.main import app, current_user
 from security.auth import CurrentUser
 from storage import get_user_card, list_agent_memories, reset_db, save_conversation, set_user_timezone
@@ -56,6 +56,25 @@ class MergeTest(unittest.TestCase):
         [operation] = merged_memories(gathered, {"known": [{"candidate": "c1", "memory": "m1"}, {"candidate": "c1", "memory": "unknown"}]}, [{"id": "m1"}])
         self.assertIsInstance(operation, MemoryReinforceProposal)
         self.assertEqual((operation.target_memory_id, operation.evidence_message_indexes), ("m1", (2,)))
+
+    def test_the_same_chat_uploaded_again_changes_the_memory_about_that_person_once(self) -> None:
+        # The earlier memory about Riya is matched by a note (a reinforce) and is also being
+        # replaced (a supersede). Storage refuses two changes to one memory, which failed the read.
+        existing = [{"id": "m-riya", "key": "chat_partner.riya"}, {"id": "m-city"}]
+        gathered = _gathered(("c1", _add("Chats with Riya a lot.", (2,))), ("c2", _add("Lives in Pune.", (4,))), ("c3", _add("Lives in Pune, Kothrud.", (6,))))
+        merge = {"known": [{"candidate": "c1", "memory": "m-riya"}, {"candidate": "c2", "memory": "m-city"}]}
+        whole = type("Whole", (), {"messages": [type("Message", (), {"role": "user", "message_index": index})() for index in (2, 4, 6)]})()
+
+        both = merged_memories(gathered, merge, existing) + relationship_memory("Riya", merge, gathered, whole, existing)
+        self.assertEqual([getattr(item, "target_memory_id", None) for item in both].count("m-riya"), 2)
+
+        kept = one_change_each(both)
+        about_riya = [item for item in kept if getattr(item, "target_memory_id", None) == "m-riya"]
+        self.assertEqual(len(about_riya), 1)
+        self.assertIsInstance(about_riya[0], MemorySupersedeProposal)
+        # Everything else stays: the city is still reinforced, the new fact still added.
+        self.assertEqual(len(kept), len(both) - 1)
+        self.assertTrue(any(isinstance(item, MemoryReinforceProposal) and item.target_memory_id == "m-city" for item in kept))
 
     def test_vibe_line_keeps_the_proof_of_the_lines_it_joined(self) -> None:
         proof = lambda index: {"conversation_id": "u", "message_index": index}  # noqa: E731
