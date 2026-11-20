@@ -217,9 +217,11 @@ class PairChatTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await JobWorker().run_once(), 1)
         self.assertIn("The introduction to Aman is off", seen[0])
         self.assertNotIn("block", seen[0].lower())
-        # Omi's standing context does not tell Bela she said no, and does not say why.
-        self.assertIn("not by this user's choice", match_hosting_sources("ub")[0]["content"])
-        self.assertIn("the user said no to it", match_hosting_sources("ua")[0]["content"])
+        # Omi's standing context does not tell Bela she said no, and does not say why. Read on the
+        # same day: a closed introduction leaves the context seven days after it ended.
+        with patch("agent.context_engine.sources.match_hosting.utc_now", return_value=DAY):
+            self.assertIn("not by this user's choice", match_hosting_sources("ub")[0]["content"])
+            self.assertIn("the user said no to it", match_hosting_sources("ua")[0]["content"])
         # Never offered to each other again: not by the pick in any pool, not by hand.
         self.assertEqual(blocked_match_pairs(["ua"]), {frozenset(("ua", "ub"))})
         self.assertEqual([(a, b) for a, b, _ in eligible_pairs(["ua", "ub", "uc"], [], blocked_match_pairs(["ua", "ub", "uc"]))], [("ua", "uc"), ("ub", "uc")])
