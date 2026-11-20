@@ -1,0 +1,215 @@
+<title>Omi Abilities</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column. One finding, one wide comparison table, then what to build, what to skip and how to keep the list. Same tokens as the Agent Map. */
+:root {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --surface-2: #eaf0ee;
+  --line: #cfd9d6;
+  --fg: #16221f;
+  --muted: #5d6f6a;
+  --accent: #0f766e;
+  --accent-soft: #d3ece8;
+  --warn: #b45309;
+  --warn-soft: #fbe9d2;
+  --good: #1f7a4d;
+  --good-soft: #d9f0e3;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1716; --surface: #15201e; --surface-2: #1c2a27; --line: #2d3f3b; --fg: #e6efec; --muted: #93a7a2;
+    --accent: #3fc1b4; --accent-soft: #163b37; --warn: #f0a04b; --warn-soft: #3b2a14; --good: #5ad08f; --good-soft: #163a28;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1716; --surface: #15201e; --surface-2: #1c2a27; --line: #2d3f3b; --fg: #e6efec; --muted: #93a7a2;
+  --accent: #3fc1b4; --accent-soft: #163b37; --warn: #f0a04b; --warn-soft: #3b2a14; --good: #5ad08f; --good-soft: #163a28;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; margin: 0; }
+.wrap { max-width: 1020px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 44px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+h1 { font: 700 clamp(1.6rem, 3vw, 2.2rem) var(--font-display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 66ch; }
+.asof { font: 500 0.78rem var(--font-mono); color: var(--muted); margin: 0; }
+nav { display: flex; flex-wrap: wrap; gap: 6px; }
+nav a { font: 600 0.82rem var(--font-display); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; }
+nav a:hover { border-color: var(--accent); }
+a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; scroll-margin-top: 16px; }
+h2 { font: 600 1.25rem var(--font-display); margin: 0; text-wrap: balance; }
+section > p { margin: 0; max-width: 68ch; }
+.muted { color: var(--muted); }
+
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.9rem; }
+th { font: 600 0.72rem var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+th.num { text-align: right; }
+code { font: 500 0.82rem var(--font-mono); color: var(--muted); }
+td b { font-family: var(--font-display); font-weight: 600; }
+
+.plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.plan li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.plan li:last-child { border-bottom: 0; }
+.plan .n { font: 600 0.9rem var(--font-display); width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); }
+.plan h3 { font: 600 1rem var(--font-display); margin: 0 0 4px; }
+.plan p { margin: 0 0 6px; }
+.plan .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font: 500 0.72rem var(--font-mono); padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.tag.code { background: var(--accent-soft); color: var(--accent); }
+.tag.hub { background: var(--warn-soft); color: var(--warn); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.two > div { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px 16px; min-width: 0; }
+.two h3 { font: 600 0.78rem var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; margin: 0 0 8px; }
+.two .ok h3 { color: var(--good); } .two .weak h3 { color: var(--warn); }
+.two ul { margin: 0; padding-left: 18px; }
+.two li { margin-bottom: 5px; }
+
+table.cmp { min-width: 900px; }
+table.cmp td:first-child { min-width: 190px; }
+tr.group td { font: 600 0.72rem var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); padding: 7px 14px; }
+.m { display: inline-block; font: 600 0.72rem var(--font-display); padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.m.y { background: var(--good-soft); color: var(--good); }
+.m.p { background: var(--warn-soft); color: var(--warn); }
+.m.n { background: var(--surface-2); color: var(--muted); }
+.m.q { border: 1px dashed var(--line); color: var(--muted); }
+td small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 3px; line-height: 1.35; }
+td.omi { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.note { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 12px; padding: 14px 16px; max-width: 76ch; }
+.note p { margin: 0 0 8px; } .note p:last-child { margin: 0; }
+.note ul, .src { margin: 0; padding-left: 18px; }
+.src li { margin-bottom: 4px; font-size: 0.88rem; }
+.src a, section a { color: var(--accent); }
+.key { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--muted); font-size: 0.85rem; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>What Omi can do, and what it cannot do yet</h1>
+    <p class="lede">A quick check of Omi against the big personal agents: what each one can do, where Omi is behind, where it is ahead, and what I would build first.</p>
+    <p class="asof">Quick check, 20 November 2026. From Omi's code and public pages. The other apps were not tested by hand, and what they offer in India can differ.</p>
+    <nav aria-label="Sections">
+      <a href="#finding">First finding</a>
+      <a href="#table">The list</a>
+      <a href="#build">What to build</a>
+      <a href="#skip">What to skip</a>
+      <a href="#keep">How to keep the list</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </header>
+
+  <section id="finding">
+    <h2>Omi already has the internet</h2>
+    <div class="note">
+      <p>Omi can search the web today. It is switched on in your local app. I ran Omi's own search on "GATE 2027 application form opening date" and it came back with the answer: the form opened on 2 September 2026 and closed on 12 October with the late fee.</p>
+      <p>So a wrong answer to a question like that is not a missing internet. It is one of these, and I have not tested which:</p>
+      <ul>
+        <li><b>It did not search.</b> The model decides on its own whether to search, and it can answer from memory by mistake.</li>
+        <li><b>It searched but read too little.</b> Each search gives 4 extracts of about 600 letters. A date table gets cut in the middle. In my test, one result was cut right where the table started.</li>
+        <li><b>It cannot open the page.</b> When the extract is not enough, Omi has no way to read the full page.</li>
+        <li><b>The question needs today's date.</b> "When is the form open" has the answer "it already closed", which needs the model to compare dates.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="table">
+    <h2>The list, ability by ability</h2>
+    <div class="key"><span class="m y">Yes</span> does it <span class="m p">Part</span> does some of it <span class="m n">No</span> does not <span class="m q">Not checked</span> I did not find a clear answer</div>
+    <div class="scroll">
+      <table class="cmp">
+        <thead><tr><th>Ability</th><th>Omi today</th><th>ChatGPT</th><th>Gemini</th><th>Meta AI</th><th>Claude</th><th>Friend apps<br>Pi, Replika, Nomi</th></tr></thead>
+        <tbody>
+<tr class="group"><td colspan="7">Knows the outside world</td></tr>
+<tr><td><b>Search the web</b></td><td class="omi"><span class="m y">Yes</span><small>4 short extracts per search</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m p">Part</span><small>Pi yes, most others no</small></td></tr>
+<tr><td><b>Open and read a page or a link you paste</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>Long research with many steps</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m y">Yes</span><small>Deep research</small></td><td><span class="m y">Yes</span><small>Deep Research</small></td><td><span class="m p">Part</span><small>helpers for hard questions</small></td><td><span class="m y">Yes</span><small>Research</small></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>Find places near you</b></td><td class="omi"><span class="m y">Yes</span><small>cafes and spots with a maps link</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>Maps</small></td><td><span class="m q">Not checked</span></td><td><span class="m q">Not checked</span></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>See a photo or a screenshot</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>also live camera</small></td><td><span class="m y">Yes</span></td><td><span class="m p">Part</span></td></tr>
+<tr><td><b>Read a file or PDF</b></td><td class="omi"><span class="m n">No</span><small>only a WhatsApp chat export</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m q">Not checked</span></td><td><span class="m y">Yes</span></td><td><span class="m n">No</span></td></tr>
+<tr class="group"><td colspan="7">Knows you</td></tr>
+<tr><td><b>Remembers you across chats</b></td><td class="omi"><span class="m y">Yes</span><small>with dates, people, and a page to see and delete it</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>Personal Intelligence</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>Nomi is known for it</small></td></tr>
+<tr><td><b>Reads your mail, calendar, files</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m y">Yes</span><small>connected apps</small></td><td><span class="m y">Yes</span><small>Gmail, Photos, YouTube</small></td><td><span class="m p">Part</span><small>mail and calendar, some countries</small></td><td><span class="m y">Yes</span><small>connectors</small></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>Reads a chat with one person and tells you the vibe</b></td><td class="omi"><span class="m y">Yes</span><small>the read</small></td><td><span class="m p">Part</span><small>only if you paste it</small></td><td><span class="m p">Part</span><small>only if you paste it</small></td><td><span class="m p">Part</span><small>only if you paste it</small></td><td><span class="m p">Part</span><small>only if you paste it</small></td><td><span class="m n">No</span></td></tr>
+<tr class="group"><td colspan="7">Does things</td></tr>
+<tr><td><b>Remind me at a time I ask</b></td><td class="omi"><span class="m n">No</span><small>on the list; follow-ups are switched off</small></td><td><span class="m y">Yes</span><small>Scheduled tasks, hourly at most</small></td><td><span class="m y">Yes</span></td><td><span class="m p">Part</span><small>repeat tasks, some countries</small></td><td><span class="m p">Part</span><small>desktop only</small></td><td><span class="m q">Not checked</span></td></tr>
+<tr><td><b>A morning or daily summary</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m p">Part</span><small>Pulse closed in June, tasks took over</small></td><td><span class="m y">Yes</span><small>Daily Brief</small></td><td><span class="m p">Part</span><small>some countries</small></td><td><span class="m q">Not checked</span></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>Writes to you first</b></td><td class="omi"><span class="m p">Part</span><small>welcome back, match news</small></td><td><span class="m p">Part</span><small>through tasks</small></td><td><span class="m y">Yes</span><small>Spark works in the background</small></td><td><span class="m q">Not checked</span></td><td><span class="m p">Part</span><small>Duet, a preview</small></td><td><span class="m q">Not checked</span></td></tr>
+<tr><td><b>Book, order or pay for you</b></td><td class="omi"><span class="m n">No</span><small>plan: links you tap, never logged-in</small></td><td><span class="m y">Yes</span><small>agent mode, table bookings</small></td><td><span class="m p">Part</span><small>calls and bills, US first</small></td><td><span class="m p">Part</span><small>some countries</small></td><td><span class="m p">Part</span><small>on a computer</small></td><td><span class="m n">No</span></td></tr>
+<tr><td><b>Make pictures, slides, documents</b></td><td class="omi"><span class="m n">No</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m p">Part</span></td><td><span class="m p">Part</span><small>pictures in some</small></td></tr>
+<tr class="group"><td colspan="7">How it talks</td></tr>
+<tr><td><b>Voice</b></td><td class="omi"><span class="m n">No</span><small>parked</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>Gemini Live</small></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span></td><td><span class="m y">Yes</span><small>Replika has calls</small></td></tr>
+<tr><td><b>Hinglish, short, like a friend</b></td><td class="omi"><span class="m y">Yes</span><small>the main work so far</small></td><td><span class="m p">Part</span></td><td><span class="m p">Part</span></td><td><span class="m p">Part</span></td><td><span class="m p">Part</span></td><td><span class="m p">Part</span><small>English first</small></td></tr>
+<tr class="group"><td colspan="7">People</td></tr>
+<tr><td><b>Finds you people to talk to and introduces you</b></td><td class="omi"><span class="m y">Yes</span><small>built, not proven with real people</small></td><td><span class="m n">No</span></td><td><span class="m n">No</span></td><td><span class="m n">No</span></td><td><span class="m n">No</span></td><td><span class="m n">No</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Read it this way: the big four are ahead on almost every row about the outside world and about doing things. Omi is ahead on two rows only, and they are the two no one else has: reading a chat between two people, and finding you people.</p>
+  </section>
+
+  <section id="build">
+    <h2>What I would build, in this order</h2>
+    <p>Not everything in the list. Only what a friend who knows you is expected to do.</p>
+    <ol class="plan">
+      <li><span class="n">1</span><div><h3>Make looked-up answers right</h3><p>Longer extracts, and let Omi open the best page when the extract is not enough. Also make sure it searches when the question is about dates, forms, prices or news. This is the GATE kind of question.</p><div class="tags"><span class="tag code">small</span><span class="tag">web_search tool</span></div></div></li>
+      <li><span class="n">2</span><div><h3>Read a link you paste</h3><p>People paste links all the time. Today Omi sees only the address. The same page reader from step 1 does this.</p><div class="tags"><span class="tag code">small</span><span class="tag">new tool</span></div></div></li>
+      <li><span class="n">3</span><div><h3>Remind me at a time I ask</h3><p>"Remind me at 6 to call mom." Every big agent has it and it is the most basic thing a personal agent does. Needs quiet hours first.</p><div class="tags"><span class="tag code">medium</span><span class="tag hub">hub: remind-at-time</span></div></div></li>
+      <li><span class="n">4</span><div><h3>See a photo or screenshot</h3><p>A screenshot of a chat, a form, a bill. Needs a reply model that can see, so it depends on the model choice.</p><div class="tags"><span class="tag code">medium</span><span class="tag">needs a check</span></div></div></li>
+      <li><span class="n">5</span><div><h3>Voice, then links for bookings</h3><p>Both are already planned. They stay behind the four above.</p><div class="tags"><span class="tag code">large</span><span class="tag hub">hub: voice, bookings</span></div></div></li>
+    </ol>
+  </section>
+
+  <section id="skip">
+    <h2>What I would not build</h2>
+    <div class="two">
+      <div class="weak"><h3>Leave to the big apps</h3><ul>
+        <li>Long research reports.</li>
+        <li>Making pictures, slides and documents.</li>
+        <li>An agent that clicks through sites, logs in or pays. Our own research says use links the person taps.</li>
+        <li>Mail and calendar connections, for now. High trust cost, and Google and OpenAI give it free.</li>
+      </ul></div>
+      <div class="ok"><h3>Where Omi should win</h3><ul>
+        <li>Knowing the person: memory with dates and people, shown openly.</li>
+        <li>Talking like a friend in Hinglish.</li>
+        <li>Reading a chat with someone and saying what is going on.</li>
+        <li>Finding people to talk to. Nobody else does this.</li>
+      </ul></div>
+    </div>
+    <p class="muted">The point of the first list is not to beat ChatGPT. It is to stop Omi from failing at small things a friend with a phone could answer, so people do not leave for those.</p>
+  </section>
+
+  <section id="keep">
+    <h2>How to keep this list honest</h2>
+    <p>A table of features goes stale and does not tell us if Omi is right. A list of real questions does.</p>
+    <ol class="plan">
+      <li><span class="n">1</span><div><h3>Write 30 to 40 real questions, grouped by ability</h3><p>"When is the GATE form open?", "what is the score?", "what does this link say?", "remind me at 6", "best cafe near Indiranagar". Made-up asks, never from anyone's chat.</p></div></li>
+      <li><span class="n">2</span><div><h3>Run them through the real reply path</h3><p>Same code a real message goes through, on a test user. Keep what happened: did it search, what it read, what it said.</p></div></li>
+      <li><span class="n">3</span><div><h3>Mark each one and say why</h3><p>Right, wrong, or cannot do. For a wrong one, the reason: did not search, read too little, or no such ability. That gives a number per ability and tells us what to build.</p></div></li>
+      <li><span class="n">4</span><div><h3>Add a question every time a real chat fails</h3><p>You hit one, it goes in the list. The list grows from real use, and we run it again after each change.</p></div></li>
+    </ol>
+  </section>
+
+  <section id="sources">
+    <h2>Sources</h2>
+    <ul class="src">
+      <li>Omi: the code on main, <code>src/agent/tools</code>, and one live run of Omi's own web search.</li>
+      <li>ChatGPT: <a href="https://eweek.com/news/10-hidden-chatgpt-features-chatbot/">eWeek on agent mode and connected apps</a>, <a href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">OpenAI release notes</a>, <a href="https://www.digit.in/news/general/openai-is-retiring-chatgpt-pulse-and-replacing-it-with-scheduled-tasks-here-is-why.html">Digit on Pulse closing</a>, <a href="https://gigazine.net/gsc_news/en/20260619-chatgpt-scheduled-tasks/">Gigazine on scheduled tasks</a>.</li>
+      <li>Gemini: <a href="https://blog.google/innovation-and-ai/products/gemini-app/next-evolution-gemini-app/">Google on the agent update</a>, <a href="https://blog.google/innovation-and-ai/products/gemini-app/tasks-in-gemini-free-new-features/">Google on tasks</a>, <a href="https://thenextweb.com/news/google-gemini-app-daily-brief-redesign-io-2026">The Next Web on Daily Brief</a>, <a href="https://techcrunch.com/2026/05/19/google-updates-its-gemini-app-to-take-on-chatgpt-and-claude-at-io-2026/">TechCrunch on I/O 2026</a>.</li>
+      <li>Meta AI: <a href="https://about.fb.com/news/2026/07/meta-ai-muse-spark-doesnt-just-think-it-acts/">Meta on task features</a>, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/">Meta on Muse Spark</a>, <a href="https://9to5mac.com/2026/05/12/meta-ai-app-enhanced-with-new-features-using-muse-spark-heres-whats-new/">9to5Mac on the app</a>.</li>
+      <li>Claude: <a href="https://support.claude.com/en/articles/12138966-release-notes">release notes</a>, <a href="https://www.techrepublic.com/article/news-claude-cheat-sheet-complete-guide/">TechRepublic guide</a>.</li>
+      <li>Friend apps: <a href="https://tech-insider.org/replika-vs-character-ai-vs-nomi-ai-2026/">Tech Insider comparison</a>, <a href="https://aicompanionguides.com/blog/best-ai-companion-apps-2026/">AI Companion Guides</a>. These are review blogs and often disagree.</li>
+      <li>Our earlier work: the Omi Daily Agent Research page in the hub.</li>
+    </ul>
+  </section>
+</div>
