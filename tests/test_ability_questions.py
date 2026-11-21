@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from agent.evals.abilities.questions import AREAS, ASKED, NEEDS, QUESTIONS, as_markdown, coverage
+from agent.evals.abilities.questions import AREAS, ASKED, NEEDS, QUESTIONS, WHO, as_markdown, coverage
 
 
 class AbilityQuestionsTest(unittest.TestCase):
@@ -14,6 +14,7 @@ class AbilityQuestionsTest(unittest.TestCase):
             self.assertIn(question.area, AREAS, question.id)
             self.assertIn(question.needs, NEEDS, question.id)
             self.assertIn(question.asked, ASKED, question.id)
+            self.assertIn(question.who, WHO, question.id)
             self.assertTrue(question.text.strip() and question.right_when.strip(), question.id)
 
     def test_a_follow_up_comes_right_after_the_question_it_follows(self) -> None:
@@ -28,6 +29,17 @@ class AbilityQuestionsTest(unittest.TestCase):
             self.assertGreaterEqual(counts["area"][area], 3, area)
         for need in NEEDS:
             self.assertGreaterEqual(counts["needs"][need], 2, need)
+
+    def test_career_gives_each_stage_the_same_spread(self) -> None:
+        # A student, a final-year and a working person each get: something to look up, a decision,
+        # something to write, a hard moment to talk through, and one that uses what Omi knows.
+        for who in ("student", "finishing", "working"):
+            needs = {question.needs for question in QUESTIONS if question.area == "career" and question.who == who}
+            self.assertGreaterEqual(sum(1 for q in QUESTIONS if q.area == "career" and q.who == who), 10, who)
+            self.assertTrue(needs & {"look_up", "look_up_dates", "look_up_deep"}, who)
+            self.assertTrue(needs & {"memory", "memory_and_look_up"}, who)
+            for need in ("decide", "write", "talk"):
+                self.assertIn(need, needs, f"{who} has no {need} question")
 
     def test_the_readable_page_matches_the_list(self) -> None:
         page = Path(__file__).resolve().parents[1] / "docs" / "ability-questions.md"
