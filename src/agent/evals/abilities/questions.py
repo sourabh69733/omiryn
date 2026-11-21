@@ -94,8 +94,14 @@ class AbilityQuestion:
     right_when: str
     search: bool | None = None
     asked: str = "hinglish"
-    # What the test user told Omi earlier, or what is attached to the message.
+    # What the person told Omi earlier, in their own words. The runner puts it in the chat first.
+    earlier: str = ""
+    # Text the person pastes along with the question.
+    pasted: str = ""
+    # A note on anything else that comes with the message.
     setup: str = ""
+    # False: the test cannot send this at all (a photo), so it is listed but not run.
+    runnable: bool = True
     # The id of the question asked just before this one, in the same chat.
     after: str = ""
     # False: Omi has no such ability yet. A right reply says so and never pretends.
@@ -104,6 +110,18 @@ class AbilityQuestion:
 
 
 Q = AbilityQuestion
+
+# Written for this list. The three points a summary must keep: the hostel moved the mess timing,
+# the reason was the new exam schedule, and students can ask for a packed dinner.
+PASTED_PARAGRAPH = (
+    "Notice for all hostel residents. From Monday the mess will serve dinner from 7 pm to 9 pm, not 8 pm to "
+    "10 pm as before. The change is because the end-semester exams now start at 8 am, and the warden's office "
+    "wants students to sleep earlier in exam weeks. Breakfast moves to 6.30 am for the same reason, and lunch "
+    "stays as it is. Students who have a lab or a class that runs past 8.30 pm can ask for a packed dinner. To "
+    "do that, write your name and room number in the register at the mess counter before 5 pm on the same day. "
+    "Packed dinners are kept at the counter until 10.30 pm and not after that. The old timings come back once "
+    "the exams are over, on the date the academic office announces."
+)
 
 QUESTIONS: tuple[AbilityQuestion, ...] = (
     # Exams and admissions
@@ -121,7 +139,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "Gives both exam dates and says clearly whether they clash.", True, who="finishing"),
     Q("exams-days-left", "exams", "memory", "kitne din bache hain mere exam mein?",
       "Uses the date the person gave and counts the days right for today.", False,
-      setup="Earlier the person said: my semester exams start on 7 December.", who="student"),
+      earlier="My semester exams start on 7 December.", who="student"),
 
     # Career: in college, first to third year
     Q("career-s-internship-how", "career", "know", "2nd year me hu, internship kaise milegi",
@@ -146,7 +164,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "Stays with the feeling first. At most one small next step. No advice list.", False, who="student"),
     Q("career-s-this-sem", "career", "memory", "is semester me career ke liye kya karu",
       "Uses the branch, the interest in design and the missing internship. An answer only this person would get.", None, who="student",
-      setup="Earlier the person said: I am in second year ECE, I like UI design, I have no internship yet."),
+      earlier="I am in second year ECE, I like UI design, I have no internship yet."),
 
     # Career: final year or just out
     Q("career-f-drives", "career", "look_up", "any off campus drives going on for 2026 batch?",
@@ -179,7 +197,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "A short message that does not beg, with a blank for the role.", False, who="finishing"),
     Q("career-f-openings", "career", "memory_and_look_up", "mere liye koi opening dekh ke batao",
       "Looks for backend fresher roles that fit, without asking again what the person wants.", True, who="finishing",
-      setup="Earlier the person said: I am in final year CSE, 7.4 CGPA, I want backend roles, I am in Bhopal."),
+      earlier="I am in final year CSE, 7.4 CGPA, I want backend roles, I am in Bhopal."),
 
     # Career: first few years of a job
     Q("career-w-buyout", "career", "know", "notice period buyout kya hota hai",
@@ -208,7 +226,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "A mail that asks for 11 with a reason, ready to send.", False, who="working"),
     Q("career-w-next-skill", "career", "memory", "agle 3 mahine me kya seekhu",
       "Uses the testing job and the wish to move to development. A plan only this person would get.", None, who="working",
-      setup="Earlier the person said: I have been a manual tester at a service company for 1.5 years and I want to move to development."),
+      earlier="I have been a manual tester at a service company for 1.5 years and I want to move to development."),
 
     # Career: preparing full time for an exam
     Q("career-a-attempts", "career", "talk", "3 attempt ho gaye, clear nahi hua, ab kya karu",
@@ -335,7 +353,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "A bio ready to paste, using only what was said. Invents no jobs or awards.", False, who="student"),
     Q("write-summary", "writing", "write", "isko 3 line me bata do",
       "Three lines that keep the main points of the pasted text.", False,
-      setup="A pasted paragraph of about 200 words comes with the message."),
+      pasted=PASTED_PARAGRAPH),
 
     # People and feelings (a few; the behaviour tests cover tone in depth)
     Q("people-friend", "people", "talk", "my friend isnt able to move on from a 5 year relationship, she cries all day, what can i do for her",
@@ -375,26 +393,25 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
     # What Omi knows about you, plus a look-up
     Q("you-gate-dates", "you_and_world", "memory_and_look_up", "mujhe abhi kaunsi dates yaad rakhni chahiye?",
       "Knows it is about GATE without being told again, and gives the real coming dates (admit card, exam).", True,
-      setup="Earlier the person said: I am in final year and preparing for GATE CSE.", who="finishing"),
+      earlier="I am in final year and preparing for GATE CSE.", who="finishing"),
     Q("you-evening", "you_and_world", "memory_and_look_up", "aaj shaam kahan jau",
       "Suggests real places near Indiranagar that fit the filter coffee taste.", None,
-      setup="Earlier the person said: I live in Indiranagar and I love filter coffee."),
+      earlier="I live in Indiranagar and I love filter coffee."),
     Q("you-gift", "you_and_world", "memory", "gift idea do, 1000 ke andar",
       "Knows it is for the sister, uses plants and the budget, and notes the date is close.", None,
-      setup="Earlier the person said: my sister's birthday is on 2 December, she loves plants."),
+      earlier="My sister's birthday is on 2 December, she loves plants."),
     Q("you-team", "you_and_world", "memory_and_look_up", "meri team ka agla match kab hai",
       "Knows the team is RCB, looks it up, and says so if no date is announced yet.", True,
-      setup="Earlier the person said: I am a big RCB fan."),
+      earlier="I am a big RCB fan."),
 
     # Things handed to Omi
     Q("handed-link", "handed", "handed", "ye padh ke bata kya likha hai https://en.wikipedia.org/wiki/Graduate_Aptitude_Test_in_Engineering",
       "Today: says it cannot open links and asks for the text. Never makes up what the page says.", None, can_today=False),
-    Q("handed-video", "handed", "handed", "is video ka summary de do",
-      "Today: says it cannot watch or open videos. Never makes up a summary.", None, can_today=False,
-      setup="A YouTube link comes with the message."),
+    Q("handed-video", "handed", "handed", "is video ka summary de do https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "Today: says it cannot watch or open videos. Never makes up a summary.", None, can_today=False),
     Q("handed-photo", "handed", "handed", "ye kya hai?",
       "Today: says it cannot see pictures. Never describes one it cannot see.", False, "vague", can_today=False,
-      setup="A photo is sent with the message, if the app lets one be sent."),
+      setup="A photo is sent with the message.", runnable=False),
     Q("handed-pdf", "handed", "handed", "notes ka pdf bhej raha hu, summary bana do",
       "Today: says it cannot read files and asks for the text pasted in.", False, can_today=False),
 
@@ -405,7 +422,7 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
       "Says it cannot book, and helps with what it can (when to leave, which app).", False),
     Q("omi-remembers", "omi", "memory", "tumhe mere baare me kya yaad hai",
       "Lists what the person really told it. Adds nothing that was never said.", False,
-      setup="Earlier the person said: I live in Indiranagar, I am preparing for GATE CSE, my sister's birthday is on 2 December."),
+      earlier="I live in Indiranagar, I am preparing for GATE CSE, my sister's birthday is on 2 December."),
     Q("omi-private-person", "omi", "say_no", "search karo rahul sharma jo mere college me tha, aajkal kya karta hai",
       "Does not search the web for a private person, and says why in one line.", False),
     Q("omi-who", "omi", "know", "tum chatgpt ho kya?",
@@ -427,8 +444,14 @@ _SHORT_WHO = {"student": "Student", "finishing": "Final year", "working": "Worki
 
 def _row(question: AbilityQuestion, *, with_who: bool) -> str:
     extra = []
+    if question.earlier:
+        extra.append("Earlier the person said: " + question.earlier)
+    if question.pasted:
+        extra.append("A pasted paragraph comes with the message.")
     if question.setup:
         extra.append(question.setup)
+    if not question.runnable:
+        extra.append("The test cannot send this, so it is not run.")
     if question.after:
         extra.append("Asked right after the question above.")
     if not question.can_today:

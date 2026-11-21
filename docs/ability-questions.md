@@ -108,7 +108,7 @@ Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
 | can i give gate in 3rd year btech? | Student | Look up a fact that changes | Says yes, with the official rule (third year or above of a degree). |
 | form kab aayega | Anyone | Ask one short question back, because the ask is unclear | No exam is named and Omi knows none: asks which exam, in one short line. Does not guess. |
 | gate aur cat dono de sakta hu kya same year, dates clash toh nahi? | Final year | Look up more than one thing and put it together | Gives both exam dates and says clearly whether they clash. |
-| kitne din bache hain mere exam mein? *Earlier the person said: my semester exams start on 7 December.* | Student | Use what the person told it before | Uses the date the person gave and counts the days right for today. |
+| kitne din bache hain mere exam mein? *Earlier the person said: My semester exams start on 7 December.* | Student | Use what the person told it before | Uses the date the person gave and counts the days right for today. |
 | ssc cgl tier 1 kab hai | Aspirant | Look up, then reason about dates (still open? how long left?) | The real date for the current cycle and how far away it is. |
 | upsc prelims 2027 kab hai | Aspirant | Look up, then reason about dates (still open? how long left?) | The date from the official calendar, or says it is not out yet. |
 | bank po ke liye age limit kya hai | Aspirant | Look up a fact that changes | The age limit and the usual relaxations, with the source. |
@@ -203,7 +203,7 @@ Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
 | she said 'k fine'. kya reply karu | Anyone | Write something ready to send | One or two replies in the person's own way of talking, not a lecture on feelings. |
 | is this correct: 'I didn't went there' | Anyone | Answer from what it knows or can work out | Says it is wrong, gives the right sentence, one line on why. |
 | linkedin bio likh do, 3rd year cse, ml me interest | Student | Write something ready to send | A bio ready to paste, using only what was said. Invents no jobs or awards. |
-| isko 3 line me bata do *A pasted paragraph of about 200 words comes with the message.* | Anyone | Write something ready to send | Three lines that keep the main points of the pasted text. |
+| isko 3 line me bata do *A pasted paragraph comes with the message.* | Anyone | Write something ready to send | Three lines that keep the main points of the pasted text. |
 
 ## People and feelings
 
@@ -240,7 +240,7 @@ Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
 |---|---|---|---|
 | mujhe abhi kaunsi dates yaad rakhni chahiye? *Earlier the person said: I am in final year and preparing for GATE CSE.* | Final year | Use what it knows about the person and look something up | Knows it is about GATE without being told again, and gives the real coming dates (admit card, exam). |
 | aaj shaam kahan jau *Earlier the person said: I live in Indiranagar and I love filter coffee.* | Anyone | Use what it knows about the person and look something up | Suggests real places near Indiranagar that fit the filter coffee taste. |
-| gift idea do, 1000 ke andar *Earlier the person said: my sister's birthday is on 2 December, she loves plants.* | Anyone | Use what the person told it before | Knows it is for the sister, uses plants and the budget, and notes the date is close. |
+| gift idea do, 1000 ke andar *Earlier the person said: My sister's birthday is on 2 December, she loves plants.* | Anyone | Use what the person told it before | Knows it is for the sister, uses plants and the budget, and notes the date is close. |
 | meri team ka agla match kab hai *Earlier the person said: I am a big RCB fan.* | Anyone | Use what it knows about the person and look something up | Knows the team is RCB, looks it up, and says so if no date is announced yet. |
 
 ## Things handed to Omi: a link, a photo, a file
@@ -248,8 +248,8 @@ Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
 | Question | Who | Needs | A right reply |
 |---|---|---|---|
 | ye padh ke bata kya likha hai https://en.wikipedia.org/wiki/Graduate_Aptitude_Test_in_Engineering *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot open links and asks for the text. Never makes up what the page says. |
-| is video ka summary de do *A YouTube link comes with the message. Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot watch or open videos. Never makes up a summary. |
-| ye kya hai? *A photo is sent with the message, if the app lets one be sent. Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot see pictures. Never describes one it cannot see. |
+| is video ka summary de do https://www.youtube.com/watch?v=jNQXAC9IVRw *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot watch or open videos. Never makes up a summary. |
+| ye kya hai? *A photo is sent with the message. The test cannot send this, so it is not run. Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot see pictures. Never describes one it cannot see. |
 | notes ka pdf bhej raha hu, summary bana do *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot read files and asks for the text pasted in. |
 
 ## About Omi itself and its limits
