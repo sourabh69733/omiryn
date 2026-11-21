@@ -195,7 +195,8 @@ def sentences(text: str) -> list[str]:
 
 
 def _word_limited_parts(text: str, word_limit: int) -> list[str]:
-    """Split an overlong bubble at sentence ends; only a single huge sentence is cut by words."""
+    """Split an overlong bubble at sentence ends. A sentence longer than a bubble stays whole in a
+    bubble of its own: a break in the middle of a sentence reads worse than a long bubble."""
     words = text.split()
     if not words or word_limit <= 0:
         return [text.strip()] if text.strip() else []
@@ -208,12 +209,6 @@ def _word_limited_parts(text: str, word_limit: int) -> list[str]:
         if current and len(current) + len(sentence_words) > word_limit:
             parts.append(" ".join(current))
             current = []
-        if len(sentence_words) > word_limit:
-            parts.extend(
-                " ".join(sentence_words[index : index + word_limit])
-                for index in range(0, len(sentence_words), word_limit)
-            )
-            continue
         current.extend(sentence_words)
     if current:
         parts.append(" ".join(current))

@@ -54,6 +54,12 @@ class ReplyLengthTest(unittest.TestCase):
         self.assertLessEqual(len(parts), MAX_REPLY_PARTS)
         self.assertGreater(max(len(part.split()) for part in parts), REPLY_PART_WORD_LIMIT)
 
+    def test_a_sentence_longer_than_a_bubble_is_not_broken(self) -> None:
+        long_sentence = "Seedha sa rasta ye hai: " + " ".join(["kaam"] * 40) + " aur seniors ko short, specific message bhejo."
+        parts = split_assistant_reply(f"Achha sign hai. {long_sentence} Phir batana.")
+
+        self.assertEqual(parts, ["Achha sign hai.", long_sentence, "Phir batana."])
+
     def test_a_runaway_reply_ends_at_a_sentence(self) -> None:
         written = " ".join("yeh ek chhota sa vaakya hai." for _ in range(80))
         reply = _compact_chat_reply(written, ASKED_IN_HINGLISH)
