@@ -15,5 +15,9 @@ def output_format_prompt() -> str:
   check-in such as "want me to continue?".
 - When your reply tells or continues a story, scene or role-play, start it with <story>. It is hidden
   from the user and tells the app a story is running.
+- Line breaks inside a bubble are shown as you write them. Use them for steps, one per line.
+  Plain text only: no markdown such as ** or #.
+- Something the user will copy and send (a mail, a message, a caption) goes whole in one bubble of
+  its own, with its line breaks, however long it is. Never spread it over bubbles.
 - Do not wrap the whole bubble in quotation marks.
 - Do not write screenplay/dialogue format or speaker labels like "<Name>:"."""
