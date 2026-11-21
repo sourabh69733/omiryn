@@ -97,6 +97,8 @@ class Asked:
     # The chat after this turn, for a follow-up to continue.
     conversation_id: str = ""
     messages: tuple[dict[str, Any], ...] = ()
+    # The reply as the person gets it: one text per chat bubble, line breaks inside kept.
+    bubbles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -177,8 +179,8 @@ async def ask(user_id: str, question: AbilityQuestion, *, model: str | None, bef
     finally:
         _tools_seen.reset(token)
     new = turn.messages[len(history):]
-    reply = "\n".join(str(message.get("content") or "") for message in new if message.get("role") == "assistant").strip()
-    return Asked(question, reply, tuple(seen), time.perf_counter() - started, conversation_id=conversation_id, messages=tuple(turn.messages))
+    bubbles = tuple(str(message.get("content") or "") for message in new if message.get("role") == "assistant")
+    return Asked(question, "\n".join(bubbles).strip(), tuple(seen), time.perf_counter() - started, conversation_id=conversation_id, messages=tuple(turn.messages), bubbles=bubbles)
 
 
 def code_mark(asked: Asked) -> Mark | None:

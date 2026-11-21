@@ -38,6 +38,12 @@ def _looked_up(asked: Asked) -> str:
     return "; ".join(f"{tool.name}({', '.join(f'{k}={v!r}' for k, v in tool.arguments.items())}) gave {len(tool.returned)} letters" for tool in asked.tools)
 
 
+def _shown(asked: Asked) -> str:
+    """The reply on one line: " / " between bubbles, " ⏎ " where a bubble has a line break."""
+    bubbles = asked.bubbles or tuple(asked.reply.split("\n"))
+    return " / ".join(" ⏎ ".join(line for line in bubble.split("\n") if line.strip()) for bubble in bubbles)
+
+
 def as_markdown(results: list[Result], *, reply_model: str, judge_model: str, when: str, cost_usd: float | None = None) -> str:
     counts = tally(results)
     marked = counts["right"] + counts["partly"] + counts["wrong"]
@@ -84,7 +90,7 @@ def as_markdown(results: list[Result], *, reply_model: str, judge_model: str, wh
                 f"- Asked ({WHO[question.who].split(',')[0].split('(')[0].strip()}): {question.text}",
                 f"- Right when: {question.right_when}",
                 f"- Looked up: {_looked_up(asked)}",
-                "- Omi: " + (asked.reply.replace("\n", " / ") if asked.reply else f"(nothing) {asked.error}"),
+                "- Omi: " + (_shown(asked) if asked.reply else f"(nothing) {asked.error}"),
                 f"- Mark ({mark.by}, {asked.seconds:.0f}s): {mark.note}",
                 "",
             ]
