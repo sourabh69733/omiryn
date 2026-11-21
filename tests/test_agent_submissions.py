@@ -2284,33 +2284,33 @@ class AgentSubmissionApiTest(unittest.TestCase):
         self.assertIn("[llm_profile] Profile", context_text)
         self.assertLess(len(context_text), 3800)
 
-    def test_chat_replies_are_compacted_for_normal_messages(self) -> None:
-        reply = _compact_chat_reply(
-            (
-                "That makes sense, and I can see why this matters to you. "
-                "The right person should probably respect your work, your pace, "
-                "your family expectations, and your communication style before "
-                "anything gets serious. We can slowly figure that out together."
-            ),
-            [{"role": "user", "content": "yes"}],
+    def test_a_long_reply_is_split_into_bubbles_not_cut(self) -> None:
+        written = (
+            "That makes sense, and I can see why this matters to you. "
+            "The right person should probably respect your work, your pace, "
+            "your family expectations, and your communication style before "
+            "anything gets serious. We can slowly figure that out together."
         )
+        reply = _compact_chat_reply(written, [{"role": "user", "content": "yes"}])
+        parts = split_assistant_reply(reply)
 
-        self.assertLessEqual(len(reply.split()), 35)
-        self.assertNotIn("slowly figure", reply)
+        self.assertEqual(" ".join(parts), written)
+        self.assertGreater(len(parts), 1)
+        self.assertTrue(all(len(part.split()) <= 35 for part in parts))
 
-    def test_batao_style_questions_do_not_enable_continuous_reply_budget(self) -> None:
-        reply = _compact_chat_reply(
-            (
-                "Abhishek ka style simple aur direct lagta hai. "
-                "Woh pehle practical cheez pakadta hai, phir halka sa casual line daalta hai. "
-                "Uske messages mein zyada drama nahi hai, bas short timing, location, "
-                "aur thoda friendly confidence hai. "
-                "Main us vibe ko copy nahi karungi, bas soft natural version rakhungi."
-            ),
-            [{"role": "user", "content": "batao abhishek kis style mai baat kerta hai"}],
+    def test_reply_length_does_not_depend_on_english_words_in_the_ask(self) -> None:
+        written = (
+            "Abhishek ka style simple aur direct lagta hai. "
+            "Woh pehle practical cheez pakadta hai, phir halka sa casual line daalta hai. "
+            "Uske messages mein zyada drama nahi hai, bas short timing, location, "
+            "aur thoda friendly confidence hai. "
+            "Main us vibe ko copy nahi karungi, bas soft natural version rakhungi."
         )
+        hinglish = _compact_chat_reply(written, [{"role": "user", "content": "batao abhishek kis style mai baat kerta hai"}])
+        english = _compact_chat_reply(written, [{"role": "user", "content": "explain how abhishek talks"}])
 
-        self.assertLessEqual(len(reply.split()), 35)
+        self.assertEqual(hinglish, written)
+        self.assertEqual(english, written)
 
     def test_story_replies_can_span_multiple_small_messages(self) -> None:
         reply = _compact_chat_reply(

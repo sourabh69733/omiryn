@@ -4,8 +4,7 @@ from unittest.mock import patch
 
 from agent.context_engine.understanding.rules import continues_story
 from agent.context_engine.engine import build_model_context_package
-from agent.providers.shared.config import CHAT_REPLY_WORD_LIMIT
-from agent.providers.shared.messages import _chat_reply_word_limit
+from agent.providers.shared.messages import _compact_chat_reply
 from agent.runtime.steps import turn_notes as _turn_notes
 from storage import reset_db, save_conversation
 
@@ -76,18 +75,10 @@ class StoryNoteTest(unittest.TestCase):
         [note] = _turn_notes(1, ("story_or_long_reply",))
         self.assertIn("the user asked for a story", note["content"])
 
-    def test_story_marker_lifts_the_one_bubble_word_cap(self) -> None:
-        messages = [{"role": "user", "content": "ek kahani sunao"}]
-        long_story = "<story>" + " ".join(["word"] * 60)
-        self.assertGreater(_chat_reply_word_limit(messages, long_story), CHAT_REPLY_WORD_LIMIT)
-
-    def test_story_note_lifts_the_one_bubble_word_cap(self) -> None:
-        [note] = _turn_notes(1, ("story_or_long_reply", "story_continuation"))
-        messages = [{"role": "user", "content": "then?"}, note]
-        self.assertGreater(_chat_reply_word_limit(messages), CHAT_REPLY_WORD_LIMIT)
-        self.assertEqual(
-            _chat_reply_word_limit([{"role": "user", "content": "then?"}]), CHAT_REPLY_WORD_LIMIT
-        )
+    def test_a_long_story_part_reaches_the_user_whole(self) -> None:
+        messages = [{"role": "user", "content": "then?"}]
+        long_story = "<story>" + " ".join(["word"] * 60) + "."
+        self.assertEqual(_compact_chat_reply(long_story, messages), long_story)
 
 
 if __name__ == "__main__":
