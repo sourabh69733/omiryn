@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .replies import REPLY_PART_SEPARATOR
+from .replies import REPLY_PART_SEPARATOR, join_pieces, sentence_pieces, tidy_lines
 # Lines that fit any message: a seed plus lines learned from real chats. Matched after normalizing.
 from .stock_phrases import STOCK_PHRASES
 
@@ -106,7 +106,7 @@ def without_repeated_questions(reply: str, previous_replies: list[str]) -> str:
         for question in repeated:
             bubble = bubble.replace(question, "")
         if bubble.strip():
-            bubbles.append(" ".join(bubble.split()))
+            bubbles.append(tidy_lines(bubble))
     return REPLY_PART_SEPARATOR.join(bubbles) if bubbles else reply
 
 
@@ -126,27 +126,26 @@ def trim_questions(reply: str, question_limit: int) -> str:
     Works on whole sentences and bubbles, so nothing is cut mid-sentence. The questions that say
     the most are kept. A reply is never emptied: if only questions remain, the longest is kept.
     """
-    bubbles = [
-        [sentence for sentence in re.split(r"(?<=[.!?\u0964])\s+", bubble.strip()) if sentence]
-        for bubble in reply.split(REPLY_PART_SEPARATOR)
-    ]
-    questions = [sentence for bubble in bubbles for sentence in bubble if "?" in sentence]
+    bubbles = [sentence_pieces(bubble) for bubble in reply.split(REPLY_PART_SEPARATOR)]
+    questions = [sentence for bubble in bubbles for sentence, _ in bubble if "?" in sentence]
     # Keep the questions that carry the most; a bare echo ("Kuch bhi?") goes first.
     keep = set(sorted(questions, key=lambda sentence: -len(sentence.split()))[:question_limit])
     kept_bubbles: list[str] = []
     for bubble in bubbles:
-        kept: list[str] = []
-        for index, sentence in enumerate(bubble):
-            if "?" in sentence and sentence not in keep:
-                continue
-            following = bubble[index + 1] if index + 1 < len(bubble) else None
+        kept: list[tuple[str, str]] = []
+        for index, (sentence, gap) in enumerate(bubble):
+            following = bubble[index + 1][0] if index + 1 < len(bubble) else None
             dropped_next = following is not None and "?" in following and following not in keep
             # A lead-in ("maine socha...") whose follow-up was dropped would hang unfinished.
-            if dropped_next and sentence.rstrip().endswith(("...", "\u2026", ":")):
+            hangs = dropped_next and sentence.rstrip().endswith(("...", "\u2026", ":"))
+            if hangs or ("?" in sentence and sentence not in keep):
+                if kept and "\n" in gap:
+                    # The line break after a dropped sentence stays where it was.
+                    kept[-1] = (kept[-1][0], gap)
                 continue
-            kept.append(sentence)
+            kept.append((sentence, gap))
         if kept:
-            kept_bubbles.append(" ".join(kept))
+            kept_bubbles.append(join_pieces(kept))
     if not kept_bubbles:
         return max(questions, key=lambda sentence: len(sentence.split())) if questions else reply
     return REPLY_PART_SEPARATOR.join(kept_bubbles)

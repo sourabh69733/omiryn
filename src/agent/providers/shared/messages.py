@@ -8,8 +8,10 @@ from typing import Any
 
 from agent.context_engine.policy.replies import (
     MAX_REPLY_WORDS,
+    join_pieces,
     normalize_part_separators,
-    sentences,
+    sentence_pieces,
+    tidy_lines,
     without_thinking,
 )
 
@@ -361,28 +363,28 @@ def reply_without_thinking(content: str) -> str:
 
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
-    """The model's reply as one clean line, with its thinking removed.
+    """The model's reply tidied, with its own line breaks kept and its thinking removed.
 
     How long a reply should be is the prompt's job, so nothing here is cut for being long: the
     finish step splits a long reply into bubbles. Only a runaway reply is ended, at a sentence.
     `messages` is kept for the callers; the user's words no longer decide the length.
     """
     content = reply_without_thinking(content)
-    cleaned = " ".join(normalize_part_separators(content).strip().split())
+    cleaned = tidy_lines(normalize_part_separators(content))
     words = cleaned.split()
     if len(words) <= MAX_REPLY_WORDS:
         return cleaned
 
-    kept: list[str] = []
+    kept: list[tuple[str, str]] = []
     count = 0
-    for sentence in sentences(cleaned):
+    for sentence, gap in sentence_pieces(cleaned):
         sentence_words = len(sentence.split())
         if kept and count + sentence_words > MAX_REPLY_WORDS:
             break
-        kept.append(sentence)
+        kept.append((sentence, gap))
         count += sentence_words
     if count <= MAX_REPLY_WORDS:
-        return " ".join(kept).strip()
+        return join_pieces(kept)
     return " ".join(words[:MAX_REPLY_WORDS]).rstrip(" ,;:")
 
 

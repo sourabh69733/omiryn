@@ -72,8 +72,9 @@ def _transliterate_devanagari(text: str) -> str:
 
 
 def _clean_spacing(text: str) -> str:
+    # Line by line, so the line breaks the model wrote survive.
     return (
-        " ".join(text.split())
+        "\n".join(" ".join(line.split()) for line in text.split("\n"))
         .replace("ee ", "i ")
         .replace("ee.", "i.")
         .replace(" .", ".")

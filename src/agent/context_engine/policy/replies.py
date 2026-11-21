@@ -142,10 +142,20 @@ def keep_open_marker(draft: str, final: str) -> str:
     return f"{final.rstrip()} <open:{page}>"
 
 
+# Markdown bold. Chat shows plain text, so the stars would reach the user as stars.
+_BOLD = re.compile(r"\*\*(\S(?:[^\n]*?\S)?)\*\*")
+
+
+def tidy_lines(text: str) -> str:
+    """The text with the model's own line breaks kept and the rest tidied: spaces squeezed, at most
+    one empty line in a row, no markdown bold. Steps and a drafted mail keep their lines this way."""
+    plain = _BOLD.sub(r"\1", str(text or "")).replace("\r\n", "\n").replace("\r", "\n")
+    lines = [" ".join(line.split()) for line in plain.split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
-    cleaned = " ".join(
-        normalize_part_separators(normalize_assistant_script(str(reply or ""))).strip().split()
-    )
+    cleaned = tidy_lines(normalize_part_separators(normalize_assistant_script(str(reply or ""))))
     if not cleaned:
         return [""]
 
@@ -158,13 +168,20 @@ def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[s
 
 def _as_bubbles(parts: list[str]) -> list[str]:
     """The model's parts as chat bubbles. An overlong part is split at sentence ends. When that
-    makes more bubbles than one reply may have, the bubbles grow instead, so nothing is lost."""
+    makes more bubbles than one reply may have, the bubbles grow instead, so nothing is lost.
+
+    A part with line breaks in it was laid out by the model (steps, a mail to copy), so it stays
+    one bubble whatever its length."""
     limit = REPLY_PART_WORD_LIMIT
-    longest = max((len(part.split()) for part in parts), default=0)
+    longest = max((len(part.split()) for part in parts if "\n" not in part), default=0)
     if limit <= 0:
         return parts
     while True:
-        bubbles = [bubble for part in parts for bubble in _word_limited_parts(part, limit)]
+        bubbles = [
+            bubble
+            for part in parts
+            for bubble in ([part] if "\n" in part else _word_limited_parts(part, limit))
+        ]
         if len(bubbles) <= MAX_REPLY_PARTS or limit >= longest:
             return bubbles
         limit += REPLY_PART_WORD_LIMIT
@@ -180,11 +197,11 @@ def sentences(text: str) -> list[str]:
     """The sentences of a reply, in order. In a numbered list each step is its own sentence and its
     number stays with it: a break never falls between "2." and the step it numbers."""
     cleaned = text.strip()
-    if not _HAS_LIST.search(cleaned):
-        return [sentence for sentence in re.split(_SENTENCE_END, cleaned) if sentence]
+    # Steps written in a row ("1. ... 2. ...") also break before each number.
+    breaks = rf"{_SENTENCE_END}|\s+(?={_LIST_NUMBER}\s)" if _HAS_LIST.search(cleaned) else _SENTENCE_END
     found: list[str] = []
     number = ""
-    for piece in re.split(rf"{_SENTENCE_END}|\s+(?={_LIST_NUMBER}\s)", cleaned):
+    for piece in re.split(breaks, cleaned):
         piece = f"{number} {piece}".strip()
         number = ""
         if re.fullmatch(_LIST_NUMBER, piece):
@@ -192,6 +209,24 @@ def sentences(text: str) -> list[str]:
         elif piece:
             found.append(piece)
     return found + ([number] if number else [])
+
+
+def sentence_pieces(text: str) -> list[tuple[str, str]]:
+    """Each sentence with the gap after it: a space, or the model's line break. Text taken apart
+    by sentence goes back together with its lines (see join_pieces)."""
+    pieces: list[tuple[str, str]] = []
+    lines = re.split(r"(\n+)", text.strip())
+    for index in range(0, len(lines), 2):
+        found = sentences(lines[index])
+        gap = lines[index + 1] if index + 1 < len(lines) else ""
+        pieces.extend((sentence, " ") for sentence in found[:-1])
+        if found:
+            pieces.append((found[-1], gap))
+    return pieces
+
+
+def join_pieces(pieces: list[tuple[str, str]]) -> str:
+    return "".join(sentence + gap for sentence, gap in pieces).strip()
 
 
 def _word_limited_parts(text: str, word_limit: int) -> list[str]:
