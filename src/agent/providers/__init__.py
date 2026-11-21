@@ -17,8 +17,6 @@ from .gateway.clients import (
     _provider_rate_limit_headers,
 )
 from .shared.config import (
-    CHAT_ADVICE_REPLY_WORD_LIMIT,
-    CHAT_REPLY_WORD_LIMIT,
     CONTEXT_SOURCE_CHAR_LIMIT,
     CONTEXT_SOURCE_LIMIT,
     ONBOARDING_SYSTEM_PROMPT,
@@ -60,7 +58,6 @@ from .extraction.service import (
 )
 from .shared.json_utils import _parse_json_object
 from .shared.messages import (
-    _chat_reply_word_limit,
     _compact_chat_reply,
     _conversation_and_context_text,
     _conversation_summary_message,

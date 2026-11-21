@@ -12,6 +12,10 @@ REPLY_PART_SEPARATOR = "<next_message>"
 # Normal replies use 1-3 bubbles by prompt; 7 leaves room for a story or scene told in one go.
 MAX_REPLY_PARTS = int(os.getenv("AGENT_MAX_REPLY_PARTS", "7"))
 REPLY_PART_WORD_LIMIT = int(os.getenv("AGENT_REPLY_PART_WORD_LIMIT", "35"))
+# The most words one reply carries, however the model laid it out. The prompt asks for short
+# replies; this only stops a runaway one. Code never decides from the user's words how long a
+# reply may be.
+MAX_REPLY_WORDS = MAX_REPLY_PARTS * REPLY_PART_WORD_LIMIT
 # Starts every per-turn story note, so later steps know this reply is a story.
 STORY_NOTE_PREFIX = "Story turn:"
 
@@ -145,17 +149,49 @@ def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[s
     if not cleaned:
         return [""]
 
-    if REPLY_PART_SEPARATOR not in cleaned:
-        return [_normalize_chat_bubble(cleaned)]
+    # A reply written as one message is split the same way as an overlong part: the model's words
+    # are never dropped for being long (see MAX_REPLY_WORDS for the one outer limit).
+    written = [_normalize_chat_bubble(part) for part in cleaned.split(REPLY_PART_SEPARATOR)]
+    bubbles = [_normalize_chat_bubble(bubble) for bubble in _as_bubbles([part for part in written if part])]
+    return _limit_parts([bubble for bubble in bubbles if bubble], MAX_REPLY_PARTS) or [_normalize_chat_bubble(cleaned)]
 
-    raw_parts = [part.strip() for part in cleaned.split(REPLY_PART_SEPARATOR)]
 
-    parts: list[str] = []
-    for raw_part in raw_parts:
-        parts.extend(_word_limited_parts(_normalize_chat_bubble(raw_part), REPLY_PART_WORD_LIMIT))
+def _as_bubbles(parts: list[str]) -> list[str]:
+    """The model's parts as chat bubbles. An overlong part is split at sentence ends. When that
+    makes more bubbles than one reply may have, the bubbles grow instead, so nothing is lost."""
+    limit = REPLY_PART_WORD_LIMIT
+    longest = max((len(part.split()) for part in parts), default=0)
+    if limit <= 0:
+        return parts
+    while True:
+        bubbles = [bubble for part in parts for bubble in _word_limited_parts(part, limit)]
+        if len(bubbles) <= MAX_REPLY_PARTS or limit >= longest:
+            return bubbles
+        limit += REPLY_PART_WORD_LIMIT
 
-    cleaned_parts = [_normalize_chat_bubble(part) for part in parts if part]
-    return _limit_parts(cleaned_parts, MAX_REPLY_PARTS) or [_normalize_chat_bubble(cleaned)]
+
+_SENTENCE_END = r"(?<=[.!?।])\s+"
+# The number of a step in a list the model wrote out, such as "2." or "2)".
+_LIST_NUMBER = r"\d{1,2}[.)]"
+_HAS_LIST = re.compile(rf"(?:^|\s)1[.)]\s.*\s2[.)]\s")
+
+
+def sentences(text: str) -> list[str]:
+    """The sentences of a reply, in order. In a numbered list each step is its own sentence and its
+    number stays with it: a break never falls between "2." and the step it numbers."""
+    cleaned = text.strip()
+    if not _HAS_LIST.search(cleaned):
+        return [sentence for sentence in re.split(_SENTENCE_END, cleaned) if sentence]
+    found: list[str] = []
+    number = ""
+    for piece in re.split(rf"{_SENTENCE_END}|\s+(?={_LIST_NUMBER}\s)", cleaned):
+        piece = f"{number} {piece}".strip()
+        number = ""
+        if re.fullmatch(_LIST_NUMBER, piece):
+            number = piece
+        elif piece:
+            found.append(piece)
+    return found + ([number] if number else [])
 
 
 def _word_limited_parts(text: str, word_limit: int) -> list[str]:
@@ -167,7 +203,7 @@ def _word_limited_parts(text: str, word_limit: int) -> list[str]:
         return [text.strip()]
     parts: list[str] = []
     current: list[str] = []
-    for sentence in re.split(r"(?<=[.!?।])\s+", text.strip()):
+    for sentence in sentences(text):
         sentence_words = sentence.split()
         if current and len(current) + len(sentence_words) > word_limit:
             parts.append(" ".join(current))
@@ -227,11 +263,16 @@ def _strip_time_note(text: str) -> str:
     return _TIME_NOTE.sub("", text.strip(), count=1)
 
 
+# Who is speaking, when a model writes that at the start of a bubble: its own name ("Omi: hey"), or
+# in a story told like a script, a character's name before the quoted line ('Rahul: "..."').
+# Any other start that ends in a colon ("Ek catch: ...", "Saturday 9:43 pm") is the reply itself.
+# The names are the ones in prompt_engine.modules.identity.
+_OWN_LABEL = re.compile(r"^(?:omi|omiryn|annie|kabir|assistant|ai)\s*:\s+", re.IGNORECASE)
+_SCRIPT_LABEL = re.compile(r"^[A-Z][a-z]+(?: [A-Z][a-z]+)?\s*:\s*(?=[\"'“‘])")
+
+
 def _strip_speaker_label(text: str) -> str:
     cleaned = text.strip()
-    return re.sub(
-        r"^[A-Z][A-Za-z0-9 _.-]{0,30}:\s*",
-        "",
-        cleaned,
-        count=1,
-    ).strip()
+    for label in (_OWN_LABEL, _SCRIPT_LABEL):
+        cleaned = label.sub("", cleaned, count=1)
+    return cleaned.strip()

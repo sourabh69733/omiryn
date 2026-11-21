@@ -4,23 +4,17 @@ from __future__ import annotations
 
 import os
 
-import re
 from typing import Any
 
 from agent.context_engine.policy.replies import (
-    MAX_REPLY_PARTS,
-    REPLY_PART_SEPARATOR,
-    REPLY_PART_WORD_LIMIT,
-    STORY_NOTE_PREFIX,
-    has_story_marker,
+    MAX_REPLY_WORDS,
     normalize_part_separators,
+    sentences,
     without_thinking,
 )
 
 from .errors import AgentProviderError
 from .config import (
-    CHAT_ADVICE_REPLY_WORD_LIMIT,
-    CHAT_REPLY_WORD_LIMIT,
     HISTORY_TOKEN_BUDGET,
     PREVIOUS_SESSION_TAIL,
     RECENT_CHAT_MESSAGE_LIMIT,
@@ -367,89 +361,30 @@ def reply_without_thinking(content: str) -> str:
 
 
 def _compact_chat_reply(content: str, messages: list[dict[str, str]]) -> str:
+    """The model's reply as one clean line, with its thinking removed.
+
+    How long a reply should be is the prompt's job, so nothing here is cut for being long: the
+    finish step splits a long reply into bubbles. Only a runaway reply is ended, at a sentence.
+    `messages` is kept for the callers; the user's words no longer decide the length.
+    """
     content = reply_without_thinking(content)
     cleaned = " ".join(normalize_part_separators(content).strip().split())
-    if not cleaned:
-        return cleaned
-
-    limit = _chat_reply_word_limit(messages, cleaned)
     words = cleaned.split()
-    if len(words) <= limit:
+    if len(words) <= MAX_REPLY_WORDS:
         return cleaned
 
-    sentence_parts = re.split(r"(?<=[.!?।])\s+", cleaned)
     kept: list[str] = []
     count = 0
-    for sentence in sentence_parts:
-        sentence_words = sentence.split()
-        if not sentence_words:
-            continue
-        if kept and count + len(sentence_words) > limit:
+    for sentence in sentences(cleaned):
+        sentence_words = len(sentence.split())
+        if kept and count + sentence_words > MAX_REPLY_WORDS:
             break
         kept.append(sentence)
-        count += len(sentence_words)
-        if count >= limit:
-            break
+        count += sentence_words
+    if count <= MAX_REPLY_WORDS:
+        return " ".join(kept).strip()
+    return " ".join(words[:MAX_REPLY_WORDS]).rstrip(" ,;:")
 
-    compact = " ".join(kept).strip()
-    if compact:
-        return compact
-    return " ".join(words[:limit]).rstrip(" ,;:")
-
-def _chat_reply_word_limit(
-    messages: list[dict[str, str]],
-    reply_text: str = "",
-) -> int:
-    latest_user_text = _latest_user_text(messages)
-    if (
-        REPLY_PART_SEPARATOR in reply_text
-        or _wants_continuous_reply(latest_user_text)
-        or _is_story_turn(messages)
-        or has_story_marker(reply_text)
-    ):
-        return MAX_REPLY_PARTS * REPLY_PART_WORD_LIMIT
-    advice_markers = {
-        "advice",
-        "detail",
-        "explain",
-        "help",
-        "how",
-        "plan",
-        "suggest",
-        "why",
-    }
-    if any(marker in latest_user_text for marker in advice_markers):
-        return CHAT_ADVICE_REPLY_WORD_LIMIT
-    return CHAT_REPLY_WORD_LIMIT
-
-def _wants_continuous_reply(latest_user_text: str) -> bool:
-    continuous_markers = {
-        "story",
-        "continue",
-        "continued",
-        "flow",
-        "scene",
-        "imagine",
-        "example",
-        "roleplay",
-        "parts",
-        "sunao",
-        "long form",
-        "long story",
-        "what happened next",
-    }
-    return any(marker in latest_user_text for marker in continuous_markers)
-
-def _is_story_turn(messages: list[dict[str, str]]) -> bool:
-    """A story note follows the latest user message (set even for "then?" mid-story)."""
-    for message in reversed(messages):
-        if message.get("role") == "user":
-            return False
-        if message.get("role") == "system" and str(message.get("content") or "").startswith(
-            STORY_NOTE_PREFIX
-        ):
-            return True
-    return False
 
 def _latest_user_text(messages: list[dict[str, str]]) -> str:
     latest = next(
