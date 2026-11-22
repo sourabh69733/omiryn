@@ -62,7 +62,24 @@ async def _run(arguments: dict[str, Any], context: ToolContext) -> ToolResult:
     days = days if isinstance(days, int) and not isinstance(days, bool) and days > 0 else None
     country = user_country(context)
     results = await search_web(query, days=days, country=country)
-    return ToolResult(web_note(query, results), {"results": len(results), "recent_days": days, "country": bool(country and not days)})
+    return ToolResult(web_note(query, results, today=user_today(context)), {"results": len(results), "recent_days": days, "country": bool(country and not days)})
+
+
+def user_today(context: ToolContext) -> str:
+    """Today's date where the user is, in words. Put next to the search results, because that is
+    where a model decides whether a date it reads has passed."""
+    from agent.shared.clock import utc_now
+    from agent.shared.timeline import user_zone
+
+    name = None
+    if context.user_id:
+        try:
+            from storage import get_user_timezone
+
+            name = get_user_timezone(context.user_id)
+        except Exception:
+            name = None
+    return utc_now().astimezone(user_zone(name)).strftime("%A, %-d %B %Y")
 
 
 def user_country(context: ToolContext) -> str | None:
@@ -117,10 +134,17 @@ async def search_web(query: str, *, days: int | None = None, country: str | None
     return results
 
 
-def web_note(query: str, results: list[dict[str, str]]) -> str:
+def web_note(query: str, results: list[dict[str, str]], *, today: str = "") -> str:
     if not results:
         return f'You searched the web for "{query}" and found nothing. Say you could not find it; do not guess.'
+    dated = (
+        f"Today is {today}. A date before today has passed: a form, exam or deadline with such a "
+        "date is closed or over, so say that, and never give it as open or coming up. "
+        if today
+        else ""
+    )
     lines = [
+        dated +
         f'You searched the web for "{query}". Answer from these extracts in your own words. If they '
         "asked for news or what is new, give 2-3 separate real items, one per bubble: what happened, "
         "the source and its date. Otherwise be brief and mention the source when it matters. Use only "

@@ -76,6 +76,11 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["country" in body for body in bodies], [True, False])
         self.assertTrue(result.trace["ok"])
 
+    def test_the_results_come_with_todays_date(self) -> None:
+        note = web_note("internship forms", [{"title": "T", "url": "https://x", "date": "", "text": "Apply by 18 November."}], today="Monday, 23 November 2026")
+        self.assertTrue(note.startswith("Today is Monday, 23 November 2026. A date before today has passed"))
+        self.assertNotIn("Today is", web_note("x", [{"title": "T", "url": "https://x", "date": "", "text": "Y"}]))
+
     def test_the_model_is_told_to_name_the_place_when_it_matters(self) -> None:
         from agent.tools.web_search import DESCRIPTION
 
