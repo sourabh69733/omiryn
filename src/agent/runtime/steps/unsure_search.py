@@ -44,7 +44,8 @@ async def search_when_unsure(draft: str, job: ReplyJob, *, extra_queries: list[s
         round_number=0,
     )
     note = {"role": "system", "content": "Your draft said you don't know; check the lines the search found first and answer from them if they do."}
-    reply = await job.generate([*job.reply_messages, *found_messages, note], **job.generation_arguments)
+    reply = await job.generate([*job.reply_messages, *job.looked_up, *found_messages, note], **job.generation_arguments)
+    job.looked_up.extend(found_messages)
     return reply, {"tool": "unsure_search", "query": query[:120], "queries": extra_queries, "hits": len(hits)}
 
 

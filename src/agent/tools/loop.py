@@ -64,8 +64,12 @@ async def reply_with_tools(
     reply_messages: list[dict[str, Any]],
     generation_arguments: dict[str, Any],
     max_rounds: int = MAX_ROUNDS,
+    looked_up: list[dict[str, Any]] | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
-    """(final reply, one trace entry per call). A plain reply passes through with no calls."""
+    """(final reply, one trace entry per call). A plain reply passes through with no calls.
+
+    `looked_up`, when given, also receives every tool message, so the caller can show the same
+    results to a later step such as a rewrite."""
     messages = list(reply_messages)
     trace: list[dict[str, Any]] = []
     for round_number in range(1, max_rounds + 1):
@@ -75,7 +79,10 @@ async def reply_with_tools(
         calls = [ToolCall(name, arguments) for name, arguments in called[:MAX_CALLS_PER_ROUND]]
         results = await run_calls(calls, context)
         trace.extend({"round": round_number, **result.trace} for result in results)
-        messages.extend(tool_result_messages(calls, results, round_number=round_number))
+        exchange = tool_result_messages(calls, results, round_number=round_number)
+        messages.extend(exchange)
+        if looked_up is not None:
+            looked_up.extend(exchange)
         offer = tool_arguments(context) if round_number < max_rounds else {}
         raw_reply = await generate(list(messages), **generation_arguments, **offer)
     # The last call had no tools, but a model may still answer with a call: never send that.

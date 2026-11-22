@@ -29,11 +29,15 @@ class ReplyJob:
     requests: list[str] = field(default_factory=list)
     # Omi's questions in this session with what the user said next (policy.asked_questions).
     asked: list[Any] = field(default_factory=list)
+    # What Omi looked up this turn: its tool calls and what they returned, as tool messages. The
+    # draft step adds to it; every later ask reads it, so a rewrite never answers from memory what
+    # the draft answered from a search.
+    looked_up: list[dict[str, Any]] = field(default_factory=list)
 
     async def ask(self, note: str, messages: list[dict[str, Any]] | None = None) -> str:
-        """The raw model output for the history plus one system note at the end."""
+        """The raw model output for the history, what was looked up, and one system note at the end."""
         history = self.reply_messages if messages is None else messages
-        return await self.generate(history + [{"role": "system", "content": note}], **self.generation_arguments)
+        return await self.generate([*history, *self.looked_up, {"role": "system", "content": note}], **self.generation_arguments)
 
     async def rewrite(self, note: str, messages: list[dict[str, Any]] | None = None) -> str:
         """Like ask, but only the text the user would see."""

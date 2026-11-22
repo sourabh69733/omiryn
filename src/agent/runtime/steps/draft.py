@@ -41,6 +41,7 @@ async def write_draft(job: ReplyJob) -> Draft:
             generate=job.generate,
             reply_messages=job.reply_messages,
             generation_arguments=job.generation_arguments,
+            looked_up=job.looked_up,
         )
         searched = any(call.get("tool") == "search_chats" for call in tool_calls)
         if not searched and job.user_id and chat_search_enabled() and says_unknown(raw):
