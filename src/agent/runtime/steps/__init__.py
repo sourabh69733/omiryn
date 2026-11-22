@@ -1,7 +1,8 @@
 """The steps of one reply, in order:
 
 1. notes: per-turn notes after the user's message (story, no questions, several messages at once).
-2. lookup: a small model says if the answer needs facts from the web; code searches before the draft.
+2. links: a link the user pasted is read before the draft, so no reply is about a page nobody read.
+   lookup (off by default): a small model says if the answer needs facts from the web; code searches.
 3. draft: the reply model with tools; a search when it says it does not know; fallbacks.
 4. checks: freshness (repeats, stock lines, too many questions), then how the user asked to be talked to.
 5. finish: hidden markers out, the reply split into bubbles.
@@ -13,6 +14,7 @@ from .checks import REPLY_CHECKS, follow_requests, freshen_reply, freshness_chec
 from .draft import Draft, write_draft
 from .finish import FinishedReply, assistant_messages, finish_reply
 from .job import Generate, ReplyJob
+from .links import read_links_enabled, read_pasted_links
 from .lookup import look_up, lookup_step_enabled
 from .notes import turn_notes
 from .unsure_search import search_queries, search_when_unsure
@@ -30,6 +32,8 @@ __all__ = [
     "freshen_reply",
     "freshness_check_enabled",
     "look_up",
+    "read_links_enabled",
+    "read_pasted_links",
     "lookup_step_enabled",
     "looks_like_model_transport",
     "request_check_enabled",

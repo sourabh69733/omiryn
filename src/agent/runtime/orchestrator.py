@@ -17,7 +17,7 @@ from agent.memory_engine.engine import capture_profile_facts_from_user_message
 from agent.memory_engine.memories.embeddings import embed_memory_query, memory_query_text
 from agent.providers import assess_user_message_quality, generate_agent_reply
 from agent.providers.shared.messages import reply_window, summarized_through
-from agent.runtime.steps import REPLY_CHECKS, ReplyJob, assistant_messages, finish_reply, follow_requests, look_up, turn_notes, write_draft
+from agent.runtime.steps import REPLY_CHECKS, ReplyJob, assistant_messages, finish_reply, follow_requests, look_up, read_pasted_links, turn_notes, write_draft
 from agent.runtime.story_mode import schedule_story_part, story_autoplay_enabled, story_part_block_reason
 from agent.shared.clock import utc_now_iso
 from storage import (
@@ -203,7 +203,9 @@ async def run_agent_turn(
         asked=asked_questions(updated_messages),
     )
     try:
-        # Facts from the web first, so any reply model answers from the same looked-up facts.
+        # What the user pointed at and facts from the web come first, so any reply model answers
+        # from the same page and the same looked-up facts.
+        job, links = await read_pasted_links(job)
         job, lookup = await look_up(job, place=str((context_package.user_profile or {}).get("location") or "") or None)
         draft = await write_draft(job)
         reply, checks = draft.reply, {}
@@ -230,6 +232,7 @@ async def run_agent_turn(
         "fallback_reason": draft.fallback_reason,
         **checks,
         "chat_search": draft.chat_search,
+        "links": links,
         "lookup": lookup,
         "tool_calls": draft.tool_calls,
     })
