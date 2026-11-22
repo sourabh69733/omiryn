@@ -26,8 +26,21 @@ class ReplyLinesTest(unittest.TestCase):
         self.assertGreater(len(MAIL.split()), REPLY_PART_WORD_LIMIT)
 
     def test_steps_keep_one_line_each(self) -> None:
-        steps = "Do tarike hain:\n\n1. UAN portal par login karo.\n2. UMANG app mein Raise Claim kholo."
-        self.assertEqual(split_assistant_reply(_compact_chat_reply(steps, ASKED)), [steps])
+        steps = "1. UAN portal par login karo.\n2. UMANG app mein Raise Claim kholo."
+        self.assertEqual(split_assistant_reply(_compact_chat_reply(f"Do tarike hain:\n{steps}", ASKED)), [f"Do tarike hain:\n{steps}"])
+
+    def test_in_a_reply_written_as_one_message_an_empty_line_starts_a_new_bubble(self) -> None:
+        steps = "1. UAN portal par login karo.\n2. UMANG app mein Raise Claim kholo."
+        reply = f"Do tarike hain:\n\n{steps}\n\nJob chhod di hai ya soch rahe ho?"
+        self.assertEqual(split_assistant_reply(_compact_chat_reply(reply, ASKED)), ["Do tarike hain:", steps, "Job chhod di hai ya soch rahe ho?"])
+
+    def test_with_separators_an_empty_line_stays_inside_the_bubble(self) -> None:
+        first = "Do tarike hain:\n\n1. UAN portal.\n2. UMANG app."
+        self.assertEqual(split_assistant_reply(f"{first}<next_message>Job chhod di hai?"), [first, "Job chhod di hai?"])
+
+    def test_too_many_paragraphs_stay_together_instead_of_being_dropped(self) -> None:
+        reply = "\n\n".join(f"Baat number {index} ye hai." for index in range(1, 10))
+        self.assertEqual(split_assistant_reply(reply), [reply])
 
     def test_spaces_and_extra_empty_lines_are_tidied(self) -> None:
         self.assertEqual(tidy_lines("  haan   yaar \r\n\n\n\n  theek   hai  \n"), "haan yaar\n\ntheek hai")
@@ -54,7 +67,7 @@ class ReplyLinesTest(unittest.TestCase):
     def test_the_prompt_says_how_to_lay_out_steps_and_drafts(self) -> None:
         prompt = output_format_prompt()
         self.assertIn("Line breaks inside a bubble are shown", prompt)
-        self.assertIn("goes whole in one bubble", prompt)
+        self.assertIn("goes between <copy> and", prompt)
 
 
 if __name__ == "__main__":
