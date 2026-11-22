@@ -23,6 +23,9 @@ DEFAULT_TIMEOUT_SECONDS = 8.0
 class ToolContext:
     user_id: str | None
     conversation_id: str | None = None
+    # The user's message this turn, for a tool that treats what the user gave it differently
+    # (read_page: a link they pasted themselves).
+    user_text: str = ""
 
 
 @dataclass(frozen=True)

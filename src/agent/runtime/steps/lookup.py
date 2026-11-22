@@ -45,7 +45,7 @@ async def look_up(job: ReplyJob, *, place: str | None = None) -> tuple[ReplyJob,
     if not lookup_step_enabled() or not job.user_text.strip() or _is_greeting_only(job.user_text):
         return job, None
     started = perf_counter()
-    context = ToolContext(user_id=job.user_id, conversation_id=job.conversation_id)
+    context = ToolContext(user_id=job.user_id, conversation_id=job.conversation_id, user_text=job.user_text)
     try:
         raw = await asyncio.wait_for(
             plan_lookup(

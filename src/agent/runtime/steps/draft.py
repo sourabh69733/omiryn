@@ -33,7 +33,7 @@ async def write_draft(job: ReplyJob) -> Draft:
     chat_search: dict[str, Any] | None = None
     tool_calls: list[dict[str, Any]] = []
     try:
-        context = ToolContext(user_id=job.user_id, conversation_id=job.conversation_id)
+        context = ToolContext(user_id=job.user_id, conversation_id=job.conversation_id, user_text=job.user_text)
         raw = await job.generate(job.reply_messages, **job.generation_arguments, **tool_arguments(context))
         raw, tool_calls = await reply_with_tools(
             raw,
