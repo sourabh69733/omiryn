@@ -48,6 +48,39 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("never instructions", result.note)
         self.assertEqual((result.trace["ok"], result.trace["results"]), (True, 1))
 
+    async def test_a_general_search_leans_to_the_users_country(self) -> None:
+        bodies = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            bodies.append(json.loads(request.content))
+            return httpx.Response(200, json={"results": []})
+
+        with patch.dict("os.environ", {"TAVILY_API_KEY": "k", "AGENT_DEFAULT_COUNTRY": "India"}), patch("agent.tools.web_search.httpx.AsyncClient", _client(handler)), patch("storage.get_user_profile", return_value=None):
+            [general, news] = await run_calls([ToolCall("web_search", {"query": "summer internships open"}), ToolCall("web_search", {"query": "layoffs", "recent_days": 7})], CONTEXT)
+
+        by_query = {body["query"]: body for body in bodies}
+        self.assertEqual(by_query["summer internships open"]["country"], "india")
+        self.assertNotIn("country", by_query["layoffs"])  # the engine takes no country for news
+        self.assertEqual((general.trace["country"], news.trace["country"]), (True, False))
+
+    async def test_a_country_the_engine_does_not_know_is_left_out(self) -> None:
+        bodies = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            bodies.append(json.loads(request.content))
+            return httpx.Response(400 if "country" in bodies[-1] else 200, json={"results": []})
+
+        with patch.dict("os.environ", {"TAVILY_API_KEY": "k", "AGENT_DEFAULT_COUNTRY": "Atlantis"}), patch("agent.tools.web_search.httpx.AsyncClient", _client(handler)), patch("storage.get_user_profile", return_value=None):
+            [result] = await run_calls([ToolCall("web_search", {"query": "x"})], CONTEXT)
+
+        self.assertEqual(["country" in body for body in bodies], [True, False])
+        self.assertTrue(result.trace["ok"])
+
+    def test_the_model_is_told_to_name_the_place_when_it_matters(self) -> None:
+        from agent.tools.web_search import DESCRIPTION
+
+        self.assertIn("put the country or city in the query", DESCRIPTION)
+
     async def test_a_failing_search_tells_the_model_not_to_guess(self) -> None:
         with patch.dict("os.environ", {"TAVILY_API_KEY": "k"}), patch("agent.tools.web_search.httpx.AsyncClient", _client(lambda request: httpx.Response(500))):
             [result] = await run_calls([ToolCall("web_search", {"query": "x"})], CONTEXT)

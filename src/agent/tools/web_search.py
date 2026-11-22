@@ -29,6 +29,8 @@ DESCRIPTION = (
     "someone asks what is new, the latest, or what is going on, search before you answer, even if "
     "earlier replies in this chat did not, and set recent_days. Asked whether you can look things "
     "up, say yes and do it. "
+    "When the answer depends on where the user lives (jobs, exams, salaries, prices, rules, "
+    "events), put the country or city in the query. "
     "Returns short extracts with their source and date. Do not use it for the "
     "user's own life or their chats (use search_chats). The query goes to an outside search engine: "
     "never put names of private people, the user's details or anything from their chats in it."
@@ -58,16 +60,43 @@ async def _run(arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         return blocked
     days = arguments.get("recent_days")
     days = days if isinstance(days, int) and not isinstance(days, bool) and days > 0 else None
-    results = await search_web(query, days=days)
-    return ToolResult(web_note(query, results), {"results": len(results), "recent_days": days})
+    country = user_country(context)
+    results = await search_web(query, days=days, country=country)
+    return ToolResult(web_note(query, results), {"results": len(results), "recent_days": days, "country": bool(country and not days)})
 
 
-async def search_web(query: str, *, days: int | None = None) -> list[dict[str, str]]:
+def user_country(context: ToolContext) -> str | None:
+    """The user's country as the search engine names it (a lowercase English name), from their
+    profile, else the app's default country. Only the country is ever sent, never the city, so
+    results lean local whichever model wrote the query. AGENT_WEB_SEARCH_COUNTRY=false turns it off."""
+    if os.getenv("AGENT_WEB_SEARCH_COUNTRY", "true").strip().lower() == "false":
+        return None
+    name = ""
+    if context.user_id:
+        try:
+            from storage import get_user_profile
+
+            name = str((get_user_profile(context.user_id) or {}).get("country") or "")
+        except Exception:
+            name = ""
+    name = (name or os.getenv("AGENT_DEFAULT_COUNTRY", "India")).strip().lower()
+    return name if name and all(char.isalpha() or char == " " for char in name) else None
+
+
+async def search_web(query: str, *, days: int | None = None, country: str | None = None) -> list[dict[str, str]]:
     body: dict[str, Any] = {"query": query, "max_results": MAX_RESULTS, "search_depth": "basic"}
     if days:
         body.update({"topic": "news", "days": days})
+    elif country:
+        # The engine takes a country only for a general search; it boosts, it does not filter.
+        body["country"] = country
+    headers = {"Authorization": f"Bearer {os.environ['TAVILY_API_KEY'].strip()}"}
     async with httpx.AsyncClient(timeout=7.0) as client:
-        response = await client.post(TAVILY_URL, json=body, headers={"Authorization": f"Bearer {os.environ['TAVILY_API_KEY'].strip()}"})
+        response = await client.post(TAVILY_URL, json=body, headers=headers)
+        if response.status_code == 400 and "country" in body:
+            # A country name the engine does not know: search without it.
+            body.pop("country")
+            response = await client.post(TAVILY_URL, json=body, headers=headers)
         response.raise_for_status()
         data = response.json()
     results = []
