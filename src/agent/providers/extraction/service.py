@@ -164,6 +164,9 @@ def vibe_verify_model(provider: str) -> str | None:
 # model (that one drifts). On 8 real drafts (2026-10-18): Qwen3 235B 8/8 at ~1.4s, DeepSeek V3.2
 # 7/8 at ~2.6s, Llama 3.3 70B 7/8, Mistral Small 6/8.
 _DEFAULT_REQUEST_CHECK_MODELS = {"deepinfra": "Qwen/Qwen3-235B-A22B-Instruct-2507"}
+# Tried when the provider refuses the first one. Seen 2026-11-23: every Qwen call came back 429
+# for hours while other models on the same account worked, so the check silently did not run.
+_SECOND_REQUEST_CHECK_MODELS = {"deepinfra": "meta-llama/Llama-3.3-70B-Instruct-Turbo"}
 
 
 async def analyze_upload_part(
@@ -347,6 +350,14 @@ def request_check_model(provider: str) -> str | None:
     return os.getenv("REQUEST_CHECK_MODEL", "").strip() or _DEFAULT_REQUEST_CHECK_MODELS.get(provider)
 
 
+def request_check_models(provider: str) -> list[str | None]:
+    """The check model, then the one to try when the provider refuses it
+    (REQUEST_CHECK_SECOND_MODEL, else a default for the provider; "off" for none)."""
+    second = os.getenv("REQUEST_CHECK_SECOND_MODEL", "").strip() or _SECOND_REQUEST_CHECK_MODELS.get(provider)
+    first = request_check_model(provider)
+    return [first] if not second or second.lower() == "off" or second == first else [first, second]
+
+
 async def check_reply_requests(
     text: str,
     *,
@@ -356,21 +367,29 @@ async def check_reply_requests(
 ) -> dict[str, Any]:
     """Which saved how-to-talk requests a draft reply breaks; returns {"broken": [...]}."""
     provider = _provider_name()
-    model = model or request_check_model(provider)
     if provider == "mock":
         return {"broken": []}
-    content = await provider_chat(
-        provider=provider,
-        system_prompt=REQUEST_CHECK_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": text}],
-        temperature=0,
-        conversation_id=conversation_id,
-        request_kind=REPLY_REQUEST_CHECK,
-        model=model,
-        timeout_seconds=timeout_seconds,
-        response_format={"type": "json_object"},
-    )
-    return _parse_json_object(content)
+    models = [model] if model else request_check_models(provider)
+    for index, name in enumerate(models):
+        try:
+            content = await provider_chat(
+                provider=provider,
+                system_prompt=REQUEST_CHECK_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": text}],
+                temperature=0,
+                conversation_id=conversation_id,
+                request_kind=REPLY_REQUEST_CHECK,
+                model=name,
+                timeout_seconds=timeout_seconds,
+                response_format={"type": "json_object"},
+            )
+        except AgentProviderError:
+            # The provider refused this model; the next one checks the reply so it is not skipped.
+            if index == len(models) - 1:
+                raise
+            continue
+        return _parse_json_object(content)
+    return {"broken": []}
 
 
 async def write_vibe_intro(
