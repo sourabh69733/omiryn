@@ -120,6 +120,18 @@ class WrittenToolCallTest(unittest.TestCase):
             [("memories_by_date", {"period": "last_week"})],
         )
 
+    def test_a_call_written_as_a_tag_becomes_a_real_call(self) -> None:
+        from agent.tools.loop import _written_call
+
+        self.assertEqual(
+            _written_call('<search_chats> {"query": "kahan gaya tha", "days": "7"} </search_chats>'),
+            [("search_chats", {"query": "kahan gaya tha", "days": 7})],
+        )
+        self.assertEqual(_written_call('<search_chats>{"query": "x"}'), [("search_chats", {"query": "x"})])
+        self.assertEqual(_written_call('<not_a_tool> {"query": "x"} </not_a_tool>'), [])
+        self.assertEqual(_written_call("<search_chats> not json </search_chats>"), [])
+        self.assertEqual(_written_call('Dekho: <search_chats> {"query": "x"} </search_chats>'), [])
+
     def test_prose_and_unknown_names_are_left_alone(self) -> None:
         from agent.tools.loop import _written_call
 

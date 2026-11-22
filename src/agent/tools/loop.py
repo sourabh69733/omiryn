@@ -30,8 +30,30 @@ _WRITTEN_CALL = re.compile(r"^\s*(?:<\|tool_call>)?(?:call:)?(\w+)\{(.*)\}(?:<to
 _WRITTEN_ARGUMENT = re.compile(r'(\w+):(?:<\|"\|>(.*?)<\|"\|>|([^,}]+))', re.DOTALL)
 
 
+# Any model may also write a call as a tag named after the tool, around JSON arguments (seen from
+# Gemma, 2026-11-23, sent to the user as the reply):
+# <web_search> {"query": "TCS fresher salary 2026", "recent_days": "7"} </web_search>
+_TAGGED_CALL = re.compile(r"^\s*<(\w+)>\s*(\{.*\})\s*(?:</\1>)?\s*$", re.DOTALL)
+
+
+def _tagged_call(text: str) -> list[tuple[str, dict[str, Any]]]:
+    match = _TAGGED_CALL.match(text)
+    if not match or get_tool(match.group(1)) is None:
+        return []
+    try:
+        arguments = json.loads(match.group(2))
+    except ValueError:
+        return []
+    if not isinstance(arguments, dict):
+        return []
+    # A number written as text ("7") is the number.
+    return [(match.group(1), {name: int(value) if isinstance(value, str) and value.isdigit() else value for name, value in arguments.items()})]
+
+
 def _written_call(text: str) -> list[tuple[str, dict[str, Any]]]:
     """That text as a real call, so it runs instead of reaching the user. Only a tool that exists."""
+    if isinstance(text, str) and (tagged := _tagged_call(text)):
+        return tagged
     match = _WRITTEN_CALL.match(text) if isinstance(text, str) else None
     if not match or get_tool(match.group(1)) is None:
         return []
