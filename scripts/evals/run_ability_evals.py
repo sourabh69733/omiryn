@@ -33,7 +33,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./data/omiryn_abilities_test.db"
 
 from agent.evals.abilities.questions import AREAS, NEEDS, QUESTIONS, WHO  # noqa: E402
 from agent.evals.abilities.report import as_markdown, tally  # noqa: E402
-from agent.evals.abilities.runner import REASONS, mark_saved, run, saved  # noqa: E402
+from agent.evals.abilities.runner import REASONS, mark_saved, plan_only, run, saved  # noqa: E402
 from agent.providers.extraction.service import request_check_model  # noqa: E402
 from agent.providers.shared.model_catalog import server_reply_model  # noqa: E402
 from storage import reset_db, summarize_agent_usage  # noqa: E402
@@ -50,6 +50,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-judge", action="store_true", help="Only what code can check.")
     parser.add_argument("--at-once", type=int, default=4, help="Chats running at the same time (default 4).")
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--plan-only", action="store_true", help="Only the look-up plan for each question: would it search, and for what. No reply, no search.")
     parser.add_argument("--mark-again", metavar="RUN.json", help="Mark a saved run again with the judge. Asks Omi nothing.")
     return parser
 
@@ -73,6 +74,8 @@ async def _run(args: argparse.Namespace) -> int:
     if not questions:
         print("No question matches.")
         return 2
+    if args.plan_only:
+        return await _plan_only(questions, args.at_once)
     reply_model = args.model or server_reply_model()
     judge_model = "none" if args.no_judge else (args.judge_model or request_check_model("deepinfra") or "default")
     print(f"{len(questions)} questions · reply {reply_model or 'provider default'} · judge {judge_model}")
@@ -80,6 +83,27 @@ async def _run(args: argparse.Namespace) -> int:
     results = await run(questions, model=reply_model, use_judge=not args.no_judge, judge_model=args.judge_model, at_once=args.at_once, on_done=show)
     cost = summarize_agent_usage(allow_app_wide=True).get("estimated_cost_usd")
     _finish(results, reply_model or "provider default", judge_model, datetime.now().astimezone(), cost, save=not args.no_save)
+    return 0
+
+
+async def _plan_only(questions, at_once: int) -> int:
+    """How the look-up plan does against each question's own label: search, do not search, either."""
+    reset_db()
+    plans = await plan_only(questions, at_once=at_once)
+    groups = {True: [], False: [], None: []}
+    for question, searches, error in plans:
+        groups[question.search].append((question, searches, error))
+    for label, title in ((True, "Must search"), (False, "Must not search"), (None, "Either is fine")):
+        group = groups[label]
+        searched = [item for item in group if item[1]]
+        print(f"\n{title}: {len(searched)} of {len(group)} planned a search")
+        for question, searches, error in group:
+            wrong = (label is True and not searches) or (label is False and bool(searches))
+            if wrong or error or label is None and searches:
+                mark = "WRONG " if wrong else "      "
+                print(f"  {mark}{question.id}: {question.text[:60]} -> {[search['query'] for search in searches] or error or 'no search'}")
+    cost = summarize_agent_usage(allow_app_wide=True).get("estimated_cost_usd")
+    print(f"\n{len(plans)} plans" + (f" · ${cost:.3f}" if cost else ""))
     return 0
 
 

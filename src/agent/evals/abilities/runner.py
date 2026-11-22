@@ -169,7 +169,8 @@ async def ask(user_id: str, question: AbilityQuestion, *, model: str | None, bef
             messages=history,
             user_text=message_text(question),
             user_id=user_id,
-            user_profile={"display_name": USER_NAME, "timezone": TIMEZONE},
+            # As the app gives it: a user with no place set is taken to be in the default country.
+            user_profile={"display_name": USER_NAME, "timezone": TIMEZONE, "country": "India", "location": "India"},
             model=model,
             agent_mode="know_me",
             agent_tone="auto",
@@ -296,6 +297,28 @@ async def judge(asked: Asked, *, model: str | None = None, today: datetime | Non
     return None
 
 
+async def plan_only(questions: list[AbilityQuestion], *, at_once: int = 6) -> list[tuple[AbilityQuestion, list[dict[str, Any]], str]]:
+    """The look-up plan for each question, with no reply written: (question, searches, error).
+
+    Measures the planner on its own against each question's `search` label. Costs one small model
+    call per question and no search."""
+    from agent.context_engine.policy.lookup import lookup_plan_input, planned_searches
+    from agent.providers import plan_lookup
+
+    gate = asyncio.Semaphore(max(1, at_once))
+    today = utc_now().astimezone(ZoneInfo(TIMEZONE)).strftime("%A, %-d %B %Y")
+
+    async def one(question: AbilityQuestion) -> tuple[AbilityQuestion, list[dict[str, Any]], str]:
+        async with gate:
+            try:
+                raw = await plan_lookup(lookup_plan_input(message_text(question), chat_before(question), today=today, place="India"), conversation_id="")
+            except Exception as error:
+                return question, [], type(error).__name__
+        return question, [search.arguments for search in planned_searches(raw)], ""
+
+    return list(await asyncio.gather(*(one(question) for question in questions if question.runnable)))
+
+
 def saved(results: list[tuple[Asked, Mark]], *, reply_model: str, when: datetime) -> dict[str, Any]:
     """A run as plain data: every reply and what Omi looked up. Asking costs money and time;
     with this a run can be marked again, by another judge, without asking again."""
@@ -419,6 +442,7 @@ __all__ = [
     "judge_input",
     "mark_saved",
     "parse_judgment",
+    "plan_only",
     "run",
     "saved",
 ]
