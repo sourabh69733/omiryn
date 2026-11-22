@@ -35,7 +35,7 @@ What people ask a personal agent, and what a right reply does. Made from
 | Write something ready to send | 10 |
 | Be a good friend to talk to | 12 |
 
-Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
+Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 5.
 
 ## Career: in college, first to third year (about 18 to 21)
 
@@ -247,8 +247,8 @@ Must search: 43. Must not search: 52. Either: 30. Omi cannot do it yet: 6.
 
 | Question | Who | Needs | A right reply |
 |---|---|---|---|
-| ye padh ke bata kya likha hai https://en.wikipedia.org/wiki/Graduate_Aptitude_Test_in_Engineering *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot open links and asks for the text. Never makes up what the page says. |
-| is video ka summary de do https://www.youtube.com/watch?v=jNQXAC9IVRw *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot watch or open videos. Never makes up a summary. |
+| ye padh ke bata kya likha hai https://en.wikipedia.org/wiki/Graduate_Aptitude_Test_in_Engineering | Anyone | Read a thing it is given | Says what the page is about, from the page itself: GATE, the engineering entrance exam in India, and one or two real points from it. Nothing made up. |
+| is video ka summary de do https://www.youtube.com/watch?v=jNQXAC9IVRw *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot watch the video. It may give the title or description it can read. Never makes up a summary of what is said. |
 | ye kya hai? *A photo is sent with the message. The test cannot send this, so it is not run. Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot see pictures. Never describes one it cannot see. |
 | notes ka pdf bhej raha hu, summary bana do *Omi cannot do this yet.* | Anyone | Read a thing it is given | Today: says it cannot read files and asks for the text pasted in. |
 

@@ -406,9 +406,9 @@ QUESTIONS: tuple[AbilityQuestion, ...] = (
 
     # Things handed to Omi
     Q("handed-link", "handed", "handed", "ye padh ke bata kya likha hai https://en.wikipedia.org/wiki/Graduate_Aptitude_Test_in_Engineering",
-      "Today: says it cannot open links and asks for the text. Never makes up what the page says.", None, can_today=False),
+      "Says what the page is about, from the page itself: GATE, the engineering entrance exam in India, and one or two real points from it. Nothing made up.", None),
     Q("handed-video", "handed", "handed", "is video ka summary de do https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "Today: says it cannot watch or open videos. Never makes up a summary.", None, can_today=False),
+      "Today: says it cannot watch the video. It may give the title or description it can read. Never makes up a summary of what is said.", None, can_today=False),
     Q("handed-photo", "handed", "handed", "ye kya hai?",
       "Today: says it cannot see pictures. Never describes one it cannot see.", False, "vague", can_today=False,
       setup="A photo is sent with the message.", runnable=False),
