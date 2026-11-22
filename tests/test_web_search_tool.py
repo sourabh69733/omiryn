@@ -60,9 +60,22 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
 
         by_query = {body["query"]: body for body in bodies}
         self.assertEqual(by_query["summer internships open"]["country"], "india")
-        self.assertIs(by_query["summer internships open"]["include_published_date"], True)
+        # Country and dates are never asked for together: that pair has returned unrelated pages.
+        self.assertNotIn("include_published_date", by_query["summer internships open"])
         self.assertNotIn("country", by_query["layoffs"])  # the engine takes no country for news
         self.assertEqual((general.trace["country"], news.trace["country"]), (True, False))
+
+    async def test_without_a_country_a_general_search_asks_for_dates(self) -> None:
+        bodies = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            bodies.append(json.loads(request.content))
+            return httpx.Response(200, json={"results": []})
+
+        with patch.dict("os.environ", {"TAVILY_API_KEY": "k", "AGENT_WEB_SEARCH_COUNTRY": "false"}), patch("agent.tools.web_search.httpx.AsyncClient", _client(handler)):
+            await run_calls([ToolCall("web_search", {"query": "gsoc timeline"})], CONTEXT)
+
+        self.assertEqual(bodies, [{"query": "gsoc timeline", "max_results": 4, "search_depth": "basic", "include_published_date": True}])
 
     async def test_a_country_the_engine_does_not_know_is_left_out(self) -> None:
         bodies = []

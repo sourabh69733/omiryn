@@ -108,13 +108,14 @@ async def search_web(query: str, *, days: int | None = None, country: str | None
     body: dict[str, Any] = {"query": query, "max_results": MAX_RESULTS, "search_depth": "basic"}
     if days:
         body.update({"topic": "news", "days": days})
+    elif country:
+        # The engine takes a country only for a general search; it boosts, it does not filter.
+        body["country"] = country
     else:
-        # A news search always comes with dates; a general one only when asked for.
-        extras: dict[str, Any] = {"include_published_date": True}
-        if country:
-            # The engine takes a country only for a general search; it boosts, it does not filter.
-            extras["country"] = country
-        body.update(extras)
+        # A news search always comes with dates; a general one only when asked for. Never asked
+        # for together with a country: seen 2026-11-23, "fastest train from Bhopal to Delhi" with
+        # both came back as four pages about the city of Delhi, and right with either one alone.
+        body["include_published_date"] = True
     headers = {"Authorization": f"Bearer {os.environ['TAVILY_API_KEY'].strip()}"}
     async with httpx.AsyncClient(timeout=7.0) as client:
         response = await client.post(TAVILY_URL, json=body, headers=headers)
