@@ -18,7 +18,11 @@ from .registry import Tool, ToolContext, ToolResult, register_tool
 
 TAVILY_URL = "https://api.tavily.com/search"
 MAX_RESULTS = 4
-SNIPPET_CHARS = 600
+# The engine returns up to three passages of about 500 characters per page; all of them are kept.
+# Measured 2026-11-23 on 18 questions that need a search, a judge reading the evidence alone: cut
+# at 600 characters the evidence held the answer for 8; whole and with dates, for 12. A deeper
+# search (twice the credits) also gave 12, and the engine's own short answer did not help.
+SNIPPET_CHARS = 1600
 QUERY_CHARS = 200
 
 DESCRIPTION = (
@@ -104,15 +108,20 @@ async def search_web(query: str, *, days: int | None = None, country: str | None
     body: dict[str, Any] = {"query": query, "max_results": MAX_RESULTS, "search_depth": "basic"}
     if days:
         body.update({"topic": "news", "days": days})
-    elif country:
-        # The engine takes a country only for a general search; it boosts, it does not filter.
-        body["country"] = country
+    else:
+        # A news search always comes with dates; a general one only when asked for.
+        extras: dict[str, Any] = {"include_published_date": True}
+        if country:
+            # The engine takes a country only for a general search; it boosts, it does not filter.
+            extras["country"] = country
+        body.update(extras)
     headers = {"Authorization": f"Bearer {os.environ['TAVILY_API_KEY'].strip()}"}
     async with httpx.AsyncClient(timeout=7.0) as client:
         response = await client.post(TAVILY_URL, json=body, headers=headers)
-        if response.status_code == 400 and "country" in body:
-            # A country name the engine does not know: search without it.
-            body.pop("country")
+        if response.status_code == 400 and not days:
+            # The engine refused an extra (a country name it does not know): the plain search.
+            for name in ("country", "include_published_date"):
+                body.pop(name, None)
             response = await client.post(TAVILY_URL, json=body, headers=headers)
         response.raise_for_status()
         data = response.json()

@@ -60,6 +60,7 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
 
         by_query = {body["query"]: body for body in bodies}
         self.assertEqual(by_query["summer internships open"]["country"], "india")
+        self.assertIs(by_query["summer internships open"]["include_published_date"], True)
         self.assertNotIn("country", by_query["layoffs"])  # the engine takes no country for news
         self.assertEqual((general.trace["country"], news.trace["country"]), (True, False))
 
@@ -74,7 +75,20 @@ class WebSearchToolTest(unittest.IsolatedAsyncioTestCase):
             [result] = await run_calls([ToolCall("web_search", {"query": "x"})], CONTEXT)
 
         self.assertEqual(["country" in body for body in bodies], [True, False])
+        self.assertEqual(bodies[-1], {"query": "x", "max_results": 4, "search_depth": "basic"})
         self.assertTrue(result.trace["ok"])
+
+    async def test_the_whole_extract_is_kept_with_its_date(self) -> None:
+        passage = "PF full withdrawal is allowed after 12 months without a job. " * 20  # about 1200 characters
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"results": [{"title": "EPFO rules", "url": "https://x", "content": passage, "published_date": "2026-11-02"}]})
+
+        with patch.dict("os.environ", {"TAVILY_API_KEY": "k"}), patch("agent.tools.web_search.httpx.AsyncClient", _client(handler)), patch("storage.get_user_profile", return_value=None):
+            [result] = await run_calls([ToolCall("web_search", {"query": "pf withdrawal rule"})], CONTEXT)
+
+        self.assertIn(" ".join(passage.split()), result.note)
+        self.assertIn("EPFO rules · 2026-11-02", result.note)
 
     def test_the_results_come_with_todays_date(self) -> None:
         note = web_note("internship forms", [{"title": "T", "url": "https://x", "date": "", "text": "Apply by 18 November."}], today="Monday, 23 November 2026")
