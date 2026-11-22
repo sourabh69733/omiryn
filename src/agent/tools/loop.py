@@ -91,7 +91,7 @@ async def reply_with_tools(
     return raw_reply, trace
 
 
-def tool_result_messages(calls: list[ToolCall], results: list[Any], *, round_number: int = 1) -> list[dict[str, Any]]:
+def tool_result_messages(calls: list[ToolCall], results: list[Any], *, round_number: int = 1, step: str = "call") -> list[dict[str, Any]]:
     """The model's calls as one assistant message, then one `tool` message per result.
 
     The provider layer sends these in the tool-call format of the chat API, so the model reads
@@ -101,7 +101,8 @@ def tool_result_messages(calls: list[ToolCall], results: list[Any], *, round_num
     assistant: dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": []}
     tool_messages: list[dict[str, Any]] = []
     for index, (call, result) in enumerate(zip(calls, results), start=1):
-        call_id = f"call_{round_number}_{index}"
+        # Unique within a turn: `step` tells apart calls made for the model outside the loop.
+        call_id = f"{step}_{round_number}_{index}"
         arguments = json.dumps(call.arguments, ensure_ascii=False)[:ARGUMENT_CHARS]
         assistant["tool_calls"].append({"id": call_id, "name": call.name, "arguments": arguments})
         tool_messages.append({"role": "tool", "tool_call_id": call_id, "name": call.name, "content": result.note})

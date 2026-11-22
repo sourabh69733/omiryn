@@ -27,6 +27,7 @@ from agent.cognition.background.vibe.prompt import (
     VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,
 )
+from agent.context_engine.policy.lookup import LOOKUP_PLAN_SYSTEM_PROMPT
 from agent.context_engine.policy.requests import REQUEST_CHECK_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
 from agent.outputs.profile_draft.prompts import EXTRACTION_REPAIR_PROMPT, EXTRACTION_SYSTEM_PROMPT
@@ -45,6 +46,7 @@ from agent.observability.usage import (
     MATCH_JUDGE,
     MATCH_NOTES,
     MATCH_REASONS,
+    LOOKUP_PLAN,
     SEARCH_QUERIES,
     UPLOAD_MERGE,
     UPLOAD_PART,
@@ -343,6 +345,40 @@ async def _upload_call(
         response_format={"type": "json_object"},
     )
     return _parse_json_object(content)
+
+
+# The look-up plan is written before every reply that may need facts, so it needs a small fast
+# model. A second one stands in when the provider refuses the first.
+_DEFAULT_LOOKUP_MODELS = {"deepinfra": ["Qwen/Qwen3-Next-80B-A3B-Instruct", "meta-llama/Llama-3.3-70B-Instruct-Turbo"]}
+
+
+def lookup_models(provider: str) -> list[str | None]:
+    """LOOKUP_MODELS (comma-separated, tried in order), else fast defaults for the provider, else
+    the provider's own model."""
+    named = [name.strip() for name in os.getenv("LOOKUP_MODELS", "").split(",") if name.strip()]
+    return named or list(_DEFAULT_LOOKUP_MODELS.get(provider) or [None])
+
+
+async def plan_lookup(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 5,
+) -> dict[str, Any]:
+    """Whether a message needs facts from the web and the searches for it:
+    {"lookup": bool, "searches": [{"query", "recent_days"}]}."""
+    provider = _provider_name()
+    if provider == "mock":
+        return {}
+    models = [model] if model else lookup_models(provider)
+    for index, name in enumerate(models):
+        try:
+            return await _upload_call(LOOKUP_PLAN_SYSTEM_PROMPT, LOOKUP_PLAN, text, conversation_id, name, timeout_seconds)
+        except AgentProviderError:
+            if index == len(models) - 1:
+                raise
+    return {}
 
 
 def request_check_model(provider: str) -> str | None:
