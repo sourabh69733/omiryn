@@ -84,7 +84,33 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
             results = await run(picked, model="claude-haiku-5-5", use_judge=False, ask_one=fake_ask)
         self.assertEqual([asked.question.id for asked, _ in results], ["exams-cat-date", "money-emi", "handed-photo"])
         self.assertEqual(asked_with, {"exams-cat-admit": None, "exams-cat-date": "exams-cat-admit", "money-emi": None})
-        self.assertEqual(tally(results)["not_run"], 1)
+        # No judge ran here, so nothing is marked: an unmarked reply is never counted as wrong.
+        self.assertEqual((tally(results)["not_run"], tally(results)["wrong"]), (3, 0))
+
+
+class SavedRunTest(unittest.IsolatedAsyncioTestCase):
+    async def test_a_saved_run_is_marked_again_without_asking_omi(self) -> None:
+        from datetime import datetime, timezone
+
+        from agent.evals.abilities.runner import mark_saved, saved
+
+        first = [
+            (Asked(BY_ID["exams-gate-form"], "2 September ko khula tha", SEARCHED, 4.0, bubbles=("2 September ko khula tha",)), Mark("wrong", "not_run", "No judge ran, so this needs a person to read it.")),
+            (Asked(BY_ID["money-emi"], "4,167"), Mark("wrong", "not_run", "No judge ran, so this needs a person to read it.")),
+        ]
+        run_data = saved(first, reply_model="any-model", when=datetime(2026, 11, 23, 10, 0, tzinfo=timezone.utc))
+        seen: list[tuple[str, str | None, int]] = []
+
+        async def fake_judge(asked, *, model=None, today=None):
+            seen.append((asked.question.id, model, today.day))
+            return Mark("right", "ok", "Reads right.", "judge")
+
+        with patch("agent.evals.abilities.runner.judge", fake_judge):
+            again = await mark_saved(run_data, judge_model="claude-haiku-5-5")
+
+        self.assertEqual(sorted(seen), [("exams-gate-form", "claude-haiku-5-5", 23), ("money-emi", "claude-haiku-5-5", 23)])
+        self.assertEqual([(asked.reply, asked.tools, mark.verdict) for asked, mark in again], [("2 September ko khula tha", SEARCHED, "right"), ("4,167", (), "right")])
+        self.assertEqual(run_data["replies"][0]["tools"][0]["returned"], SEARCHED[0].returned)
 
 
 class ReportTest(unittest.TestCase):

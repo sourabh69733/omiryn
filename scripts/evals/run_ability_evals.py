@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 from datetime import datetime
@@ -32,7 +33,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./data/omiryn_abilities_test.db"
 
 from agent.evals.abilities.questions import AREAS, NEEDS, QUESTIONS, WHO  # noqa: E402
 from agent.evals.abilities.report import as_markdown, tally  # noqa: E402
-from agent.evals.abilities.runner import REASONS, run  # noqa: E402
+from agent.evals.abilities.runner import REASONS, mark_saved, run, saved  # noqa: E402
 from agent.providers.extraction.service import request_check_model  # noqa: E402
 from agent.providers.shared.model_catalog import server_reply_model  # noqa: E402
 from storage import reset_db, summarize_agent_usage  # noqa: E402
@@ -49,11 +50,18 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-judge", action="store_true", help="Only what code can check.")
     parser.add_argument("--at-once", type=int, default=4, help="Chats running at the same time (default 4).")
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--mark-again", metavar="RUN.json", help="Mark a saved run again with the judge. Asks Omi nothing.")
     return parser
 
 
 async def _run(args: argparse.Namespace) -> int:
     os.environ.update({"AGENT_PIPELINE_VERSION": "v3", "AGENT_PROVIDER": "deepinfra", "MEMORY_EMBEDDING_MODEL": "off"})
+    def show(asked, mark) -> None:
+        verdict = "NOT MARKED" if mark.reason == "not_run" else mark.verdict.upper()
+        print(f"{asked.question.id}: {verdict} ({REASONS[mark.reason]})", flush=True)
+
+    if args.mark_again:
+        return await _mark_again(args, show)
     questions = [
         question
         for question in QUESTIONS
@@ -69,23 +77,39 @@ async def _run(args: argparse.Namespace) -> int:
     judge_model = "none" if args.no_judge else (args.judge_model or request_check_model("deepinfra") or "default")
     print(f"{len(questions)} questions · reply {reply_model or 'provider default'} · judge {judge_model}")
     reset_db()
-
-    def show(asked, mark) -> None:
-        print(f"{asked.question.id}: {mark.verdict.upper()} ({REASONS[mark.reason]})", flush=True)
-
     results = await run(questions, model=reply_model, use_judge=not args.no_judge, judge_model=args.judge_model, at_once=args.at_once, on_done=show)
-    counts = tally(results)
     cost = summarize_agent_usage(allow_app_wide=True).get("estimated_cost_usd")
-    print(f"Right {counts['right']} · partly {counts['partly']} · wrong {counts['wrong']} · not run {counts['not_run']}" + (f" · ${cost:.2f}" if cost else ""))
-    if not args.no_save:
-        now = datetime.now()
-        folder = PROJECT_ROOT / "reports" / "evals" / now.strftime("%Y-%m-%d")
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"{now.strftime('%H%M%S')}__abilities.md"
-        report = as_markdown(results, reply_model=reply_model or "provider default", judge_model=judge_model, when=now.strftime("%d %B %Y, %H:%M"), cost_usd=cost)
-        path.write_text(report + "\n", encoding="utf-8")
-        print(f"Report: {path}")
+    _finish(results, reply_model or "provider default", judge_model, datetime.now().astimezone(), cost, save=not args.no_save)
     return 0
+
+
+async def _mark_again(args: argparse.Namespace, show) -> int:
+    run_data = json.loads(Path(args.mark_again).read_text(encoding="utf-8"))
+    judge_model = args.judge_model or request_check_model("deepinfra") or "default"
+    print(f"{len(run_data['replies'])} saved replies · reply {run_data['reply_model']} · judge {judge_model}")
+    reset_db()
+    results = await mark_saved(run_data, judge_model=args.judge_model, at_once=args.at_once, on_done=show)
+    cost = summarize_agent_usage(allow_app_wide=True).get("estimated_cost_usd")
+    _finish(results, run_data["reply_model"], judge_model, datetime.fromisoformat(run_data["when"]), cost, save=not args.no_save, marked_again=True)
+    return 0
+
+
+def _finish(results, reply_model: str, judge_model: str, when: datetime, cost, *, save: bool, marked_again: bool = False) -> None:
+    """Print the score; save the report and the run as data (replies and lookups) beside it."""
+    counts = tally(results)
+    print(f"Right {counts['right']} · partly {counts['partly']} · wrong {counts['wrong']} · not marked {counts['not_run']}" + (f" · ${cost:.2f}" if cost else ""))
+    if not save:
+        return
+    now = datetime.now()
+    folder = PROJECT_ROOT / "reports" / "evals" / now.strftime("%Y-%m-%d")
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{now.strftime('%H%M%S')}__abilities.md"
+    # A run marked again reports only the judge's cost; the replies were paid for before.
+    report = as_markdown(results, reply_model=reply_model, judge_model=judge_model, when=when.strftime("%d %B %Y, %H:%M"), cost_usd=cost)
+    path.write_text(report + "\n", encoding="utf-8")
+    path.with_suffix(".json").write_text(json.dumps(saved(results, reply_model=reply_model, when=when), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(f"Report: {path}" + (" (marked again)" if marked_again else ""))
+    print(f"Saved run: {path.with_suffix('.json')}")
 
 
 def main() -> int:

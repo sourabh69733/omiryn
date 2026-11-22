@@ -11,8 +11,9 @@ Result = tuple[Asked, Mark]
 
 
 def tally(results: list[Result]) -> Counter:
-    """right / partly / wrong, and not_run for what the test cannot send."""
-    return Counter("not_run" if mark.reason == "not_run" and not asked.reply and not asked.error else mark.verdict for asked, mark in results)
+    """right / partly / wrong, and not_run for what the test cannot send or no judge marked. A
+    reply nobody marked is not a wrong reply."""
+    return Counter("not_run" if mark.reason == "not_run" else mark.verdict for asked, mark in results)
 
 
 def _score_rows(results: list[Result], key, labels: dict[str, str]) -> list[str]:
@@ -54,7 +55,7 @@ def as_markdown(results: list[Result], *, reply_model: str, judge_model: str, wh
         f"Reply model `{reply_model}` · judge `{judge_model}` · {when}",
         "",
         f"**{counts['right']} right, {counts['partly']} partly, {counts['wrong']} wrong** out of {marked} asked."
-        + (f" {counts['not_run']} could not be sent." if counts["not_run"] else "")
+        + (f" {counts['not_run']} more were not marked (no judge answered, or the test cannot send them)." if counts["not_run"] else "")
         + (f" Cost of this run: ${cost_usd:.2f}." if cost_usd is not None else ""),
         "",
         "The marks are by a judge model reading each reply against the written rule. Every reply is below; overrule any mark you disagree with.",

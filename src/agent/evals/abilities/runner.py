@@ -31,6 +31,8 @@ from agent.evals.abilities.questions import NEEDS, QUESTIONS, WHO, AbilityQuesti
 from agent.shared.clock import utc_now
 
 TIMEZONE = "Asia/Kolkata"
+# The made-up person every question is asked as.
+USER_NAME = "Aarav"
 JUDGE_KIND = "ability_judge"
 NOTE_CHARS = 3000
 # What a made-up Omi line says after the person tells it something, so the chat reads as a real one.
@@ -167,7 +169,7 @@ async def ask(user_id: str, question: AbilityQuestion, *, model: str | None, bef
             messages=history,
             user_text=message_text(question),
             user_id=user_id,
-            user_profile={"display_name": "Aarav", "timezone": TIMEZONE},
+            user_profile={"display_name": USER_NAME, "timezone": TIMEZONE},
             model=model,
             agent_mode="know_me",
             agent_tone="auto",
@@ -215,6 +217,8 @@ def judge_input(asked: Asked, *, today: datetime | None = None) -> str:
         {
             "today": now.strftime("%A, %d %B %Y, %H:%M India time"),
             "who_is_asking": WHO[question.who],
+            # Omi knows this from the profile, so using the name is not making it up.
+            "name_omi_knows_them_by": USER_NAME,
             "said_earlier": question.earlier,
             "question": message_text(question),
             "asked_right_after": question.after,
@@ -251,34 +255,100 @@ def parse_judgment(raw: dict[str, Any]) -> Mark | None:
     return Mark(verdict, reason, note, "judge")
 
 
-async def judge(asked: Asked, *, model: str | None = None) -> Mark | None:
-    """The judge's mark, or None when it could not be read (after one more try)."""
-    from agent.providers.extraction.service import request_check_model
+async def judge(asked: Asked, *, model: str | None = None, today: datetime | None = None) -> Mark | None:
+    """The judge's mark, or None when it could not be read (after one more try).
+
+    Any model can judge: a Claude model by name, or one of the provider's. `today` is the day the
+    reply was written, for marking a saved run later."""
+    from agent.providers.extraction.service import request_check_models
+    from agent.providers.gateway.claude import is_claude
+    from agent.providers.gateway.claude_chat import claude_chat
     from agent.providers.gateway.router import provider_chat
     from agent.providers.shared.config import agent_runtime_status
     from agent.providers.shared.json_utils import _parse_json_object
 
     provider = str(agent_runtime_status().get("provider") or "")
-    for _ in range(2):
+    messages = [{"role": "user", "content": judge_input(asked, today=today)}]
+    # The test user's own chat, so the judge's cost is counted with the run.
+    conversation_id = asked.conversation_id or None
+    # One try per model: the named judge twice, or the check model and then its stand-in.
+    for name in ([model, model] if model else request_check_models(provider)):
         try:
-            raw = await provider_chat(
-                provider=provider,
-                system_prompt=JUDGE_PROMPT,
-                messages=[{"role": "user", "content": judge_input(asked)}],
-                temperature=0,
-                # The test user's own chat, so the judge's cost is counted with the run.
-                conversation_id=asked.conversation_id or None,
-                request_kind=JUDGE_KIND,
-                model=model or request_check_model(provider),
-                timeout_seconds=40,
-                response_format={"type": "json_object"},
-            )
+            if is_claude(name):
+                raw = await claude_chat(JUDGE_PROMPT, messages, model=str(name), conversation_id=conversation_id, request_kind=JUDGE_KIND, timeout_seconds=40)
+            else:
+                raw = await provider_chat(
+                    provider=provider,
+                    system_prompt=JUDGE_PROMPT,
+                    messages=messages,
+                    temperature=0,
+                    conversation_id=conversation_id,
+                    request_kind=JUDGE_KIND,
+                    model=name,
+                    timeout_seconds=40,
+                    response_format={"type": "json_object"},
+                )
             mark = parse_judgment(_parse_json_object(raw))
         except Exception:
             mark = None
         if mark is not None:
             return mark
     return None
+
+
+def saved(results: list[tuple[Asked, Mark]], *, reply_model: str, when: datetime) -> dict[str, Any]:
+    """A run as plain data: every reply and what Omi looked up. Asking costs money and time;
+    with this a run can be marked again, by another judge, without asking again."""
+    return {
+        "reply_model": reply_model,
+        "when": when.isoformat(),
+        "replies": [
+            {
+                "id": asked.question.id,
+                "reply": asked.reply,
+                "bubbles": list(asked.bubbles),
+                "tools": [{"name": tool.name, "arguments": tool.arguments, "returned": tool.returned} for tool in asked.tools],
+                "seconds": round(asked.seconds, 1),
+                "error": asked.error,
+                "mark": {"verdict": mark.verdict, "reason": mark.reason, "note": mark.note, "by": mark.by},
+            }
+            for asked, mark in results
+        ],
+    }
+
+
+async def mark_saved(
+    run_data: dict[str, Any],
+    *,
+    judge_model: str | None = None,
+    at_once: int = 4,
+    on_done: Callable[[Asked, Mark], None] | None = None,
+) -> list[tuple[Asked, Mark]]:
+    """Mark a saved run again. No reply is asked for: only the judge is called."""
+    by_id = {question.id: question for question in QUESTIONS}
+    today = datetime.fromisoformat(run_data["when"])
+    gate = asyncio.Semaphore(max(1, at_once))
+
+    async def one(item: dict[str, Any]) -> tuple[Asked, Mark]:
+        asked = Asked(
+            by_id[item["id"]],
+            item.get("reply") or "",
+            tuple(ToolUse(tool["name"], tool.get("arguments") or {}, tool.get("returned") or "") for tool in item.get("tools") or []),
+            float(item.get("seconds") or 0),
+            item.get("error") or "",
+            bubbles=tuple(item.get("bubbles") or ()),
+        )
+        if not asked.question.runnable:
+            mark = Mark("wrong", "not_run", "The test cannot send this.")
+        else:
+            async with gate:
+                judged = await judge(asked, model=judge_model, today=today) if asked.reply else None
+            mark = final_mark(asked, judged)
+        if on_done:
+            on_done(asked, mark)
+        return asked, mark
+
+    return list(await asyncio.gather(*(one(item) for item in run_data.get("replies") or [] if item.get("id") in by_id)))
 
 
 def chains(questions: list[AbilityQuestion]) -> list[list[AbilityQuestion]]:
@@ -347,6 +417,8 @@ __all__ = [
     "final_mark",
     "judge",
     "judge_input",
+    "mark_saved",
     "parse_judgment",
     "run",
+    "saved",
 ]
