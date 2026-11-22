@@ -7,6 +7,7 @@ from typing import Any
 
 from agent.context_engine.policy import split_assistant_reply
 from agent.context_engine.policy.replies import (
+    copy_pieces,
     strip_open_marker,
     strip_quiet_markers,
     strip_story_end,
@@ -44,7 +45,8 @@ def finish_reply(reply: str, user_text: str) -> FinishedReply:
     if no_reply or (reaction and not reply):
         return FinishedReply("", [], False, False, voice, reaction, no_reply)
     return FinishedReply(
-        reply,
+        # The copy tags are for the app; the bubbles and this text never carry them.
+        "".join(text for text, _ in copy_pieces(reply)).strip(),
         split_assistant_reply(reply, user_text=user_text),
         story_marked or story_ended,
         story_ended,

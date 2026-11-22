@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import unicodedata
+from typing import Callable
 
 from agent.context_engine.policy.script import normalize_assistant_script
 
@@ -154,33 +155,105 @@ def tidy_lines(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+# Written by the model around text the user will copy and send: a mail, a message, a caption.
+# Hidden from the user. It tells the app this text is not Omi talking, so it stays one bubble
+# exactly as written, and the checks on Omi's own words (question limit, repeats) leave it alone.
+COPY_OPEN, COPY_CLOSE = "<copy>", "</copy>"
+_COPY_OPEN_VARIANTS = re.compile(r"[<\[]\s*copy\s*[>\]]", re.IGNORECASE)
+_COPY_CLOSE_VARIANTS = re.compile(r"[<\[]\s*/\s*copy\s*[>\]]", re.IGNORECASE)
+
+
+def copy_pieces(reply: str) -> list[tuple[str, bool]]:
+    """The reply in order as (text, is it text to copy). A block with no closing tag ends at the
+    next bubble; a block the model spread over bubbles is one text again."""
+    rest = _COPY_CLOSE_VARIANTS.sub(COPY_CLOSE, _COPY_OPEN_VARIANTS.sub(COPY_OPEN, normalize_part_separators(str(reply or ""))))
+    pieces: list[tuple[str, bool]] = []
+    while COPY_OPEN in rest:
+        own, _, body = rest.partition(COPY_OPEN)
+        pieces.append((own, False))
+        if COPY_CLOSE in body:
+            block, _, rest = body.partition(COPY_CLOSE)
+        else:
+            block, separator, after = body.partition(REPLY_PART_SEPARATOR)
+            rest = separator + after
+        pieces.append((block.replace(REPLY_PART_SEPARATOR, "\n\n"), True))
+    pieces.append((rest.replace(COPY_CLOSE, ""), False))
+    return [(text, copied) for text, copied in pieces if text.strip()]
+
+
+def has_copy_text(reply: str) -> bool:
+    return any(copied for _, copied in copy_pieces(reply))
+
+
+def own_words(reply: str) -> str:
+    """The reply without the text to copy: what Omi itself says to the user, bubble by bubble."""
+    bubbles = [bubble.strip() for text, copied in copy_pieces(reply) if not copied for bubble in text.split(REPLY_PART_SEPARATOR)]
+    return REPLY_PART_SEPARATOR.join(bubble for bubble in bubbles if bubble)
+
+
+def outside_copy_text(reply: str, change: Callable[[str], str]) -> str:
+    """`change` applied to Omi's own words only; text to copy comes back exactly as written.
+
+    Each block is held as a marker on a line of its own while `change` runs. If a marker is lost,
+    the reply is returned unchanged: an untrimmed reply is better than a lost mail."""
+    pieces = copy_pieces(reply)
+    blocks = [text for text, copied in pieces if copied]
+    if not blocks:
+        return change(reply)
+    held = iter(range(len(blocks)))
+    marked = "".join(f"\n{_held(next(held))}\n" if copied else text for text, copied in pieces)
+    changed = change(marked)
+    if any(changed.count(_held(index)) != 1 for index in range(len(blocks))):
+        return reply
+    for index, block in enumerate(blocks):
+        changed = changed.replace(_held(index), f"{COPY_OPEN}{block.strip()}{COPY_CLOSE}")
+    return changed
+
+
+def _held(index: int) -> str:
+    return f"⟦copy{index}⟧"
+
+
 def split_assistant_reply(reply: str, *, user_text: str | None = None) -> list[str]:
     cleaned = tidy_lines(normalize_part_separators(normalize_assistant_script(str(reply or ""))))
     if not cleaned:
         return [""]
 
-    # A reply written as one message is split the same way as an overlong part: the model's words
-    # are never dropped for being long (see MAX_REPLY_WORDS for the one outer limit).
-    written = [_normalize_chat_bubble(part) for part in cleaned.split(REPLY_PART_SEPARATOR)]
-    bubbles = [_normalize_chat_bubble(bubble) for bubble in _as_bubbles([part for part in written if part])]
-    return _limit_parts([bubble for bubble in bubbles if bubble], MAX_REPLY_PARTS) or [_normalize_chat_bubble(cleaned)]
+    # A reply written as one message, with no separator: its empty lines are the bubble breaks.
+    # With separators the model laid the bubbles out itself, so an empty line stays inside one.
+    # When paragraphs would make more bubbles than a reply may have, they stay together.
+    parts = _written_parts(cleaned, paragraphs_apart=REPLY_PART_SEPARATOR not in cleaned)
+    if len(parts) > MAX_REPLY_PARTS:
+        parts = _written_parts(cleaned, paragraphs_apart=False)
+    bubbles = [_normalize_chat_bubble(bubble) for bubble in _as_bubbles(parts)]
+    return _limit_parts([bubble for bubble in bubbles if bubble], MAX_REPLY_PARTS) or [_normalize_chat_bubble(own_words(cleaned) or cleaned)]
 
 
-def _as_bubbles(parts: list[str]) -> list[str]:
+def _written_parts(cleaned: str, *, paragraphs_apart: bool) -> list[tuple[str, bool]]:
+    """The reply as the model laid it out: (text, keep it whole). Text to copy is whole as written.
+    A part with line breaks (steps, one per line) is whole too. A part on one line may be split
+    later at sentence ends when it is long."""
+    breaks = rf"{re.escape(REPLY_PART_SEPARATOR)}|\n\n" if paragraphs_apart else re.escape(REPLY_PART_SEPARATOR)
+    parts: list[tuple[str, bool]] = []
+    for text, copied in copy_pieces(cleaned):
+        written = [tidy_lines(text)] if copied else [_normalize_chat_bubble(part) for part in re.split(breaks, text)]
+        parts.extend((part, copied or "\n" in part) for part in written if part)
+    return parts
+
+
+def _as_bubbles(parts: list[tuple[str, bool]]) -> list[str]:
     """The model's parts as chat bubbles. An overlong part is split at sentence ends. When that
     makes more bubbles than one reply may have, the bubbles grow instead, so nothing is lost.
-
-    A part with line breaks in it was laid out by the model (steps, a mail to copy), so it stays
-    one bubble whatever its length."""
+    A part marked whole stays one bubble whatever its length."""
     limit = REPLY_PART_WORD_LIMIT
-    longest = max((len(part.split()) for part in parts if "\n" not in part), default=0)
+    longest = max((len(part.split()) for part, whole in parts if not whole), default=0)
     if limit <= 0:
-        return parts
+        return [part for part, _ in parts]
     while True:
         bubbles = [
             bubble
-            for part in parts
-            for bubble in ([part] if "\n" in part else _word_limited_parts(part, limit))
+            for part, whole in parts
+            for bubble in ([part] if whole else _word_limited_parts(part, limit))
         ]
         if len(bubbles) <= MAX_REPLY_PARTS or limit >= longest:
             return bubbles

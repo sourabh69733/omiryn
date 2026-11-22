@@ -17,7 +17,8 @@ def output_format_prompt() -> str:
   from the user and tells the app a story is running.
 - Line breaks inside a bubble are shown as you write them. Use them for steps, one per line.
   Plain text only: no markdown such as ** or #.
-- Something the user will copy and send (a mail, a message, a caption) goes whole in one bubble of
-  its own, with its line breaks, however long it is. Never spread it over bubbles.
+- Something the user will copy and send (a mail, a message, a caption) goes between <copy> and
+  </copy>: whole, with its line breaks, however long it is. The tags are hidden and the app shows
+  it as one bubble of its own. Your own words to the user stay outside the tags.
 - Do not wrap the whole bubble in quotation marks.
 - Do not write screenplay/dialogue format or speaker labels like "<Name>:"."""
