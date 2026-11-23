@@ -39,13 +39,34 @@ their name at the bottom.
 Asked how to do something here, point to the page; if it is not listed, say you are not sure.
 </the_app>"""
 
-_CANNOT = (
-    "You cannot yet set alarms or timed reminders, book tickets or cabs, order food, or message anyone "
-    "for them, and you cannot open or use websites for them; you can share a link. Asked for one of "
-    "these, say so plainly and offer what you can do instead. Never say you sent, shared, opened, saved "
-    "or booked something this reply does not do: a link counts only when you write it out in full, "
-    "starting with https://."
+_NEVER_CLAIM = (
+    "Asked for one of these, say so plainly in one line and offer what you can do instead. Never say you "
+    "will do, did, sent, shared, opened, read, watched, saved or booked something this reply does not "
+    "do: a link counts only when you write it out in full, starting with https://."
 )
+
+
+def limits(*, reads_pages: bool, writes_first: bool) -> list[str]:
+    """What Omi cannot do today, as plain facts. Built from what is switched on, like the ability
+    list, and kept true: change a line the day the product changes, never ahead of it. A model does
+    not know its own limits, so without this it agrees to read a PDF or to ask again tomorrow."""
+    return [
+        "See a photo, a screenshot or any image, or read a file (a PDF, a document, a sheet). Ask "
+        "them to paste the text here or tell you what it shows.",
+        "Watch a video or listen to audio."
+        + (" From a video link you get only its title and description; say that, never what is said in it." if reads_pages else ""),
+        (
+            "Set an alarm or a reminder for a set time. You may check in on your own at a sensible "
+            "hour, but never at a time you promise."
+            if writes_first
+            else "Set an alarm or a reminder, or write to them first: you speak only when they write. "
+            "So never promise to ask, remind or check in later; offer to bring it up when they next write."
+        ),
+        "Book tickets or cabs, order food, pay, or message anyone for them.",
+        "Use a website for them (log in, fill a form, buy)."
+        + ("" if reads_pages else " You cannot open a link either: ask them to paste what the page says."),
+    ]
+
 
 _PAGE_BUTTON = (
     "Put a button under your reply that opens a page of the app (privacy, memories, vibe, matches, "
@@ -56,7 +77,7 @@ _PAGE_BUTTON = (
 
 def abilities_block() -> str:
     from agent.proactive.service import proactive_messaging_enabled
-    from agent.tools import places_enabled, tools_enabled, web_search_enabled
+    from agent.tools import places_enabled, read_page_enabled, tools_enabled, web_search_enabled
 
     tools = tools_enabled()
     lines = [
@@ -66,6 +87,9 @@ def abilities_block() -> str:
     ]
     if tools and web_search_enabled():
         lines.append("Look up news and facts on the web.")
+    reads_pages = tools and read_page_enabled()
+    if reads_pages:
+        lines.append("Read a web page: a link they send you, or a page from a search.")
     if tools and places_enabled():
         lines.append("Find places to go out (cafes, food, spots) with ratings and a maps link.")
     if proactive_messaging_enabled():
@@ -75,7 +99,8 @@ def abilities_block() -> str:
     )
     lines.append(_PAGE_BUTTON)
     body = "\n".join(f"- {line}" for line in lines)
-    return f"<what_you_can_do>\n{body}\n{_CANNOT}\n</what_you_can_do>"
+    cannot = "\n".join(f"- {line}" for line in limits(reads_pages=reads_pages, writes_first=proactive_messaging_enabled()))
+    return f"<what_you_can_do>\n{body}\nYou cannot yet:\n{cannot}\n{_NEVER_CLAIM}\n</what_you_can_do>"
 
 
-__all__ = ["APP_PAGES_FACTS", "IDENTITY_FACTS", "PRIVACY_FACTS", "abilities_block"]
+__all__ = ["APP_PAGES_FACTS", "IDENTITY_FACTS", "PRIVACY_FACTS", "abilities_block", "limits"]

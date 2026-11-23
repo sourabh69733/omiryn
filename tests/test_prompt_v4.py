@@ -301,7 +301,8 @@ class PromptV44Test(unittest.TestCase):
             new, old = self._prompt("v4-4"), self._prompt("v4-3")
         self.assertIn("<what_you_can_do>", new)
         self.assertIn("not end-to-end encrypted", new)
-        self.assertIn("You cannot yet set alarms", new)
+        self.assertIn("You cannot yet:", new)
+        self.assertIn("Set an alarm or a reminder", new)
         self.assertNotIn("<what_you_can_do>", old)
         self.assertNotIn("<privacy>", old)
         # Nothing in the omi block is cut by its size limit.
@@ -315,6 +316,27 @@ class PromptV44Test(unittest.TestCase):
         self.assertNotIn("facts on the web", block)
         self.assertNotIn("maps link", block)
         self.assertNotIn("on your own", block)
+
+    def test_the_limits_are_facts_built_from_what_is_switched_on(self) -> None:
+        from agent.context_engine.prompt_engine.modules.omiryn_facts import abilities_block
+
+        with patch.dict(os.environ, {"AGENT_TOOLS": "true", "TAVILY_API_KEY": "x", "AGENT_READ_PAGE": "true", "PROACTIVE_MESSAGING_ENABLED": "false"}):
+            block = abilities_block()
+        self.assertIn("Read a web page: a link they send you", block)
+        self.assertIn("See a photo, a screenshot or any image, or read a file", block)
+        self.assertIn("From a video link you get only its title and description", block)
+        self.assertIn("you speak only when they write", block)
+        self.assertIn("never promise to ask, remind or check in later", block)
+        self.assertNotIn("cannot open a link", block)
+        self.assertIn("Never say you will do, did, sent", " ".join(block.split()))
+
+        with patch.dict(os.environ, {"AGENT_TOOLS": "true", "TAVILY_API_KEY": "", "PROACTIVE_MESSAGING_ENABLED": "true"}):
+            block = abilities_block()
+        self.assertNotIn("Read a web page", block)
+        self.assertIn("You cannot open a link either", block)
+        self.assertNotIn("title and description", block)
+        self.assertIn("never at a time you promise", block)
+        self.assertNotIn("you speak only when they write", block)
 
     def test_someone_new_is_marked_until_omi_knows_them(self) -> None:
         self.assertIn("they are new to you", self._prompt("v4-4"))
