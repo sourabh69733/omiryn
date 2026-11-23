@@ -196,6 +196,43 @@ class TimeAwarenessPromptTest(unittest.TestCase):
         self.assertIn("unknown", time_awareness_prompt({}))
 
 
+class CalendarFactsTest(unittest.TestCase):
+    """Weekdays and day counts are handed to the model as facts; it never works them out."""
+
+    def test_every_day_of_the_coming_weeks_has_its_weekday_and_days_from_today(self) -> None:
+        from datetime import date
+
+        from agent.shared.timeline import calendar_lines
+
+        lines = calendar_lines(date(2026, 11, 23))
+        text = "\n".join(lines)
+        self.assertIn("never work one out yourself", lines[0])
+        self.assertEqual(lines[1], "Mon 23 Nov (today) · Tue 24 +1 · Wed 25 +2 · Thu 26 +3 · Fri 27 +4 · Sat 28 +5 · Sun 29 +6")
+        self.assertIn("Mon 14 Dec +21", text)  # seen wrong from a model: 14 December called a Sunday
+        self.assertIn("Fri 25 +32", text)  # Christmas 2026 is a Friday
+        self.assertIn("Fri 1 Jan 2027 +39", text)
+        self.assertEqual(lines[-1].split(" · ")[0], "Later months start on: Mon 1 Feb 2027 +70")
+        self.assertEqual(len(lines), 8)
+
+    def test_the_week_starts_on_monday_so_past_days_show_too(self) -> None:
+        from datetime import date
+
+        from agent.shared.timeline import calendar_lines
+
+        self.assertTrue(calendar_lines(date(2026, 12, 31))[1].startswith("Mon 28 Dec -3 · Tue 29 -2 · Wed 30 -1 · Thu 31 (today) · Fri 1 Jan 2027 +1"))
+
+    def test_the_prompt_carries_the_calendar_unless_switched_off(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        profile = conversation_time([], "Asia/Kolkata", NOW).profile_fields()
+        self.assertIn("Calendar, worked out by the app", time_awareness_prompt(profile))
+        self.assertIn("(today)", time_awareness_prompt(profile))
+        with patch.dict(os.environ, {"AGENT_CALENDAR_FACTS": "false"}):
+            self.assertNotIn("Calendar", time_awareness_prompt(profile))
+        self.assertNotIn("Calendar", time_awareness_prompt({"current_local_label": "now", "current_date": "not a date"}))
+
+
 class TimeAwarenessApiTest(unittest.TestCase):
     def setUp(self) -> None:
         self.env = patch.dict(

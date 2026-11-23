@@ -246,6 +246,53 @@ def relative_day(day: date, today: date) -> str:
     return f"in {amount}" if delta > 0 else f"{amount} ago"
 
 
+# Built by hand, like _local_label, so the output does not depend on the server's locale.
+_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+CALENDAR_WEEKS = 6
+CALENDAR_MONTH_STARTS = 6
+
+
+def calendar_facts_enabled() -> bool:
+    return os.getenv("AGENT_CALENDAR_FACTS", "true").strip().lower() != "false"
+
+
+def calendar_lines(today: date, *, weeks: int = CALENDAR_WEEKS, month_starts: int = CALENDAR_MONTH_STARTS) -> list[str]:
+    """The coming weeks day by day, each with its weekday and how many days from today it is.
+
+    A model asked "which day is 14 December" or "how many days are left" works it out in its head
+    and gets it wrong (seen: a Monday called Sunday, next Friday a day late). Code knows the
+    calendar, so it hands the answer over as a fact: one line a week from this week's Monday, then
+    the first day of the months after that."""
+    monday = today - timedelta(days=today.weekday())
+    lines = [
+        "Calendar, worked out by the app. Read every weekday, date and count of days from it; never "
+        "work one out yourself. +N is days from today, -N days ago. For a date that is not here, "
+        "say you are not sure of the weekday."
+    ]
+    last = today
+    for week in range(weeks):
+        days = []
+        for offset in range(7):
+            day = monday + timedelta(days=week * 7 + offset)
+            last = day
+            # The month is named on the first day of each line and wherever a month begins.
+            named = f"{_DAYS[offset]} {day.day}" + (f" {_MONTHS[day.month - 1]}" if offset == 0 or day.day == 1 else "")
+            if (day.day, day.month) == (1, 1):
+                named += f" {day.year}"  # a new year starts inside the calendar
+            gap = (day - today).days
+            days.append(f"{named} (today)" if gap == 0 else f"{named} {gap:+d}")
+        lines.append(" · ".join(days))
+    starts = []
+    year, month = last.year, last.month
+    for _ in range(month_starts):
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+        first = date(year, month, 1)
+        starts.append(f"{_DAYS[first.weekday()]} 1 {_MONTHS[month - 1]} {year} {(first - today).days:+d}")
+    lines.append("Later months start on: " + " · ".join(starts))
+    return lines
+
+
 def _local_label(local: datetime, *, with_year: bool = False) -> str:
     # Built by hand so the output does not depend on the server's locale.
     time_text = local.strftime("%I:%M %p").lstrip("0").lower()
@@ -256,6 +303,8 @@ def _local_label(local: datetime, *, with_year: bool = False) -> str:
 
 
 __all__ = [
+    "calendar_facts_enabled",
+    "calendar_lines",
     "ConversationTime",
     "clock_label",
     "time_note_gap",

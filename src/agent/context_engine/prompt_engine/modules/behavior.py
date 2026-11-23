@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from agent.context_engine.prompt_engine.models import PromptBehaviorVersion
@@ -13,6 +14,7 @@ from agent.context_engine.prompt_engine.modules.identity import (
     persona_cards_enabled,
     voice_prompt,
 )
+from agent.shared.timeline import calendar_facts_enabled, calendar_lines
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,16 @@ def _env_bool(value: object) -> bool:
     return str(value).strip().lower() == "true"
 
 
+def _calendar(current_date: Any) -> list[str]:
+    """The calendar of the coming weeks from the user's own date; nothing when that is unknown."""
+    if not calendar_facts_enabled():
+        return []
+    try:
+        return calendar_lines(date.fromisoformat(str(current_date)))
+    except ValueError:
+        return []
+
+
 def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
     """State the user's local time and how long they were away, computed in code."""
     profile = user_profile or {}
@@ -156,6 +168,7 @@ def time_awareness_prompt(user_profile: dict[str, Any] | None) -> str:
         f"Time for the user now: {now_label} ({profile.get('current_day_part')}), "
         f"timezone={timezone}."
     ]
+    lines.extend(_calendar(profile.get("current_date")))
     last_label = profile.get("last_user_message_label")
     if last_label:
         lines.append(
