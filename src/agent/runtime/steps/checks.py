@@ -15,6 +15,7 @@ from agent.context_engine.policy.freshness import (
     without_repeated_opening,
     without_repeated_questions,
 )
+from agent.context_engine.policy.facts import fact_check_input, fact_problems, fact_rewrite_instruction, looked_up_evidence
 from agent.context_engine.policy.identity import maker_claim, maker_claim_reason
 from agent.context_engine.policy.replies import has_copy_text, outside_copy_text, own_words
 from agent.context_engine.policy.requests import (
@@ -27,7 +28,7 @@ from agent.context_engine.policy.requests import (
     request_check_reason,
 )
 from agent.memory_engine.memories.talk_requests import save_talk_requests
-from agent.providers import check_reply_requests
+from agent.providers import check_reply_facts, check_reply_requests
 
 from .job import ReplyJob
 
@@ -46,6 +47,11 @@ def request_check_enabled() -> bool:
 
 def identity_check_enabled() -> bool:
     return os.getenv("AGENT_IDENTITY_CHECK", "true").strip().lower() != "false"
+
+
+def fact_check_enabled() -> bool:
+    """Off unless AGENT_FACT_CHECK=true: kept off until it is measured to help."""
+    return os.getenv("AGENT_FACT_CHECK", "false").strip().lower() == "true"
 
 
 def request_check_mode() -> str:
@@ -155,6 +161,40 @@ async def follow_requests(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any
     return rewritten, {"checked": True, "reason": reason, "broken": broken, "rewritten": True, "saved_requests": len(saved)}
 
 
+async def check_facts(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
+    """One rewrite when the draft does not match what was looked up this turn: it states a fact the
+    results contradict, or a changing fact the results do not hold. Runs only on a turn that looked
+    something up. A small model finds the mismatches; code keeps those whose quotes are real."""
+    if not fact_check_enabled():
+        return reply, None
+    evidence = looked_up_evidence([*job.reply_messages, *job.looked_up])
+    spoken = own_words(reply)
+    if not evidence or not spoken.strip():
+        return reply, None
+    from agent.tools import ToolContext
+    from agent.tools.web_search import user_now
+
+    try:
+        raw = await check_reply_facts(
+            fact_check_input(spoken, job.user_text, evidence, today=user_now(ToolContext(job.user_id))),
+            conversation_id=str(job.generation_arguments.get("conversation_id") or job.conversation_id or ""),
+        )
+    except Exception as error:
+        return reply, {"checked": False, "error": type(error).__name__}
+    problems = fact_problems(raw, spoken, evidence)
+    # Counts only: the quotes are the user's chat and web pages, and never go to the trace.
+    found = {"conflicts": sum(1 for problem in problems if problem.kind == "conflict"), "unsupported": sum(1 for problem in problems if problem.kind == "unsupported")}
+    if not problems:
+        return reply, {"checked": True, **found}
+    try:
+        rewritten = await job.rewrite(fact_rewrite_instruction(reply, problems), job.reply_messages)
+    except Exception as error:
+        return reply, {"checked": True, **found, "rewritten": False, "error": type(error).__name__}
+    if not rewritten.strip():
+        return reply, {"checked": True, **found, "rewritten": False}
+    return rewritten, {"checked": True, **found, "rewritten": True}
+
+
 async def check_identity(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any] | None]:
     """One rewrite when the draft says which company or model made or runs Omi, such as the
     underlying model's own "I was developed by Google". Code finds the sentence; the model rewrites."""
@@ -173,9 +213,11 @@ async def check_identity(reply: str, job: ReplyJob) -> tuple[str, dict[str, Any]
 # In order; the name is the key of its result in the turn trace. Freshness comes last so it reads
 # the text the user will see: a request rewrite has no repeat check of its own.
 REPLY_CHECKS: tuple[tuple[str, Check], ...] = (
+    # Facts first: the checks after it read the corrected text.
+    ("fact_check", check_facts),
     ("identity_check", check_identity),
     ("request_check", follow_requests),
     ("freshness", freshen_reply),
 )
 
-__all__ = ["REPLY_CHECKS", "check_identity", "follow_requests", "freshen_reply", "freshness_check_enabled", "identity_check_enabled", "request_check_enabled", "request_check_mode"]
+__all__ = ["REPLY_CHECKS", "check_facts", "check_identity", "fact_check_enabled", "follow_requests", "freshen_reply", "freshness_check_enabled", "identity_check_enabled", "request_check_enabled", "request_check_mode"]

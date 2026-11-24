@@ -86,6 +86,22 @@ def user_today(context: ToolContext) -> str:
     return utc_now().astimezone(user_zone(name)).strftime("%A, %-d %B %Y")
 
 
+def user_now(context: ToolContext) -> str:
+    """Today's date and the time where the user is, in words."""
+    from agent.shared.clock import utc_now
+    from agent.shared.timeline import user_zone
+
+    name = None
+    if context.user_id:
+        try:
+            from storage import get_user_timezone
+
+            name = get_user_timezone(context.user_id)
+        except Exception:
+            name = None
+    return utc_now().astimezone(user_zone(name)).strftime("%A, %-d %B %Y, %-I:%M %p")
+
+
 def user_country(context: ToolContext) -> str | None:
     """The user's country as the search engine names it (a lowercase English name), from their
     profile, else the app's default country. Only the country is ever sent, never the city, so
