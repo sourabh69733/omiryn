@@ -27,6 +27,7 @@ from agent.cognition.background.vibe.prompt import (
     VIBE_INTRO_SYSTEM_PROMPT,
     VIBE_VERIFY_SYSTEM_PROMPT,
 )
+from agent.context_engine.policy.facts import FACT_CHECK_SYSTEM_PROMPT
 from agent.context_engine.policy.lookup import LOOKUP_PLAN_SYSTEM_PROMPT
 from agent.context_engine.policy.requests import REQUEST_CHECK_SYSTEM_PROMPT
 from agent.outputs.profile_draft.models import normalize_extracted_profile
@@ -47,6 +48,7 @@ from agent.observability.usage import (
     MATCH_NOTES,
     MATCH_REASONS,
     LOOKUP_PLAN,
+    REPLY_FACT_CHECK,
     SEARCH_QUERIES,
     UPLOAD_MERGE,
     UPLOAD_PART,
@@ -426,6 +428,46 @@ async def check_reply_requests(
             continue
         return _parse_json_object(content)
     return {"broken": []}
+
+
+def fact_check_models(provider: str) -> list[str | None]:
+    """FACT_CHECK_MODELS (comma-separated, tried in order), else the request check's models."""
+    named = [name.strip() for name in os.getenv("FACT_CHECK_MODELS", "").split(",") if name.strip()]
+    return named or request_check_models(provider)
+
+
+async def check_reply_facts(
+    text: str,
+    *,
+    conversation_id: str,
+    model: str | None = None,
+    timeout_seconds: float | None = 20,
+) -> dict[str, Any]:
+    """Where a drafted reply does not match what was looked up for it:
+    {"conflicts": [{"reply_says", "found"}], "unsupported": [{"reply_says"}]}."""
+    provider = _provider_name()
+    if provider == "mock":
+        return {"conflicts": [], "unsupported": []}
+    models = [model] if model else fact_check_models(provider)
+    for index, name in enumerate(models):
+        try:
+            content = await provider_chat(
+                provider=provider,
+                system_prompt=FACT_CHECK_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": text}],
+                temperature=0,
+                conversation_id=conversation_id,
+                request_kind=REPLY_FACT_CHECK,
+                model=name,
+                timeout_seconds=timeout_seconds,
+                response_format={"type": "json_object"},
+            )
+        except AgentProviderError:
+            if index == len(models) - 1:
+                raise
+            continue
+        return _parse_json_object(content)
+    return {"conflicts": [], "unsupported": []}
 
 
 async def write_vibe_intro(
