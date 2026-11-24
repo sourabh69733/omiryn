@@ -69,8 +69,10 @@ class IdentityCheckTest(unittest.TestCase):
             reply, info = asyncio.run(check_identity("I was developed by Google.", job))
         self.assertEqual((reply, info, notes), ("I was developed by Google.", None, []))
 
-    def test_runs_first_so_later_checks_read_the_fixed_text(self) -> None:
-        self.assertEqual(REPLY_CHECKS[0][0], "identity_check")
+    def test_runs_before_the_request_and_freshness_checks_so_they_read_the_fixed_text(self) -> None:
+        names = [name for name, _check in REPLY_CHECKS]
+        self.assertLess(names.index("identity_check"), names.index("request_check"))
+        self.assertLess(names.index("identity_check"), names.index("freshness"))
 
 
 if __name__ == "__main__":
