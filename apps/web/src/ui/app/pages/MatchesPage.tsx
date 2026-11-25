@@ -1,5 +1,5 @@
 import { Fragment, type FormEvent, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, Check, MessageCircle, MoreHorizontal, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronDown, MessageCircle, MoreHorizontal, X } from "lucide-react";
 import { apiErrorMessage, apiFetch } from "../../../lib/api";
 import { trackAppEvent } from "../../../lib/appLogger";
 import { ReportDialog } from "../ReportDialog";
@@ -42,6 +42,8 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
   const [endBusy, setEndBusy] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [shownAgain, setShownAgain] = useState<string | null>(null);
+  // With several offers, one card is open at a time; the rest are short rows.
+  const [openOffer, setOpenOffer] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinNote, setJoinNote] = useState("");
@@ -179,6 +181,12 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
           </ul>
         </div>
       ) : null}
+      {!card.reasons.length && !card.difference && !card.icebreaker ? (
+        <div className="mt-section mt-no-reasons">
+          <p>Omi didn't write down why for this one yet.</p>
+          <button type="button" className="mt-link is-strong" onClick={onChat}>Ask Omi why</button>
+        </div>
+      ) : null}
       {card.difference ? (
         <div className="mt-difference">
           <span className="mt-eyebrow">One difference, and that's fine</span>
@@ -237,7 +245,24 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
         </section>
       ) : null}
 
-      {split.open.map((card) => <Fragment key={card.pair_id}>{intro(card, true)}</Fragment>)}
+      {split.open.length === 1 ? intro(split.open[0], true) : null}
+      {split.open.length > 1 ? (
+        <section className="mt-offers" aria-label={`${split.open.length} people for you`}>
+          {split.open.map((card) => {
+            const shown = (openOffer ?? split.open[0].pair_id) === card.pair_id;
+            if (shown) return <Fragment key={card.pair_id}>{intro(card, true)}</Fragment>;
+            const why = card.reasons[0]?.text || card.meet_line || "Tap to see why";
+            return (
+              <button type="button" className="mt-card mt-offer" key={card.pair_id} aria-label={`See the card for ${card.name}`} onClick={() => setOpenOffer(card.pair_id)}>
+                <span className="mt-avatar is-small" aria-hidden="true">{initialOf(card.name)}</span>
+                <span className="mt-offer-copy"><strong>{card.name}</strong><small>{why}</small></span>
+                {deadlineLabel(card.answer_by) ? <span className="mt-offer-due">{deadlineLabel(card.answer_by)}</span> : null}
+                <ChevronDown aria-hidden="true" className="mt-offer-chevron" />
+              </button>
+            );
+          })}
+        </section>
+      ) : null}
 
       {loaded && ready && !split.open.length ? (
         <section className="mt-looking" aria-label="Omi is looking">
@@ -259,7 +284,7 @@ export function MatchesPage({ onVibe, onChat, onOpenPerson, onPeopleChanged }: P
           </div>
           <div className="mt-wait"><div><strong>You said hi.</strong> Waiting for {card.name}. {card.answer_by ? <span>{deadlineLabel(card.answer_by)}.</span> : null}</div></div>
           <ol className="mt-steps">
-            <li><span>01</span><span>If {card.name} says hi too, Omi tells you both in your own chats and suggests a time and place.</span></li>
+            <li><span>01</span><span>If {card.name} says hi too, your chat with {card.name} opens here, under your chats.</span></li>
             <li><span>02</span><span>If not, or there is no answer within two days, you hear “not this week” and nothing else. Never why.</span></li>
           </ol>
           {shownAgain === card.pair_id ? intro(card, false) : null}

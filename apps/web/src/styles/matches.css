@@ -721,3 +721,81 @@
 @media (prefers-reduced-motion: reduce) {
   .mt-toast { animation: none; }
 }
+
+/* Several people offered at once: one full card open, the others as short rows. */
+.mt-offers {
+  display: grid;
+  gap: 10px;
+}
+
+.legacy-react-shell button.mt-offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.legacy-react-shell button.mt-offer:hover {
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+}
+
+.mt-offer-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.mt-offer-copy strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.mt-offer-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mt-offer-due {
+  flex: none;
+  color: var(--ember-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mt-offer-chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.mt-no-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 14.5px;
+}
+
+@media (max-width: 420px) {
+  .mt-offer-due {
+    display: none;
+  }
+}
