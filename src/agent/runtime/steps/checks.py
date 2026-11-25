@@ -50,8 +50,10 @@ def identity_check_enabled() -> bool:
 
 
 def fact_check_enabled() -> bool:
-    """Off unless AGENT_FACT_CHECK=true: kept off until it is measured to help."""
-    return os.getenv("AGENT_FACT_CHECK", "false").strip().lower() == "true"
+    """On unless AGENT_FACT_CHECK=false. Switched on 2026-11-25 after measuring: on 54 look-up
+    questions it rewrote 10 replies, 1 judged better, 9 the same, none worse, and the rewrites
+    removed made-up facts. It costs about 2.4 s on a reply that looked something up."""
+    return os.getenv("AGENT_FACT_CHECK", "true").strip().lower() != "false"
 
 
 def request_check_mode() -> str:

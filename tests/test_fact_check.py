@@ -90,10 +90,16 @@ class FactCheckStepTest(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, ON), patch("agent.runtime.steps.checks.check_reply_facts", clean):
             self.assertEqual(await check_facts(REPLY, job(AsyncMock())), (REPLY, {"checked": True, "conflicts": 0, "unsupported": 0}))
 
-    async def test_it_runs_only_when_switched_on_and_something_was_looked_up(self) -> None:
+    async def test_it_is_on_by_default(self) -> None:
+        clean = AsyncMock(return_value={"conflicts": [], "unsupported": []})
+        with patch.dict(os.environ, {"AGENT_FACT_CHECK": ""}), patch("agent.runtime.steps.checks.check_reply_facts", clean):
+            _, info = await check_facts(REPLY, job(AsyncMock()))
+        self.assertTrue(info["checked"])
+
+    async def test_it_can_be_switched_off_and_needs_something_looked_up(self) -> None:
         checker = AsyncMock(return_value=FOUND)
         with patch("agent.runtime.steps.checks.check_reply_facts", checker):
-            with patch.dict(os.environ, {"AGENT_FACT_CHECK": ""}):
+            with patch.dict(os.environ, {"AGENT_FACT_CHECK": "false"}):
                 self.assertEqual(await check_facts(REPLY, job(AsyncMock())), (REPLY, None))
             with patch.dict(os.environ, ON):
                 self.assertEqual(await check_facts(REPLY, job(AsyncMock(), [{"role": "user", "content": "hi"}])), (REPLY, None))
