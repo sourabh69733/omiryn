@@ -110,6 +110,19 @@ def claim_due_agent_jobs(
     return claimed
 
 
+def extend_agent_job_lease(job_id: str, *, now: datetime, lease_seconds: float) -> bool:
+    """A job that runs long says it is still alive: its lease moves out, so no other worker
+    takes it for dead and runs it a second time. False when the job is no longer running."""
+    now_utc = _utc(now)
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            agent_jobs.update()
+            .where(agent_jobs.c.id == job_id, agent_jobs.c.status == JOB_RUNNING)
+            .values(locked_until=now_utc + timedelta(seconds=lease_seconds), updated_at=now_utc)
+        )
+    return result.rowcount == 1
+
+
 def finish_agent_job(job: dict[str, Any], *, now: datetime) -> str:
     """Mark a claimed job done, unless it was rescheduled while running."""
     now_utc = _utc(now)
@@ -206,6 +219,7 @@ __all__ = [
     "JOB_RUNNING",
     "cancel_agent_jobs",
     "claim_due_agent_jobs",
+    "extend_agent_job_lease",
     "fail_agent_job",
     "finish_agent_job",
     "get_agent_job",

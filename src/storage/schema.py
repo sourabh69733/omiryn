@@ -917,6 +917,25 @@ match_reports = Table(
     Column("note", String, nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
+# One run of the pick for a pool (match day). A background job does it in passes, so the row says
+# where it stands and what came out. Ids, counts and states only: what the judge wrote stays on
+# the pairs, encrypted.
+match_pick_runs = Table(
+    "match_pick_runs",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("pool_id", String, nullable=False),
+    # queued, running, done, failed
+    Column("status", String, nullable=False, server_default="queued"),
+    Column("progress_json", JSON, nullable=True),
+    Column("result_json", JSON, nullable=True),
+    Column("error", String, nullable=True),
+    Column("created_by", String, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("finished_at", DateTime(timezone=True), nullable=True),
+)
+Index("ix_match_pick_runs_pool", match_pick_runs.c.pool_id, match_pick_runs.c.created_at)
 
 # A short "who this user is" note across all chats, rewritten by background cognition
 # and shown to the companion on every reply. Encrypted like other user content.
