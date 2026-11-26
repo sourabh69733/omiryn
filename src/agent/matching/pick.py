@@ -32,7 +32,9 @@ MIN_READY = 3
 GROUP_SIZE = 4
 # A judgement this old is made again: cards change in a week.
 CANDIDATE_FRESH = timedelta(days=7)
-# Pairs with a past in one of these are never proposed again; "expired" may come back once.
+# An ask nobody answered may be tried once more; after this many lapses the pair is not offered again.
+MAX_LAPSES = 2
+# Pairs with a past in one of these are never proposed again; "expired" is counted by `lapses`.
 NEVER_AGAIN = frozenset({"proposed", "asked", "introduced", "met", "still_talking", "declined", "no_show"})
 # A person in a pair at one of these stages has this week's match already and is not picked again.
 BUSY = frozenset({"proposed", "asked", "introduced"})
@@ -143,6 +145,13 @@ def propose(ready: list[str], candidates: list[Candidate]) -> Proposal:
     return Proposal(pairs=pairs, group=group, waiting=waiting, dropped=dropped, judged=len(candidates))
 
 
+def lapses(rows: list[dict[str, Any]]) -> int:
+    """How many times these two were asked and the ask ran out unanswered. Each pick stores a new
+    row for a pair it offers again, so the rows are counted; a row the operator put back to
+    proposed and asked again carries its own count."""
+    return sum(max(1, int((row.get("plan") or {}).get("expired_count") or 0)) for row in rows if row["status"] == "expired")
+
+
 def eligible_pairs(
     ready: list[str], history: list[dict[str, Any]], blocked: set[frozenset[str]] | None = None
 ) -> list[tuple[str, str, dict[str, Any] | None]]:
@@ -159,10 +168,8 @@ def eligible_pairs(
         rows = past.get(frozenset((a, b)), [])
         if any(row["status"] in NEVER_AGAIN for row in rows) or (blocked and frozenset((a, b)) in blocked):
             continue
-        if sum(1 for row in rows if row["status"] == "expired") >= 1 and any(((row.get("plan") or {}).get("expired_count") or 0) >= 1 and row["status"] == "expired" for row in rows):
-            # Asked once and nobody answered: one more try, not more.
-            if sum(1 for row in rows if row["status"] == "expired") >= 2:
-                continue
+        if lapses(rows) >= MAX_LAPSES:
+            continue
         fresh = None
         for row in rows:
             if row["status"] == "candidate":
@@ -175,19 +182,23 @@ def eligible_pairs(
 
 async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
     """Judge what needs judging, store candidates, mark the picked pairs proposed, return the proposal."""
-    from storage import blocked_match_pairs, get_user_style, list_match_pairs, match_pool_members_of, save_match_pair, set_match_pair_status
+    from storage import blocked_match_pairs, delete_stale_match_candidates, get_user_style, list_match_pairs, match_pool_members_of, save_match_pair, set_match_pair_status
 
     from .choose import judge_version
     from .compatibility import check_compatibility
-    from .readiness import match_readiness
+    from .reads import PickReads
     from .style import style_gaps
 
     if judge_version() == 3:
         return await pick_pool_mutual(pool_id, created_by=created_by)
+    # A judgement past its week is never read again; without this every match day leaves a row per pair behind.
+    delete_stale_match_candidates(pool_id, utc_now() - CANDIDATE_FRESH)
     members = [m["user_id"] for m in match_pool_members_of(pool_id)]
     history = list_match_pairs(pool_id)
     busy = {user for pair in history if pair["status"] in BUSY for user in (pair["user_a"], pair["user_b"])}
-    ready = [user_id for user_id in members if user_id not in busy and match_readiness(user_id).ready]
+    # Each person is read once for the whole pick, however many pairs they are in.
+    reads = PickReads()
+    ready = [user_id for user_id in members if user_id not in busy and reads.readiness(user_id).ready]
     if len(ready) < MIN_READY:
         return Proposal(waiting=ready, busy=sorted(busy & set(members)))
     styles = {user_id: get_user_style(user_id) or {} for user_id in ready}
@@ -197,7 +208,7 @@ async def pick_pool(pool_id: str, *, created_by: str | None = None) -> Proposal:
         if fresh is not None:
             check, pair_id = fresh["check"], fresh["id"]
         else:
-            check = (await check_compatibility(a, b)).as_dict()
+            check = (await check_compatibility(a, b, reads=reads)).as_dict()
             pair_id = save_match_pair(pool_id, a, b, check, created_by=created_by, status="candidate")["id"]
             judged += 1
         candidates.append(Candidate(pair_id, a, b, check, style_gaps(styles[a], styles[b])))
@@ -251,4 +262,4 @@ async def pick_pool_mutual(pool_id: str, *, created_by: str | None = None) -> Pr
     return proposal
 
 
-__all__ = ["BUSY", "CANDIDATE_FRESH", "GROUP_SIZE", "MIN_READY", "NEVER_AGAIN", "Candidate", "Proposal", "eligible_pairs", "greedy_pairs", "pick_pool", "pick_pool_mutual", "propose", "rank_candidates", "thin_week_group"]
+__all__ = ["BUSY", "CANDIDATE_FRESH", "GROUP_SIZE", "MAX_LAPSES", "MIN_READY", "NEVER_AGAIN", "Candidate", "Proposal", "eligible_pairs", "greedy_pairs", "lapses", "pick_pool", "pick_pool_mutual", "propose", "rank_candidates", "thin_week_group"]

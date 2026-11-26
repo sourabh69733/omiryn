@@ -208,6 +208,16 @@ def update_match_pair_plan(
     return get_match_pair(pair_id)
 
 
+def delete_stale_match_candidates(pool_id: str, before: datetime) -> int:
+    """Drop the pool's pairs that were judged, never picked, and last touched before `before`.
+    Only `candidate` rows go: a pair anyone was asked about keeps its record."""
+    with ENGINE.begin() as connection:
+        result = connection.execute(
+            match_pairs.delete().where(match_pairs.c.pool_id == pool_id, match_pairs.c.status == "candidate", match_pairs.c.updated_at < before)
+        )
+    return int(result.rowcount or 0)
+
+
 def delete_match_data_for_user(connection, user_id: str) -> dict[str, int]:
     """Account deletion: memberships, every pair the user was in, and those pairs' chats."""
     from .match_chat import delete_match_chat_for_user
@@ -238,7 +248,7 @@ def _pair(row: Any) -> dict[str, Any]:
 
 
 __all__ = [
-    "PAIR_STATUSES", "create_match_pool", "delete_match_data_for_user", "get_match_pair", "get_match_pool", "join_match_pool",
+    "PAIR_STATUSES", "create_match_pool", "delete_match_data_for_user", "delete_stale_match_candidates", "get_match_pair", "get_match_pool", "join_match_pool",
     "leave_match_pool", "list_match_pairs", "list_match_pools", "match_pairs_for_user", "match_pool_by_code", "match_pool_members_of",
     "match_pools_for_user", "save_match_pair", "set_match_pair_plan", "set_match_pair_status", "update_match_pair_plan",
 ]

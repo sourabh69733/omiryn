@@ -4,14 +4,24 @@ week; pairs with a past are never proposed again."""
 
 import os
 import unittest
+from dataclasses import replace
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 from agent.matching.compatibility import MatchCheck
-from agent.matching.pick import Candidate, eligible_pairs, greedy_pairs, pick_pool, propose, rank_candidates, thin_week_group
+from agent.matching.pick import CANDIDATE_FRESH, Candidate, eligible_pairs, greedy_pairs, lapses, pick_pool, propose, rank_candidates, thin_week_group
+from agent.matching.readiness import match_readiness
+from agent.matching.touchpoints import load_memory_vectors
+from agent.shared.clock import utc_now
 from api.main import app
-from storage import create_match_pool, join_match_pool, list_match_pairs, reset_db, save_match_pair, save_user_profile, update_vibe_card
+from storage import (
+    create_agent_memory, create_match_pool, join_match_pool, list_match_pairs, reset_db, save_agent_memory_embedding, save_conversation, save_match_pair,
+    save_user_profile, update_vibe_card,
+)
+from storage.database import ENGINE
+from storage.schema import match_pairs
 from test_matching import ready_areas
 
 
@@ -59,6 +69,22 @@ class PureTest(unittest.TestCase):
         self.assertEqual([(a, b, fresh["id"] if fresh else None) for a, b, fresh in pairs], [("a", "c", "p2"), ("b", "c", None)])
 
 
+    def test_an_unanswered_ask_comes_back_once_and_not_again(self) -> None:
+        def row(pair_id: str, a: str, b: str, status: str, expired_count: int | None = None) -> dict:
+            return {"id": pair_id, "user_a": a, "user_b": b, "status": status, "plan": {"expired_count": expired_count} if expired_count is not None else None, "check": {}, "updated_at": "2026-11-06T10:00:00+00:00"}
+
+        self.assertEqual(lapses([row("p1", "a", "b", "expired", 1), row("p2", "a", "b", "candidate")]), 1)
+        self.assertEqual(lapses([row("p1", "a", "b", "expired", 1), row("p2", "a", "b", "expired", 1)]), 2)
+        self.assertEqual(lapses([row("p1", "a", "b", "expired", 2)]), 2)  # one row the operator asked twice
+        self.assertEqual(lapses([row("p1", "a", "b", "expired")]), 1)  # set by hand, no count stored
+        history = [
+            row("p1", "a", "b", "expired", 1),  # lapsed once: one more try
+            row("p2", "a", "c", "expired", 1), row("p3", "a", "c", "expired", 1),  # lapsed twice: over
+            row("p4", "b", "c", "expired", 2),  # the same row asked twice: over
+        ]
+        self.assertEqual([(a, b) for a, b, _ in eligible_pairs(["a", "b", "c"], history)], [("a", "b")])
+
+
 class PickPoolTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         reset_db()
@@ -72,7 +98,7 @@ class PickPoolTest(unittest.IsolatedAsyncioTestCase):
         def check(fit: str) -> MatchCheck:
             return MatchCheck(fit, 50, ("humor",), [{"source": "area:humor", "text": "r"}] if fit == "yes" else [])
 
-        judge = AsyncMock(side_effect=lambda a, b: check("yes" if {a, b} in ({"ua", "ub"}, {"uc", "ud"}) else "maybe"))
+        judge = AsyncMock(side_effect=lambda a, b, **_: check("yes" if {a, b} in ({"ua", "ub"}, {"uc", "ud"}) else "maybe"))
         with patch("agent.matching.readiness.match_readiness", side_effect=lambda u: type("R", (), {"ready": True, "facts_known": {}})()), patch("agent.matching.compatibility.check_compatibility", judge):
             proposal = await pick_pool(self.pool["id"], created_by="op")
         self.assertEqual(judge.await_count, 6)
@@ -86,6 +112,51 @@ class PickPoolTest(unittest.IsolatedAsyncioTestCase):
         judge.assert_not_awaited()
         self.assertEqual((again.pairs, again.waiting, again.busy), ([], [], ["ua", "ub", "uc", "ud"]))
         self.assertEqual(again.as_dict()["busy"], ["ua", "ub", "uc", "ud"])
+
+    async def test_a_judgement_past_its_week_is_dropped_not_piled_up(self) -> None:
+        stale = save_match_pair(self.pool["id"], "ua", "ub", {"fit": "maybe"}, status="candidate")
+        fresh = save_match_pair(self.pool["id"], "ua", "uc", {"fit": "maybe", "reasons": []}, status="candidate")
+        declined = save_match_pair(self.pool["id"], "ub", "uc", {"fit": "yes"}, status="declined")
+        old = utc_now() - CANDIDATE_FRESH - timedelta(hours=1)
+        with ENGINE.begin() as connection:
+            connection.execute(match_pairs.update().where(match_pairs.c.id.in_([stale["id"], declined["id"]])).values(updated_at=old))
+        judge = AsyncMock(return_value=MatchCheck("maybe", 50, ("humor",)))
+        with patch("agent.matching.readiness.match_readiness", side_effect=lambda u: type("R", (), {"ready": u != "ud", "facts_known": {}})()), patch("agent.matching.compatibility.check_compatibility", judge):
+            await pick_pool(self.pool["id"], created_by="op")
+        rows = {pair["id"]: pair for pair in list_match_pairs(self.pool["id"])}
+        self.assertNotIn(stale["id"], rows)  # the old judgement is gone
+        self.assertIn(fresh["id"], rows)  # this week's is reused
+        self.assertEqual(rows[declined["id"]]["status"], "declined")  # a pair with a past keeps its record, however old
+        self.assertEqual(judge.await_count, 1)  # only ua and ub are judged again
+        self.assertEqual(len([pair for pair in rows.values() if {pair["user_a"], pair["user_b"]} == {"ua", "ub"}]), 1)
+
+    async def test_each_person_is_read_once_however_many_pairs_they_are_in(self) -> None:
+        for user_id in ("ua", "ub", "uc", "ud"):
+            save_conversation({"id": f"chat-{user_id}", "status": "active", "messages": [{"role": "user", "content": "hi", "created_at": "2026-11-07T09:00:00+00:00"}]}, user_id)
+            memory = create_agent_memory({
+                "user_id": user_id, "kind": "semantic", "purposes": ["profile"], "key": "walks", "value": "Walks every evening", "statement": "Walks every evening",
+                "confidence": 0.9, "importance": 0.6,
+                "evidence": [{"conversation_id": f"chat-{user_id}", "message_index": 0, "exact_quote": "hi", "observed_at": "2026-11-07T09:00:00+00:00"}],
+            })
+            save_agent_memory_embedding(memory["id"], user_id, {"provider": "p", "model": "m", "dimensions": 2, "values": [1.0, 0.1]})
+        readiness_reads, vector_reads = [], []
+
+        def readiness(user_id: str):
+            readiness_reads.append(user_id)
+            return replace(match_readiness(user_id), ready=True)
+
+        def vectors(user_id: str):
+            vector_reads.append(user_id)
+            return load_memory_vectors(user_id)
+
+        judge = AsyncMock(return_value={"fit": "maybe"})
+        with patch("agent.matching.readiness.match_readiness", readiness), patch("agent.matching.touchpoints.load_memory_vectors", vectors), patch("agent.providers.judge_match", judge):
+            await pick_pool(self.pool["id"], created_by="op")
+        self.assertEqual(judge.await_count, 6)  # four people, every pair
+        # Before: readiness once per member and twice more per judged pair (16 reads), vectors twice per pair (12).
+        self.assertEqual(sorted(readiness_reads), ["ua", "ub", "uc", "ud"])
+        self.assertEqual(sorted(vector_reads), ["ua", "ub", "uc", "ud"])
+        self.assertTrue(all(len(pair["check"]["touchpoints"]) == 1 for pair in list_match_pairs(self.pool["id"])))
 
     def test_operator_endpoint(self) -> None:
         with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true", "AGENT_PROVIDER": "mock"}):
