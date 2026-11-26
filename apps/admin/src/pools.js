@@ -184,12 +184,21 @@ export function renderPoolView(view) {
     </section>`;
 }
 
+/** The pick button while the server's job runs: how many pairs are checked and how many are left. */
+export function pickProgressLabel(run) {
+  const progress = run?.progress || {};
+  if (run?.status === "queued" || !progress.passes) return "Picking… (waiting to start)";
+  const left = progress.left == null ? "" : `, ${progress.left} left`;
+  return `Picking… ${progress.judged || 0} checked${left}`;
+}
+
 /** What a pick run did, in a few lines: pairs made, who waits, who was dropped and why. */
 export function renderPickResult(result, view) {
   if (!result) return "";
   const names = (ids) => (ids || []).map((id) => esc(nameOf(view, id))).join(", ");
   const pairs = (result.pairs || []).map((pair) => `<li><strong>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}</strong> · fit ${esc(pair.fit || "unknown")}</li>`).join("");
   const dropped = (result.dropped || []).map((pair) => `<li>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}: ${esc(pair.why || "")}</li>`).join("");
+  const notJudged = (result.not_judged || []).map((pair) => `<li>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}</li>`).join("");
   return `
     <div class="request-card pool-pick-result">
       <strong>Pick done: ${esc(String(result.pairs?.length || 0))} pairs proposed, ${esc(String(result.judged || 0))} checks run.</strong>
@@ -198,5 +207,6 @@ export function renderPickResult(result, view) {
       ${result.waiting?.length ? `<p class="pool-muted">Waiting: ${names(result.waiting)}</p>` : ""}
       ${result.busy?.length ? `<p class="pool-muted">Already in a pair: ${names(result.busy)}</p>` : ""}
       ${dropped ? `<p class="pool-muted">Dropped:</p><ul class="pool-reasons">${dropped}</ul>` : ""}
+      ${notJudged ? `<p class="pool-muted">Not checked (the model call kept failing):</p><ul class="pool-reasons">${notJudged}</ul>` : ""}
     </div>`;
 }

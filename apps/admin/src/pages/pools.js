@@ -1,5 +1,5 @@
 // Pools page: list, one open pool, and the operator actions (create, pick, propose, ask, introduce, status).
-import { renderPickResult, renderPoolList, renderPoolView } from "../pools.js";
+import { pickProgressLabel, renderPickResult, renderPoolList, renderPoolView } from "../pools.js";
 import { esc, skeleton } from "../ui.js";
 
 const state = { pools: [], selectedPoolId: null, view: null, pick: null };
@@ -49,6 +49,22 @@ async function openPool(root, api, setStatus, poolId) {
     detail.innerHTML = `<div class="empty bad">${esc(error.message)}</div>`;
     setStatus(error.message, "bad");
   }
+}
+
+// The pick is a background job on the server: start it, then ask how it stands until it is done.
+// A big pool takes minutes; the server keeps what it has judged, so a reload loses nothing.
+const PICK_POLL_MS = 3000;
+
+async function runPick(api, poolId, onProgress) {
+  const address = `/api/admin/pools/${encodeURIComponent(poolId)}/pick`;
+  let run = (await api(address, { method: "POST" })).run;
+  while (run && ["queued", "running"].includes(run.status)) {
+    onProgress(run);
+    await new Promise((resolve) => setTimeout(resolve, PICK_POLL_MS));
+    run = (await api(address)).run;
+  }
+  if (!run || run.status !== "done") throw new Error(`The pick did not finish${run?.error ? ` (${run.error})` : ""}. Pairs judged so far are kept; start it again.`);
+  return run.proposal;
 }
 
 function bind(root, api, setStatus) {
@@ -105,7 +121,7 @@ function bind(root, api, setStatus) {
         setStatus("Asked. Each person answers in their own chat.");
       } else if (button.dataset.pick) {
         button.textContent = "Picking… (runs model checks)";
-        state.pick = await api(`/api/admin/pools/${encodeURIComponent(button.dataset.pick)}/pick`, { method: "POST" });
+        state.pick = await runPick(api, button.dataset.pick, (run) => { button.textContent = pickProgressLabel(run); });
         setStatus("Pick done. Nothing reaches anyone until you ask or introduce.");
       }
       await reopen();

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { esc, nameOf, pairStatusLabel, readinessLine, renderPairs, renderPoolList, renderSuggestions, weekdayName } from "./pools.js";
+import { esc, nameOf, pairStatusLabel, pickProgressLabel, readinessLine, renderPairs, renderPickResult, renderPoolList, renderSuggestions, weekdayName } from "./pools.js";
 
 const view = {
   pool: { id: "p1", name: "Sunrise", join_code: "ABCDEF", match_weekday: 5 },
@@ -50,4 +50,13 @@ test("renderPoolList marks the open pool", () => {
   assert.match(html, /data-pool-id="p2" tabindex="0"/);
   assert.match(html, /class="pool-row is-selected" data-pool-id="p2"/);
   assert.match(html, /Tuesdays/);
+});
+
+test("the pick button says how far the server's job is, and the result names pairs it could not check", () => {
+  assert.equal(pickProgressLabel({ status: "queued", progress: { passes: 0, judged: 0, left: null } }), "Picking… (waiting to start)");
+  assert.equal(pickProgressLabel({ status: "running", progress: { passes: 2, judged: 40, left: 12 } }), "Picking… 40 checked, 12 left");
+  const html = renderPickResult({ pairs: [{ user_a: "u1", user_b: "u2", fit: "yes" }], judged: 3, not_judged: [{ user_a: "u1", user_b: "u2", why: "the judge call kept failing" }] }, view);
+  assert.match(html, /Pick done: 1 pairs proposed, 3 checks run/);
+  assert.match(html, /Not checked/);
+  assert.equal(renderPickResult(null, view), "");
 });
