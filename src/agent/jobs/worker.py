@@ -51,9 +51,11 @@ def _job_handlers() -> dict[str, JobHandler]:
     from agent.matching.hosting import (
         MATCH_CHECK_IN_JOB,
         MATCH_INTRO_JOB,
+        MATCH_PLAN_JOB,
         MATCH_REMINDER_JOB,
         run_match_check_in_job,
         run_match_intro_job,
+        run_match_plan_job,
         run_match_reminder_job,
     )
     from agent.matching.pair_chat import MATCH_CLOSED_JOB, run_match_closed_job
@@ -69,6 +71,7 @@ def _job_handlers() -> dict[str, JobHandler]:
         RETURN_GREETING_JOB: run_return_greeting_job,
         MATCH_INTRO_JOB: run_match_intro_job,
         MATCH_REMINDER_JOB: run_match_reminder_job,
+        MATCH_PLAN_JOB: run_match_plan_job,
         MATCH_CHECK_IN_JOB: run_match_check_in_job,
         MATCH_ASK_JOB: run_match_ask_job,
         MATCH_ASK_EXPIRE_JOB: run_match_ask_expire_job,

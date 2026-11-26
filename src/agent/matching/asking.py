@@ -17,7 +17,7 @@ from typing import Any
 from agent.shared.clock import utc_now
 from storage import get_match_pair, set_match_pair_plan, update_match_pair_plan
 
-from .hosting import CLOSED_STATUSES, _chat_announced, _defer_to_daytime, _host, hosting_conversation, pair_facts, schedule_hosting_jobs
+from .hosting import MATCH_INTRO_JOB, CLOSED_STATUSES, _chat_announced, _defer_to_daytime, _host, hosting_conversation, pair_facts, schedule_hosting_jobs, tell_step, undelivered
 
 logger = logging.getLogger(__name__)
 
@@ -110,15 +110,32 @@ async def run_match_ask_job(job: dict[str, Any]) -> bool:
     instructions = _ASK_INSTRUCTIONS.format(
         name=facts["name"], group=facts["group"], reasons=reasons, difference=difference, purpose=_ASK_FOR_CHAT if _chat_announced() else _ASK_FOR_MEET
     )
-    sent = await _host(user_id, pair, kind="match_ask", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_ASK_CUE)
-    now = utc_now().isoformat()
+    # Only an ask that reached the person opens their answer: the card, the tool, the two buttons.
+    return await tell_step(job, pair, user_id, kind="match_ask", user_text=f"meeting {facts['name']}", instructions=instructions, cue=_ASK_CUE)
 
-    def told(current: dict[str, Any]) -> dict[str, Any]:
-        current.setdefault("told", {})[user_id] = {"at": now, "sent": sent}
-        return current
 
-    update_match_pair_plan(pair["id"], told)
-    return sent
+def resend_undelivered(pair_id: str) -> list[str]:
+    """The operator sends a step again to whoever it did not reach: the ask while the pair is
+    asked, the introduction once it is introduced. Returns who was queued. The answer window
+    does not move."""
+    from agent.jobs.queue import schedule_job
+
+    pair = get_match_pair(pair_id)
+    if pair is None:
+        raise LookupError("pair not found")
+    if pair["status"] == "asked":
+        kind, key = MATCH_ASK_JOB, f"{pair_id}:ask"
+    elif pair["status"] == "introduced":
+        kind, key = MATCH_INTRO_JOB, pair_id
+    else:
+        raise ValueError(f"pair is {pair['status']}; there is nothing to send again")
+    who = [user_id for user_id in (pair["user_a"], pair["user_b"]) if user_id in undelivered(pair)]
+    if not who:
+        raise ValueError("everyone was reached")
+    for user_id in who:
+        conversation = hosting_conversation(user_id)
+        schedule_job(kind, user_id, conversation["id"] if conversation else None, payload={"pair_id": pair_id}, key=key)
+    return who
 
 
 def record_answer(pair_id: str, user_id: str, answer: str, note: str | None = None) -> dict[str, Any]:
@@ -243,6 +260,7 @@ __all__ = [
     "heard_about",
     "open_ask_for",
     "record_answer",
+    "resend_undelivered",
     "run_match_ask_expire_job",
     "run_match_ask_job",
     "run_match_not_this_week_job",
