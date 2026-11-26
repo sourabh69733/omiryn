@@ -59,12 +59,16 @@ def operator_plan(plan: dict[str, Any] | None) -> dict[str, Any] | None:
         "place": plan.get("place"),
         "when": plan.get("when"),
         "meet_at": plan.get("meet_at"),
+        "plan_set_at": plan.get("plan_set_at"),
         "asked_at": plan.get("asked_at"),
         "answer_by": plan.get("answer_by"),
         "expired_count": int(plan.get("expired_count") or 0),
         "set_by": plan.get("set_by"),
         "closed_by": plan.get("closed_by"),
-        "told": {user_id: {key: note.get(key) for key in ("at", "sent", "failed", "attempts", "plan_at") if note.get(key) is not None} for user_id, note in told.items() if isinstance(note, dict)},
+        "told": {
+            user_id: {key: note.get(key) for key in ("at", "sent", "step", "failed", "failed_step", "failed_at", "attempts", "gave_up", "plan_at") if note.get(key) is not None}
+            for user_id, note in told.items() if isinstance(note, dict)
+        },
         "answers": {user_id: {"answer": answer.get("answer"), "at": answer.get("at")} for user_id, answer in answers.items() if isinstance(answer, dict)},
         "outcomes": [{"user_id": item.get("user_id"), "outcome": item.get("outcome"), "at": item.get("at")} for item in plan.get("outcomes") or [] if isinstance(item, dict)],
     }
@@ -72,7 +76,9 @@ def operator_plan(plan: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def operator_pair(pair: dict[str, Any]) -> dict[str, Any]:
     """One stored pair as the operator may read it; every admin answer that carries a pair uses this."""
-    return {**pair, "check": operator_check(pair.get("check")), "plan": operator_plan(pair.get("plan"))}
+    from .hosting import undelivered
+
+    return {**pair, "check": operator_check(pair.get("check")), "plan": operator_plan(pair.get("plan")), "undelivered": undelivered(pair)}
 
 
 def pick_run_view(run: dict[str, Any] | None) -> dict[str, Any] | None:

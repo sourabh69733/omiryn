@@ -15,8 +15,8 @@ from pydantic import BaseModel, Field
 
 from admin.auth import require_admin_user
 from agent.matching import pool_view, propose_pair
-from agent.matching.asking import ask_pair
-from agent.matching.hosting import introduce_pair
+from agent.matching.asking import ask_pair, resend_undelivered
+from agent.matching.hosting import PlanNotOpen, introduce_pair, set_meet_plan
 from agent.matching.pick_job import start_pick
 from agent.matching.pool import operator_pair, pick_run_view
 from security.auth import CurrentUser
@@ -116,6 +116,20 @@ async def admin_ask_pair(pair_id: str, admin: CurrentUser = Depends(require_admi
     return operator_pair(pair)
 
 
+@router.post("/api/admin/pairs/{pair_id}/resend")
+async def admin_resend(pair_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """Send the ask (pair asked) or the introduction (pair introduced) again to whoever it did not
+    reach; a pair's `undelivered` says who that is and why. 409 when everyone was reached."""
+    try:
+        queued = resend_undelivered(pair_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Pair not found.") from None
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    record_audit_event("admin.resend_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"queued": len(queued)})
+    return {"queued": queued}
+
+
 @router.post("/api/admin/pairs/{pair_id}/introduce")
 async def admin_introduce_pair(pair_id: str, payload: PairIntroduction, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
     """Omi tells both people about each other in their own chats, with the plan; reminder and check-ins follow."""
@@ -128,6 +142,26 @@ async def admin_introduce_pair(pair_id: str, payload: PairIntroduction, admin: C
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     record_audit_event("admin.introduce_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"has_time": payload.meet_at is not None})
+    return operator_pair(pair)
+
+
+@router.post("/api/admin/pairs/{pair_id}/plan")
+async def admin_set_plan(pair_id: str, payload: PairIntroduction, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """Set or change where and when an introduced pair meets, also after both said hi through the
+    ask. Fields left out stay as they are. Omi tells both the plan; the reminder goes out the day
+    before `meet_at` and the first check-in moves to three days after it."""
+    changes = {field: getattr(payload, field) for field in payload.model_fields_set}
+    if payload.meet_at is not None and payload.meet_at.utcoffset() is None:
+        raise HTTPException(status_code=400, detail="meet_at needs a timezone offset.")
+    try:
+        pair = set_meet_plan(pair_id, changes, created_by=admin.id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Pair not found.") from None
+    except PlanNotOpen as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    record_audit_event("admin.set_plan", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"has_time": bool((pair.get("plan") or {}).get("meet_at"))})
     return operator_pair(pair)
 
 
