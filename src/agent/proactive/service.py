@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -407,6 +408,17 @@ async def _deliver(
     )
 
 
+@dataclass(frozen=True)
+class Delivery:
+    """What became of agent-initiated bubbles. `stored`: they are in the chat. `reached`: they got
+    to where the person reads that chat; for a chat on a messaging app that means the app took
+    every bubble, and `bubbles_sent` says how many went out before one was refused."""
+
+    stored: bool
+    reached: bool = False
+    bubbles_sent: int = 0
+
+
 async def deliver_messages(
     user_id: str,
     conversation_id: str,
@@ -414,11 +426,23 @@ async def deliver_messages(
     expected_count: int,
     new_messages: list[dict[str, Any]],
 ) -> bool:
-    """Append agent-initiated bubbles and push them live, unless the chat moved on meanwhile."""
+    """Append agent-initiated bubbles and push them live, unless the chat moved on meanwhile.
+    True when they were stored; a caller that must know they reached the phone uses deliver_messages_report."""
+    return (await deliver_messages_report(user_id, conversation_id, expected_count=expected_count, new_messages=new_messages)).stored
+
+
+async def deliver_messages_report(
+    user_id: str,
+    conversation_id: str,
+    *,
+    expected_count: int,
+    new_messages: list[dict[str, Any]],
+) -> Delivery:
+    """deliver_messages, saying also whether the bubbles reached a chat that lives on WhatsApp or Telegram."""
     # The user may have written while the model was thinking; the count is checked under the
     # row lock, so Omi never talks over them and never overwrites a reply saved meanwhile.
     if not new_messages:
-        return False
+        return Delivery(False)
 
     added = False
 
@@ -431,7 +455,7 @@ async def deliver_messages(
 
     stored = update_conversation(conversation_id, user_id, add)
     if not stored or not added:
-        return False
+        return Delivery(False)
     for index, message in enumerate(new_messages, start=expected_count):
         await realtime_hub.publish(
             conversation_event(
@@ -450,37 +474,52 @@ async def deliver_messages(
                 },
             )
         )
-    await send_on_channel(user_id, stored, [str(m.get("content") or "") for m in new_messages])
-    return True
+    reached, sent = await send_bubbles_on_channel(user_id, stored, [str(m.get("content") or "") for m in new_messages])
+    return Delivery(True, reached, sent)
 
 
-async def send_on_channel(user_id: str, conversation: dict[str, Any], bubbles: list[str]) -> None:
+async def send_on_channel(user_id: str, conversation: dict[str, Any], bubbles: list[str]) -> bool:
     """A chat on a messaging app gets the bubbles sent there too; a web chat hears through the live push.
+    False when the chat lives on a messaging app and a bubble did not go out there."""
+    return (await send_bubbles_on_channel(user_id, conversation, bubbles))[0]
+
+
+async def send_bubbles_on_channel(user_id: str, conversation: dict[str, Any], bubbles: list[str]) -> tuple[bool, int]:
+    """(reached, how many bubbles went out). A web chat is reached with nothing to send. A chat on
+    WhatsApp or Telegram is reached only when the app took every bubble: no linked chat, the
+    channel switched off, or a refused send (an expired token, a closed reply window, a blocked
+    bot) all mean the phone got nothing, and sending stops at the first refusal.
 
     Looked up at call time, so tests can patch the channel modules' send functions.
     """
     channel = conversation.get("channel")
     if channel not in {"whatsapp", "telegram"}:
-        return
+        return True, 0
     link = channel_link_for_user(user_id, channel)
     if link is None:
-        return
+        return False, 0
     if channel == "whatsapp":
         from channels import whatsapp
 
         if not whatsapp.whatsapp_enabled():
-            return
-        for bubble in bubbles:
-            if bubble.strip():
-                await whatsapp.send_whatsapp_message(link["external_chat_id"], bubble)
+            return False, 0
+        send = whatsapp.send_whatsapp_message
     else:
         from channels import telegram
 
         if not telegram.telegram_enabled():
-            return
-        for bubble in bubbles:
-            if bubble.strip():
-                await telegram.send_telegram_message(link["external_chat_id"], bubble)
+            return False, 0
+        send = telegram.send_telegram_message
+    sent = 0
+    for bubble in bubbles:
+        if not bubble.strip():
+            sent += 1
+            continue
+        # The send functions answer False when the app refused; anything else went out.
+        if await send(link["external_chat_id"], bubble) is False:
+            return False, sent
+        sent += 1
+    return True, sent
 
 
 async def _generate(
