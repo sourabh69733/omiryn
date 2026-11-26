@@ -75,6 +75,35 @@ def operator_pair(pair: dict[str, Any]) -> dict[str, Any]:
     return {**pair, "check": operator_check(pair.get("check")), "plan": operator_plan(pair.get("plan"))}
 
 
+def pick_run_view(run: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A pick run as the operator reads it: where it stands and, once done, the proposal. The run
+    row holds ids; what may be read of each picked pair is filled in here from the stored pair."""
+    if run is None:
+        return None
+    from storage import get_match_pair
+
+    progress = run.get("progress") or {}
+    view: dict[str, Any] = {
+        "id": run["id"], "pool_id": run["pool_id"], "status": run["status"], "error": run.get("error"), "created_by": run.get("created_by"),
+        "created_at": run["created_at"], "updated_at": run["updated_at"], "finished_at": run.get("finished_at"),
+        "progress": {"passes": int(progress.get("passes") or 0), "judged": int(progress.get("judged") or 0), "left": progress.get("left"), "failed_calls": sum((progress.get("failures") or {}).values())},
+        "proposal": None,
+    }
+    result = run.get("result")
+    if result is None:
+        return view
+    pairs = []
+    for item in result.get("pairs") or []:
+        pair = get_match_pair(item["pair_id"])
+        check = operator_check((pair or {}).get("check")) or {}
+        pairs.append({
+            **item, "status": (pair or {}).get("status"), "fit": check.get("fit"), "reasons": check.get("reasons") or [], "difference": check.get("difference"),
+            "meet_fit": check.get("meet_fit"), "chemistry": check.get("chemistry"),
+        })
+    view["proposal"] = {**result, "pairs": pairs}
+    return view
+
+
 def pool_view(pool_id: str) -> dict[str, Any] | None:
     from storage import blocked_match_pairs, get_match_pool, get_user_profile, get_vibe_card, list_match_pairs, match_chat_counts, match_pool_members_of, private_matching_allowed
 
@@ -151,4 +180,4 @@ async def propose_pair(pool_id: str, user_a: str, user_b: str, *, created_by: st
     return save_match_pair(pool_id, user_a, user_b, check.as_dict(), created_by=created_by)
 
 
-__all__ = ["SUGGESTION_LIMIT", "operator_check", "operator_pair", "operator_plan", "pool_view", "propose_pair"]
+__all__ = ["SUGGESTION_LIMIT", "operator_check", "operator_pair", "operator_plan", "pick_run_view", "pool_view", "propose_pair"]

@@ -14,12 +14,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from admin.auth import require_admin_user
-from agent.matching import pick_pool, pool_view, propose_pair
+from agent.matching import pool_view, propose_pair
 from agent.matching.asking import ask_pair
 from agent.matching.hosting import introduce_pair
-from agent.matching.pool import operator_pair
+from agent.matching.pick_job import start_pick
+from agent.matching.pool import operator_pair, pick_run_view
 from security.auth import CurrentUser
-from storage import PAIR_STATUSES, create_match_pool, list_match_pools, list_match_reports, set_match_pair_status
+from storage import PAIR_STATUSES, create_match_pool, get_match_pool, latest_match_pick_run, list_match_pools, list_match_reports, set_match_pair_status
 from storage.audit_log import record_audit_event
 
 router = APIRouter()
@@ -79,15 +80,27 @@ async def admin_propose_pair(pool_id: str, payload: PairCreate, admin: CurrentUs
     return operator_pair(pair)
 
 
-@router.post("/api/admin/pools/{pool_id}/pick")
+@router.post("/api/admin/pools/{pool_id}/pick", status_code=202)
 async def admin_pick(pool_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
-    """Match day: judge what needs judging and propose pairs (each ready person once), a group in a thin
-    week, and who waits. Picked pairs become proposed; nothing reaches a user until they are asked."""
-    if pool_view(pool_id) is None:
+    """Match day: queue the pick and return its run at once. A background job judges what needs
+    judging and proposes pairs (each ready person once), a group in a thin week, and who waits;
+    GET the same address for where it stands and the proposal. Picked pairs become proposed;
+    nothing reaches a user until they are asked. While a run for the pool is going, that run comes back."""
+    if get_match_pool(pool_id) is None:
         raise HTTPException(status_code=404, detail="Pool not found.")
-    proposal = await pick_pool(pool_id, created_by=admin.id)
-    record_audit_event("admin.pick_pairs", actor_id=admin.id, actor_role="admin", target_id=pool_id, detail={"pairs": len(proposal.pairs), "judged": proposal.judged})
-    return proposal.as_dict()
+    run = start_pick(pool_id, created_by=admin.id)
+    record_audit_event("admin.pick_pairs", actor_id=admin.id, actor_role="admin", target_id=pool_id, detail={"run_id": run["id"]})
+    return {"run": pick_run_view(run)}
+
+
+@router.get("/api/admin/pools/{pool_id}/pick")
+async def admin_pick_status(pool_id: str, admin: CurrentUser = Depends(require_admin_user)) -> dict[str, object]:
+    """The pool's newest pick run: queued, running (with how many pairs are judged and left), done
+    (with the proposal) or failed. `run` is null when the pool was never picked."""
+    if get_match_pool(pool_id) is None:
+        raise HTTPException(status_code=404, detail="Pool not found.")
+    record_audit_event("admin.view_pick", actor_id=admin.id, actor_role="admin", target_id=pool_id)
+    return {"run": pick_run_view(latest_match_pick_run(pool_id))}
 
 
 @router.post("/api/admin/pairs/{pair_id}/ask")
