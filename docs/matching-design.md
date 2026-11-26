@@ -386,3 +386,15 @@ Measured on the six seeded people: humour notes matched 3 to 5 of the 5 others a
 - The pick as a whole is not reliable on this data. It makes few pairs, and one pair that was not planted (Rohan and Sanya) keeps choosing each other.
 - The test has reached its limit. In 32 turns the made-up people drift from their scripts: Dev became someone who guards his time alone and Rohan someone who wants company at meals, so the judge sees a clash between two planted friends. All six also write in the voice of the one model that plays them. A wrong answer can no longer be told from drifted test data.
 - So the switch stays off. The next evidence has to come from real people: the friend check of section 3.7 and 8.5 (two people who are friends both talk to Omi for some days; the pick should put them together and not with others), with the operator reading every proposed pair before anyone is asked.
+
+## 13. Plumbing fixed before the first real match day (26 November 2026)
+
+The backend review of 8 November found ten problems around the judge, none in what it decides. All ten are fixed; the list with every change is progress row 7zt. What changes in the flow of sections 3.5 and 3.6:
+
+- **The pick is a job, not a request.** The operator starts it and gets a run back at once; the job judges in short passes and stores each judgement, so a pool of forty (780 calls) no longer has to fit in one web request. The operator page polls the run and reads the proposal from it.
+- **A plan can come later.** A pair that came through the ask is introduced with no place or time. The operator can now set them afterwards; Omi tells both, the reminder is queued and the first check-in moves to after the meet.
+- **"Told" means it reached them.** A message WhatsApp or Telegram refused does not count. The ask and the introduction are tried three times; after that the pair names who was not reached and why, and the operator can send it again.
+- **What the operator reads.** Reasons, the difference, the meet line and the chemistry line, as before. The memory statements the judge compared, the clash note and the notes on answers stay in the database.
+- **A person sees a pair only after Omi told them.** Not on the pools call either.
+
+Still open for a real match day: WhatsApp refuses free text more than 24 hours after the person last wrote, so a quiet WhatsApp user needs an approved template or the app; and the job worker needs CPU while no request is open (production-plan).
