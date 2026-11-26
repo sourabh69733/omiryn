@@ -316,15 +316,17 @@ class PairEvidence:
         )
 
 
-def pair_evidence(user_a: str, user_b: str, *, with_touchpoints: bool = True, with_style: bool = True) -> PairEvidence:
+def pair_evidence(user_a: str, user_b: str, *, with_touchpoints: bool = True, with_style: bool = True, reads: Any = None) -> PairEvidence:
     """Load both cards and gather the pack's parts. Touchpoints and style can be skipped to save
-    the reads when a caller only needs the vibe lines."""
+    the reads when a caller only needs the vibe lines. `reads` (agent.matching.reads.PickReads)
+    holds what was already read about each person in this pick."""
     from storage import get_user_profile, get_user_style, get_vibe_card, private_matching_allowed
 
-    from .readiness import match_readiness
+    from .reads import PickReads
     from .style import pair_style_lines
     from .touchpoints import pair_touchpoints
 
+    reads = reads or PickReads()
     card_a, card_b = get_vibe_card(user_a), get_vibe_card(user_b)
     both_private = private_matching_allowed(card_a) and private_matching_allowed(card_b)
     comparable = comparable_areas(card_a["areas"], card_b["areas"], both_private_allowed=both_private)
@@ -333,19 +335,19 @@ def pair_evidence(user_a: str, user_b: str, *, with_touchpoints: bool = True, wi
     return PairEvidence(
         name_a, name_b, card_a["areas"], card_b["areas"], comparable,
         compatibility_score(card_a["areas"], card_b["areas"], comparable),
-        [point.as_dict() for point in pair_touchpoints(user_a, user_b)] if enough and with_touchpoints else [],
+        [point.as_dict() for point in pair_touchpoints(user_a, user_b, vectors=reads.vectors)] if enough and with_touchpoints else [],
         pair_style_lines(get_user_style(user_a) or {}, get_user_style(user_b) or {}, name_a, name_b) if enough and with_style else [],
-        match_readiness(user_a).facts_known if enough else {},
-        match_readiness(user_b).facts_known if enough else {},
+        reads.readiness(user_a).facts_known if enough else {},
+        reads.readiness(user_b).facts_known if enough else {},
     )
 
 
-async def check_compatibility(user_a: str, user_b: str, *, model: str | None = None) -> MatchCheck:
+async def check_compatibility(user_a: str, user_b: str, *, model: str | None = None, reads: Any = None) -> MatchCheck:
     """Load both cards, build the evidence pack, and ask the judge when there is enough. With too
     little in common, fit is "unknown" and no model call is made."""
     from agent.providers import judge_match
 
-    evidence = pair_evidence(user_a, user_b)
+    evidence = pair_evidence(user_a, user_b, reads=reads)
     if len(evidence.comparable) < MIN_COMPARABLE_AREAS:
         return MatchCheck("unknown", evidence.score, evidence.comparable, why_not=f"only {len(evidence.comparable)} areas to compare; needs {MIN_COMPARABLE_AREAS}")
     # The two people go in random order: a pairwise judge leans towards whoever comes first.
