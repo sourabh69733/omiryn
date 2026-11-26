@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from agent.shared.vibe import BASIC_AREA_IDS, DEEPER_AREA_IDS
 from api.main import app, current_user
 from security.auth import CurrentUser
-from storage import create_agent_memory, reset_db, save_conversation, save_user_profile, update_vibe_card
+from storage import create_agent_memory, reset_db, save_conversation, save_user_profile, set_match_pair_status, update_match_pair_plan, update_vibe_card
 from storage.user_deletion import delete_user_private_data
 
 from test_matching import line, ready_areas
@@ -82,9 +82,19 @@ class MatchPoolTest(unittest.TestCase):
 
         self.assertEqual(self.client.patch(f"/api/admin/pairs/{pair['id']}", json={"status": "met"}).json()["status"], "met")
         self.assertEqual(self.client.patch(f"/api/admin/pairs/{pair['id']}", json={"status": "vanished"}).status_code, 400)
+        # Bela has heard nothing from Omi about this pair, so it is not hers to see at any status.
         self._as("ub")
+        self.assertEqual(self.client.get("/api/me/pools").json()["pairs"], [])
+        for status in ("candidate", "proposed", "asked"):
+            set_match_pair_status(pair["id"], status)
+            self.assertEqual(self.client.get("/api/me/pools").json()["pairs"], [], status)
+        # Once Omi told her, she sees the pair and its status, never the reasons.
+        update_match_pair_plan(pair["id"], lambda plan: {**plan, "told": {"ub": {"at": "2026-11-20T10:00:00+00:00", "sent": True}}}, status="met")
         self.assertEqual(self.client.get("/api/me/pools").json()["pairs"][0]["status"], "met")
         self.assertNotIn("check", self.client.get("/api/me/pools").json()["pairs"][0])
+        self._as("ua")
+        self.assertEqual(self.client.get("/api/me/pools").json()["pairs"], [])  # Aman was not told
+        self._as("ub")
 
         self.assertTrue(self.client.delete(f"/api/me/pools/{pool['id']}").json()["left"])
         self.assertEqual(self.client.get("/api/admin/pools").json()["pools"][0]["member_count"], 2)

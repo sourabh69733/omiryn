@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from agent.matching.asking import ANSWERS, record_answer
+from agent.matching.asking import ANSWERS, heard_about, record_answer
 from agent.matching.hosting import pair_facts
 from agent.matching.pair_chat import chat_state, other_user
 from security.auth import CurrentUser, require_user
@@ -21,10 +21,6 @@ from storage import blocked_match_pairs, get_match_pair, match_chat_summaries, m
 from ..helpers import _user_id
 
 router = APIRouter()
-
-# Statuses a user can see; a pair they have not heard about yet is not a card.
-_VISIBLE = frozenset({"asked", "introduced", "met", "still_talking", "declined", "no_show", "expired"})
-
 
 class MatchAnswer(BaseModel):
     answer: str
@@ -40,10 +36,10 @@ def match_card(
 ) -> dict[str, Any] | None:
     """One card. `chats`, `blocked` (people the user blocked) and `blocks` (blocked pairs touching
     the user, either way) are passed in when many cards are built at once; looked up here otherwise."""
-    plan = pair.get("plan") or {}
-    told = ((plan.get("told") or {}).get(user_id) or {}).get("sent")
-    if pair["status"] not in _VISIBLE or not told:
+    # A pair they have not heard about yet is not a card.
+    if not heard_about(user_id, pair):
         return None
+    plan = pair.get("plan") or {}
     check = pair.get("check") or {}
     answers = plan.get("answers") or {}
     mine = (answers.get(user_id) or {}).get("answer")
