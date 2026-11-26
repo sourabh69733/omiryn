@@ -158,16 +158,20 @@ class PickPoolTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(vector_reads), ["ua", "ub", "uc", "ud"])
         self.assertTrue(all(len(pair["check"]["touchpoints"]) == 1 for pair in list_match_pairs(self.pool["id"])))
 
-    def test_operator_endpoint(self) -> None:
+    def test_operator_endpoint_queues_the_pick(self) -> None:
+        # The request only queues it; the job and what it returns are in test_match_pick_job.py.
         with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true", "AGENT_PROVIDER": "mock"}):
             client = TestClient(app)
             self.assertEqual(client.post("/api/admin/pools/nope/pick").status_code, 404)
-            with patch("agent.matching.readiness.match_readiness", side_effect=lambda u: type("R", (), {"ready": u != "ud", "facts_known": {}})()):
-                body = client.post(f"/api/admin/pools/{self.pool['id']}/pick").json()
-            # The mock provider returns {} so every judgement is "maybe" with no reasons: still proposable.
-            self.assertEqual(body["judged"], 3)
-            self.assertEqual(len(body["pairs"]), 1)
-            self.assertEqual(len(body["waiting"]), 1)
+            response = client.post(f"/api/admin/pools/{self.pool['id']}/pick")
+            self.assertEqual((response.status_code, response.json()["run"]["status"]), (202, "queued"))
+            self.assertEqual(list_match_pairs(self.pool["id"]), [])
+
+    async def test_in_one_go_with_the_mock_judge(self) -> None:
+        with patch.dict(os.environ, {"AGENT_PROVIDER": "mock"}), patch("agent.matching.readiness.match_readiness", side_effect=lambda u: type("R", (), {"ready": u != "ud", "facts_known": {}})()):
+            proposal = (await pick_pool(self.pool["id"], created_by="op")).as_dict()
+        # The mock provider returns {} so every judgement is "maybe" with no reasons: still proposable.
+        self.assertEqual((proposal["judged"], len(proposal["pairs"]), len(proposal["waiting"]), proposal["not_judged"]), (3, 1, 1, []))
 
 
 if __name__ == "__main__":
