@@ -3,11 +3,13 @@ embeddings. Only active, standard memories that are not how-to-talk rules take p
 taken out, each memory is used once, and a touchpoint may back a reason only when both memories
 carry the matching purpose."""
 
+import random
 import unittest
 from datetime import UTC, datetime
 
 import storage
-from agent.matching.touchpoints import Touchpoint, memory_text, pair_touchpoints, touchpoints
+from agent.matching.touchpoints import Touchpoint, memory_text, memory_vectors, pair_touchpoints, touchpoints, touchpoints_between
+from agent.memory_engine.memories.ranking import embedding_similarity
 
 NOW = datetime(2026, 11, 7, 9, 0, tzinfo=UTC)
 A, B = "touch-a", "touch-b"
@@ -91,6 +93,41 @@ class TouchpointsTest(unittest.TestCase):
         self.assertEqual(len(points), 3)
         self.assertTrue(all(isinstance(p, Touchpoint) and p.similarity == 1.0 for p in points))
         self.assertEqual(memory_text({"statement": "Met Priya Sharma and Priya at Baner", "about": ["Priya Sharma", "Baner"]}), "Met [name] and Priya at [name]")
+
+    def test_the_matrix_gives_what_the_plain_loop_gave(self) -> None:
+        rng = random.Random(7)
+
+        def people(prefix: str) -> tuple[list[dict], list[dict]]:
+            memories = [{"id": f"{prefix}{i}", "statement": f"{prefix} says {i}", "purposes": ["matching"], "sensitivity": "standard"} for i in range(14)]
+            vectors = [{"memory_id": f"{prefix}{i}", "provider": "p", "model": "m", "dimensions": 16, "values": [rng.uniform(-1, 1) for _ in range(16)]} for i in range(10)]
+            vectors.append({"memory_id": f"{prefix}10", "provider": "p", "model": "m", "dimensions": 16, "values": [0.0] * 16})  # no direction
+            vectors.append({"memory_id": f"{prefix}11", "provider": "p", "model": "other", "dimensions": 16, "values": [rng.uniform(-1, 1) for _ in range(16)]})
+            vectors.append({"memory_id": f"{prefix}12", "provider": "p", "model": "m", "dimensions": 16, "values": [1.0] * 8})  # cut short
+            return memories, vectors  # the fourteenth memory has no vector at all
+
+        memories_a, emb_a = people("a")
+        memories_b, emb_b = people("b")
+        # The loop this replaced: one cosine per pair of memories, in Python.
+        by_a, by_b = {e["memory_id"]: e for e in emb_a}, {e["memory_id"]: e for e in emb_b}
+        scored = sorted(
+            ((score, a["id"], b["id"]) for a in memories_a if a["id"] in by_a for b in memories_b if b["id"] in by_b
+             if (score := embedding_similarity(by_a[a["id"]], by_b[b["id"]])) is not None and score >= 0.1),
+            key=lambda item: -item[0],
+        )
+        expected, used_a, used_b = [], set(), set()
+        for score, id_a, id_b in scored:
+            if id_a not in used_a and id_b not in used_b:
+                used_a.add(id_a); used_b.add(id_b)
+                expected.append((id_a, id_b, score))
+        points = touchpoints(memories_a, emb_a, memories_b, emb_b, limit=50, floor=0.1)
+        self.assertGreater(len(points), 3)
+        self.assertEqual([(p.memory_a, p.memory_b) for p in points], [(a, b) for a, b, _ in expected])
+        for point, (_, _, score) in zip(points, expected, strict=True):
+            self.assertAlmostEqual(point.similarity, score, places=9)
+        # Built once per person and used against anyone: the same answer as from the raw lists.
+        ready_a, ready_b = memory_vectors(memories_a, emb_a), memory_vectors(memories_b, emb_b)
+        self.assertEqual(set(ready_a.memories), {f"a{i}" for i in range(13)} - {"a10"})  # no direction or no vector: left out
+        self.assertEqual(touchpoints_between(ready_a, ready_b, limit=50, floor=0.1), points)
 
 
 if __name__ == "__main__":

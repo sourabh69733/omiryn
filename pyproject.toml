@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.2.0",
     "python-dotenv>=1.0.1",
     "maxminddb>=2.6",
+    "numpy>=1.26",
     "sqlalchemy>=2.0.0",
     "uvicorn[standard]>=0.30.0",
 ]

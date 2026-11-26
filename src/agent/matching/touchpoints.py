@@ -1,7 +1,9 @@
 """Touchpoints: pairs of memories, one from each person, that are about the same thing.
 
 Code pairs each of A's memories with B's most similar one by cosine between the stored memory
-embeddings (the same vectors recall uses) and keeps the pairs above a floor. The judge reads them
+embeddings (the same vectors recall uses) and keeps the pairs above a floor. The cosines for two
+people are one matrix product (numpy); a pool of forty is 780 pairs of people, each with every
+memory of one against every memory of the other, which a Python loop does not finish in time. The judge reads them
 and says whether each is shared, complementary or a clash; code never decides that.
 
 What leaves an account: only active, standard-sensitivity memories that are not how-to-talk rules,
@@ -12,10 +14,12 @@ when both memories carry the matching purpose; everything else is context for th
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from agent.memory_engine.memories.ranking import embedding_similarity
+import numpy as np
+
 from agent.shared.memory_models import MemoryKind, MemoryPurpose, MemorySensitivity
 
 TOUCHPOINT_LIMIT = 6
@@ -71,6 +75,72 @@ def memory_text(memory: dict[str, Any]) -> str:
     return text[:MAX_TEXT_CHARS]
 
 
+# The space a stored vector is in: only two vectors of the same provider, model and size compare.
+Space = tuple[Any, Any, Any, int]
+
+
+@dataclass(frozen=True)
+class MemoryVectors:
+    """One person's shareable memories that have a stored vector, ready to compare: per space, the
+    memory ids and one matrix with a row per memory, each row scaled to length one. Built once per
+    person, so the cosines between two people are one matrix product and not a Python loop over
+    every pair of memories."""
+
+    memories: dict[str, dict[str, Any]]
+    spaces: dict[Space, tuple[list[str], np.ndarray]]
+
+
+def memory_vectors(memories: list[dict[str, Any]], embeddings: list[dict[str, Any]]) -> MemoryVectors:
+    """Keep the shareable memories with a usable vector; a vector of the wrong size or of length
+    zero compares with nothing, as before."""
+    by_id = {str(m.get("id")): m for m in memories if shareable(m)}
+    grouped: dict[Space, tuple[list[str], list[np.ndarray]]] = {}
+    kept: dict[str, dict[str, Any]] = {}
+    for item in embeddings:
+        memory_id = str(item.get("memory_id"))
+        values = item.get("values")
+        if memory_id not in by_id or memory_id in kept or not isinstance(values, list) or not values:
+            continue
+        try:
+            row = np.asarray(values, dtype=np.float64)
+        except (TypeError, ValueError):
+            continue
+        norm = float(np.linalg.norm(row))
+        if row.ndim != 1 or not norm or not np.isfinite(norm):
+            continue
+        ids, rows = grouped.setdefault((item.get("provider"), item.get("model"), item.get("dimensions"), len(values)), ([], []))
+        ids.append(memory_id)
+        rows.append(row / norm)
+        kept[memory_id] = by_id[memory_id]
+    return MemoryVectors(kept, {space: (ids, np.vstack(rows)) for space, (ids, rows) in grouped.items()})
+
+
+def touchpoints_between(a: MemoryVectors, b: MemoryVectors, *, limit: int = TOUCHPOINT_LIMIT, floor: float = SIMILARITY_FLOOR) -> list[Touchpoint]:
+    """Best pairs across the two people, each memory used at most once, strongest first."""
+    scored: list[tuple[float, str, str]] = []
+    for space, (ids_a, rows_a) in a.spaces.items():
+        if space not in b.spaces:
+            continue
+        ids_b, rows_b = b.spaces[space]
+        similarity = np.clip(rows_a @ rows_b.T, 0.0, 1.0)
+        for i, j in zip(*np.nonzero(similarity >= floor), strict=True):
+            scored.append((float(similarity[i, j]), ids_a[i], ids_b[j]))
+    scored.sort(key=lambda item: -item[0])
+    used_a: set[str] = set()
+    used_b: set[str] = set()
+    points: list[Touchpoint] = []
+    for similarity, id_a, id_b in scored:
+        if id_a in used_a or id_b in used_b:
+            continue
+        used_a.add(id_a)
+        used_b.add(id_b)
+        memory_a, memory_b = a.memories[id_a], b.memories[id_b]
+        points.append(Touchpoint(id_a, id_b, memory_text(memory_a), memory_text(memory_b), similarity, reason_allowed(memory_a) and reason_allowed(memory_b)))
+        if len(points) == limit:
+            break
+    return points
+
+
 def touchpoints(
     memories_a: list[dict[str, Any]],
     embeddings_a: list[dict[str, Any]],
@@ -81,45 +151,39 @@ def touchpoints(
     floor: float = SIMILARITY_FLOOR,
 ) -> list[Touchpoint]:
     """Best pairs across the two sets, each memory used at most once, strongest first."""
-    vectors_a = {str(item["memory_id"]): item for item in embeddings_a}
-    vectors_b = {str(item["memory_id"]): item for item in embeddings_b}
-    shareable_a = [m for m in memories_a if shareable(m) and str(m.get("id")) in vectors_a]
-    shareable_b = [m for m in memories_b if shareable(m) and str(m.get("id")) in vectors_b]
-    scored: list[tuple[float, dict[str, Any], dict[str, Any]]] = []
-    for a in shareable_a:
-        for b in shareable_b:
-            similarity = embedding_similarity(vectors_a[str(a["id"])], vectors_b[str(b["id"])])
-            if similarity is not None and similarity >= floor:
-                scored.append((similarity, a, b))
-    scored.sort(key=lambda item: -item[0])
-    used_a: set[str] = set()
-    used_b: set[str] = set()
-    points: list[Touchpoint] = []
-    for similarity, a, b in scored:
-        if str(a["id"]) in used_a or str(b["id"]) in used_b:
-            continue
-        used_a.add(str(a["id"]))
-        used_b.add(str(b["id"]))
-        points.append(
-            Touchpoint(str(a["id"]), str(b["id"]), memory_text(a), memory_text(b), similarity, reason_allowed(a) and reason_allowed(b))
-        )
-        if len(points) == limit:
-            break
-    return points
+    return touchpoints_between(memory_vectors(memories_a, embeddings_a), memory_vectors(memories_b, embeddings_b), limit=limit, floor=floor)
 
 
-def pair_touchpoints(user_a: str, user_b: str, *, limit: int = TOUCHPOINT_LIMIT) -> list[Touchpoint]:
-    """Touchpoints for two users from what is stored; empty when either has no embeddings."""
+def load_memory_vectors(user_id: str) -> MemoryVectors:
+    """One person's shareable memories and their vectors from what is stored; empty when there are none."""
     from storage import list_agent_memories
     from storage.memory_embeddings import list_agent_memory_embeddings
 
-    memories_a = [m for m in list_agent_memories(user_a) if shareable(m)]
-    memories_b = [m for m in list_agent_memories(user_b) if shareable(m)]
-    if not memories_a or not memories_b:
+    memories = [m for m in list_agent_memories(user_id) if shareable(m)]
+    if not memories:
+        return MemoryVectors({}, {})
+    return memory_vectors(memories, list_agent_memory_embeddings(user_id, [str(m["id"]) for m in memories]))
+
+
+def pair_touchpoints(
+    user_a: str, user_b: str, *, limit: int = TOUCHPOINT_LIMIT, vectors: Callable[[str], MemoryVectors] | None = None
+) -> list[Touchpoint]:
+    """Touchpoints for two users from what is stored; empty when either has no embeddings.
+
+    `vectors` gives a person's vectors when the caller already holds them: a pick over a pool
+    reads each person once (agent.matching.reads), not once per pair they are in.
+    """
+    load = vectors or load_memory_vectors
+    a = load(user_a)
+    if not a.memories:
         return []
-    embeddings_a = list_agent_memory_embeddings(user_a, [str(m["id"]) for m in memories_a])
-    embeddings_b = list_agent_memory_embeddings(user_b, [str(m["id"]) for m in memories_b])
-    return touchpoints(memories_a, embeddings_a, memories_b, embeddings_b, limit=limit)
+    b = load(user_b)
+    if not b.memories:
+        return []
+    return touchpoints_between(a, b, limit=limit)
 
 
-__all__ = ["SIMILARITY_FLOOR", "TOUCHPOINT_LIMIT", "Touchpoint", "memory_text", "pair_touchpoints", "reason_allowed", "shareable", "touchpoints"]
+__all__ = [
+    "SIMILARITY_FLOOR", "TOUCHPOINT_LIMIT", "MemoryVectors", "Touchpoint", "load_memory_vectors", "memory_text", "memory_vectors",
+    "pair_touchpoints", "reason_allowed", "shareable", "touchpoints", "touchpoints_between",
+]
