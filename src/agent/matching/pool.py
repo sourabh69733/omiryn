@@ -1,6 +1,12 @@
 """The operator's view of one pool: who is ready, what can be shown of them, and which pairs look
 worth a closer look. Only non-private vibe lines ever reach the operator; private areas are
 weighed by the compatibility check, never shown.
+
+A stored pair holds more than the operator may read: the check keeps the memory statements the
+judge compared (touchpoints) and what the judge wrote about a clash, and the plan keeps the notes
+taken when a person answered. operator_pair is the one place that decides what leaves: what the
+two people will be told anyway, what the design gives the operator (fit, the meet line, the
+chemistry line), and counts, states and times for the rest.
 """
 
 from __future__ import annotations
@@ -14,6 +20,59 @@ from .compatibility import check_compatibility, comparable_areas, compatibility_
 from .readiness import match_readiness
 
 SUGGESTION_LIMIT = 10
+
+
+def operator_check(check: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The check without anyone's own words: reasons, difference and icebreaker are what both
+    people hear; a clash is a flag, never its note; touchpoints and style lines are counts."""
+    if not check:
+        return None
+    fit = check.get("fit")
+    return {
+        "version": check.get("version"),
+        "fit": fit,
+        "score": check.get("score"),
+        "comparable": list(check.get("comparable") or []),
+        "reasons": [{key: reason[key] for key in ("source", "area", "text") if reason.get(key)} for reason in check.get("reasons") or []],
+        "difference": {key: check["difference"][key] for key in ("source", "area", "text") if check["difference"].get(key)} if check.get("difference") else None,
+        "icebreaker": check.get("icebreaker"),
+        "meet_fit": check.get("meet_fit"),
+        "chemistry": check.get("chemistry"),
+        "clash": bool(check.get("clash")),
+        # Written by code only when there was too little to compare; the judge's own "why not" may lean on a private area.
+        "why_not": check.get("why_not") if fit == "unknown" else None,
+        "mutual": check.get("mutual"),
+        "views": check.get("views"),
+        "touchpoints": len(check.get("touchpoints") or []),
+        "style_lines": len(check.get("style_lines") or []),
+    }
+
+
+def operator_plan(plan: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The plan without the notes: where and when, who was told and whether it reached them, who
+    answered what and when, and what each said came of it."""
+    if plan is None:
+        return None
+    told = plan.get("told") or {}
+    answers = plan.get("answers") or {}
+    return {
+        "place": plan.get("place"),
+        "when": plan.get("when"),
+        "meet_at": plan.get("meet_at"),
+        "asked_at": plan.get("asked_at"),
+        "answer_by": plan.get("answer_by"),
+        "expired_count": int(plan.get("expired_count") or 0),
+        "set_by": plan.get("set_by"),
+        "closed_by": plan.get("closed_by"),
+        "told": {user_id: {key: note.get(key) for key in ("at", "sent", "failed", "attempts", "plan_at") if note.get(key) is not None} for user_id, note in told.items() if isinstance(note, dict)},
+        "answers": {user_id: {"answer": answer.get("answer"), "at": answer.get("at")} for user_id, answer in answers.items() if isinstance(answer, dict)},
+        "outcomes": [{"user_id": item.get("user_id"), "outcome": item.get("outcome"), "at": item.get("at")} for item in plan.get("outcomes") or [] if isinstance(item, dict)],
+    }
+
+
+def operator_pair(pair: dict[str, Any]) -> dict[str, Any]:
+    """One stored pair as the operator may read it; every admin answer that carries a pair uses this."""
+    return {**pair, "check": operator_check(pair.get("check")), "plan": operator_plan(pair.get("plan"))}
 
 
 def pool_view(pool_id: str) -> dict[str, Any] | None:
@@ -44,7 +103,7 @@ def pool_view(pool_id: str) -> dict[str, Any] | None:
     pairs = list_match_pairs(pool_id)
     # How much each introduced pair has written to each other: counts and times, never the words.
     chats = match_chat_counts([pair["id"] for pair in pairs if pair.get("introduced_at")])
-    pairs = [{**pair, "chat": chats.get(pair["id"])} for pair in pairs]
+    pairs = [{**operator_pair(pair), "chat": chats.get(pair["id"])} for pair in pairs]
     paired = {frozenset((pair["user_a"], pair["user_b"])) for pair in pairs} | blocked_match_pairs([m["user_id"] for m in members])
     ready = [m["user_id"] for m in members if m["readiness"]["ready"]]
     suggestions = []
@@ -92,4 +151,4 @@ async def propose_pair(pool_id: str, user_a: str, user_b: str, *, created_by: st
     return save_match_pair(pool_id, user_a, user_b, check.as_dict(), created_by=created_by)
 
 
-__all__ = ["SUGGESTION_LIMIT", "pool_view", "propose_pair"]
+__all__ = ["SUGGESTION_LIMIT", "operator_check", "operator_pair", "operator_plan", "pool_view", "propose_pair"]

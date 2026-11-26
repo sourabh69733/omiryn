@@ -1,7 +1,9 @@
 """Operator endpoints for match pools: create a pool, see who is ready, propose pairs, record what came of them.
 
 The pool view shows non-private vibe lines, which is more than the other admin views show; every
-read is audited with the pool as the target.
+read is audited with the pool as the target. A pair never leaves here as it is stored: every
+answer goes through operator_pair, which keeps the memory statements the judge compared and the
+notes on people's answers out.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from admin.auth import require_admin_user
 from agent.matching import pick_pool, pool_view, propose_pair
 from agent.matching.asking import ask_pair
 from agent.matching.hosting import introduce_pair
+from agent.matching.pool import operator_pair
 from security.auth import CurrentUser
 from storage import PAIR_STATUSES, create_match_pool, list_match_pools, list_match_reports, set_match_pair_status
 from storage.audit_log import record_audit_event
@@ -73,7 +76,7 @@ async def admin_propose_pair(pool_id: str, payload: PairCreate, admin: CurrentUs
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     record_audit_event("admin.propose_pair", actor_id=admin.id, actor_role="admin", target_id=pair["id"])
-    return pair
+    return operator_pair(pair)
 
 
 @router.post("/api/admin/pools/{pool_id}/pick")
@@ -97,7 +100,7 @@ async def admin_ask_pair(pair_id: str, admin: CurrentUser = Depends(require_admi
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     record_audit_event("admin.ask_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id)
-    return pair
+    return operator_pair(pair)
 
 
 @router.post("/api/admin/pairs/{pair_id}/introduce")
@@ -112,7 +115,7 @@ async def admin_introduce_pair(pair_id: str, payload: PairIntroduction, admin: C
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     record_audit_event("admin.introduce_pair", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"has_time": payload.meet_at is not None})
-    return pair
+    return operator_pair(pair)
 
 
 @router.get("/api/admin/match-reports")
@@ -131,4 +134,4 @@ async def admin_pair_status(pair_id: str, payload: PairStatus, admin: CurrentUse
     if pair is None:
         raise HTTPException(status_code=404, detail="Pair not found.")
     record_audit_event("admin.pair_status", actor_id=admin.id, actor_role="admin", target_id=pair_id, detail={"status": payload.status})
-    return pair
+    return operator_pair(pair)

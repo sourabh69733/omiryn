@@ -10,7 +10,11 @@ from fastapi.testclient import TestClient
 from agent.shared.vibe import BASIC_AREA_IDS, DEEPER_AREA_IDS
 from api.main import app, current_user
 from security.auth import CurrentUser
-from storage import create_agent_memory, reset_db, save_conversation, save_user_profile, set_match_pair_status, update_match_pair_plan, update_vibe_card
+from agent.matching.pool import operator_check
+from storage import (
+    create_agent_memory, create_match_pool, get_match_pair, join_match_pool, reset_db, save_conversation, save_match_pair, save_user_profile,
+    set_match_pair_plan, set_match_pair_status, update_match_pair_plan, update_vibe_card,
+)
 from storage.user_deletion import delete_user_private_data
 
 from test_matching import line, ready_areas
@@ -101,6 +105,54 @@ class MatchPoolTest(unittest.TestCase):
 
         deleted = delete_user_private_data("ua")["deleted"]
         self.assertEqual((deleted["match_pool_members"], deleted["match_pairs"]), (1, 1))
+
+    def test_the_operator_never_gets_memory_texts_or_answer_notes(self) -> None:
+        pool = create_match_pool("Baner block A")
+        for user_id, name in (("ua", "Aman Verma"), ("ub", "Bela Rao")):
+            save_user_profile(user_id, "male", "female", display_name=name)
+            join_match_pool(user_id, pool["join_code"])
+        check = {
+            "version": 2, "fit": "yes", "score": 61, "comparable": ["humor", "interests", "values"],
+            "reasons": [{"source": "area:humor", "area": "humor", "text": "Aman and Bela both like dry humour."}],
+            "difference": {"source": "area:social_energy", "area": "social_energy", "text": "Aman plans, Bela decides late."},
+            "icebreaker": "Ask about the worst chai in Baner.",
+            "why_not": "Bela's belief line would grate on Aman.",
+            "clash": {"source": "area:deal_breakers", "note": "Aman cannot stand people who cancel late."},
+            "meet_fit": {"level": "easy", "line": "both free weekday evenings"},
+            "chemistry": "Bela carries the first ten minutes.",
+            "touchpoints": [{"memory_a": "m1", "memory_b": "m2", "a": "Aman's sister moved to Canada last spring.", "b": "Bela misses her brother in Toronto.", "similarity": 0.71, "reason_ok": False}],
+            "style_lines": ["both write mostly Hinglish"],
+        }
+        plan = {
+            "asked_at": "2026-11-20T10:00:00+00:00", "answer_by": "2026-11-22T10:00:00+00:00", "expired_count": 0, "set_by": "op",
+            "told": {"ua": {"at": "2026-11-20T10:01:00+00:00", "sent": True}},
+            "answers": {"ua": {"answer": "accept", "note": "said her week is rough but yes", "at": "2026-11-20T11:00:00+00:00"}},
+            "outcomes": [{"user_id": "ua", "outcome": "met", "note": "they talked about her father", "at": "2026-11-25T10:00:00+00:00"}],
+        }
+        pair = save_match_pair(pool["id"], "ua", "ub", check, created_by="op")
+        set_match_pair_plan(pair["id"], plan, status="asked")
+
+        view = self.client.get(f"/api/admin/pools/{pool['id']}").json()
+        shown = view["pairs"][0]
+        for private in ("Canada", "Toronto", "cancel late", "belief line", "Hinglish", "week is rough", "her father"):
+            self.assertNotIn(private, str(view), private)
+        # What both people are told anyway, the lines the design gives the operator, and counts for the rest.
+        self.assertEqual((shown["check"]["fit"], shown["check"]["score"], shown["check"]["clash"]), ("yes", 61, True))
+        self.assertEqual(shown["check"]["reasons"][0]["text"], "Aman and Bela both like dry humour.")
+        self.assertEqual(shown["check"]["chemistry"], "Bela carries the first ten minutes.")
+        self.assertEqual((shown["check"]["touchpoints"], shown["check"]["style_lines"], shown["check"]["why_not"]), (1, 1, None))
+        self.assertEqual(shown["plan"]["answers"], {"ua": {"answer": "accept", "at": "2026-11-20T11:00:00+00:00"}})
+        self.assertEqual(shown["plan"]["told"], {"ua": {"at": "2026-11-20T10:01:00+00:00", "sent": True}})
+        self.assertEqual(shown["plan"]["outcomes"], [{"user_id": "ua", "outcome": "met", "at": "2026-11-25T10:00:00+00:00"}])
+        # Every other admin answer that carries a pair is cut the same way.
+        patched = self.client.patch(f"/api/admin/pairs/{pair['id']}", json={"status": "met"}).json()
+        self.assertEqual(patched["status"], "met")
+        self.assertNotIn("Canada", str(patched))
+        self.assertNotIn("week is rough", str(patched))
+        # Too little to compare is a line code wrote, so the operator may read it.
+        self.assertEqual(operator_check({"fit": "unknown", "why_not": "only 2 areas to compare; needs 3"})["why_not"], "only 2 areas to compare; needs 3")
+        # Storage keeps the whole check: the judge's evidence is not lost, only not sent.
+        self.assertEqual(len(get_match_pair(pair["id"])["check"]["touchpoints"]), 1)
 
 
 if __name__ == "__main__":
