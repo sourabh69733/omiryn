@@ -5,7 +5,7 @@ user may know."""
 
 import os
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -13,9 +13,10 @@ from fastapi.testclient import TestClient
 from agent.context_engine.sources.match_hosting import match_hosting_sources
 from agent.jobs.worker import JobWorker
 from agent.matching.asking import MATCH_ASK_EXPIRE_JOB, MATCH_ASK_JOB, MATCH_NOT_THIS_WEEK_JOB, ask_pair, record_answer, run_match_ask_expire_job
-from agent.matching.hosting import MATCH_INTRO_JOB
+from agent.matching.hosting import MATCH_CHECK_IN_JOB, MATCH_INTRO_JOB, MATCH_PLAN_JOB, MATCH_REMINDER_JOB, run_match_plan_job, run_match_reminder_job
 from agent.tools import ToolCall, ToolContext, run_calls, tool_specs
 from api.main import app, current_user
+from api.routes.matches import match_card
 from security.auth import CurrentUser
 from storage import create_match_pool, get_agent_job, get_conversation, get_match_pair, join_match_pool, reset_db, save_conversation, save_match_pair, save_user_profile, update_match_pair_plan
 
@@ -180,6 +181,78 @@ class AskingTest(unittest.IsolatedAsyncioTestCase):
         with patch("agent.matching.asking._asked_pair", return_value=stale):
             self.assertFalse(await run_match_ask_expire_job(job))
         self.assertEqual(get_match_pair(pair["id"])["status"], "introduced")
+
+    async def test_a_plan_can_be_set_after_both_said_hi_and_the_reminder_is_queued(self) -> None:
+        pair = await self._ask_and_tell_both()
+        for user_id in ("ua", "ub"):
+            record_answer(pair["id"], user_id, "accept")
+        pair_id = pair["id"]
+        self.assertEqual(get_match_pair(pair_id)["status"], "introduced")
+        # Both said hi with no place or time: no reminder exists, and the first check-in counts from today.
+        self.assertIsNone(get_agent_job(f"{MATCH_REMINDER_JOB}:ua:{pair_id}:reminder"))
+        day_30 = get_agent_job(f"{MATCH_CHECK_IN_JOB}:ua:{pair_id}:30")["run_after"]
+        now = datetime.now(UTC)
+        meet_at = now + timedelta(days=5)
+        seen: list[str] = []
+
+        async def generate(conversation, user_id, *, instructions, **kwargs):
+            seen.append(instructions)
+            return "Here is the plan."
+
+        with patch.dict(os.environ, {"ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true"}):
+            client = TestClient(app)
+            address = f"/api/admin/pairs/{pair_id}/plan"
+            self.assertEqual(client.post(address, json={}).status_code, 400)  # nothing to set
+            self.assertEqual(client.post(address, json={"meet_at": "2027-01-01T18:00:00"}).status_code, 400)  # no offset
+            self.assertEqual(client.post(address, json={"meet_at": (now - timedelta(days=1)).isoformat()}).status_code, 400)  # in the past
+            self.assertEqual(client.post("/api/admin/pairs/nope/plan", json={"place": "x"}).status_code, 404)
+            response = client.post(address, json={"place": "Chai Point, Baner", "when": "Sunday 6pm", "meet_at": meet_at.isoformat()})
+            self.assertEqual(response.status_code, 200, response.text)
+            shown = response.json()["plan"]
+            self.assertEqual((shown["place"], shown["when"]), ("Chai Point, Baner", "Sunday 6pm"))
+            for user_id in ("ua", "ub"):
+                reminder = get_agent_job(f"{MATCH_REMINDER_JOB}:{user_id}:{pair_id}:reminder")
+                self.assertLess(abs((reminder["run_after"] - (meet_at - timedelta(days=1))).total_seconds()), 5)  # the day before
+                check_in = get_agent_job(f"{MATCH_CHECK_IN_JOB}:{user_id}:{pair_id}:3")
+                self.assertLess(abs((check_in["run_after"] - (meet_at + timedelta(days=3))).total_seconds()), 5)  # three days after the meet
+                self.assertIsNotNone(get_agent_job(f"{MATCH_PLAN_JOB}:{user_id}:{pair_id}:plan"))
+            self.assertEqual(get_agent_job(f"{MATCH_CHECK_IN_JOB}:ua:{pair_id}:30")["run_after"], day_30)  # counts from the introduction
+
+            # The introduction has not gone out yet: it carries the plan, so the plan is not told a second time.
+            with patch("agent.proactive.service.generate_initiative_text", generate), patch("agent.matching.hosting.utc_now", return_value=DAY):
+                self.assertEqual(await JobWorker().run_once(), 4)  # two introductions, two plan jobs
+            self.assertEqual(len(seen), 2)
+            self.assertTrue(all("INTRODUCTION" in text and "Chai Point, Baner, Sunday 6pm" in text for text in seen))
+            told = get_match_pair(pair_id)["plan"]["told"]
+            self.assertEqual({told[u]["step"] for u in ("ua", "ub")}, {"match_intro"})
+
+            # The time moves. The place was not given again and stays; both are told the new plan, once.
+            seen.clear()
+            later = now + timedelta(days=6)
+            self.assertEqual(client.post(address, json={"when": "Monday 7pm", "meet_at": later.isoformat()}).json()["plan"]["place"], "Chai Point, Baner")
+            with patch("agent.proactive.service.generate_initiative_text", generate), patch("agent.matching.hosting.utc_now", return_value=DAY):
+                self.assertEqual(await JobWorker().run_once(), 2)
+                self.assertEqual(len(seen), 2)
+                self.assertTrue(all("MEET PLAN" in text and "Chai Point, Baner, Monday 7pm" in text for text in seen))
+                self.assertEqual(get_conversation("ua-web", "ua")["messages"][-1]["proactive_kind"], "match_plan")
+                after = get_match_pair(pair_id)
+                self.assertEqual({after["plan"]["told"][u]["plan_at"] for u in ("ua", "ub")}, {after["plan"]["plan_set_at"]})
+                job = {"id": "j", "kind": MATCH_PLAN_JOB, "user_id": "ua", "conversation_id": "ua-web", "payload": {"pair_id": pair_id}}
+                self.assertFalse(await run_match_plan_job(job))  # already told this plan
+                self.assertEqual(len(seen), 2)
+            reminder = get_agent_job(f"{MATCH_REMINDER_JOB}:ua:{pair_id}:reminder")
+            self.assertLess(abs((reminder["run_after"] - (later - timedelta(days=1))).total_seconds()), 5)
+            # The reminder, when its time comes, has a meet to remind about.
+            with patch("agent.proactive.service.generate_initiative_text", generate):
+                self.assertTrue(await run_match_reminder_job({"id": "r", "kind": MATCH_REMINDER_JOB, "user_id": "ua", "conversation_id": "ua-web", "payload": {"pair_id": pair_id}}))
+            self.assertIn("MEET REMINDER", seen[-1])
+            self.assertIn("Chai Point, Baner, Monday 7pm", seen[-1])
+            # A pair that is not introduced takes no plan.
+            update_match_pair_plan(pair_id, lambda plan: plan, status="declined")
+            self.assertEqual(client.post(address, json={"place": "x"}).status_code, 409)
+        # The user's card shows the plan.
+        update_match_pair_plan(pair_id, lambda plan: plan, status="introduced")
+        self.assertEqual(match_card(get_match_pair(pair_id), "ua")["plan"], {"place": "Chai Point, Baner", "when": "Monday 7pm"})
 
     def test_operator_endpoint_and_a_pair_that_is_not_proposed(self) -> None:
         with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true"}):

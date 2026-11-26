@@ -10,15 +10,22 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from agent.jobs.worker import JobWorker
+from agent.matching.asking import MATCH_ASK_JOB, heard_about, open_ask_for, record_answer, resend_undelivered, run_match_ask_job
 from agent.matching.hosting import (
     MATCH_CHECK_IN_JOB,
     MATCH_INTRO_JOB,
     MATCH_REMINDER_JOB,
+    Undelivered,
     follow_up_times,
     hosting_conversation,
     introduce_pair,
     run_match_check_in_job,
+    run_match_intro_job,
+    undelivered,
 )
+from agent.proactive.service import send_bubbles_on_channel
+from api.routes.matches import match_card
+from storage.audit_log import list_audit_events
 from agent.context_engine.sources.match_hosting import match_hosting_sources
 from agent.tools import ToolCall, ToolContext, run_calls, tool_specs
 from api.main import app
@@ -37,6 +44,7 @@ from storage import (
 )
 
 NOW = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)
+DAY = datetime(2026, 11, 7, 9, 0, tzinfo=UTC)  # 14:30 in India: Omi may write
 CHECK = {
     "fit": "yes",
     "reasons": [{"area": "humor", "text": "Aman and Bela both like dry humour."}],
@@ -167,6 +175,125 @@ class HostingTest(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(await run_match_check_in_job(job))
             generate.assert_not_awaited()
         self.assertEqual(match_hosting_sources("ub"), [])  # declined and the user was never told: nothing to say
+
+    async def _ask(self) -> dict:
+        from agent.matching.asking import ask_pair
+
+        return await ask_pair(self.pair["id"], created_by="op")
+
+    def _ask_job(self, user_id: str, attempts: int) -> dict:
+        chat = "ua-whatsapp" if user_id == "ua" else "ub-web"
+        return {"id": f"j-{user_id}", "kind": MATCH_ASK_JOB, "user_id": user_id, "conversation_id": chat, "payload": {"pair_id": self.pair["id"]}, "attempts": attempts}
+
+    def _ask_bubbles(self) -> list[str]:
+        return [m["content"] for m in get_conversation("ua-whatsapp", "ua")["messages"] if m.get("proactive_kind") == "match_ask"]
+
+    async def test_a_refused_send_is_not_told_and_the_same_words_go_out_on_the_next_try(self) -> None:
+        pair = await self._ask()
+        generate = AsyncMock(return_value="There is someone I think you would get on with.<next_message>Want me to introduce you?")
+        # WhatsApp takes the first bubble and refuses the second (say the token ran out in between).
+        refused = AsyncMock(side_effect=[True, False])
+        with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", refused), \
+                patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+            self.assertEqual(await JobWorker().run_once(), 2)  # both asks; Aman's fails and the worker will run it again
+        after = get_match_pair(pair["id"])
+        told = after["plan"]["told"]
+        self.assertTrue(told["ub"]["sent"])  # Bela reads in the app: reached
+        self.assertEqual((told["ua"]["sent"], told["ua"]["failed"], told["ua"]["failed_step"], told["ua"]["attempts"], told["ua"]["bubbles_out"], told["ua"]["gave_up"]),
+                         (False, "channel_failed", "match_ask", 1, 1, False))
+        self.assertEqual(get_agent_job(f"{MATCH_ASK_JOB}:ua:{pair['id']}:ask")["status"], "pending")  # queued for another try
+        # Nothing unlocks for Aman on a message his phone never got in full: no card, no open ask, no answer tool.
+        self.assertFalse(heard_about("ua", after) or open_ask_for("ua", after))
+        self.assertIsNone(match_card(after, "ua"))
+        self.assertNotIn("answer_match", [t["function"]["name"] for t in tool_specs(ToolContext("ua", "ua-whatsapp"))])
+        self.assertEqual(match_hosting_sources("ua"), [])
+        self.assertTrue(open_ask_for("ub", after))
+        self.assertEqual(len(self._ask_bubbles()), 2)  # the words are in the chat record
+
+        # The next try: the send works. The same words go out from where it stopped; nothing is written twice.
+        generate.reset_mock()
+        works = AsyncMock(return_value=True)
+        with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", works), \
+                patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+            self.assertTrue(await run_match_ask_job(self._ask_job("ua", 2)))
+        generate.assert_not_awaited()
+        self.assertEqual([call.args for call in works.await_args_list], [("ua-phone", "Want me to introduce you?")])
+        self.assertEqual(len(self._ask_bubbles()), 2)
+        after = get_match_pair(pair["id"])
+        self.assertEqual(after["plan"]["told"]["ua"], {"at": DAY.isoformat(), "sent": True, "step": "match_ask"})
+        self.assertTrue(open_ask_for("ua", after))
+        self.assertEqual(undelivered(after), {})
+
+    async def test_an_ask_that_never_arrives_is_marked_and_the_operator_can_send_it_again(self) -> None:
+        pair = await self._ask()
+        generate = AsyncMock(return_value="There is someone I think you would get on with.")
+        refused = AsyncMock(return_value=False)
+        with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", refused), \
+                patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+            with self.assertRaises(Undelivered):
+                await run_match_ask_job(self._ask_job("ua", 1))  # the worker runs it again
+            with self.assertRaises(Undelivered):
+                await run_match_ask_job(self._ask_job("ua", 2))
+            self.assertFalse(await run_match_ask_job(self._ask_job("ua", 3)))  # the last try: no more, and it says so
+        self.assertEqual(generate.await_count, 1)  # written once; the later tries send the same words
+        after = get_match_pair(pair["id"])
+        self.assertEqual(undelivered(after), {"ua": {"step": "match_ask", "why": "channel_failed", "gave_up": True}})
+        self.assertEqual(after["plan"]["told"]["ua"]["attempts"], 3)
+        event = next(e for e in list_audit_events(target_user_id="ua") if e["action"] == "match.undelivered")
+        self.assertEqual((event["target_id"], event["detail"]), (pair["id"], {"step": "match_ask", "why": "channel_failed", "attempts": 3}))
+
+        with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true"}):
+            client = TestClient(app)
+            shown = client.get(f"/api/admin/pools/{pair['pool_id']}").json()["pairs"][0]
+            self.assertEqual(shown["undelivered"], {"ua": {"step": "match_ask", "why": "channel_failed", "gave_up": True}})
+            self.assertEqual(shown["plan"]["told"]["ua"]["gave_up"], True)
+            self.assertEqual(client.post("/api/admin/pairs/nope/resend").status_code, 404)
+            self.assertEqual(client.post(f"/api/admin/pairs/{pair['id']}/resend").json(), {"queued": ["ua"]})
+            queued = get_agent_job(f"{MATCH_ASK_JOB}:ua:{pair['id']}:ask")
+            self.assertEqual((queued["status"], queued["attempts"]), ("pending", 0))
+            works = AsyncMock(return_value=True)
+            with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", works), \
+                    patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+                self.assertEqual(await JobWorker().run_once(), 2)  # Aman's ask again, and Bela's first one
+            after = get_match_pair(pair["id"])
+            self.assertTrue(after["plan"]["told"]["ua"]["sent"] and open_ask_for("ua", after))
+            self.assertEqual(len(self._ask_bubbles()), 1)
+            self.assertEqual(client.post(f"/api/admin/pairs/{pair['id']}/resend").status_code, 409)  # everyone was reached
+
+    async def test_no_chat_is_not_tried_again_and_a_failed_introduction_keeps_the_card(self) -> None:
+        pair = await self._ask()
+        with patch("agent.matching.hosting.hosting_conversation", return_value=None), patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+            self.assertFalse(await run_match_ask_job(self._ask_job("ub", 1)))  # no chat with Omi at all: trying again cannot help
+        self.assertEqual(undelivered(get_match_pair(pair["id"])), {"ub": {"step": "match_ask", "why": "no_chat", "gave_up": True}})
+
+        # Both are told and both say hi; then Aman's introduction is refused by WhatsApp to the end.
+        generate = AsyncMock(return_value="Meet Bela.")
+        with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", AsyncMock(return_value=True)), \
+                patch("agent.matching.hosting.utc_now", return_value=DAY), patch("agent.matching.asking.utc_now", return_value=DAY):
+            for user_id in ("ua", "ub"):
+                self.assertTrue(await run_match_ask_job(self._ask_job(user_id, 1)))
+        for user_id in ("ua", "ub"):
+            record_answer(pair["id"], user_id, "accept")
+        intro = {"id": "j", "kind": MATCH_INTRO_JOB, "user_id": "ua", "conversation_id": "ua-whatsapp", "payload": {"pair_id": pair["id"]}, "attempts": 3}
+        with patch("agent.proactive.service.generate_initiative_text", generate), patch("channels.whatsapp.send_whatsapp_message", AsyncMock(return_value=False)):
+            self.assertFalse(await run_match_intro_job(intro))
+        after = get_match_pair(pair["id"])
+        self.assertEqual(after["status"], "introduced")
+        self.assertEqual(undelivered(after), {"ua": {"step": "match_intro", "why": "channel_failed", "gave_up": True}})
+        # He was told by the ask and answered it: the card he already has does not vanish.
+        self.assertTrue(after["plan"]["told"]["ua"]["sent"] and heard_about("ua", after))
+        self.assertEqual(match_card(after, "ua")["status"], "introduced")
+        self.assertEqual(resend_undelivered(pair["id"]), ["ua"])
+        self.assertEqual(get_agent_job(f"{MATCH_INTRO_JOB}:ua:{pair['id']}")["status"], "pending")
+
+    async def test_a_linked_number_on_a_channel_that_is_off_falls_back_to_the_app(self) -> None:
+        with patch.dict(os.environ, {"WHATSAPP_ENABLED": "false"}):
+            self.assertEqual(hosting_conversation("ua")["id"], "ua-web")
+            # And a chat that does live on a channel that is off is not "delivered".
+            self.assertEqual(await send_bubbles_on_channel("ua", get_conversation("ua-whatsapp", "ua"), ["hi"]), (False, 0))
+        self.assertEqual(await send_bubbles_on_channel("ub", get_conversation("ub-web", "ub"), ["hi"]), (True, 0))
+        with patch("channels.whatsapp.send_whatsapp_message", AsyncMock(side_effect=[True, False, True])):
+            self.assertEqual(await send_bubbles_on_channel("ua", get_conversation("ua-whatsapp", "ua"), ["one", "two", "three"]), (False, 1))
 
     def test_operator_endpoint(self) -> None:
         with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true"}):
