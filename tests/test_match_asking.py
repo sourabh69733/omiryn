@@ -17,7 +17,7 @@ from agent.matching.hosting import MATCH_INTRO_JOB
 from agent.tools import ToolCall, ToolContext, run_calls, tool_specs
 from api.main import app, current_user
 from security.auth import CurrentUser
-from storage import create_match_pool, get_agent_job, get_conversation, get_match_pair, join_match_pool, reset_db, save_conversation, save_match_pair, save_user_profile
+from storage import create_match_pool, get_agent_job, get_conversation, get_match_pair, join_match_pool, reset_db, save_conversation, save_match_pair, save_user_profile, update_match_pair_plan
 
 CHECK = {
     "fit": "yes",
@@ -148,6 +148,38 @@ class AskingTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(get_agent_job(f"{MATCH_NOT_THIS_WEEK_JOB}:ua:{pair['id']}:ntw"))
         self.assertIsNone(get_agent_job(f"{MATCH_NOT_THIS_WEEK_JOB}:ub:{pair['id']}:ntw"))
         self.assertFalse(await run_match_ask_expire_job(job))  # already lapsed
+
+    async def test_both_yes_is_one_locked_write_and_keeps_the_told_notes(self) -> None:
+        pair = await self._ask_and_tell_both()
+        record_answer(pair["id"], "ua", "accept")
+        # The step to introduced is written with the answer, under the row lock; the plan is never written again from an old read.
+        with patch("agent.matching.asking.set_match_pair_plan", side_effect=AssertionError("plan written outside the lock")):
+            self.assertEqual(record_answer(pair["id"], "ub", "accept"), {"ok": True, "status": "introduced", "both": True})
+        after = get_match_pair(pair["id"])
+        self.assertEqual(after["status"], "introduced")
+        self.assertIsNotNone(after["introduced_at"])
+        self.assertTrue(after["plan"]["told"]["ua"]["sent"] and after["plan"]["told"]["ub"]["sent"])
+        self.assertEqual({user: a["answer"] for user, a in after["plan"]["answers"].items()}, {"ua": "accept", "ub": "accept"})
+
+    async def test_an_answer_that_races_the_lapse_changes_nothing(self) -> None:
+        pair = await self._ask_and_tell_both()
+        record_answer(pair["id"], "ua", "accept")
+        stale = get_match_pair(pair["id"])
+        update_match_pair_plan(pair["id"], lambda plan: plan, status="expired")
+        # The answer read the pair while it was still asked; the lapse landed before its write.
+        with patch("agent.matching.asking.get_match_pair", return_value=stale):
+            result = record_answer(pair["id"], "ub", "accept")
+        self.assertEqual((result["ok"], result["error"], result["status"]), (False, "not_open", "expired"))
+        after = get_match_pair(pair["id"])
+        self.assertEqual(after["status"], "expired")
+        self.assertNotIn("ub", after["plan"]["answers"])
+        self.assertIsNone(get_agent_job(f"{MATCH_INTRO_JOB}:ub:{pair['id']}"))
+        # And the lapse does not undo an introduction made in the same moment.
+        update_match_pair_plan(pair["id"], lambda plan: plan, status="introduced")
+        job = {"id": "j", "kind": MATCH_ASK_EXPIRE_JOB, "user_id": "ua", "conversation_id": None, "payload": {"pair_id": pair["id"]}}
+        with patch("agent.matching.asking._asked_pair", return_value=stale):
+            self.assertFalse(await run_match_ask_expire_job(job))
+        self.assertEqual(get_match_pair(pair["id"])["status"], "introduced")
 
     def test_operator_endpoint_and_a_pair_that_is_not_proposed(self) -> None:
         with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ADMIN_ALLOW_UNAUTHENTICATED_DEV": "true"}):

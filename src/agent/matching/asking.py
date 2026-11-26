@@ -25,6 +25,8 @@ MATCH_ASK_JOB = "match_ask"
 MATCH_ASK_EXPIRE_JOB = "match_ask_expire"
 MATCH_NOT_THIS_WEEK_JOB = "match_not_this_week"
 ANSWERS = ("accept", "pass")
+# Statuses a pair can have once a person has heard of it; a candidate or proposed pair is the operator's alone.
+HEARD_STATUSES = frozenset({"asked", "introduced", "met", "still_talking", "declined", "no_show", "expired"})
 # How long both have to answer before the ask lapses.
 ANSWER_WINDOW = timedelta(hours=48)
 
@@ -133,25 +135,32 @@ def record_answer(pair_id: str, user_id: str, answer: str, note: str | None = No
         return {"ok": False, "error": "not_open", "status": pair["status"]}
     other = pair["user_b"] if pair["user_a"] == user_id else pair["user_a"]
     now = utc_now()
-    state = {"both": False, "other_answer": None}
+    state = {"ran": False, "both": False}
 
     def record(plan: dict[str, Any]) -> dict[str, Any]:
+        state["ran"] = True
         answers = plan.setdefault("answers", {})
         answers[user_id] = {"answer": answer, "note": (" ".join(str(note or "").split())[:200] or None), "at": now.isoformat()}
-        state["other_answer"] = (answers.get(other) or {}).get("answer")
-        state["both"] = answer == "accept" and state["other_answer"] == "accept"
+        state["both"] = answer == "accept" and (answers.get(other) or {}).get("answer") == "accept"
         return plan
 
+    # The answer, and the step it leads to, are one write under the row lock, and only while the
+    # pair is still asked: an answer that races the lapse or the other person's pass changes nothing.
     if answer == "pass":
-        pair = update_match_pair_plan(pair_id, record, status="declined")
+        pair = update_match_pair_plan(pair_id, record, status="declined", only_if_status="asked")
+        if not state["ran"]:
+            return {"ok": False, "error": "not_open", "status": (pair or {}).get("status")}
         told = ((pair or {}).get("plan") or {}).get("told", {}).get(other) or {}
         if told.get("sent"):
             conversation = hosting_conversation(other)
             schedule_job(MATCH_NOT_THIS_WEEK_JOB, other, conversation["id"] if conversation else None, payload={"pair_id": pair_id}, key=f"{pair_id}:ntw")
         return {"ok": True, "status": "declined", "both": False}
-    pair = update_match_pair_plan(pair_id, record)
+    pair = update_match_pair_plan(
+        pair_id, record, status=lambda plan: "introduced" if state["both"] else None, introduced_at=now, only_if_status="asked"
+    )
+    if not state["ran"]:
+        return {"ok": False, "error": "not_open", "status": (pair or {}).get("status")}
     if state["both"]:
-        pair = set_match_pair_plan(pair_id, dict((pair or {}).get("plan") or {}), status="introduced", introduced_at=now)
         assert pair is not None
         schedule_hosting_jobs(pair, now, None)
         return {"ok": True, "status": "introduced", "both": True}
@@ -166,12 +175,18 @@ async def run_match_ask_expire_job(job: dict[str, Any]) -> bool:
     if pair is None:
         return False
 
+    lapsed = False
+
     def lapse(plan: dict[str, Any]) -> dict[str, Any]:
+        nonlocal lapsed
+        lapsed = True
         plan["expired_count"] = int(plan.get("expired_count") or 0) + 1
         return plan
 
-    pair = update_match_pair_plan(pair["id"], lapse, status="expired")
-    assert pair is not None
+    pair = update_match_pair_plan(pair["id"], lapse, status="expired", only_if_status="asked")
+    if pair is None or not lapsed:
+        # Answered in the same moment: the answer stands.
+        return False
     plan = pair.get("plan") or {}
     for user_id in (pair["user_a"], pair["user_b"]):
         answered = ((plan.get("answers") or {}).get(user_id) or {}).get("answer")
@@ -194,6 +209,13 @@ async def run_match_not_this_week_job(job: dict[str, Any]) -> bool:
     return await _host(user_id, pair, kind="match_not_this_week", user_text=f"meeting {facts['name']}", instructions=_NOT_THIS_WEEK_INSTRUCTIONS.format(name=facts["name"]), cue=_NOT_THIS_WEEK_CUE)
 
 
+def heard_about(user_id: str, pair: dict[str, Any]) -> bool:
+    """Omi has told this user about the pair. Until then nothing of it is theirs to see: not a
+    card, not a status, not that a pair exists."""
+    told = (((pair.get("plan") or {}).get("told") or {}).get(user_id) or {}).get("sent")
+    return pair["status"] in HEARD_STATUSES and bool(told)
+
+
 def open_ask_for(user_id: str, pair: dict[str, Any]) -> bool:
     """The user has heard this ask and has not answered it."""
     plan = pair.get("plan") or {}
@@ -213,10 +235,12 @@ def _asked_pair(job: dict[str, Any]) -> dict[str, Any] | None:
 __all__ = [
     "ANSWERS",
     "ANSWER_WINDOW",
+    "HEARD_STATUSES",
     "MATCH_ASK_EXPIRE_JOB",
     "MATCH_ASK_JOB",
     "MATCH_NOT_THIS_WEEK_JOB",
     "ask_pair",
+    "heard_about",
     "open_ask_for",
     "record_answer",
     "run_match_ask_expire_job",

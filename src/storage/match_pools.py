@@ -168,25 +168,42 @@ def set_match_pair_plan(pair_id: str, plan: dict[str, Any], *, status: str | Non
     return get_match_pair(pair_id)
 
 
-def update_match_pair_plan(pair_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], *, status: str | None = None) -> dict[str, Any] | None:
+def update_match_pair_plan(
+    pair_id: str,
+    change: Callable[[dict[str, Any]], dict[str, Any] | None],
+    *,
+    status: str | Callable[[dict[str, Any]], str | None] | None = None,
+    introduced_at: datetime | None = None,
+    only_if_status: str | None = None,
+) -> dict[str, Any] | None:
     """Change the plan under a row lock: `change` gets the stored plan and returns the new one (None keeps it).
 
     Two jobs (one per user) record that they told their user at about the same time; each reads the
     newest plan inside the lock, so neither note is lost.
+
+    `status` may be a function of the changed plan, so a step that depends on what is stored (both
+    said yes) is decided and written inside the same lock. `introduced_at` is written only when the
+    pair becomes introduced. With `only_if_status` nothing runs and nothing is written unless the
+    pair is at that status when the lock is taken; the pair comes back as it is.
     """
     with ENGINE.begin() as connection:
         row = connection.execute(select(match_pairs).where(match_pairs.c.id == pair_id).with_for_update()).mappings().first()
         if row is None:
             return None
+        if only_if_status is not None and row["status"] != only_if_status:
+            return _pair(row)
         plan = decrypt_json(row["user_a"], row["plan_json"]) if row["plan_json"] is not None else {}
         changed = change(dict(plan or {}))
         values: dict[str, Any] = {"updated_at": utc_now()}
         if changed is not None:
             values["plan_json"] = maybe_encrypt_json(row["user_a"], changed)
-        if status is not None:
-            if status not in PAIR_STATUSES:
-                raise ValueError(f"unknown pair status: {status}")
-            values["status"] = status
+        new_status = status(changed if changed is not None else dict(plan or {})) if callable(status) else status
+        if new_status is not None:
+            if new_status not in PAIR_STATUSES:
+                raise ValueError(f"unknown pair status: {new_status}")
+            values["status"] = new_status
+            if new_status == "introduced" and introduced_at is not None:
+                values["introduced_at"] = introduced_at
         connection.execute(match_pairs.update().where(match_pairs.c.id == pair_id).values(**values))
     return get_match_pair(pair_id)
 
