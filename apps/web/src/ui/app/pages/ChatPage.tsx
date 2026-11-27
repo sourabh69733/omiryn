@@ -536,7 +536,9 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
   const typingVisible = sending || revealingBubbles || Boolean(conversation && typingConversationId === conversation.id);
   // A brand-new user's first chat: explain what Omi does until they send their first message.
   const firstChat = Boolean(conversation && !temporary && conversation.id === omiId && summaries.length <= 1 && !conversation.messages.some((message) => message.role === "user"));
-  const lastVisibleIsAgent = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === "assistant";
+  // The newest message still shown (a deleted one is skipped), so the typing row joins the right bubble.
+  const newestShown = [...visibleMessages].reverse().find((message) => !isDeletedMessage(message));
+  const lastVisibleIsAgent = newestShown?.role === "assistant";
   // Tell the contacts rail what Omi is doing: typing, its last line, or that an earlier chat is open.
   const omiTyping = Boolean(omiId && (sendingIds.has(omiId) || typingConversationId === omiId || (conversation?.id === omiId && typingVisible)));
   const lastShown = conversation?.id === omiId ? [...visibleMessages].reverse().find((message) => message.content)?.content || "" : "";
@@ -1226,21 +1228,28 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     [conversation],
   );
   const allSelected = selectableIndexes.length > 0 && selected.length === selectableIndexes.length;
-  const messageRows = useMemo(() => (loading ? null : visibleMessages.map((message, index) => {
+  const messageRows = useMemo(() => {
+    if (loading) return null;
+    // Neighbours are the nearest messages still shown: a deleted one is skipped, so the bubble
+    // before it keeps its avatar, corners and time line as if it were never there.
+    const shown = visibleMessages.flatMap((message, index) => (isDeletedMessage(message) ? [] : [index]));
+    const neighbours = new Map(shown.map((index, position) => [index, { before: position > 0 ? shown[position - 1] : -1, after: position < shown.length - 1 ? shown[position + 1] : -1 }]));
+    return visibleMessages.map((message, index) => {
               if (isDeletedMessage(message)) return null;
+              const { before, after } = neighbours.get(index) ?? { before: -1, after: -1 };
               const agent = message.role === "assistant";
               const isSelected = selected.includes(index);
               const currentDate = messageDateKey(message, index);
-              const previous = index > 0 ? visibleMessages[index - 1] : null;
-              const next = index < visibleMessages.length - 1 ? visibleMessages[index + 1] : null;
-              const previousDate = previous ? messageDateKey(previous, index - 1) : "";
-              const nextDate = next ? messageDateKey(next, index + 1) : "";
-              const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, index - 1, message, index) < 20);
+              const previous = before >= 0 ? visibleMessages[before] : null;
+              const next = after >= 0 ? visibleMessages[after] : null;
+              const previousDate = previous ? messageDateKey(previous, before) : "";
+              const nextDate = next ? messageDateKey(next, after) : "";
+              const sameAsPrevious = Boolean(previous && previous.role === message.role && currentDate === previousDate && minutesBetweenMessages(previous, before, message, index) < 20);
               // The typing row continues Omiryn's last bubble, so that bubble gives up its avatar.
               const typingContinues = typingVisible && agent && !next;
-              const sameAsNext = typingContinues || Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, index + 1) < 20);
+              const sameAsNext = typingContinues || Boolean(next && next.role === message.role && currentDate === nextDate && minutesBetweenMessages(message, index, next, after) < 20);
               const clusterClass = !sameAsPrevious && !sameAsNext ? "cluster-single" : !sameAsPrevious ? "cluster-start" : !sameAsNext ? "cluster-end" : "cluster-middle";
-              const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, index - 1, message, index) >= 20;
+              const showTimeSeparator = !previous || currentDate !== previousDate || minutesBetweenMessages(previous, before, message, index) >= 20;
               const showAvatar = !sameAsNext;
               return (
                 <Fragment key={index}>
@@ -1330,7 +1339,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
                   {!agent && index === retryIndex && !sending ? <div className="message-status-row" role="status"><span className="message-status-text">Not sent</span><button type="button" className="message-retry-button" onClick={() => void retryMessage(index)} aria-label="Retry" title="Retry"><RotateCw aria-hidden="true" /></button></div> : null}
                 </Fragment>
               );
-            })), [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuAnchor, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
+            });
+  }, [loading, conversation, shownCount, typingVisible, sending, retryIndex, userAvatar, selecting, selected, menuFor, menuView, menuAnchor, menuUp, menuToLeft, menuAsksWhy, ratings, temporary]);
 
   return (
     <section className="screen interview-screen legacy-chat-screen" hidden={!active}>
