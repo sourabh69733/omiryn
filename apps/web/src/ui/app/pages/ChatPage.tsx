@@ -19,6 +19,7 @@ import { isUnread, loadSeen, markSeen, saveSeen, withNewChatsSeen, type SeenCoun
 import { isFailedMessage } from "../messageDelivery";
 import { NO_TYPING_SIGNAL, nextTypingSignal } from "../typingSignal";
 import { applyMessageAt, withUserReaction, dropLocal, lastFailedIndex, markBurstFailed, markLocalFailed, mergeServerMessages, newClientId } from "../messageQueue";
+import { addToOutbox, loadDraft, removeFromOutbox, restoreOutbox, saveDraft } from "../outbox";
 import { isDeletedMessage, markDeleted, messageDeletionImpactLines, replyQuoteFor, replyQuoteLabel, toggleSelected, type MessageDeletionImpact } from "../messageSelection";
 import { AGENT_TYPING_TIMEOUT_MS, typingAfterEvent } from "../agentTyping";
 import { temporaryName } from "../temporaryName";
@@ -126,6 +127,21 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     setSharedUpload(upload);
   }, []);
   const dismissUpload = useCallback(() => showUpload(null), [showUpload]);
+  // The draft in the box is kept per chat in this browser, so a refresh or an outage loses nothing.
+  // `draftChatRef` is the chat the draft on screen belongs to; it changes only once that chat's
+  // own draft is back, so one chat's text is never saved under another.
+  const draftChatRef = useRef<string | null>(null);
+  const savedChatId = conversation && !conversation.temporary ? conversation.id : null;
+  useEffect(() => {
+    draftChatRef.current = null;
+    if (!savedChatId) return;
+    // The previous chat's text is already saved under that chat.
+    setDraft(loadDraft(savedChatId));
+    draftChatRef.current = savedChatId;
+  }, [savedChatId]);
+  useEffect(() => {
+    if (draftChatRef.current) saveDraft(draftChatRef.current, draft);
+  }, [draft]);
   // A chat tried before sign-in (/try) is shared now, once, with the read they already saw.
   useEffect(() => {
     if (!conversation || conversation.temporary) return;
@@ -272,7 +288,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
       if (!response.ok) throw new Error(await apiErrorMessage(response, "Could not load that conversation."));
       const data = (await response.json()) as Conversation;
       if (!isLatest()) return;
-      setConversation(data);
+      setConversation(data.temporary ? data : { ...data, messages: restoreOutbox(data.id, data.messages) });
       trackAppEvent("chat_opened", { conversation_id: data.id }, { page: "chat", target_type: "conversation", target_id: data.id });
       if (!cached && !targetHash) syncChatToBottomAfterRender();
       void loadConversationUsage(data.id);
@@ -741,6 +757,8 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     setReplyTo(null);
     const bubble: Message = { role: "user", content: message, created_at: new Date().toISOString(), delivery_status: "sending", client_id: clientId, local: true, ...(quote ? { reply_to: quote } : {}) };
     updateIfOpen(target.id, (current) => ({ ...current, messages: [...current.messages.map((item) => (!item.local && isFailedMessage(item) ? { ...item, delivery_status: "read" } : item)), bubble] }));
+    // Kept in this browser until the server has it, so a server outage or a refresh loses nothing.
+    if (!target.temporary && !Object.keys(extra).length) addToOutbox(target.id, { client_id: clientId, content: message, created_at: bubble.created_at || new Date().toISOString() });
     await postReply(`/api/agent/conversations/${target.id}/messages`, { message, client_id: clientId, ...(quote ? { reply_to_index: quote.index } : {}), ...extra }, target, message, clientId);
   }
 
@@ -803,6 +821,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
     const id = previousConversation.id;
     const stillOpen = () => openConversationIdRef.current === id;
     const dropBubble = () => {
+      if (clientId) removeFromOutbox(id, clientId);
       if (clientId) updateIfOpen(id, (current) => ({ ...current, messages: dropLocal(current.messages, clientId) }));
       else updateIfOpen(id, () => previousConversation);
     };
@@ -847,6 +866,7 @@ export function ChatPage({ initialConversationId, userAvatar, userNames, onOpenN
         return "failed";
       }
       const nextConversation = (await response.json()) as Conversation;
+      if (clientId) removeFromOutbox(id, clientId);
       // Shown only if the user is still in that chat; otherwise it waits there, marked unread.
       updateIfOpen(id, (current) => ({ ...nextConversation, messages: mergeServerMessages(current.messages, nextConversation.messages) }));
       // Drop the typing row in the same render the reply lands, not after the history refresh.

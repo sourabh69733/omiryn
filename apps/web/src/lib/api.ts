@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { clearSavedWriting } from "../ui/app/outbox";
 
 type AuthConfig = {
   auth_provider?: string;
@@ -94,6 +95,8 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
+  // Unsent messages and drafts are kept in this browser; none stay for the next person.
+  clearSavedWriting();
   const authClient = await getAuthClient();
   if (authClient) await authClient.auth.signOut();
   window.dispatchEvent(new Event("omiryn:auth-required"));
