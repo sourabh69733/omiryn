@@ -1,5 +1,5 @@
-// Pools page: list, one open pool, and the operator actions (create, pick, propose, ask, introduce, status).
-import { pickProgressLabel, renderPickResult, renderPoolList, renderPoolView } from "../pools.js";
+// Pools page: list, one open pool, and the operator actions (create, pick, propose, ask, send again, introduce, set plan, status).
+import { pickProgressLabel, planChanges, renderPickResult, renderPoolList, renderPoolView } from "../pools.js";
 import { esc, skeleton } from "../ui.js";
 
 const state = { pools: [], selectedPoolId: null, view: null, pick: null };
@@ -101,7 +101,7 @@ function bind(root, api, setStatus) {
 
   const detail = root.querySelector("#pool-detail");
   detail.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-propose], [data-ask], [data-pick]");
+    const button = event.target.closest("[data-propose], [data-ask], [data-pick], [data-resend]");
     if (!button || !state.selectedPoolId) return;
     const label = button.textContent;
     button.disabled = true;
@@ -119,6 +119,11 @@ function bind(root, api, setStatus) {
         button.textContent = "Asking…";
         await api(`/api/admin/pairs/${encodeURIComponent(button.dataset.ask)}/ask`, { method: "POST" });
         setStatus("Asked. Each person answers in their own chat.");
+      } else if (button.dataset.resend) {
+        button.textContent = "Sending…";
+        const result = await api(`/api/admin/pairs/${encodeURIComponent(button.dataset.resend)}/resend`, { method: "POST" });
+        const count = result.queued?.length || 0;
+        setStatus(`Sending again to ${count} ${count === 1 ? "person" : "people"}. Reload in a minute to see if it arrived.`);
       } else if (button.dataset.pick) {
         button.textContent = "Picking… (runs model checks)";
         state.pick = await runPick(api, button.dataset.pick, (run) => { button.textContent = pickProgressLabel(run); });
@@ -147,6 +152,32 @@ function bind(root, api, setStatus) {
       await reopen();
     } catch (error) {
       form.querySelector("button").disabled = false;
+      setStatus(error.message, "bad");
+    }
+  });
+
+  detail.addEventListener("submit", async (event) => {
+    const form = event.target.closest("form.pool-set-plan");
+    if (!form) return;
+    event.preventDefault();
+    // Only what the operator changed is sent; the server keeps the rest of the plan as it is.
+    const field = (name) => form.elements[name];
+    const changes = planChanges(
+      { place: field("place").defaultValue, when: field("when").defaultValue, meet_at: field("meet_at").defaultValue },
+      { place: field("place").value, when: field("when").value, meet_at: field("meet_at").value },
+    );
+    if (!Object.keys(changes).length) {
+      setStatus("Nothing changed in the plan.");
+      return;
+    }
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+      await api(`/api/admin/pairs/${encodeURIComponent(form.dataset.pairId)}/plan`, { method: "POST", body: JSON.stringify(changes) });
+      setStatus("Plan saved. Omi tells both in their own chats.");
+      await reopen();
+    } catch (error) {
+      button.disabled = false;
       setStatus(error.message, "bad");
     }
   });

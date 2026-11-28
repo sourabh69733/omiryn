@@ -395,6 +395,7 @@ tr.selected td { background: var(--primary-soft); }
 
 .pool-create label,
 .pool-introduce label,
+.pool-set-plan label,
 .pool-status-row label {
   display: grid;
   gap: 4px;
@@ -405,6 +406,7 @@ tr.selected td { background: var(--primary-soft); }
 .pool-create input,
 .pool-create select,
 .pool-introduce input,
+.pool-set-plan input,
 .pool-status-row select {
   min-height: 36px;
   padding: 0 10px;
@@ -483,15 +485,47 @@ tr.selected td { background: var(--primary-soft); }
   font-size: 13px;
 }
 
-.pool-introduce {
+.pool-introduce,
+.pool-set-plan {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)); /* two per row: the pair card is half the page */
   align-items: end;
   gap: 8px;
 }
 
-.pool-introduce button {
+.pool-introduce button,
+.pool-set-plan button {
   min-height: 36px;
+}
+
+.pool-set-plan {
+  margin-top: 10px;
+}
+
+.pool-set-plan small {
+  grid-column: 1 / -1;
+}
+
+/* The ask or the introduction did not reach someone: the operator has to see this first. */
+.pool-unreached {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--bad);
+  border-radius: 6px;
+  background: var(--bad-soft);
+  font-size: 13px;
+}
+
+.pool-unreached strong {
+  color: var(--bad);
+}
+
+.pool-unreached ul {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .pool-member.is-ready {
@@ -500,7 +534,8 @@ tr.selected td { background: var(--primary-soft); }
 
 @media (max-width: 900px) {
   .pool-columns,
-  .pool-introduce {
+  .pool-introduce,
+  .pool-set-plan {
     grid-template-columns: 1fr;
   }
 }

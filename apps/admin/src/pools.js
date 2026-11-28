@@ -105,6 +105,81 @@ function checkBlock(check) {
     </div>`;
 }
 
+const STEP_LABELS = { match_ask: "the ask", match_intro: "the introduction" };
+const UNREACHED_WHY = {
+  channel_failed: "WhatsApp or Telegram refused the message",
+  no_chat: "they have no chat with Omi yet",
+  chat_moved: "they were writing at that moment",
+  nothing_written: "Omi wrote nothing",
+};
+
+/** One line per person the ask or the introduction did not reach, in plain words. */
+export function unreachedLines(pair, view) {
+  return Object.entries(pair?.undelivered || {}).map(([userId, note]) => {
+    const step = STEP_LABELS[note?.step] || "the message";
+    const why = UNREACHED_WHY[note?.why] || String(note?.why || "unknown reason").replaceAll("_", " ");
+    return `${nameOf(view, userId)} did not get ${step}: ${why}.${note?.gave_up ? "" : " Omi is trying again."}`;
+  });
+}
+
+function unreachedBlock(pair, view) {
+  const lines = unreachedLines(pair, view);
+  if (!lines.length) return "";
+  // Sending again only means something while the step is still open, and once Omi has stopped trying by itself.
+  const canResend = ["asked", "introduced"].includes(pair.status) && Object.values(pair.undelivered).some((note) => note?.gave_up);
+  return `
+    <div class="pool-unreached" role="status">
+      <strong>Not reached</strong>
+      <ul>${lines.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>
+      ${canResend ? `<button type="button" class="secondary-button" data-resend="${esc(pair.id)}">Send again</button>` : ""}
+    </div>`;
+}
+
+/** An ISO time as the value a datetime-local input takes, in the operator's own time zone. */
+export function toLocalInput(iso) {
+  const date = iso ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** What the plan form changed, as the plan call takes it: only fields that differ; an emptied
+ *  field is cleared (null); the exact time goes as ISO. Empty object: nothing to send. */
+export function planChanges(before, after) {
+  const changes = {};
+  for (const field of ["place", "when"]) {
+    const was = String(before?.[field] || "").trim();
+    const now = String(after?.[field] || "").trim();
+    if (was !== now) changes[field] = now || null;
+  }
+  const wasAt = String(before?.meet_at || "");
+  const nowAt = String(after?.meet_at || "");
+  if (wasAt !== nowAt) changes.meet_at = nowAt ? new Date(nowAt).toISOString() : null;
+  return changes;
+}
+
+function planLine(pair) {
+  const plan = pair.plan || {};
+  const parts = [plan.place, plan.when].filter(Boolean).map(esc);
+  if (plan.meet_at) parts.push(`<span class="pool-muted">${esc(new Date(plan.meet_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }))}</span>`);
+  if (parts.length) return `<p class="pool-plan"><strong>Plan:</strong> ${parts.join(", ")}</p>`;
+  return pair.status === "introduced" ? '<p class="pool-plan pool-muted">No place or time set yet.</p>' : "";
+}
+
+function planForm(pair) {
+  if (pair.status !== "introduced") return "";
+  const plan = pair.plan || {};
+  const has = Boolean(plan.place || plan.when || plan.meet_at);
+  return `
+    <form class="pool-set-plan" data-pair-id="${esc(pair.id)}">
+      <label>Place <input name="place" maxlength="160" placeholder="Blue Tokai, Sector 29" value="${esc(plan.place || "")}"></label>
+      <label>When, in words <input name="when" maxlength="80" placeholder="Saturday 6 pm" value="${esc(plan.when || "")}"></label>
+      <label>Exact time (for the reminder) <input name="meet_at" type="datetime-local" value="${esc(toLocalInput(plan.meet_at))}"></label>
+      <button type="submit" class="secondary-button">${has ? "Change plan" : "Set plan"}</button>
+      <small class="pool-muted">Omi tells both. With an exact time it reminds them the day before.</small>
+    </form>`;
+}
+
 export function renderPairs(view) {
   const pairs = view?.pairs || [];
   if (!pairs.length) return '<div class="table-empty">No pairs proposed in this pool yet.</div>';
@@ -117,8 +192,10 @@ export function renderPairs(view) {
         </div>
         ${pill(pair.status)}
       </div>
+      ${unreachedBlock(pair, view)}
       ${checkBlock(pair.check)}
-      ${pair.plan ? `<p class="pool-plan"><strong>Plan:</strong> ${esc(pair.plan.place || "")}${pair.plan.when ? `, ${esc(pair.plan.when)}` : ""}</p>` : ""}
+      ${planLine(pair)}
+      ${planForm(pair)}
       ${pair.status === "proposed" ? `
         <div class="pool-ask-row">
           <button type="button" class="secondary-button" data-ask="${esc(pair.id)}">Ask both in chat</button>
@@ -198,7 +275,7 @@ export function renderPickResult(result, view) {
   const names = (ids) => (ids || []).map((id) => esc(nameOf(view, id))).join(", ");
   const pairs = (result.pairs || []).map((pair) => `<li><strong>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}</strong> · fit ${esc(pair.fit || "unknown")}</li>`).join("");
   const dropped = (result.dropped || []).map((pair) => `<li>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}: ${esc(pair.why || "")}</li>`).join("");
-  const notJudged = (result.not_judged || []).map((pair) => `<li>${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}</li>`).join("");
+  const notJudged = (result.not_judged || []).map((pair) => `${esc(nameOf(view, pair.user_a))} &amp; ${esc(nameOf(view, pair.user_b))}`).join(", ");
   return `
     <div class="request-card pool-pick-result">
       <strong>Pick done: ${esc(String(result.pairs?.length || 0))} pairs proposed, ${esc(String(result.judged || 0))} checks run.</strong>
@@ -207,6 +284,6 @@ export function renderPickResult(result, view) {
       ${result.waiting?.length ? `<p class="pool-muted">Waiting: ${names(result.waiting)}</p>` : ""}
       ${result.busy?.length ? `<p class="pool-muted">Already in a pair: ${names(result.busy)}</p>` : ""}
       ${dropped ? `<p class="pool-muted">Dropped:</p><ul class="pool-reasons">${dropped}</ul>` : ""}
-      ${notJudged ? `<p class="pool-muted">Not checked (the model call kept failing):</p><ul class="pool-reasons">${notJudged}</ul>` : ""}
+      ${notJudged ? `<p class="pool-muted">Not checked, the model call kept failing: ${notJudged}</p>` : ""}
     </div>`;
 }
